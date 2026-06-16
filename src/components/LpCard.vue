@@ -6,7 +6,9 @@ const card = tv({
   base: "rounded-card border bg-surface-raised",
   variants: {
     variant: {
-      raised: "border-line shadow-panel",
+      // raised opts into the skin painter (.lp-skin-panel) so it follows the
+      // active surface tokens (flat → glass) instead of a fixed shadow.
+      raised: "lp-skin-panel border-line",
       flat: "border-line",
       ghost: "border-transparent bg-transparent",
     },

@@ -68,10 +68,13 @@ export {
   serializeTheme,
   useTheme,
 } from "./theme/useTheme"
+export { DEFAULT_SURFACE } from "./theme/tokens"
 export type {
   ColorTokens,
   DensityTokens,
+  FontTokens,
   ShapeTokens,
+  SurfaceTokens,
   TokenSet,
 } from "./theme/tokens"
 export { dark, light, lime, presets } from "./theme/presets"

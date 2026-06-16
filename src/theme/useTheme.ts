@@ -6,13 +6,16 @@
  */
 import {
   COLOR_VARS,
+  DEFAULT_SURFACE,
   DENSITY_VARS,
   FONT_VARS,
   SHAPE_VARS,
+  SURFACE_VARS,
   type ColorTokens,
   type DensityTokens,
   type FontTokens,
   type ShapeTokens,
+  type SurfaceTokens,
   type TokenSet,
 } from "./tokens"
 
@@ -30,6 +33,12 @@ export function applyTheme(theme: TokenSet, root: HTMLElement = document.documen
   }
   for (const [key, cssVar] of Object.entries(FONT_VARS)) {
     root.style.setProperty(cssVar, theme.font[key as keyof FontTokens])
+  }
+  // Skin axis is optional; fall back to a flat default so themes saved before
+  // it existed still paint correctly.
+  const surface = theme.surface ?? DEFAULT_SURFACE
+  for (const [key, cssVar] of Object.entries(SURFACE_VARS)) {
+    root.style.setProperty(cssVar, surface[key as keyof SurfaceTokens])
   }
   root.dataset.themeMode = theme.mode
   root.style.colorScheme = theme.mode

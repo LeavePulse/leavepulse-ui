@@ -60,6 +60,17 @@
   /* ── depth ───────────────────────────────────── */
   --shadow-panel: 0 16px 48px rgba(0, 0, 0, 0.32);
 
+  /* ── surface / skin ──────────────────────────────
+     The skin axis (flat default). applyTheme() overrides these at runtime per
+     TokenSet.surface; components paint panels via .lp-skin-panel which reads
+     them, so a flat look and a full glass look are the same vars. */
+  --surface-border-width: 1px;
+  --surface-panel-blur: 0px;
+  --surface-panel-saturate: 100%;
+  --surface-panel-overlay: none;
+  --surface-panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --surface-panel-inset: none;
+
   /* ── motion ──────────────────────────────────── */
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
   --duration-fast: 160ms;
@@ -198,6 +209,36 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/*
+ * Skin painter. A raised panel opts in with .lp-skin-panel and gets the active
+ * skin (flat → glass) purely from the surface tokens: border width, an overlay
+ * gradient layer, backdrop blur/saturate, and a layered + inset shadow. Driven
+ * by data, so re-skinning needs no per-component CSS.
+ */
+.lp-skin-panel {
+  position: relative;
+  border-width: var(--surface-border-width);
+  box-shadow: var(--surface-panel-inset), var(--surface-panel-shadow);
+  backdrop-filter: blur(var(--surface-panel-blur)) saturate(var(--surface-panel-saturate));
+  -webkit-backdrop-filter: blur(var(--surface-panel-blur)) saturate(var(--surface-panel-saturate));
+}
+
+/* The overlay gradient rides above the base fill but under the content. */
+.lp-skin-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--surface-panel-overlay);
+  pointer-events: none;
+}
+
+.lp-skin-panel > * {
+  position: relative;
+  z-index: 1;
 }
 
 /*
