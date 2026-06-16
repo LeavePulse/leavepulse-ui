@@ -1,0 +1,28 @@
+/*
+ * Preview-only web fonts. The kit package never ships fonts — apps load their
+ * own (frontend via @nuxt/fonts, launcher bundles its own). Here we pull the
+ * fonts the demo themes reference so the live preview renders them for real.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+/* App-level resets — these are NOT part of the kit package (tokens.css stays
+   embeddable); the preview supplies them like any host app would. */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+/* Hide native scrollbars; visible bars are drawn by <LpScrollArea>. */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

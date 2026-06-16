@@ -1,0 +1,208 @@
+/*
+ * Design tokens — the single source of truth for the kit.
+ *
+ * No `@import "tailwindcss"` here: this file is meant to be pulled in by a
+ * consumer that already imports Tailwind (see src/index.css and the package's
+ * "./css" export). Importing Tailwind here too would double its rules.
+ *
+ * Exposed to Tailwind v4 via @theme, so every token becomes BOTH a utility
+ * (bg-surface-raised, text-ink, rounded-card, …) AND a live CSS variable that
+ * the runtime theme engine can override. Components read only tokens; theming
+ * is just rewriting these variables.
+ *
+ * Three orthogonal axes:
+ *   color   — semantic palette (theme / brand)
+ *   shape   — radii (style)
+ *   density — spacing unit, control height, font scale (compactness)
+ */
+@theme {
+  /* ── color: surfaces ─────────────────────────── */
+  --color-surface: #080b0d;
+  --color-surface-raised: #12171d;
+  --color-surface-soft: #172027;
+  /* Derived from the (themed) raised surface so it can never drift per theme.
+     A popover/dropdown is just the raised surface with a touch of translucency. */
+  --color-surface-overlay: color-mix(in srgb, var(--color-surface-raised) 94%, transparent);
+
+  /* ── color: text ─────────────────────────────── */
+  --color-ink: #eef5f1;
+  --color-ink-inverse: #06100b;
+  --color-muted: #9aa8a2;
+  --color-muted-strong: #c7d2cc;
+
+  /* ── color: brand + state ────────────────────── */
+  --color-brand: #00bcff;
+  --color-brand-hover: #19c6ff;
+  --color-brand-soft: rgba(0, 188, 255, 0.16);
+  --color-action: #39e58c;
+  --color-action-hover: #4dffa1;
+  --color-accent: #f0b35a;
+  --color-danger: #ff6f6f;
+  --color-danger-hover: #ff8585;
+  --color-danger-soft: rgba(255, 111, 111, 0.14);
+
+  /* ── color: lines + focus ────────────────────── */
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-strong: rgba(255, 255, 255, 0.18);
+  --color-ring: rgba(0, 188, 255, 0.45);
+
+  /* ── shape ───────────────────────────────────── */
+  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-pill: 9999px;
+
+  /* ── density ─────────────────────────────────── */
+  --spacing-unit: 4px; /* base rhythm; scaled per density mode */
+  --size-control-sm: 32px;
+  --size-control-md: 38px;
+  --size-control-lg: 44px;
+
+  /* ── depth ───────────────────────────────────── */
+  --shadow-panel: 0 16px 48px rgba(0, 0, 0, 0.32);
+
+  /* ── motion ──────────────────────────────────── */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 160ms;
+
+  /* ── type ────────────────────────────────────── */
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+/*
+ * NOTE: there are no static [data-theme]/[data-density] rules. Themes are
+ * JSON (TokenSet) applied at runtime via useTheme().apply() — see src/theme/.
+ * The :root block above is only the bootstrap fallback (the dark default).
+ */
+
+/* ── layering scale ──────────────────────────────
+   One ladder so overlays never fight. Toasts sit ABOVE modals on purpose:
+   a notification must remain visible even while a dialog is open. */
+@theme {
+  --z-dropdown: 50;
+  --z-overlay: 100;
+  --z-modal: 110;
+  --z-popover: 120;
+  --z-tooltip: 130;
+  --z-toast: 200;
+}
+
+/* ── overlay enter/exit animations ───────────────
+   reka keeps content mounted while data-state=closed as long as a CSS
+   animation is declared for that state (via its Presence wrapper). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+@keyframes popover-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+/* Option cascade: items slide in top→down on open. */
+@keyframes option-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes drawer-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes drawer-out-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes drawer-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes drawer-out-left {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--reka-collapsible-content-height);
+    opacity: 1;
+  }
+}
+@keyframes collapsible-up {
+  from {
+    height: var(--reka-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+@keyframes disclosure-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * NOTE: tokens.css is the EMBEDDABLE layer — tokens + keyframes + z-scale only,
+ * no html/body resets and no global scrollbar rules (those would clobber a host
+ * app like the launcher). App-level resets live in the consumer (see the
+ * preview's preview.css / a host's own base styles).
+ */

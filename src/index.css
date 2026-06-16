@@ -1,0 +1,20 @@
+/*
+ * Public CSS entry for @leavepulse/ui — what `@import "@leavepulse/ui"`
+ * resolves to (see the "." export's "style" field and "./css").
+ *
+ * Mirrors how @nuxt/ui ships styles: the consumer owns Tailwind, the kit owns
+ * its tokens + a @source over its own components. So this file deliberately
+ * does NOT `@import "tailwindcss"` — the consuming app does that once, then
+ * imports this. The @source makes the consumer's Tailwind build emit the
+ * utilities our components use (node_modules isn't scanned by default).
+ *
+ * Consumer usage:
+ *   @import "tailwindcss";
+ *   @import "@leavepulse/ui";
+ */
+@import "./tokens/tokens.css";
+
+@source "./components";
+@source "./composables";
+@source "./layout";
+@source "./theme";

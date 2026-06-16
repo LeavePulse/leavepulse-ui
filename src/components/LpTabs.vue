@@ -1,0 +1,98 @@
+<script setup lang="ts">
+import { Motion } from "motion-v"
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
+import { ref, useId } from "vue"
+import LpIcon from "./LpIcon.vue"
+
+export interface TabItem {
+  value: string
+  label: string
+  /** Optional iconify name (e.g. "lucide:palette"), shown left of the label. */
+  icon?: string
+}
+
+withDefaults(
+  defineProps<{
+    modelValue?: string
+    items: TabItem[]
+    /**
+     * "contained" (default) wraps the triggers in a bordered, filled bar.
+     * "plain" drops the container chrome — a flat row of tabs with only the
+     * sliding pill marking the active one (for nav bars over a custom surface).
+     */
+    variant?: "contained" | "plain"
+    /** Tint the active pill + label with the brand colour (nav-bar style). */
+    accent?: boolean
+    /** Stretch the bar to full width with equal-share triggers. */
+    block?: boolean
+  }>(),
+  { variant: "contained", accent: false, block: false },
+)
+defineEmits<{ (e: "update:modelValue", value: string): void }>()
+
+// The pill sits under the hovered tab, falling back to the active one
+// (UAProject header behaviour). motion-v shared layoutId animates the move.
+// The id must be unique per instance — a shared constant makes the pill fly
+// between separate LpTabs on the same page.
+const pillId = `lp-tab-indicator-${useId()}`
+const hovered = ref<string | null>(null)
+
+function pillUnder(value: string, active?: string): boolean {
+  return hovered.value ? hovered.value === value : active === value
+}
+</script>
+
+<template>
+  <TabsRoot
+    :model-value="modelValue"
+    @update:model-value="(v) => $emit('update:modelValue', v as string)"
+  >
+    <TabsList
+      class="gap-1"
+      :class="[
+        block ? 'flex w-full' : 'inline-flex',
+        variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
+      ]"
+      @pointerleave="hovered = null"
+    >
+      <TabsTrigger
+        v-for="item in items"
+        :key="item.value"
+        :value="item.value"
+        class="relative inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        :class="[
+          block ? 'flex-1' : '',
+          accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
+          hovered === item.value ? 'text-ink' : 'text-muted',
+        ]"
+        @pointerenter="hovered = item.value"
+      >
+        <Motion
+          v-if="pillUnder(item.value, modelValue)"
+          :layout-id="pillId"
+          :transition="{ type: 'spring', stiffness: 520, damping: 40 }"
+          class="absolute inset-0 z-0 rounded-md shadow-sm"
+          :class="accent
+            ? 'border border-brand/35 bg-brand/12'
+            : 'border border-line bg-surface-raised'"
+        />
+        <LpIcon v-if="item.icon" :name="item.icon" :size="14" class="relative z-10" />
+        <span class="relative z-10">{{ item.label }}</span>
+      </TabsTrigger>
+    </TabsList>
+
+    <!-- Animated panels: only rendered if a per-item #panel slot is provided. -->
+    <template v-if="$slots.panel">
+      <TabsContent
+        v-for="item in items"
+        :key="item.value"
+        :value="item.value"
+        class="mt-3 outline-none data-[state=active]:animate-[tab-in_200ms_var(--ease-emphasized)]"
+      >
+        <slot name="panel" :value="item.value" />
+      </TabsContent>
+    </template>
+
+    <slot />
+  </TabsRoot>
+</template>

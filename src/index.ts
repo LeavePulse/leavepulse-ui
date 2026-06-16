@@ -1,0 +1,81 @@
+export { default as LayoutCanvas } from "./components/LayoutCanvas.vue"
+export { default as LpAvatar } from "./components/LpAvatar.vue"
+export { default as LpBadge } from "./components/LpBadge.vue"
+export { default as LpBreadcrumbs } from "./components/LpBreadcrumbs.vue"
+export type { Crumb } from "./components/LpBreadcrumbs.vue"
+export { default as LpButton } from "./components/LpButton.vue"
+export { default as LpCard } from "./components/LpCard.vue"
+export { default as LpCheckbox } from "./components/LpCheckbox.vue"
+export { default as LpConfirmDialog } from "./components/LpConfirmDialog.vue"
+export { default as LpDisclosure } from "./components/LpDisclosure.vue"
+export { default as LpDivider } from "./components/LpDivider.vue"
+export { default as LpDrawer } from "./components/LpDrawer.vue"
+export { default as LpDropdownMenu } from "./components/LpDropdownMenu.vue"
+export type { MenuItem } from "./components/LpDropdownMenu.vue"
+export { default as LpEmptyState } from "./components/LpEmptyState.vue"
+export { default as LpFormField } from "./components/LpFormField.vue"
+export { default as LpIcon } from "./components/LpIcon.vue"
+export { default as LpInput } from "./components/LpInput.vue"
+export { default as LpLink } from "./components/LpLink.vue"
+export { default as LpModal } from "./components/LpModal.vue"
+export { default as LpNumberField } from "./components/LpNumberField.vue"
+export { default as LpPasswordInput } from "./components/LpPasswordInput.vue"
+export { default as LpPopover } from "./components/LpPopover.vue"
+export { default as LpProgress } from "./components/LpProgress.vue"
+export { default as LpRadioGroup } from "./components/LpRadioGroup.vue"
+export type { RadioOption } from "./components/LpRadioGroup.vue"
+export { default as LpScrollArea } from "./components/LpScrollArea.vue"
+export { default as LpSelect } from "./components/LpSelect.vue"
+export type { SelectOption, SelectValue } from "./components/LpSelect.vue"
+export { default as LpSkeleton } from "./components/LpSkeleton.vue"
+export { default as LpSlider } from "./components/LpSlider.vue"
+export { default as LpStat } from "./components/LpStat.vue"
+export { default as LpStepper } from "./components/LpStepper.vue"
+export type { Step } from "./components/LpStepper.vue"
+export { default as LpSwitch } from "./components/LpSwitch.vue"
+export { default as LpTabs } from "./components/LpTabs.vue"
+export type { TabItem } from "./components/LpTabs.vue"
+export { default as LpTextarea } from "./components/LpTextarea.vue"
+export { default as LpToaster } from "./components/LpToaster.vue"
+export { default as LpTooltip } from "./components/LpTooltip.vue"
+
+export {
+  addLeaf,
+  countLeaves,
+  deserializeLayout,
+  makeLayout,
+  moveLeaf,
+  removeLeaf,
+  resizeAt,
+  serializeLayout,
+} from "./layout/tree"
+export type { Dir, LayoutNode, Leaf, Side, Split } from "./layout/tree"
+export { useLayout } from "./layout/useLayout"
+export type { UseLayout, UseLayoutOptions } from "./layout/useLayout"
+
+// theme engine — themes are JSON (TokenSet), applied at runtime
+export {
+  applyTheme,
+  bootstrapTheme,
+  parseTheme,
+  serializeTheme,
+  useTheme,
+} from "./theme/useTheme"
+export type {
+  ColorTokens,
+  DensityTokens,
+  ShapeTokens,
+  TokenSet,
+} from "./theme/tokens"
+export { dark, light, lime, presets } from "./theme/presets"
+export type { PresetName } from "./theme/presets"
+export { parseConfig, serializeConfig, UI_CONFIG_VERSION } from "./theme/config"
+export type { UiConfig } from "./theme/config"
+
+export { useToast } from "./composables/useToast"
+export type {
+  ToastAction,
+  ToastItem,
+  ToastOptions,
+  ToastVariant,
+} from "./composables/useToast"

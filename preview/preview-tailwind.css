@@ -1,0 +1,8 @@
+/*
+ * Preview plays the role of a consumer app: it owns Tailwind and imports the
+ * kit's CSS entry, exactly as the docs tell real consumers to. The relative
+ * path (vs the "@leavepulse/ui/css" a real app uses) just points at the local
+ * source — the @source globs inside it still resolve against the kit.
+ */
+@import "tailwindcss";
+@import "../src/index.css";

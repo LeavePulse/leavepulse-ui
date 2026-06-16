@@ -1,0 +1,14 @@
+node_modules/
+
+# Build output. Not committed — the `prepare` script rebuilds it on install,
+# so any consumer pulling the kit (file:/git dependency) gets a fresh dist.
+dist/
+
+# Preview demo build output (vite.config.ts), separate from the library dist.
+dist-preview/
+
+# Local env / editor noise
+*.log
+.DS_Store
+.vscode/
+.idea/
