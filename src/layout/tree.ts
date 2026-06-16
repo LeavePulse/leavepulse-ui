@@ -14,8 +14,14 @@ export type Side = "left" | "right" | "top" | "bottom" | "center"
 export interface Leaf {
   kind: "leaf"
   id: string
-  /** Block id — the consumer maps this to content via the canvas slot. */
-  block: string
+  /**
+   * Block ids stacked as tabs in this cell. A plain cell is a single-element
+   * stack; dropping onto a cell's center adds another tab. The consumer maps
+   * each id to content via the canvas slot.
+   */
+  blocks: string[]
+  /** Index into `blocks` of the visible tab. */
+  active: number
   /** Flex fraction among siblings. */
   size: number
 }
@@ -31,19 +37,18 @@ export type LayoutNode = Leaf | Split
 let uid = 0
 const nid = () => `lp-n${uid++}`
 
-/** Build a single-row layout from a flat list of block ids. */
+function leaf(block: string): Leaf {
+  return { kind: "leaf", id: nid(), blocks: [block], active: 0, size: 1 }
+}
+
+/** Build a single-row layout from a flat list of block ids (one cell each). */
 export function makeLayout(blocks: string[]): Split {
   return reactive<Split>({
     kind: "split",
     id: nid(),
     dir: "row",
     size: 1,
-    children: blocks.map<Leaf>((block) => ({
-      kind: "leaf",
-      id: nid(),
-      block,
-      size: 1,
-    })),
+    children: blocks.map<Leaf>(leaf),
   })
 }
 
@@ -72,6 +77,12 @@ export function countLeaves(node: LayoutNode): number {
   return node.children.reduce((s, c) => s + countLeaves(c), 0)
 }
 
+/** Total blocks across all cells (a tabbed cell counts each of its tabs). */
+export function countBlocks(node: LayoutNode): number {
+  if (node.kind === "leaf") return node.blocks.length
+  return node.children.reduce((s, c) => s + countBlocks(c), 0)
+}
+
 function detach(root: Split, id: string): void {
   const parent = findParent(root, id)
   if (!parent) return
@@ -91,18 +102,71 @@ function collapse(root: Split, parent: Split): void {
   grand.children.splice(pIdx, 1, only)
 }
 
+/** Remove an entire cell (with all its tabs). */
 export function removeLeaf(root: Split, id: string): void {
-  if (countLeaves(root) <= 1) return // keep at least one block
+  if (countLeaves(root) <= 1) return // keep at least one cell
   detach(root, id)
+}
+
+/**
+ * Remove one tab from a cell. Removing the last tab removes the cell itself
+ * (unless it's the only block left in the whole layout, which is kept).
+ */
+export function removeBlock(root: Split, leafId: string, index: number): void {
+  const target = findLeaf(root, leafId)
+  if (!target || index < 0 || index >= target.blocks.length) return
+  if (target.blocks.length > 1) {
+    target.blocks.splice(index, 1)
+    if (target.active >= target.blocks.length) target.active = target.blocks.length - 1
+    return
+  }
+  // Last tab in this cell → drop the cell, but never empty the whole layout.
+  if (countBlocks(root) <= 1) return
+  detach(root, leafId)
 }
 
 export function addLeaf(root: Split, block: string, side: Side = "right"): void {
   const targetId = root.children[root.children.length - 1]?.id
   if (!targetId) {
-    root.children.push({ kind: "leaf", id: nid(), block, size: 1 })
+    root.children.push(leaf(block))
     return
   }
-  insertBeside(root, { kind: "leaf", id: nid(), block, size: 1 }, targetId, side)
+  if (side === "center") {
+    addTab(root, targetId, block)
+    return
+  }
+  insertBeside(root, leaf(block), targetId, side)
+}
+
+/** Append a block as a new tab in the target cell and focus it. */
+export function addTab(root: Split, leafId: string, block: string): void {
+  const target = findLeaf(root, leafId)
+  if (!target) return
+  target.blocks.push(block)
+  target.active = target.blocks.length - 1
+}
+
+/** Switch the visible tab of a cell. */
+export function setActiveTab(root: Split, leafId: string, index: number): void {
+  const target = findLeaf(root, leafId)
+  if (!target || index < 0 || index >= target.blocks.length) return
+  target.active = index
+}
+
+/**
+ * Reorder a tab within its cell, moving the block at `from` to `to`. The same
+ * block stays visible afterwards (active follows the moved block by identity,
+ * not by index). Always available — not gated by edit mode.
+ */
+export function reorderTab(root: Split, leafId: string, from: number, to: number): void {
+  const target = findLeaf(root, leafId)
+  if (!target) return
+  const n = target.blocks.length
+  if (from < 0 || from >= n || to < 0 || to >= n || from === to) return
+  const activeBlock = target.blocks[target.active]
+  const [moved] = target.blocks.splice(from, 1)
+  target.blocks.splice(to, 0, moved)
+  target.active = target.blocks.indexOf(activeBlock)
 }
 
 function insertBeside(
@@ -137,16 +201,31 @@ function insertBeside(
   }
 }
 
-/** Move an existing block beside a target on the given edge. */
+/**
+ * Move an existing cell to a target. An edge side splits beside the target;
+ * `center` merges the moving cell's tabs into the target cell (and focuses
+ * the first moved tab).
+ */
 export function moveLeaf(
   root: Split,
   movingId: string,
   targetId: string,
   side: Side,
 ): void {
-  if (movingId === targetId || side === "center") return
+  if (movingId === targetId) return
   const moving = findLeaf(root, movingId)
   if (!moving) return
+
+  if (side === "center") {
+    const target = findLeaf(root, targetId)
+    if (!target) return
+    const merged = moving.blocks
+    detach(root, movingId)
+    target.active = target.blocks.length
+    target.blocks.push(...merged)
+    return
+  }
+
   detach(root, movingId)
   moving.size = 1
   insertBeside(root, moving, targetId, side)
@@ -167,8 +246,11 @@ export function resizeAt(parent: Split, index: number, deltaFraction: number): v
 // ── serialization ────────────────────────────────────────────
 interface SerializedLeaf {
   kind: "leaf"
-  block: string
+  blocks: string[]
+  active: number
   size: number
+  /** Legacy single-block form (pre-tabs); hydrated into `blocks`. */
+  block?: string
 }
 interface SerializedSplit {
   kind: "split"
@@ -181,21 +263,26 @@ type SerializedNode = SerializedLeaf | SerializedSplit
 export function serializeLayout(root: Split): SerializedNode {
   const strip = (n: LayoutNode): SerializedNode =>
     n.kind === "leaf"
-      ? { kind: "leaf", block: n.block, size: n.size }
+      ? { kind: "leaf", blocks: [...n.blocks], active: n.active, size: n.size }
       : { kind: "split", dir: n.dir, size: n.size, children: n.children.map(strip) }
   return strip(root) as SerializedSplit
 }
 
 export function deserializeLayout(data: SerializedNode): Split {
-  const hydrate = (n: SerializedNode): LayoutNode =>
-    n.kind === "leaf"
-      ? { kind: "leaf", id: nid(), block: n.block, size: n.size ?? 1 }
-      : {
-          kind: "split",
-          id: nid(),
-          dir: n.dir,
-          size: n.size ?? 1,
-          children: n.children.map(hydrate),
-        }
+  const hydrate = (n: SerializedNode): LayoutNode => {
+    if (n.kind === "leaf") {
+      // Accept both the tabbed form and the legacy single-`block` form.
+      const blocks = n.blocks ?? (n.block != null ? [n.block] : [])
+      const active = Math.min(Math.max(n.active ?? 0, 0), Math.max(blocks.length - 1, 0))
+      return { kind: "leaf", id: nid(), blocks, active, size: n.size ?? 1 }
+    }
+    return {
+      kind: "split",
+      id: nid(),
+      dir: n.dir,
+      size: n.size ?? 1,
+      children: n.children.map(hydrate),
+    }
+  }
   return reactive(hydrate(data) as Split)
 }

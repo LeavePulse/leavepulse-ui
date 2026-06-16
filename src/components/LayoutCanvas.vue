@@ -2,28 +2,43 @@
 /*
  * LayoutCanvas — a user-composable block layout.
  *
- * Renders a layout tree (v-model) of blocks. In `edit` mode the user can drag
- * a block onto another block's edge to split, drag dividers to resize, and
- * (via the consumer's UI) add/remove blocks. Block content is supplied through
- * the `#block` scoped slot, keyed by the block id stored in the tree — the
- * canvas owns geometry, the consumer owns content.
+ * Renders a layout tree (v-model) of cells. Each cell is a tab stack of blocks.
+ * In `edit` mode the user can drag a cell onto another cell's edge to split,
+ * drop on the center to merge as tabs, drag dividers to resize, switch tabs,
+ * and close tabs. Block content is supplied through the `#block` scoped slot,
+ * keyed by the block id stored in the tree — the canvas owns geometry + chrome,
+ * the consumer owns content. Pass a `registry` for tab titles/icons.
  *
- * The tree is plain serializable data (see layout/tree.ts) — persist it with
- * serializeLayout()/deserializeLayout().
+ * The tree is plain serializable data (see layout/tree.ts).
  */
 import LayoutNode from "./LayoutNode.vue"
-import { moveLeaf, removeLeaf, resizeAt, type Side, type Split } from "../layout/tree"
+import {
+  moveLeaf,
+  removeBlock,
+  reorderTab,
+  resizeAt,
+  setActiveTab,
+  type Side,
+  type Split,
+} from "../layout/tree"
+import type { BlockRegistry } from "../layout/registry"
 import { ref } from "vue"
 
 const props = defineProps<{
   modelValue: Split
   edit?: boolean
+  /** Catalogue mapping block ids to titles/icons for the tab bars. */
+  registry?: BlockRegistry
 }>()
 
 // modelValue is a reactive tree we mutate in place; no emit needed for
 // structural changes, but we keep the v-model contract for replacement
 // (e.g. load-from-disk swaps the whole tree).
 defineEmits<{ (e: "update:modelValue", value: Split): void }>()
+
+defineSlots<{
+  block(props: { block: string; leafId: string; edit: boolean }): unknown
+}>()
 
 const dragId = ref<string | null>(null)
 
@@ -43,15 +58,18 @@ function onResize(parent: Split, index: number, delta: number) {
       :node="modelValue"
       :drag-id="dragId"
       :edit="!!edit"
+      :registry="registry"
       class="flex-1"
       @dragstart="(id) => (dragId = id)"
       @dragend="dragId = null"
       @drop="onDrop"
-      @remove="(id) => removeLeaf(modelValue, id)"
+      @set-active="(leafId, i) => setActiveTab(modelValue, leafId, i)"
+      @remove-block="(leafId, i) => removeBlock(modelValue, leafId, i)"
+      @reorder-tab="(leafId, from, to) => reorderTab(modelValue, leafId, from, to)"
       @resize="onResize"
     >
-      <template #block="{ block, edit: inEdit, remove }">
-        <slot name="block" :block="block" :edit="inEdit" :remove="remove" />
+      <template #block="slotProps">
+        <slot name="block" v-bind="slotProps" />
       </template>
     </LayoutNode>
   </div>

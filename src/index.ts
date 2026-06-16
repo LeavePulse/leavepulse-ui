@@ -41,15 +41,22 @@ export { default as LpTooltip } from "./components/LpTooltip.vue"
 
 export {
   addLeaf,
+  addTab,
+  countBlocks,
   countLeaves,
   deserializeLayout,
   makeLayout,
   moveLeaf,
+  removeBlock,
   removeLeaf,
+  reorderTab,
   resizeAt,
+  setActiveTab,
   serializeLayout,
 } from "./layout/tree"
 export type { Dir, LayoutNode, Leaf, Side, Split } from "./layout/tree"
+export { blockTitle, defineBlocks } from "./layout/registry"
+export type { BlockDef, BlockRegistry } from "./layout/registry"
 export { useLayout } from "./layout/useLayout"
 export type { UseLayout, UseLayoutOptions } from "./layout/useLayout"
 

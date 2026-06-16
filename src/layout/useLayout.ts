@@ -1,12 +1,16 @@
 import { computed, ref, shallowRef, type Ref } from "vue"
 import {
   addLeaf,
-  countLeaves,
+  addTab,
+  countBlocks,
   deserializeLayout,
   makeLayout,
   moveLeaf,
+  removeBlock,
   removeLeaf,
+  reorderTab,
   resizeAt,
+  setActiveTab,
   serializeLayout,
   type Side,
   type Split,
@@ -35,11 +39,21 @@ export interface UseLayoutOptions {
 export interface UseLayout {
   /** The live reactive tree to hand to <LayoutCanvas v-model>. */
   layout: Ref<Split>
-  /** Block count, handy for "N blocks" labels and empty-guards. */
+  /** Block count across all tabs, handy for "N blocks" labels and guards. */
   count: Ref<number>
   canUndo: Ref<boolean>
   canRedo: Ref<boolean>
+  /** Add a block: a new cell on an edge, or a tab on the last cell (center). */
   add: (block: string, side?: Side) => void
+  /** Add a block as a tab in a specific cell. */
+  addTab: (leafId: string, block: string) => void
+  /** Switch the visible tab of a cell. */
+  setActive: (leafId: string, index: number) => void
+  /** Reorder a tab within its cell (always available, not edit-gated). */
+  reorderTab: (leafId: string, from: number, to: number) => void
+  /** Remove one tab (drops the cell when it was the last tab). */
+  removeBlock: (leafId: string, index: number) => void
+  /** Remove an entire cell with all its tabs. */
   remove: (leafId: string) => void
   move: (movingId: string, targetId: string, side: Side) => void
   resize: (parent: Split, index: number, deltaFraction: number) => void
@@ -56,7 +70,7 @@ export interface UseLayout {
 export function useLayout(options: UseLayoutOptions): UseLayout {
   const limit = options.historyLimit ?? 50
   const layout = shallowRef<Split>(makeLayout(options.initial))
-  const count = computed(() => countLeaves(layout.value))
+  const count = computed(() => countBlocks(layout.value))
 
   const past = ref<string[]>([])
   const future = ref<string[]>([])
@@ -84,6 +98,10 @@ export function useLayout(options: UseLayoutOptions): UseLayout {
     canUndo,
     canRedo,
     add: (block, side) => record(() => addLeaf(layout.value, block, side)),
+    addTab: (leafId, block) => record(() => addTab(layout.value, leafId, block)),
+    setActive: (leafId, index) => setActiveTab(layout.value, leafId, index),
+    reorderTab: (leafId, from, to) => record(() => reorderTab(layout.value, leafId, from, to)),
+    removeBlock: (leafId, index) => record(() => removeBlock(layout.value, leafId, index)),
     remove: (leafId) => record(() => removeLeaf(layout.value, leafId)),
     move: (movingId, targetId, side) =>
       record(() => moveLeaf(layout.value, movingId, targetId, side)),

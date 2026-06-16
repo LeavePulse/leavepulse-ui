@@ -1,27 +1,38 @@
 <script setup lang="ts">
 /*
  * Demonstrates the public LayoutCanvas API the way the launcher will use it:
- * the consumer owns the controls (edit toggle, palette, save/load) and the
- * block content (#block slot), the kit owns geometry + drag/resize.
+ * the consumer owns the controls (edit toggle, palette, save/load) and a block
+ * registry (id → title/icon), the kit owns geometry, tabs, drag/resize.
  */
 import { ref } from "vue"
-import { LayoutCanvas, useLayout } from "../../src"
+import { defineBlocks, LayoutCanvas, useLayout } from "../../src"
 import DemoBlock from "../DemoBlock.vue"
 
 const STORE_KEY = "lp-layout-canvas"
 const INITIAL = ["play", "metrics", "instances"]
 
-// Consumer's block catalogue (in the launcher: Play, Metrics, …).
-const palette = [
-  { id: "play", title: "Play", accent: "var(--color-action)" },
-  { id: "metrics", title: "Metrics", accent: "var(--color-brand)" },
-  { id: "instances", title: "Instances", accent: "var(--color-accent)" },
-  { id: "news", title: "News", accent: "var(--color-brand)" },
-  { id: "friends", title: "Friends", accent: "var(--color-accent)" },
-  { id: "logs", title: "Logs", accent: "var(--color-muted)" },
-]
-const titleOf = (block: string) => palette.find((b) => b.id === block)?.title ?? block
-const accentOf = (block: string) => palette.find((b) => b.id === block)?.accent
+// Consumer's block catalogue. The kit reads title/icon for the tab bars; the
+// `accent` is demo-only metadata the #block slot uses when rendering content.
+const catalogue = {
+  play: { title: "Play", icon: "lucide:play", accent: "var(--color-action)" },
+  metrics: { title: "Metrics", icon: "lucide:chart-no-axes-column", accent: "var(--color-brand)" },
+  instances: { title: "Instances", icon: "lucide:box", accent: "var(--color-accent)" },
+  news: { title: "News", icon: "lucide:newspaper", accent: "var(--color-brand)" },
+  friends: { title: "Friends", icon: "lucide:users", accent: "var(--color-accent)" },
+  logs: { title: "Logs", icon: "lucide:terminal", accent: "var(--color-muted)" },
+} as const
+
+const registry = defineBlocks(
+  Object.fromEntries(
+    Object.entries(catalogue).map(([id, m]) => [
+      id,
+      { component: DemoBlock, title: m.title, icon: m.icon },
+    ]),
+  ),
+)
+const palette = Object.entries(catalogue).map(([id, m]) => ({ id, ...m }))
+const accentOf = (block: string) => catalogue[block as keyof typeof catalogue]?.accent
+const titleOf = (block: string) => catalogue[block as keyof typeof catalogue]?.title ?? block
 
 // One stateful controller owns the tree + undo/redo + persistence.
 const { layout, count, canUndo, canRedo, add, undo, redo, reset, serialize, hydrate } =
@@ -111,25 +122,20 @@ function clear() {
       </div>
 
       <p class="m-0 text-[11px] leading-relaxed text-muted">
-        Drag a block header onto another block's edge to split. Drag a divider
-        to resize. × on a header removes it.
+        Drag a cell's tab bar onto another cell: edges split, the
+        <strong class="text-ink">center merges as tabs</strong>. Drag a divider
+        to resize. Click a tab to switch; × closes it.
       </p>
     </aside>
 
-    <!-- The kit component. Content supplied via #block. -->
+    <!-- The kit component. Content supplied via #block, chrome via :registry. -->
     <div
       class="flex min-h-0 min-w-0 flex-1 p-4"
       :class="edit ? 'bg-[radial-gradient(circle_at_1px_1px,var(--color-line)_1px,transparent_0)] bg-[length:22px_22px]' : ''"
     >
-      <LayoutCanvas v-model="layout" :edit="edit">
-        <template #block="{ block, edit: inEdit, remove }">
-          <DemoBlock
-            :title="titleOf(block)"
-            :accent="accentOf(block)"
-            :draggable-head="inEdit"
-            :removable="inEdit"
-            @remove="remove"
-          />
+      <LayoutCanvas v-model="layout" :edit="edit" :registry="registry">
+        <template #block="{ block }">
+          <DemoBlock :title="titleOf(block)" :accent="accentOf(block)" />
         </template>
       </LayoutCanvas>
     </div>

@@ -11,7 +11,7 @@ const showcasePages = [
   {
     id: "layout",
     title: "Layout canvas",
-    desc: "Drag-to-compose block layout — resize, undo/redo, save/load via useLayout().",
+    desc: "Drag-to-compose blocks — split, tabs (center-drop), resize, undo/redo via useLayout().",
   },
   {
     id: "showcase",
