@@ -135,12 +135,17 @@ export const SURFACE_VARS: Record<keyof SurfaceTokens, string> = {
   panelInset: "--surface-panel-inset",
 }
 
-/** Flat default skin for themes that don't ship a `surface` axis. */
+/*
+ * Flat default skin for themes that don't ship a `surface` axis.
+ * panelInset is a no-op shadow (not "none") because it's composited in a
+ * box-shadow list — `box-shadow: none, <x>` is invalid, so the empty value
+ * must be a transparent layer.
+ */
 export const DEFAULT_SURFACE: SurfaceTokens = {
   borderWidth: "1px",
   panelBlur: "0px",
   panelSaturate: "100%",
   panelOverlay: "none",
   panelShadow: "0 1px 2px rgba(0, 0, 0, 0.18)",
-  panelInset: "none",
+  panelInset: "0 0 0 0 transparent",
 }
