@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "reka-ui"
+import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
 export interface MenuItem {
@@ -29,7 +30,7 @@ defineProps<{ items: MenuItem[] }>()
       <DropdownMenuContent
         :side-offset="6"
         align="end"
-        class="z-(--z-popover) min-w-44 rounded-control border border-line bg-surface-overlay p-1 shadow-panel backdrop-blur outline-none data-[state=open]:animate-[popover-in_140ms_var(--ease-emphasized)] data-[state=closed]:animate-[popover-out_120ms_ease]"
+        :class="[POPOVER_PANEL, 'z-(--z-popover) min-w-44 p-1 outline-none']"
       >
         <template v-for="(item, i) in items" :key="i">
           <DropdownMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />

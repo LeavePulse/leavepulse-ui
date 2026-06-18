@@ -11,7 +11,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "reka-ui"
-import { onBeforeUnmount, ref } from "vue"
+import { onBeforeUnmount, ref, watch } from "vue"
 import { useToast, type ToastItem } from "../composables/useToast"
 import LpIcon from "./LpIcon.vue"
 
@@ -38,14 +38,57 @@ const variantBar: Record<ToastItem["variant"], string> = {
   error: "bg-danger",
 }
 
-// Ticking clock so the progress bar animates smoothly.
+// reka pauses its own auto-dismiss timer while a toast is hovered/focused; mirror
+// that on the visual bar by carrying each toast's dismissAt forward over the
+// paused span, so the countdown matches when it actually closes.
+const pausedAt = new Map<number, number>()
+
+// Ticking clock so the progress bar animates smoothly. Runs only while there's
+// at least one auto-dismissing toast on screen — no idle interval otherwise.
 const now = ref(Date.now())
-const timer = setInterval(() => (now.value = Date.now()), 80)
-onBeforeUnmount(() => clearInterval(timer))
+let timer: ReturnType<typeof setInterval> | null = null
+
+function startTimer() {
+  if (timer === null) timer = setInterval(() => (now.value = Date.now()), 80)
+}
+function stopTimer() {
+  if (timer !== null) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+watch(
+  () => queue.length,
+  () => {
+    // Drop pause state for toasts that have left the queue (e.g. dismissed
+    // while hovered) so the map can't grow unbounded over a long session.
+    for (const id of pausedAt.keys()) {
+      if (!queue.some((t) => t.id === id)) pausedAt.delete(id)
+    }
+    if (queue.some((t) => t.dismissAt !== null)) startTimer()
+    else stopTimer()
+  },
+  { immediate: true },
+)
+onBeforeUnmount(stopTimer)
+
+function onPause(t: ToastItem) {
+  pausedAt.set(t.id, now.value)
+}
+function onResume(t: ToastItem) {
+  const since = pausedAt.get(t.id)
+  if (since !== undefined && t.dismissAt !== null) {
+    t.dismissAt += Date.now() - since
+  }
+  pausedAt.delete(t.id)
+}
 
 function progress(t: ToastItem): number {
   if (!t.dismissAt || t.duration <= 0) return 0
-  const remaining = t.dismissAt - now.value
+  // While paused, freeze the bar at the moment hover started.
+  const at = pausedAt.get(t.id) ?? now.value
+  const remaining = t.dismissAt - at
   return Math.max(0, Math.min(100, (remaining / t.duration) * 100))
 }
 
@@ -71,6 +114,8 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
       class="pointer-events-auto relative overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel data-[state=open]:animate-[toast-in_200ms_var(--ease-emphasized)] data-[state=closed]:animate-[toast-out_140ms_ease]"
       :class="{ 'cursor-pointer': t.onClick }"
       @update:open="(open) => !open && dismiss(t.id)"
+      @pause="onPause(t)"
+      @resume="onResume(t)"
       @click="runClick(t)"
     >
       <div class="flex items-start gap-3 p-3.5">

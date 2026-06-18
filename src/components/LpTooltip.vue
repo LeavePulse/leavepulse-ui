@@ -6,6 +6,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
+import { PANEL_SURFACE, TOOLTIP_ANIM } from "./dropdown"
 
 defineProps<{ content?: string; sideOffset?: number }>()
 </script>
@@ -19,7 +20,7 @@ defineProps<{ content?: string; sideOffset?: number }>()
       <TooltipPortal>
         <TooltipContent
           :side-offset="sideOffset ?? 6"
-          class="z-(--z-tooltip) rounded-control border border-line bg-surface-overlay px-2.5 py-1.5 text-xs text-ink shadow-panel backdrop-blur data-[state=delayed-open]:animate-[popover-in_120ms_var(--ease-emphasized)] data-[state=closed]:animate-[popover-out_100ms_ease]"
+          :class="[PANEL_SURFACE, TOOLTIP_ANIM, 'z-(--z-tooltip) px-2.5 py-1.5 text-xs text-ink']"
         >
           <slot name="content">{{ content }}</slot>
         </TooltipContent>

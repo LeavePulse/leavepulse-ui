@@ -1,0 +1,51 @@
+name: publish
+
+# Publishes @leavepulse/ui to GitHub Packages on a version tag.
+# Cut a release with:  git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # node + the GitHub Packages registry, so `npm publish` authenticates
+      # via NODE_AUTH_TOKEN. bun builds; npm publishes (bun's publish auth to
+      # GitHub Packages is less battle-tested than npm's).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@leavepulse"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build library
+        run: bun run build
+
+      # The repo's committed .npmrc resolves _authToken from ${GITHUB_TOKEN};
+      # setup-node's generated .npmrc uses NODE_AUTH_TOKEN. Set both so whichever
+      # .npmrc wins, the token is present.
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

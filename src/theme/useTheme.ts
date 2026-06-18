@@ -48,6 +48,38 @@ export function serializeTheme(theme: TokenSet): string {
   return JSON.stringify(theme)
 }
 
+/*
+ * Render a theme as CSS custom-property declarations (the body of a rule, e.g.
+ * `--color-brand: #00bcff; …`). Same var mapping as applyTheme, so a server can
+ * inline the theme into a <style> for the first paint while the client uses
+ * applyTheme — no duplicated values, the TokenSet stays the single source.
+ */
+export function themeToCssVars(theme: TokenSet): string {
+  const decls: string[] = []
+  for (const [key, cssVar] of Object.entries(COLOR_VARS)) {
+    decls.push(`${cssVar}: ${theme.colors[key as keyof ColorTokens]}`)
+  }
+  for (const [key, cssVar] of Object.entries(SHAPE_VARS)) {
+    decls.push(`${cssVar}: ${theme.shape[key as keyof ShapeTokens]}px`)
+  }
+  for (const [key, cssVar] of Object.entries(DENSITY_VARS)) {
+    decls.push(`${cssVar}: ${theme.density[key as keyof DensityTokens]}px`)
+  }
+  for (const [key, cssVar] of Object.entries(FONT_VARS)) {
+    decls.push(`${cssVar}: ${theme.font[key as keyof FontTokens]}`)
+  }
+  const surface = theme.surface ?? DEFAULT_SURFACE
+  for (const [key, cssVar] of Object.entries(SURFACE_VARS)) {
+    decls.push(`${cssVar}: ${surface[key as keyof SurfaceTokens]}`)
+  }
+  return decls.join("; ")
+}
+
+/** Render a theme as a complete CSS rule (default selector `:root`). */
+export function themeToCssRule(theme: TokenSet, selector = ":root"): string {
+  return `${selector} { color-scheme: ${theme.mode}; ${themeToCssVars(theme)}; }`
+}
+
 const DEFAULT_FONT = {
   sans: '"Inter", "Segoe UI", system-ui, sans-serif',
   mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',

@@ -1,7 +1,8 @@
 node_modules/
 
-# Build output. Not committed — the `prepare` script rebuilds it on install,
-# so any consumer pulling the kit (file:/git dependency) gets a fresh dist.
+# Build output. Not committed — `prepublishOnly` rebuilds it at publish time,
+# and the tarball ships it via package.json "files", so consumers installing
+# the published package get a fresh dist without rebuilding on their end.
 dist/
 
 # Preview demo build output (vite.config.ts), separate from the library dist.

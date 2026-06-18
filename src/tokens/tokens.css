@@ -123,6 +123,12 @@
     transform: translate(-50%, -50%) scale(0.96);
   }
 }
+/*
+ * Popover enter/exit. The -in/-out pair drifts DOWN from the trigger (content
+ * placed below it). When the popper flips ABOVE the trigger (data-side=top),
+ * use the -up pair so the drift direction matches where it actually opens —
+ * otherwise an upward menu still slides down-from-above and reads wrong.
+ */
 @keyframes popover-in {
   from {
     opacity: 0;
@@ -135,11 +141,31 @@
     transform: translateY(-4px) scale(0.97);
   }
 }
+@keyframes popover-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
+@keyframes popover-out-up {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+}
 /* Option cascade: items slide in top→down on open. */
 @keyframes option-in {
   from {
     opacity: 0;
     transform: translateY(-6px);
+  }
+}
+/* Cascade upward when the list opens above the trigger (data-side=top), so the
+   options drift toward where the list actually is — mirror of option-in. */
+@keyframes option-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }
 @keyframes tab-in {
@@ -200,6 +226,13 @@
     opacity: 0;
   }
 }
+/* Check/indicator pop: the tick scales + fades in when toggled on. */
+@keyframes indicator-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
 @keyframes disclosure-body-in {
   from {
     opacity: 0;
@@ -239,6 +272,23 @@
 .lp-skin-panel > * {
   position: relative;
   z-index: 1;
+}
+
+/* ── reduced motion ──────────────────────────────
+   WCAG 2.3.3: honour the OS "reduce motion" preference. Every overlay
+   keyframe above (pop/drawer/toast/option/tab/popover/collapsible) and the
+   CSS transitions/animate-pulse used across the kit collapse to a near-instant
+   state change — content still mounts/unmounts, it just doesn't travel. This is
+   the CSS half; motion-v springs (Tabs/Layout) opt out in JS via
+   useReducedMotion(). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /*

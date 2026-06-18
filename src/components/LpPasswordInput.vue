@@ -13,10 +13,17 @@ defineProps<{ modelValue?: string; placeholder?: string; invalid?: boolean; disa
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
 const visible = ref(false)
+const inner = ref<InstanceType<typeof LpInput> | null>(null)
+defineExpose({
+  focus: (options?: FocusOptions) => inner.value?.focus(options),
+  blur: () => inner.value?.blur(),
+  select: () => inner.value?.select(),
+})
 </script>
 
 <template>
   <LpInput
+    ref="inner"
     :model-value="modelValue"
     :type="visible ? 'text' : 'password'"
     :placeholder="placeholder"
