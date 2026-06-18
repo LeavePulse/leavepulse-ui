@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Motion } from "motion-v"
+import { Motion, useReducedMotion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { ref, useId } from "vue"
+import { computed, ref, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 
 export interface TabItem {
@@ -37,6 +37,14 @@ defineEmits<{ (e: "update:modelValue", value: string): void }>()
 const pillId = `lp-tab-indicator-${useId()}`
 const hovered = ref<string | null>(null)
 
+// Honour OS "reduce motion": snap the pill instead of springing it across.
+const reduceMotion = useReducedMotion()
+const pillTransition = computed(() =>
+  reduceMotion.value
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 520, damping: 40 },
+)
+
 function pillUnder(value: string, active?: string): boolean {
   return hovered.value ? hovered.value === value : active === value
 }
@@ -70,7 +78,7 @@ function pillUnder(value: string, active?: string): boolean {
         <Motion
           v-if="pillUnder(item.value, modelValue)"
           :layout-id="pillId"
-          :transition="{ type: 'spring', stiffness: 520, damping: 40 }"
+          :transition="pillTransition"
           class="absolute inset-0 z-0 rounded-md shadow-sm"
           :class="accent
             ? 'border border-brand/35 bg-brand/12'

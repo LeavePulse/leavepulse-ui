@@ -32,6 +32,22 @@ import { LpButton, LpModal } from "@leavepulse/ui"
 The kit does **not** ship a precompiled stylesheet — your Tailwind build emits the
 utilities its components use, scoped via the `@source` globs in the CSS entry.
 
+### Native scrollbar skin (opt-in)
+
+`LpScrollArea` skins the scroll it owns. For everything it can't — the page
+itself, sticky panels, code blocks — opt the whole app into the same look by
+importing the native scrollbar skin. It styles the browser's own scrollbars
+(brand thumb, thin, rounded) **without** a container, so sticky positioning,
+scroll restoration and anchor jumps keep working:
+
+```css
+@import "tailwindcss";
+@import "@leavepulse/ui/css";
+@import "@leavepulse/ui/scrollbar.css"; /* after the tokens — reads --color-brand */
+```
+
+Hide a specific scrollbar with the `lp-scrollbar-none` class.
+
 ## Develop
 
 ```bash

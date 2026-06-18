@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
+import LpIcon from "./LpIcon.vue"
 
 defineProps<{
   modelValue?: boolean
@@ -30,7 +31,11 @@ function onUpdate(v: boolean | "indeterminate") {
       class="flex size-[18px] items-center justify-center rounded-[5px] border border-line-strong bg-surface-soft outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
       @update:model-value="onUpdate"
     >
-      <CheckboxIndicator class="text-xs leading-none text-ink-inverse">✓</CheckboxIndicator>
+      <CheckboxIndicator
+        class="flex items-center justify-center text-ink-inverse data-[state=checked]:animate-[indicator-in_140ms_var(--ease-emphasized)]"
+      >
+        <LpIcon name="lucide:check" :size="13" />
+      </CheckboxIndicator>
     </CheckboxRoot>
     <slot>{{ label }}</slot>
   </label>

@@ -20,15 +20,22 @@
       "import": "./dist/index.js"
     },
     "./css": "./src/index.css",
-    "./tokens.css": "./src/tokens/tokens.css"
+    "./tokens.css": "./src/tokens/tokens.css",
+    "./scrollbar.css": "./src/tokens/scrollbar.css"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "sideEffects": ["**/*.css", "**/icons.ts", "**/icons.js"],
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
-    "prepare": "vite build --config vite.lib.config.ts",
-    "typecheck": "vue-tsc --noEmit"
+    "prepublishOnly": "vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
+    "typecheck": "vue-tsc --noEmit",
+    "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
+    "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
+    "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags"
   },
   "peerDependencies": {
     "@iconify-json/lucide": "^1.2.0",
@@ -54,7 +61,7 @@
     "typescript": "^5.6.3",
     "vite": "^7.0.0",
     "vite-plugin-dts": "^5.0.2",
-    "vue": "3.5.33",
+    "vue": "3.5.31",
     "vue-tsc": "^3.0.0"
   }
 }

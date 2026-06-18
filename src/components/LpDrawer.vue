@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed } from "vue"
+import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -67,7 +68,12 @@ const widthClass = computed(() => {
               {{ description }}
             </DialogDescription>
           </div>
-          <DialogClose class="rounded-md px-1 text-xl leading-none text-muted hover:text-ink">×</DialogClose>
+          <DialogClose
+            class="flex shrink-0 items-center rounded-md p-1 text-muted hover:text-ink"
+            aria-label="Close"
+          >
+            <LpIcon name="lucide:x" :size="18" />
+          </DialogClose>
         </header>
         <div class="min-h-0 flex-1 overflow-auto"><slot /></div>
         <footer v-if="$slots.footer" class="mt-4 flex justify-end gap-2"><slot name="footer" /></footer>

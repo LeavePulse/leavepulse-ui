@@ -5,6 +5,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui"
+import { POPOVER_PANEL } from "./dropdown"
 
 defineProps<{ side?: "top" | "right" | "bottom" | "left"; align?: "start" | "center" | "end" }>()
 </script>
@@ -19,7 +20,7 @@ defineProps<{ side?: "top" | "right" | "bottom" | "left"; align?: "start" | "cen
         :side="side ?? 'bottom'"
         :align="align ?? 'center'"
         :side-offset="6"
-        class="z-(--z-popover) w-64 rounded-card border border-line bg-surface-overlay p-3 text-sm text-ink shadow-panel backdrop-blur outline-none data-[state=open]:animate-[popover-in_140ms_var(--ease-emphasized)] data-[state=closed]:animate-[popover-out_120ms_ease]"
+        :class="[POPOVER_PANEL, 'z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none']"
       >
         <slot />
       </PopoverContent>
