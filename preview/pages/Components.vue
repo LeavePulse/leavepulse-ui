@@ -8,6 +8,7 @@ import {
   LpFormField,
   LpInput,
   LpModal,
+  LpNotificationBell,
   LpPopover,
   LpRadioGroup,
   LpSelect,
@@ -16,6 +17,7 @@ import {
   LpTextarea,
   LpTooltip,
   useToast,
+  type NotificationItem,
   type RadioOption,
   type SelectOption,
   type TabItem,
@@ -62,6 +64,40 @@ const tabs: TabItem[] = [
 ]
 
 const modalOpen = ref(false)
+
+const notifications = ref<NotificationItem[]>([
+  {
+    id: "1",
+    title: "Payment received",
+    body: "Your payment of €12.99 was received.",
+    icon: "lucide:check-circle",
+    createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+    read: false,
+  },
+  {
+    id: "2",
+    title: "Service resumed",
+    body: "ger-01-p is back online.",
+    icon: "lucide:server",
+    createdAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+    read: false,
+  },
+  {
+    id: "3",
+    title: "Invoice available",
+    body: "Your June invoice is ready to view.",
+    icon: "lucide:receipt-text",
+    createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    read: true,
+  },
+])
+function markNotifRead(id: string) {
+  const n = notifications.value.find((x) => x.id === id)
+  if (n) n.read = true
+}
+function markAllNotifsRead() {
+  for (const n of notifications.value) n.read = true
+}
 
 const section = "flex flex-col gap-4"
 const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
@@ -245,6 +281,24 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
         <LpCard variant="raised"><span class="text-sm">Raised</span></LpCard>
         <LpCard variant="flat"><span class="text-sm">Flat</span></LpCard>
         <LpCard variant="flat" interactive><span class="text-sm">Interactive</span></LpCard>
+      </div>
+    </section>
+
+    <!-- Notification bell -->
+    <section :class="section">
+      <h2 :class="heading">Notification bell</h2>
+      <p class="text-sm text-muted">
+        Icon button with an unread badge; opens a popover feed. Data-driven —
+        bind <code>items</code> / <code>unread-count</code> and handle
+        <code>mark-read</code> / <code>mark-all-read</code>.
+      </p>
+      <div class="flex items-center gap-4">
+        <LpNotificationBell
+          :items="notifications"
+          @mark-read="markNotifRead"
+          @mark-all-read="markAllNotifsRead"
+        />
+        <span class="text-sm text-muted">← click the bell</span>
       </div>
     </section>
   </div>
