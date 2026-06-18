@@ -42,6 +42,7 @@ import {
   LpSwitch,
   LpTable,
   LpSegmented,
+  LpSidebar,
   LpTabs,
   LpTextarea,
   LpTooltip,
@@ -249,6 +250,69 @@ export const registry: ComponentEntry[] = [
   <LpTabs v-model="tab" :items="items" block />
   <LpTabs v-model="tab" :items="items" variant="plain" />
   <LpTabs v-model="tab" :items="items" variant="plain" accent />
+</div>`,
+  },
+  {
+    id: "sidebar",
+    name: "Sidebar",
+    description:
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Mirrors the cabinet/profile sidebars in the apps.",
+    components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
+    state: () =>
+      reactive({
+        active: "overview",
+        loading: false,
+        sections: [
+          {
+            items: [
+              { id: "overview", label: "Overview", icon: "lucide:layout-dashboard" },
+              { id: "servers", label: "Servers", icon: "lucide:server", badge: 12 },
+              { id: "metrics", label: "Metrics", icon: "lucide:activity" },
+            ],
+          },
+          {
+            title: "Workspace",
+            items: [
+              { id: "logs", label: "Logs", icon: "lucide:scroll-text", badge: "3" },
+              { id: "billing", label: "Billing", icon: "lucide:credit-card" },
+              { id: "settings", label: "Settings", icon: "lucide:settings" },
+            ],
+          },
+        ],
+      }),
+    template: `<div class="flex flex-col gap-3">
+  <label class="flex items-center gap-2 text-xs text-muted">
+    <LpSwitch v-model="loading" /> Loading
+  </label>
+  <div class="h-[28rem] w-64 overflow-hidden rounded-card border border-line">
+    <LpSidebar v-model="active" :sections="sections" :loading="loading">
+      <template #header>
+        <div class="flex items-center gap-2 px-1 py-1 font-semibold text-ink">
+          <span class="grid size-8 place-items-center rounded-lg bg-brand text-ink-inverse">
+            <LpIcon name="lucide:server" :size="18" />
+          </span>
+          LeavePulse
+        </div>
+      </template>
+      <template #actions>
+        <LpButton variant="soft" size="sm" class="w-full justify-start">
+          <LpIcon name="lucide:plus" :size="16" /> New server
+        </LpButton>
+      </template>
+      <template #footer>
+        <div class="flex items-center gap-3 px-1">
+          <LpAvatar size="sm" fallback="SA" />
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-ink">System Admin</p>
+            <p class="truncate text-xs text-muted">admin@leavepulse.io</p>
+          </div>
+        </div>
+        <LpButton variant="ghost" size="sm" class="mt-1 w-full justify-start">
+          <LpIcon name="lucide:log-out" :size="16" /> Sign out
+        </LpButton>
+      </template>
+    </LpSidebar>
+  </div>
 </div>`,
   },
   {
