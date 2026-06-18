@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed } from "vue"
+import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
@@ -70,10 +71,14 @@ const widthClass = computed(() => {
             </DialogDescription>
           </div>
           <DialogClose
-            class="flex shrink-0 items-center rounded-md p-1 text-muted hover:text-ink"
+            class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close"
           >
-            <LpIcon name="lucide:x" :size="18" />
+            <LpIcon
+              name="lucide:x"
+              :size="18"
+              :class="CLOSE_ICON"
+            />
           </DialogClose>
         </header>
 

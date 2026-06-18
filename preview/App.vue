@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from "vue"
+import { computed, ref, watch } from "vue"
 import { LpScrollArea, LpToaster, presets, useTheme, type PresetName, type TokenSet } from "../src"
 import ComponentPage from "./playground/ComponentPage.vue"
 import { registry } from "./playground/registry"
@@ -26,17 +26,17 @@ const crumb = computed(() => {
 })
 
 // Themes are JSON now — the switcher applies a TokenSet via the engine.
-const { apply } = useTheme()
+const { apply, applyWithTransition } = useTheme()
 const theme = ref<PresetName>("dark")
 const density = ref<"compact" | "default" | "comfortable">("default")
 
 const densityScale = { compact: 0.85, default: 1, comfortable: 1.18 }
 
-watchEffect(() => {
+function buildTheme(): TokenSet {
   const base = presets[theme.value]
   const k = densityScale[density.value]
   // density is just a scaling of the base theme's control sizes / spacing
-  const themed: TokenSet = {
+  return {
     ...base,
     density: {
       spacingUnit: Math.round(base.density.spacingUnit * k),
@@ -45,8 +45,20 @@ watchEffect(() => {
       controlLg: Math.round(base.density.controlLg * k),
     },
   }
-  apply(themed)
-})
+}
+
+// First paint + density changes: apply instantly (resizing controls shouldn't
+// trigger a colour wipe). Watches density only — theme swaps go through
+// pickTheme so they can animate from the click point.
+apply(buildTheme())
+watch(density, () => apply(buildTheme()))
+
+// Theme button: circular reveal growing from the clicked chip.
+function pickTheme(name: PresetName, event: MouseEvent) {
+  if (name === theme.value) return
+  theme.value = name
+  applyWithTransition(buildTheme(), { x: event.clientX, y: event.clientY })
+}
 
 const chip = "rounded-control px-3 py-1.5 text-sm transition-colors"
 const on = "bg-surface-soft text-ink"
@@ -70,7 +82,7 @@ const off = "text-muted hover:text-ink"
           v-for="t in (['dark', 'light', 'lime'] as const)"
           :key="t"
           :class="[chip, theme === t ? on : off]"
-          @click="theme = t"
+          @click="pickTheme(t, $event)"
         >
           {{ t }}
         </button>

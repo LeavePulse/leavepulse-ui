@@ -35,11 +35,15 @@ defineExpose({
     <template #trailing>
       <button
         type="button"
-        class="rounded-md p-1 text-muted hover:text-ink"
+        class="group rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:text-ink"
         :aria-label="visible ? 'Hide password' : 'Show password'"
         @click="visible = !visible"
       >
-        <LpIcon :name="visible ? 'lucide:eye-off' : 'lucide:eye'" :size="16" />
+        <LpIcon
+          :name="visible ? 'lucide:eye-off' : 'lucide:eye'"
+          :size="16"
+          class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:scale-90 motion-reduce:group-active:scale-100"
+        />
       </button>
     </template>
   </LpInput>

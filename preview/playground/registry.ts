@@ -12,15 +12,22 @@ import {
   LpDisclosure,
   LpDivider,
   LpDrawer,
+  LpCalendar,
+  LpCodeBlock,
+  LpCommandPalette,
+  LpContextMenu,
+  LpDatePicker,
   LpDropdownMenu,
   LpEmptyState,
   LpFormField,
   LpIcon,
   LpInput,
   LpLink,
+  LpLogViewer,
   LpModal,
   LpNumberField,
   LpOtpInput,
+  LpPagination,
   LpPasswordInput,
   LpPhoneInput,
   LpPopover,
@@ -34,10 +41,12 @@ import {
   LpStepper,
   LpSwitch,
   LpTable,
+  LpSegmented,
   LpTabs,
   LpTextarea,
   LpTooltip,
   LpUptimeBar,
+  useToast,
 } from "../../src"
 
 export interface ComponentEntry {
@@ -243,6 +252,33 @@ export const registry: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "segmented",
+    name: "Segmented",
+    description:
+      "Compact mutually-exclusive control with a sliding pill (reka ToggleGroup). For short option sets where Tabs is too heavy — view/density toggles. icon and/or label per option; block stretches it full-width.",
+    components: { LpSegmented },
+    state: () =>
+      reactive({
+        view: "list",
+        density: "default",
+        viewOpts: [
+          { value: "list", icon: "lucide:list", label: "List" },
+          { value: "grid", icon: "lucide:layout-grid", label: "Grid" },
+          { value: "board", icon: "lucide:columns-3", label: "Board" },
+        ],
+        densityOpts: [
+          { value: "compact", label: "Compact" },
+          { value: "default", label: "Default" },
+          { value: "comfortable", label: "Comfortable" },
+        ],
+      }),
+    template: `<div class="flex flex-col items-start gap-3">
+  <LpSegmented v-model="view" :options="viewOpts" />
+  <LpSegmented v-model="density" :options="densityOpts" size="sm" />
+  <LpSegmented v-model="view" :options="viewOpts" block class="w-80" />
+</div>`,
+  },
+  {
     id: "textarea",
     name: "Textarea",
     description: "Multi-line input. Optional `label`/`hint`/`error` wrap it in a form field.",
@@ -255,11 +291,14 @@ export const registry: ComponentEntry[] = [
   {
     id: "stat",
     name: "Stat",
-    description: "Metric tile: label, mono value, hint.",
+    description:
+      "Metric tile: label, mono value, hint, and an optional delta/trend badge. Numeric delta auto-derives direction & sign; invertTrend flips colours for \"lower is better\" metrics (latency, errors).",
     components: { LpStat },
     template: `<div class="grid w-full grid-cols-2 gap-6">
   <LpStat online label="Servers online" value="43" hint="Responding now." />
-  <LpStat label="Total playtime" value="19,802 h" hint="Across integrations." />
+  <LpStat label="Revenue" value="€8,420" :delta="12.4" delta-suffix="%" hint="vs last week" />
+  <LpStat label="Avg latency" value="48 ms" :delta="-6" invert-trend hint="lower is better" />
+  <LpStat label="Signups" value="312" delta="+18%" />
 </div>`,
   },
   {
@@ -375,6 +414,90 @@ export const registry: ComponentEntry[] = [
 </LpDropdownMenu>`,
   },
   {
+    id: "codeblock",
+    name: "CodeBlock",
+    description:
+      "Code with lightweight, theme-aware highlighting (zero-dep tokenizer; ts/js/json/bash/python/rust). Line numbers, wrap, copy, language label. locked=true is read-only; lockToggle adds an editable mode (v-model writes back, highlighting stays live).",
+    components: { LpCodeBlock },
+    state: () =>
+      reactive({
+        rust: 'fn main() {\\n    let count = 42; // answer\\n    println!("hello, {}", count);\\n}',
+        py: 'def greet(name: str) -> str:\\n    # build the greeting\\n    return f"hello, {name}"',
+        editable: '{\\n  "service": "api",\\n  "replicas": 3,\\n  "healthy": true\\n}',
+        locked: true,
+      }),
+    template: `<div class="flex flex-col gap-4">
+  <LpCodeBlock :model-value="rust" lang="rust" line-numbers title="main.rs" />
+  <LpCodeBlock :model-value="py" lang="python" />
+  <LpCodeBlock v-model="editable" lang="json" lock-toggle v-model:locked="locked" title="config.json" />
+</div>`,
+  },
+  {
+    id: "calendar",
+    name: "Calendar · DatePicker",
+    description:
+      "Inline month calendar and a field+popover date picker (reka Calendar + @internationalized/date). Model is an ISO \"YYYY-MM-DD\" string; min/max bounds and an isDisabled predicate. Today is tinted, the selection is a brand pill.",
+    components: { LpCalendar, LpDatePicker },
+    state: () => reactive({ date: "2026-06-18", picked: "" }),
+    template: `<div class="flex flex-wrap items-start gap-6">
+  <LpCalendar v-model="date" min="2026-06-01" />
+  <div class="flex w-64 flex-col gap-2">
+    <LpDatePicker v-model="picked" clearable placeholder="Select a date" />
+    <p class="text-xs text-muted">ISO value: {{ picked || "—" }}</p>
+  </div>
+</div>`,
+  },
+  {
+    id: "commandpalette",
+    name: "CommandPalette",
+    description:
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default.",
+    components: { LpCommandPalette, LpButton },
+    state: () =>
+      reactive({
+        open: false,
+        commands: [
+          { id: "new", label: "New server", description: "Provision a fresh node", icon: "lucide:plus", shortcut: "⌘N", group: "Actions", keywords: ["create", "add"] },
+          { id: "deploy", label: "Deploy current branch", description: "Roll out to production", icon: "lucide:rocket", group: "Actions", keywords: ["ship", "release"] },
+          { id: "logs", label: "View logs", description: "Tail the live log stream", icon: "lucide:scroll-text", shortcut: "⌘L", group: "Navigate" },
+          { id: "metrics", label: "Open metrics", icon: "lucide:activity", group: "Navigate" },
+          { id: "theme", label: "Toggle theme", icon: "lucide:palette", group: "Preferences", keywords: ["dark", "light", "appearance"] },
+        ],
+      }),
+    template: `<div>
+  <LpButton variant="outline" @click="open = true">Open palette ( ⌘K )</LpButton>
+  <LpCommandPalette v-model:open="open" :commands="commands" />
+</div>`,
+  },
+  {
+    id: "contextmenu",
+    name: "ContextMenu",
+    description:
+      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus. Right-click (or long-press) the target.",
+    components: { LpContextMenu },
+    state: () =>
+      reactive({
+        items: [
+          { label: "Open", icon: "lucide:external-link", shortcut: "⏎" },
+          { label: "Copy", icon: "lucide:copy", shortcut: "⌘C" },
+          {
+            label: "Move to",
+            icon: "lucide:folder-input",
+            children: [
+              { label: "Production", icon: "lucide:server" },
+              { label: "Staging", icon: "lucide:flask-conical" },
+            ],
+          },
+          { label: "Delete", icon: "lucide:trash-2", shortcut: "⌫", danger: true, separatorBefore: true },
+        ],
+      }),
+    template: `<LpContextMenu :items="items">
+  <div class="grid h-32 w-full place-items-center rounded-card border border-dashed border-line text-sm text-muted">
+    Right-click here
+  </div>
+</LpContextMenu>`,
+  },
+  {
     id: "emptystate",
     name: "EmptyState",
     description: "Placeholder for empty lists.",
@@ -406,6 +529,68 @@ export const registry: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "log-viewer",
+    name: "Log Viewer",
+    description:
+      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines.",
+    components: { LpLogViewer, LpInput, LpButton, LpSwitch, LpIcon },
+    state: () => {
+      const samples: { level: string; source: string; message: string }[] = [
+        { level: "info", source: "api", message: "GET /v1/servers 200 in 14ms" },
+        { level: "debug", source: "auth", message: "token verified for user 4821 (scope: read)" },
+        { level: "success", source: "deploy", message: "ger-01-p rolled out — 3/3 replicas healthy" },
+        { level: "warn", source: "db", message: "connection pool at 82% — consider raising max" },
+        { level: "error", source: "api", message: "POST /v1/billing 502 upstream timeout after 30s" },
+        { level: "info", source: "nats", message: "subscribed metrics.host.* (queue=ingest)" },
+        { level: "trace", source: "cache", message: "miss key=profile:4821 ttl=300" },
+        { level: "fatal", source: "core", message: "panic: nil pointer in scheduler.tick() — restarting" },
+      ]
+      const s = reactive({
+        wrap: false,
+        query: "",
+        onlyMatches: false,
+        n: 0,
+        lines: Array.from({ length: 18 }, (_, i) => {
+          const base = Date.now() - (18 - i) * 1400
+          const x = samples[i % samples.length]
+          return { ...x, time: base }
+        }) as { level: string; source: string; message: string; time: number }[],
+        push() {
+          const x = samples[s.n++ % samples.length]
+          s.lines.push({ ...x, time: Date.now() })
+        },
+      })
+      return s
+    },
+    template: `<div class="flex w-[36rem] max-w-full flex-col gap-3">
+  <div class="flex items-center gap-3">
+    <LpInput v-model="query" icon="lucide:search" placeholder="Highlight…" class="flex-1" />
+    <Transition
+      enter-active-class="transition duration-150 ease-[var(--ease-emphasized)]"
+      enter-from-class="-translate-x-1 scale-95 opacity-0"
+      leave-active-class="transition duration-100 ease-in"
+      leave-to-class="-translate-x-1 scale-95 opacity-0"
+    >
+      <label v-if="query.trim()" class="flex shrink-0 items-center gap-2 text-xs text-muted">
+        <LpSwitch v-model="onlyMatches" />
+        <LpIcon name="lucide:filter" :size="14" /> Only matches
+      </label>
+    </Transition>
+    <label class="flex items-center gap-2 text-xs text-muted">
+      <LpSwitch v-model="wrap" /> Wrap
+    </label>
+    <LpButton size="sm" variant="soft" @click="push">Push line</LpButton>
+  </div>
+  <LpLogViewer
+    :lines="lines"
+    :highlight="query"
+    :filter-matches="onlyMatches"
+    :wrap="wrap"
+    height="18rem"
+  />
+</div>`,
+  },
+  {
     id: "disclosure",
     name: "Disclosure",
     description: "Collapsible \"show more\" section. label/icon or a #trigger slot; height + fade animate on toggle. scroll-into-view smooth-scrolls the block into view on open so revealed content isn't left below the fold.",
@@ -427,6 +612,39 @@ export const registry: ComponentEntry[] = [
     </LpDisclosure>
   </div>
   <div class="flex h-40 items-start justify-center text-xs text-muted">extra space below</div>
+</div>`,
+  },
+  {
+    id: "toast",
+    name: "Toast",
+    description:
+      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist.",
+    components: { LpButton },
+    state: () => {
+      const toast = useToast()
+      return {
+        info: () => toast.info("Heads up — metrics refreshed."),
+        success: () => toast.success("Saved", { title: "Profile updated" }),
+        warning: () => toast.warning("Connection pool is running hot (82%)."),
+        error: () => toast.error("Upstream timed out", { title: "Billing failed" }),
+        withAction: () =>
+          toast.info("Server ger-01-p went offline.", {
+            title: "Host down",
+            actions: [{ label: "View", onClick: () => { toast.success("Opening host…") } }],
+          }),
+        persistent: () =>
+          toast.warning("Deploy in progress — don't close the tab.", { duration: 0 }),
+        clearAll: () => toast.clear(),
+      }
+    },
+    template: `<div class="flex max-w-md flex-wrap gap-2">
+  <LpButton size="sm" @click="info">Info</LpButton>
+  <LpButton size="sm" variant="action" @click="success">Success</LpButton>
+  <LpButton size="sm" variant="soft" @click="warning">Warning</LpButton>
+  <LpButton size="sm" variant="danger" @click="error">Error</LpButton>
+  <LpButton size="sm" variant="outline" @click="withAction">With action</LpButton>
+  <LpButton size="sm" variant="outline" @click="persistent">Persistent</LpButton>
+  <LpButton size="sm" variant="ghost" @click="clearAll">Clear all</LpButton>
 </div>`,
   },
   {
@@ -477,13 +695,37 @@ export const registry: ComponentEntry[] = [
   {
     id: "drawer",
     name: "Drawer",
-    description: "Side panel sliding from an edge. side=left|right, size=sm…xl (or width=\"…\").",
+    description:
+      "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground.",
     components: { LpDrawer, LpButton },
-    state: () => reactive({ open: false }),
-    template: `<div>
-  <LpButton variant="outline" @click="open = true">Open drawer</LpButton>
-  <LpDrawer v-model:open="open" size="lg" title="Filters" description="Refine the list">
+    state: () => reactive({ side: false, sheet: false, snap: false }),
+    template: `<div class="flex flex-wrap gap-2">
+  <LpButton variant="outline" @click="side = true">Side panel</LpButton>
+  <LpButton variant="outline" @click="sheet = true">Bottom sheet</LpButton>
+  <LpButton variant="outline" @click="snap = true">Snap points</LpButton>
+
+  <!-- Classic side drawer: drag right past the threshold to dismiss. -->
+  <LpDrawer v-model:open="side" direction="right" size="lg" title="Filters" description="Drag the edge or grab the handle to close">
     <p class="text-sm text-muted">Drawer body — put filter controls here.</p>
+  </LpDrawer>
+
+  <!-- Mobile-style bottom sheet with a handle. -->
+  <LpDrawer v-model:open="sheet" direction="bottom" size="sm" handle title="Bottom sheet">
+    <p class="text-sm text-muted">Drag the handle down to dismiss.</p>
+  </LpDrawer>
+
+  <!-- Multi-position sheet: snaps between 30% / 60% / 95%. -->
+  <LpDrawer
+    v-model:open="snap"
+    direction="bottom"
+    :snap-points="[0.3, 0.6, 0.95]"
+    handle
+    handle-only
+    title="Snap points"
+  >
+    <div class="space-y-2 text-sm text-muted">
+      <p v-for="i in 30" :key="i">Scrollable row {{ i }} — drag the handle to snap.</p>
+    </div>
   </LpDrawer>
 </div>`,
   },
@@ -551,27 +793,53 @@ export const registry: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width), row key, empty state, and per-column scoped cell slots (`#cell-<key>`).",
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, and stickyHeader.",
     components: { LpTable, LpBadge },
     state: () =>
       reactive({
+        sort: { key: "amount", dir: "desc" },
+        selected: ["ORD-1041"],
         columns: [
-          { key: "id", label: "Order", width: "30%" },
-          { key: "amount", label: "Amount", align: "right" },
+          { key: "id", label: "Order", width: "30%", sortable: true },
+          { key: "amount", label: "Amount", align: "right", sortable: true },
           { key: "status", label: "Status", align: "center" },
         ],
         rows: [
-          { id: "ORD-1042", amount: "€12.00", status: "paid" },
-          { id: "ORD-1041", amount: "€12.00", status: "pending" },
-          { id: "ORD-1040", amount: "€24.00", status: "failed" },
+          { id: "ORD-1042", amount: 12, status: "paid" },
+          { id: "ORD-1041", amount: 12, status: "pending" },
+          { id: "ORD-1040", amount: 24, status: "failed" },
+          { id: "ORD-1039", amount: 8, status: "paid" },
         ],
       }),
-    template: `<LpTable :columns="columns" :rows="rows" row-key="id">
-  <template #cell-status="{ value }">
-    <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">
-      {{ value }}
-    </LpBadge>
-  </template>
-</LpTable>`,
+    template: `<div class="flex flex-col gap-2">
+  <LpTable
+    :columns="columns"
+    :rows="rows"
+    row-key="id"
+    selectable
+    v-model:selected="selected"
+    v-model:sort="sort"
+  >
+    <template #cell-amount="{ value }">€{{ value.toFixed(2) }}</template>
+    <template #cell-status="{ value }">
+      <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">
+        {{ value }}
+      </LpBadge>
+    </template>
+  </LpTable>
+  <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected</p>
+</div>`,
+  },
+  {
+    id: "pagination",
+    name: "Pagination",
+    description:
+      "Windowed page navigator (prev/next + ellipses). v-model:page (1-based); size it via total+pageSize or pageCount. Pairs with Table.",
+    components: { LpPagination },
+    state: () => reactive({ page: 4 }),
+    template: `<div class="flex flex-col items-center gap-3">
+  <LpPagination v-model:page="page" :total="240" :page-size="10" />
+  <p class="text-xs text-muted">Page {{ page }} of 24</p>
+</div>`,
   },
 ]

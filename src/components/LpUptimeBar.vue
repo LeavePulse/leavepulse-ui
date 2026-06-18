@@ -82,7 +82,7 @@ const uptimeText = computed(() => {
           <TooltipTrigger as-child>
             <button
               type="button"
-              class="min-w-0 flex-1 rounded-xs outline-none transition-[transform,opacity] duration-150 hover:scale-y-110 focus-visible:ring-2 focus-visible:ring-ring"
+              class="min-w-0 flex-1 rounded-xs outline-none transition-[scale,opacity] duration-150 hover:scale-y-110 focus-visible:ring-2 focus-visible:ring-ring"
               :class="[segColor[seg.status], seg.status === 'empty' ? 'opacity-50' : '']"
               :aria-label="seg.label ?? statusLabel[seg.status]"
             />

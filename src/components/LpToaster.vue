@@ -13,9 +13,37 @@ import {
 } from "reka-ui"
 import { onBeforeUnmount, ref, watch } from "vue"
 import { useToast, type ToastItem } from "../composables/useToast"
+import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
 const { queue, dismiss } = useToast()
+
+// Toasts that are playing their exit animation. We don't splice them out of the
+// queue immediately on close — that would unmount before `toast-out` can run.
+// Instead we flip `open` to false (reka sets data-state=closed → the keyframe
+// plays), then drop the toast for real once `animationend` fires. A safety
+// timer removes it even if the animationend event is missed (e.g. tab hidden).
+const closing = ref<Set<number>>(new Set())
+
+function beginClose(id: number) {
+  if (closing.value.has(id)) return
+  closing.value = new Set(closing.value).add(id)
+  // Fallback slightly longer than the 140ms toast-out duration.
+  window.setTimeout(() => finishClose(id), 220)
+}
+
+function finishClose(id: number) {
+  if (!closing.value.has(id)) return
+  const next = new Set(closing.value)
+  next.delete(id)
+  closing.value = next
+  dismiss(id)
+}
+
+function onAnimEnd(e: AnimationEvent, id: number) {
+  // Only the exit keyframe should trigger removal, not toast-in.
+  if (e.animationName === "toast-out") finishClose(id)
+}
 
 const variantIcon: Record<ToastItem["variant"], string> = {
   info: "lucide:info",
@@ -66,6 +94,12 @@ watch(
     for (const id of pausedAt.keys()) {
       if (!queue.some((t) => t.id === id)) pausedAt.delete(id)
     }
+    // Same for the closing set — a toast evicted by the queue cap or clear()
+    // leaves without an animationend, so prune dead ids here.
+    if (closing.value.size) {
+      const live = new Set([...closing.value].filter((id) => queue.some((t) => t.id === id)))
+      if (live.size !== closing.value.size) closing.value = live
+    }
     if (queue.some((t) => t.dismissAt !== null)) startTimer()
     else stopTimer()
   },
@@ -95,13 +129,13 @@ function progress(t: ToastItem): number {
 async function runClick(t: ToastItem) {
   if (t.onClick) {
     await t.onClick()
-    dismiss(t.id)
+    beginClose(t.id)
   }
 }
 
 async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[number]) {
   await action.onClick()
-  dismiss(t.id)
+  beginClose(t.id)
 }
 </script>
 
@@ -110,10 +144,12 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
     <ToastRoot
       v-for="t in queue"
       :key="t.id"
+      :open="!closing.has(t.id)"
       :duration="t.duration"
       class="pointer-events-auto relative overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel data-[state=open]:animate-[toast-in_200ms_var(--ease-emphasized)] data-[state=closed]:animate-[toast-out_140ms_ease]"
       :class="{ 'cursor-pointer': t.onClick }"
-      @update:open="(open) => !open && dismiss(t.id)"
+      @update:open="(open) => !open && beginClose(t.id)"
+      @animationend="(e: AnimationEvent) => onAnimEnd(e, t.id)"
       @pause="onPause(t)"
       @resume="onResume(t)"
       @click="runClick(t)"
@@ -142,7 +178,7 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
               v-for="(action, i) in t.actions"
               :key="i"
               type="button"
-              class="rounded-control border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink hover:border-line-strong"
+              class="rounded-control border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink outline-none transition-[border-color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:border-line-strong hover:bg-surface-soft/70 active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
               @click="runAction(t, action)"
             >
               {{ action.label }}
@@ -152,18 +188,22 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
 
         <button
           type="button"
-          class="-mr-1 -mt-1 rounded-md p-1 text-muted hover:text-ink"
+          class="group -mr-1 -mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
           aria-label="Dismiss"
-          @click.stop="dismiss(t.id)"
+          @click.stop="beginClose(t.id)"
         >
-          <LpIcon name="lucide:x" :size="16" />
+          <LpIcon
+            name="lucide:x"
+            :size="16"
+            :class="CLOSE_ICON"
+          />
         </button>
       </div>
 
       <!-- Countdown progress bar -->
       <div
         v-if="t.dismissAt"
-        class="absolute inset-x-0 bottom-0 h-0.5 origin-left"
+        class="absolute inset-x-0 bottom-0 h-0.5 origin-left transition-transform duration-100 ease-linear motion-reduce:transition-none"
         :class="variantBar[t.variant]"
         :style="{ transform: `scaleX(${progress(t) / 100})` }"
       />

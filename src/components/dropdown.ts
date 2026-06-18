@@ -53,3 +53,12 @@ export const OPTION_ITEM =
   "animate-[option-in_180ms_var(--ease-emphasized)_both] " +
   "group-data-[side=top]:animate-[option-in-up_180ms_var(--ease-emphasized)_both] " +
   "data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand"
+
+/**
+ * Micro-animation for a close / clear "✕" icon: a quarter-turn on hover and a
+ * dip on press. Put on the <LpIcon>, with `group` on its button. Shared by
+ * Modal, Drawer, Toaster and the Autocomplete clear button.
+ */
+export const CLOSE_ICON =
+  "transition-transform duration-medium ease-[var(--ease-emphasized)] " +
+  "group-hover:rotate-90 group-active:scale-90 motion-reduce:group-hover:rotate-0"

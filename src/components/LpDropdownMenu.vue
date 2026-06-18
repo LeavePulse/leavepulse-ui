@@ -35,11 +35,16 @@ defineProps<{ items: MenuItem[] }>()
         <template v-for="(item, i) in items" :key="i">
           <DropdownMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />
           <DropdownMenuItem
-            class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-brand-soft"
+            class="group/item flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[highlighted]:bg-brand-soft"
             :class="item.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand'"
             @select="item.onSelect?.()"
           >
-            <LpIcon v-if="item.icon" :name="item.icon" :size="15" />
+            <LpIcon
+              v-if="item.icon"
+              :name="item.icon"
+              :size="15"
+              class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[highlighted]/item:translate-x-0.5"
+            />
             {{ item.label }}
           </DropdownMenuItem>
         </template>

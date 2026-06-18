@@ -5,7 +5,9 @@ import { computed, type Component } from "vue"
 const button = tv({
   base: [
     "inline-flex select-none items-center justify-center gap-2 font-semibold",
-    "rounded-control transition-colors duration-[var(--duration-fast)]",
+    "rounded-control transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]",
+    // tactile press: dips slightly on click, springs back on release.
+    "active:scale-[0.97] motion-reduce:active:scale-100",
     "outline-none focus-visible:ring-2 focus-visible:ring-ring",
     "disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55",
   ],

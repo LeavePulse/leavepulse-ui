@@ -22,7 +22,7 @@ defineEmits<{ (e: "navigate", item: Crumb, index: number): void }>()
       <a
         v-if="item.href && i < items.length - 1"
         :href="item.href"
-        class="text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+        class="rounded-xs text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
         @click="$emit('navigate', item, i)"
       >
         {{ item.label }}

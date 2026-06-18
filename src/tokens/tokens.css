@@ -73,7 +73,21 @@
 
   /* ── motion ──────────────────────────────────── */
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  /* Three-step motion scale, themeable like everything else. fast = state
+     feedback (hover/press/focus); medium = transforms & most enter/exit;
+     slow = larger reveals (disclosure height, drawer slide).
+
+     Exposed under BOTH names on purpose: `--duration-*` for the explicit
+     `duration-[var(--duration-fast)]` form already used across components, and
+     `--transition-duration-*` so Tailwind v4 emits the short `duration-medium`
+     utility (v4 reads duration utilities from the --transition-duration-*
+     namespace, not --duration-*). They reference one source so values can't drift. */
   --duration-fast: 160ms;
+  --duration-medium: 220ms;
+  --duration-slow: 320ms;
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-medium: var(--duration-medium);
+  --transition-duration-slow: var(--duration-slow);
 
   /* ── type ────────────────────────────────────── */
   --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
@@ -272,6 +286,26 @@
 .lp-skin-panel > * {
   position: relative;
   z-index: 1;
+}
+
+/* ── circular theme reveal (View Transitions) ────
+   applyThemeWithTransition() snapshots the page, swaps the theme tokens, then
+   shrinks a clip-path circle in the OLD snapshot from the toggle's position,
+   revealing the new theme through the hole. The browser's default root
+   cross-fade would smear that, so we disable it: both snapshots hold full
+   opacity and don't blend — only the JS-driven circle animates. The NEW layer
+   sits beneath, full-screen and static; the OLD layer is on top and gets
+   clipped away. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}
+::view-transition-old(root) {
+  z-index: 2;
 }
 
 /* ── reduced motion ──────────────────────────────

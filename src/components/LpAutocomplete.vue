@@ -23,7 +23,7 @@ import {
 } from "reka-ui"
 import { computed, ref, watch } from "vue"
 import { useInputFilter } from "../composables/useInputFilter"
-import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
+import { CLOSE_ICON, OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
 export interface AutocompleteOption {
@@ -195,11 +195,15 @@ function clear() {
       <button
         v-if="clearable && hasValue"
         type="button"
-        class="flex shrink-0 items-center text-muted hover:text-ink"
+        class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
         aria-label="Clear"
         @pointerdown.prevent="clear"
       >
-        <LpIcon name="lucide:x" :size="16" />
+        <LpIcon
+          name="lucide:x"
+          :size="16"
+          :class="CLOSE_ICON"
+        />
       </button>
     </ComboboxAnchor>
 

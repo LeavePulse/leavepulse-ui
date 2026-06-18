@@ -10,6 +10,8 @@ const props = withDefaults(
     max?: number
     step?: number
     disabled?: boolean
+    /** Accessible name for the thumb when there's no visible label. */
+    ariaLabel?: string
   }>(),
   { modelValue: 0, min: 0, max: 100, step: 1 },
 )
@@ -44,7 +46,8 @@ function onCommit(v: number[] | undefined) {
       <SliderRange class="absolute h-full rounded-pill bg-brand" />
     </SliderTrack>
     <SliderThumb
-      class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      :aria-label="ariaLabel"
+      class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
     />
   </SliderRoot>
 </template>

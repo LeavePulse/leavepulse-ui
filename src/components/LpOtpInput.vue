@@ -67,6 +67,7 @@ const cellSize = {
       v-for="i in length"
       :key="i"
       :index="i - 1"
+      :aria-invalid="invalid || undefined"
       :class="[
         cellSize[size],
         'rounded-control border bg-surface-soft text-center font-semibold text-ink caret-brand',

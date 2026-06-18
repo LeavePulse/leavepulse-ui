@@ -22,7 +22,7 @@ const bar: Record<string, string> = {
     class="h-1.5 w-full overflow-hidden rounded-pill bg-surface-soft"
   >
     <ProgressIndicator
-      class="h-full rounded-pill transition-[width] duration-300 ease-[var(--ease-emphasized)]"
+      class="h-full rounded-pill transition-[width] duration-slow ease-[var(--ease-emphasized)]"
       :class="bar[tone]"
       :style="{ width: `${pct}%` }"
     />

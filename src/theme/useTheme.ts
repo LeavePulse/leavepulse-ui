@@ -44,6 +44,77 @@ export function applyTheme(theme: TokenSet, root: HTMLElement = document.documen
   root.style.colorScheme = theme.mode
 }
 
+/** Point a circular theme reveal expands from (viewport px). */
+export interface RevealOrigin {
+  x: number
+  y: number
+}
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (cb: () => void) => { ready: Promise<void>; finished: Promise<void> }
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
+  )
+}
+
+/*
+ * Apply a theme with the "circular reveal" transition — a clip-path circle
+ * grows from `origin` (usually the toggle button's centre), repainting the page
+ * underneath. Uses the View Transitions API; falls back to a plain applyTheme
+ * when it's unsupported or the user prefers reduced motion (so behaviour is
+ * identical, just without the animation). The actual token write still happens
+ * through applyTheme, so this stays a thin wrapper — no duplicated var logic.
+ */
+export function applyThemeWithTransition(
+  theme: TokenSet,
+  origin?: RevealOrigin,
+  root: HTMLElement = document.documentElement,
+  durationMs = 480,
+): void {
+  const doc = document as ViewTransitionDocument
+  if (typeof doc.startViewTransition !== "function" || prefersReducedMotion()) {
+    applyTheme(theme, root)
+    return
+  }
+
+  // Centre of the viewport is the default origin if no click point is given.
+  const x = origin?.x ?? window.innerWidth / 2
+  const y = origin?.y ?? window.innerHeight / 2
+  // Radius that reaches the farthest viewport corner from the origin.
+  const endRadius = Math.hypot(
+    Math.max(x, window.innerWidth - x),
+    Math.max(y, window.innerHeight - y),
+  )
+
+  const transition = doc.startViewTransition(() => applyTheme(theme, root))
+  transition.ready.then(() => {
+    // Animate the OLD snapshot shrinking to a point, revealing the (already
+    // repainted) live page underneath through the growing hole. Clipping the
+    // old layer — not growing the new one — avoids a one-frame flash of the new
+    // theme before the circle starts, which read as the theme "changing twice".
+    root.animate(
+      {
+        clipPath: [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`],
+      },
+      {
+        duration: durationMs,
+        easing: "cubic-bezier(0.2, 0, 0, 1)",
+        // Hold the fully-shrunk circle after the keyframes end. Without it the
+        // old snapshot snaps back to its default (un-clipped) state for the one
+        // frame between animation-end and the browser tearing down the
+        // view-transition pseudo-elements — that flash is the old theme
+        // "blinking" at the very end.
+        fill: "forwards",
+        pseudoElement: "::view-transition-old(root)",
+      },
+    )
+  })
+}
+
 export function serializeTheme(theme: TokenSet): string {
   return JSON.stringify(theme)
 }
@@ -122,6 +193,15 @@ export function useTheme() {
   return {
     apply: (theme: TokenSet) => {
       applyTheme(theme)
+      cacheTheme(theme)
+    },
+    /**
+     * Apply + cache a theme with the circular reveal animation. Pass the click
+     * point (e.g. from a toggle's `event`) as `origin` so the circle grows from
+     * the button; omit it to reveal from the viewport centre.
+     */
+    applyWithTransition: (theme: TokenSet, origin?: RevealOrigin) => {
+      applyThemeWithTransition(theme, origin)
       cacheTheme(theme)
     },
     serialize: serializeTheme,

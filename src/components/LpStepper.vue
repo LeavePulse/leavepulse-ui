@@ -14,6 +14,7 @@ defineProps<{ steps: Step[]; current: number }>()
       v-for="(step, i) in steps"
       :key="i"
       class="flex flex-1 items-center gap-2 last:flex-none"
+      :aria-current="i === current ? 'step' : undefined"
     >
       <div class="flex items-center gap-2">
         <span
@@ -29,6 +30,10 @@ defineProps<{ steps: Step[]; current: number }>()
         </span>
         <span class="text-sm" :class="i <= current ? 'text-ink' : 'text-muted'">
           {{ step.label }}
+          <!-- Status for screen readers; the colour/check are visual only. -->
+          <span class="sr-only">{{
+            i < current ? "(completed)" : i === current ? "(current step)" : ""
+          }}</span>
         </span>
       </div>
       <span

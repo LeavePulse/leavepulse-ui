@@ -32,17 +32,25 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
     @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
   >
     <NumberFieldDecrement
-      class="grid h-full w-8 place-items-center text-muted hover:text-ink disabled:opacity-40"
+      class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
-      <LpIcon name="lucide:minus" :size="15" />
+      <LpIcon
+        name="lucide:minus"
+        :size="15"
+        class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:scale-75 motion-reduce:group-active:scale-100"
+      />
     </NumberFieldDecrement>
     <NumberFieldInput
       class="min-w-0 flex-1 bg-transparent text-center text-sm text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
     />
     <NumberFieldIncrement
-      class="grid h-full w-8 place-items-center text-muted hover:text-ink disabled:opacity-40"
+      class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
-      <LpIcon name="lucide:plus" :size="15" />
+      <LpIcon
+        name="lucide:plus"
+        :size="15"
+        class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:scale-75 motion-reduce:group-active:scale-100"
+      />
     </NumberFieldIncrement>
   </NumberFieldRoot>
 </template>

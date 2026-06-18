@@ -5,6 +5,7 @@ defineProps<{ rounded?: "control" | "card" | "pill" }>()
 
 <template>
   <div
+    aria-hidden="true"
     class="animate-pulse bg-surface-soft"
     :class="{
       'rounded-control': rounded === 'control' || !rounded,

@@ -1,83 +1,154 @@
 <script setup lang="ts">
 /*
- * Side panel built on reka Dialog. Slides in from left/right with overlay.
- * Used for filter panels, nav drawers, etc.
+ * Side / bottom panel built on vaul-vue (drag-driven drawer over reka's Dialog
+ * primitive — same base as the rest of the kit, so accessibility and the token
+ * theming carry over). Over the old reka-Dialog version this adds drag-to-
+ * dismiss with inertia, snap points, a draggable handle and an optional
+ * scale-background effect. Slot/prop surface stays backwards compatible: `side`
+ * still works (mapped onto `direction`), plus `size`/`width`/title/footer.
+ *
+ * scale-background note: the effect scales the page behind the drawer, so the
+ * host app must wrap its root in an element with `[vaul-drawer-wrapper]` (and a
+ * solid background) for vaul to find and transform. Without it the drawer still
+ * works — the background just doesn't scale.
  */
 import {
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-} from "reka-ui"
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHandle,
+  DrawerOverlay,
+  DrawerPortal,
+  DrawerRoot,
+  DrawerTitle,
+} from "vaul-vue"
 import { computed } from "vue"
+import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+
+type Direction = "top" | "bottom" | "left" | "right"
 
 const props = withDefaults(
   defineProps<{
     open?: boolean
+    /** Edge the drawer attaches to. `side` is a back-compat alias (left/right). */
+    direction?: Direction
     side?: "left" | "right"
     title?: string
     description?: string
-    /** Width preset. sm≈22rem, md≈28rem, lg≈36rem, xl≈48rem. */
+    /** Size preset along the drawer's main axis (width for left/right, height for top/bottom). */
     size?: "sm" | "md" | "lg" | "xl"
-    /** Explicit width override (any CSS length), wins over `size`. */
+    /** Explicit size override (any CSS length), wins over `size`. */
     width?: string
+    /** Drag-to-dismiss + click-outside. Set false to force a controlled close. */
+    dismissible?: boolean
+    /** Fractions (0–1) or px strings the drawer snaps between, nearest edge first. */
+    snapPoints?: (number | string)[]
+    /** Show the drag handle (auto-on for bottom/top sheets). */
+    handle?: boolean
+    /** Only the handle initiates a drag — frees inner content to scroll. */
+    handleOnly?: boolean
+    /** Scale the [vaul-drawer-wrapper] background while open. */
+    scaleBackground?: boolean
+    /** Drag fraction (0–1) past which a release dismisses. */
+    closeThreshold?: number
   }>(),
-  { side: "right", size: "sm" },
+  { side: "right", size: "sm", dismissible: true },
 )
 
-defineEmits<{ (e: "update:open", value: boolean): void }>()
+const emit = defineEmits<{
+  (e: "update:open", value: boolean): void
+}>()
 
-const sideClass = computed(() =>
-  props.side === "left"
-    ? "left-0 data-[state=open]:animate-[drawer-in-left_220ms_var(--ease-emphasized)] data-[state=closed]:animate-[drawer-out-left_180ms_ease]"
-    : "right-0 data-[state=open]:animate-[drawer-in-right_220ms_var(--ease-emphasized)] data-[state=closed]:animate-[drawer-out-right_180ms_ease]",
-)
+// `direction` wins; otherwise fall back to the legacy `side`.
+const dir = computed<Direction>(() => props.direction ?? props.side ?? "right")
+const isHorizontal = computed(() => dir.value === "left" || dir.value === "right")
+const isSheet = computed(() => dir.value === "top" || dir.value === "bottom")
 
-const widthClass = computed(() => {
-  if (props.width) return ""
-  return {
-    sm: "w-[min(90vw,22rem)]",
-    md: "w-[min(92vw,28rem)]",
-    lg: "w-[min(94vw,36rem)]",
-    xl: "w-[min(95vw,48rem)]",
-  }[props.size]
+// Handle defaults on for top/bottom sheets (where dragging a handle is the norm).
+const showHandle = computed(() => props.handle ?? isSheet.value)
+
+const SIZES = { sm: 22, md: 28, lg: 36, xl: 48 } // rem along the main axis
+
+// Geometry per edge. The cross-axis is pinned to the viewport; the main axis
+// takes the size preset. vaul drives the open/close transform itself, so we
+// don't add slide keyframes — only the resting box + rounding toward the centre.
+const contentClass = computed(() => {
+  const base = "fixed z-(--z-modal) flex flex-col border-line bg-surface-raised shadow-panel outline-none"
+  const map: Record<Direction, string> = {
+    left: "inset-y-0 left-0 border-r rounded-r-card",
+    right: "inset-y-0 right-0 border-l rounded-l-card",
+    top: "inset-x-0 top-0 border-b rounded-b-card",
+    bottom: "inset-x-0 bottom-0 border-t rounded-t-card",
+  }
+  return [base, map[dir.value]]
 })
+
+const sizeStyle = computed(() => {
+  // When snapPoints drive the height, let vaul own the main-axis size.
+  if (props.snapPoints?.length && isSheet.value) return undefined
+  const len = props.width ?? `min(${isHorizontal.value ? "94vw" : "94vh"}, ${SIZES[props.size]}rem)`
+  return isHorizontal.value ? { width: len } : { height: len }
+})
+
+const padClass = computed(() => (showHandle.value && isSheet.value ? "px-5 pb-5 pt-2" : "p-5"))
 </script>
 
 <template>
-  <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
-    <DialogPortal>
-      <DialogOverlay
+  <DrawerRoot
+    :open="open"
+    :direction="dir"
+    :dismissible="dismissible"
+    :snap-points="snapPoints"
+    :handle-only="handleOnly"
+    :should-scale-background="scaleBackground"
+    :close-threshold="closeThreshold"
+    @update:open="(v: boolean) => emit('update:open', v)"
+  >
+    <DrawerPortal>
+      <DrawerOverlay
         class="fixed inset-0 z-(--z-overlay) bg-black/50 backdrop-blur-sm data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
-      <DialogContent
-        class="fixed inset-y-0 z-(--z-modal) flex flex-col border-line bg-surface-raised p-5 shadow-panel outline-none"
-        :class="[side === 'left' ? 'border-r' : 'border-l', sideClass, widthClass]"
-        :style="width ? { width } : undefined"
-      >
-        <header v-if="title || $slots.title" class="mb-4 flex items-start justify-between gap-4">
+      <DrawerContent :class="contentClass" :style="sizeStyle">
+        <!-- Drag handle: a pill the user grabs; vaul wires the drag to it. -->
+        <DrawerHandle
+          v-if="showHandle"
+          class="mx-auto my-2 h-1.5 w-12 shrink-0 cursor-grab rounded-pill bg-line-strong transition-colors hover:bg-muted active:cursor-grabbing"
+        />
+
+        <header
+          v-if="title || $slots.title"
+          class="flex items-start justify-between gap-4"
+          :class="padClass.includes('pt-2') ? 'px-5' : 'mb-4'"
+        >
           <div class="flex flex-col gap-1">
-            <DialogTitle class="text-base font-semibold text-ink">
+            <DrawerTitle class="text-base font-semibold text-ink">
               <slot name="title">{{ title }}</slot>
-            </DialogTitle>
-            <DialogDescription v-if="description" class="text-sm text-muted">
+            </DrawerTitle>
+            <DrawerDescription v-if="description" class="text-sm text-muted">
               {{ description }}
-            </DialogDescription>
+            </DrawerDescription>
           </div>
-          <DialogClose
-            class="flex shrink-0 items-center rounded-md p-1 text-muted hover:text-ink"
+          <DrawerClose
+            class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close"
           >
-            <LpIcon name="lucide:x" :size="18" />
-          </DialogClose>
+            <LpIcon
+              name="lucide:x"
+              :size="18"
+              :class="CLOSE_ICON"
+            />
+          </DrawerClose>
         </header>
-        <div class="min-h-0 flex-1 overflow-auto"><slot /></div>
-        <footer v-if="$slots.footer" class="mt-4 flex justify-end gap-2"><slot name="footer" /></footer>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+
+        <div class="min-h-0 flex-1 overflow-auto" :class="padClass">
+          <slot />
+        </div>
+
+        <footer v-if="$slots.footer" class="flex justify-end gap-2 px-5 pb-5 pt-4">
+          <slot name="footer" />
+        </footer>
+      </DrawerContent>
+    </DrawerPortal>
+  </DrawerRoot>
 </template>
