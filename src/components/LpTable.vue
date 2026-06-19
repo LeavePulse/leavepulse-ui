@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
 import { computed } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
+import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 
 export interface TableColumn<Row> {
@@ -36,6 +37,9 @@ const props = withDefaults(
     sort?: SortState | null
     /** Pin the header while the body scrolls. Pair with a height on the wrapper. */
     stickyHeader?: boolean
+    /** Per-row right-click menu. Return [] (or omit the prop) to disable it for
+     *  a row; the row then keeps the browser's native context menu. */
+    rowMenu?: (row: T) => ContextMenuItemDef[]
   }>(),
   {
     emptyLabel: "Nothing here yet",
@@ -62,6 +66,12 @@ function alignClass(align?: "left" | "right" | "center"): string {
   if (align === "right") return "text-right"
   if (align === "center") return "text-center"
   return "text-left"
+}
+
+// Resolved right-click menu for a row, or [] when none — keeps the template
+// branch simple and avoids calling rowMenu twice per row.
+function menuFor(row: T): ContextMenuItemDef[] {
+  return props.rowMenu?.(row) ?? []
 }
 
 // ── sorting ──────────────────────────────────────────────────
@@ -175,30 +185,38 @@ const colSpan = computed(() => props.columns.length + (props.selectable ? 1 : 0)
             <div>{{ emptyLabel }}</div>
           </td>
         </tr>
-        <tr
+        <!-- Each row is wrapped in a right-click menu; with no rowMenu (or an
+             empty result) LpContextMenu is a passthrough and the row keeps the
+             browser's native menu. It renders via as-child, so the DOM stays a
+             bare <tr> either way. -->
+        <LpContextMenu
           v-for="(row, index) in displayRows"
           :key="keyFor(row, index)"
-          class="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft/60"
-          :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
-          @click="emit('rowClick', row)"
+          :items="menuFor(row)"
         >
-          <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
-            <LpCheckbox
-              :model-value="selectedSet.has(keyFor(row, index))"
-              @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
-            />
-          </td>
-          <td
-            v-for="col in columns"
-            :key="col.key"
-            class="px-4 py-3 text-ink"
-            :class="alignClass(col.align)"
+          <tr
+            class="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft/60"
+            :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
+            @click="emit('rowClick', row)"
           >
-            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
-              {{ row[col.key] }}
-            </slot>
-          </td>
-        </tr>
+            <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
+              <LpCheckbox
+                :model-value="selectedSet.has(keyFor(row, index))"
+                @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
+              />
+            </td>
+            <td
+              v-for="col in columns"
+              :key="col.key"
+              class="px-4 py-3 text-ink"
+              :class="alignClass(col.align)"
+            >
+              <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
+                {{ row[col.key] }}
+              </slot>
+            </td>
+          </tr>
+        </LpContextMenu>
       </tbody>
     </table>
   </div>

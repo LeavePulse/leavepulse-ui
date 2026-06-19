@@ -17,6 +17,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "reka-ui"
+import { computed } from "vue"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
@@ -33,7 +34,12 @@ export interface ContextMenuItemDef {
   children?: ContextMenuItemDef[]
 }
 
-defineProps<{ items: ContextMenuItemDef[] }>()
+const props = defineProps<{ items: ContextMenuItemDef[] }>()
+
+// With no items, render just the trigger slot — no reka machinery — so the
+// element keeps the browser's native context menu. Lets callers wrap
+// unconditionally and pass [] to opt out per element.
+const enabled = computed(() => props.items.length > 0)
 
 const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
 const ITEM =
@@ -43,7 +49,9 @@ const ICON =
 </script>
 
 <template>
-  <ContextMenuRoot>
+  <slot v-if="!enabled" />
+
+  <ContextMenuRoot v-else>
     <ContextMenuTrigger as-child>
       <slot />
     </ContextMenuTrigger>

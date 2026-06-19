@@ -6,29 +6,19 @@
  * Items carry an optional badge count. Header/footer slots hold a logo, a
  * collapse control, a user chip, etc. Data-driven: bind the active id with
  * v-model. Each item can route via href (rendered as <a>) or just emit select.
+ *
+ * Phones: set `responsive` and the rail hides below the `mobileBreakpoint` and
+ * is replaced by a swipeable LpDrawer (vaul-vue gives drag-to-close for free).
+ * The host owns the burger button and binds v-model:open; selecting an item
+ * auto-closes the drawer. With `responsive` off the component renders exactly
+ * the static <nav> it always has — existing call sites are unaffected.
  */
-import { Motion } from "motion-v"
-import { useId } from "vue"
-import { usePillTransition } from "../composables/usePillTransition"
-import LpBadge from "./LpBadge.vue"
-import LpIcon from "./LpIcon.vue"
+import { computed, useId } from "vue"
+import LpDrawer from "./LpDrawer.vue"
+import LpSidebarNav from "./LpSidebarNav.vue"
+import type { SidebarItem, SidebarSection } from "./sidebar"
 
-export interface SidebarItem {
-  id: string
-  label: string
-  icon?: string
-  /** Render as a link instead of a button. */
-  href?: string
-  /** Count chip on the right (number or short string). */
-  badge?: number | string
-  disabled?: boolean
-}
-
-export interface SidebarSection {
-  /** Optional heading above the group. */
-  title?: string
-  items: SidebarItem[]
-}
+export type { SidebarItem, SidebarSection } from "./sidebar"
 
 const props = withDefaults(
   defineProps<{
@@ -49,18 +39,34 @@ const props = withDefaults(
     skeletonRows?: number
     /** Render the user/header skeleton row too (paired with a #header avatar). */
     skeletonHeader?: boolean
+    /**
+     * Collapse to a swipeable drawer on phones. Off by default so existing
+     * static-rail usage is unchanged.
+     */
+    responsive?: boolean
+    /** Drawer open state on mobile (v-model:open). Only used when `responsive`. */
+    open?: boolean
+    /** Tailwind breakpoint below which the drawer takes over. */
+    mobileBreakpoint?: "sm" | "md" | "lg" | "xl"
   }>(),
-  { skeletonRows: 6, skeletonHeader: true },
+  {
+    skeletonRows: 6,
+    skeletonHeader: true,
+    responsive: false,
+    mobileBreakpoint: "md",
+  },
 )
 
 const emit = defineEmits<{
   (e: "update:modelValue", id: string): void
+  (e: "update:open", value: boolean): void
   (e: "select", item: SidebarItem): void
 }>()
 
 // Normalise both inputs to a single section list.
-const groups = (): SidebarSection[] =>
-  props.sections ?? (props.items ? [{ items: props.items }] : [])
+const groups = computed<SidebarSection[]>(() =>
+  props.sections ?? (props.items ? [{ items: props.items }] : []),
+)
 
 function itemActive(item: SidebarItem): boolean {
   return props.isActive ? props.isActive(item) : item.id === props.modelValue
@@ -70,101 +76,96 @@ function activate(item: SidebarItem) {
   if (item.disabled) return
   emit("update:modelValue", item.id)
   emit("select", item)
+  // Selecting an item dismisses the mobile drawer; harmless on desktop.
+  if (props.responsive && props.open) emit("update:open", false)
 }
 
-const pillId = `lp-sidebar-${useId()}`
-const pillTransition = usePillTransition()
+// Each shell (rail vs drawer) gets its own pill layoutId: when responsive they
+// can be mounted at once, and a shared layoutId would make motion-v tug one pill
+// between two live elements.
+const baseId = `lp-sidebar-${useId()}`
+const railPillId = `${baseId}-rail`
+const drawerPillId = `${baseId}-drawer`
+
+// Hide the static rail at/under the breakpoint when responsive; otherwise the
+// rail is always shown and the drawer is never rendered.
+const RAIL_VISIBILITY: Record<NonNullable<typeof props.mobileBreakpoint>, string> = {
+  sm: "hidden sm:flex",
+  md: "hidden md:flex",
+  lg: "hidden lg:flex",
+  xl: "hidden xl:flex",
+}
+const railClass = computed(() =>
+  props.responsive ? RAIL_VISIBILITY[props.mobileBreakpoint] : "flex",
+)
 </script>
 
 <template>
+  <!-- Desktop / always-on rail -->
   <nav
-    class="flex h-full w-60 flex-col gap-1 border-r border-line bg-surface-raised p-3"
+    class="h-full w-60 flex-col gap-1 border-r border-line bg-surface-raised p-3"
+    :class="railClass"
     aria-label="Sidebar"
   >
     <div v-if="$slots.header" class="mb-2 shrink-0">
       <slot name="header" />
     </div>
 
-    <!-- Loading skeleton: an optional identity row + a run of item rows. -->
-    <div v-if="loading" class="flex min-h-0 flex-1 flex-col gap-4">
-      <div v-if="skeletonHeader" class="flex items-center gap-3 px-1">
-        <div class="size-10 shrink-0 animate-pulse rounded-pill bg-surface-soft" />
-        <div class="flex-1 space-y-2">
-          <div class="h-3.5 w-24 animate-pulse rounded bg-surface-soft" />
-          <div class="h-3 w-16 animate-pulse rounded bg-surface-soft/60" />
-        </div>
-      </div>
-      <div class="space-y-1">
-        <div
-          v-for="n in skeletonRows"
-          :key="n"
-          class="h-9 animate-pulse rounded-control bg-surface-soft"
-        />
-      </div>
-    </div>
-
-    <div v-else class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-      <div v-for="(section, si) in groups()" :key="si" class="flex flex-col gap-0.5">
-        <p
-          v-if="section.title"
-          class="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
-        >
-          {{ section.title }}
-        </p>
-
-        <component
-          :is="item.href && !item.disabled ? 'a' : 'button'"
-          v-for="item in section.items"
-          :key="item.id"
-          :href="item.href && !item.disabled ? item.href : undefined"
-          :type="item.href ? undefined : 'button'"
-          :disabled="item.href ? undefined : item.disabled"
-          :aria-current="itemActive(item) ? 'page' : undefined"
-          :aria-disabled="item.disabled || undefined"
-          class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
-          :class="item.disabled
-            ? 'cursor-not-allowed text-muted/50'
-            : itemActive(item)
-              ? 'text-ink'
-              : 'text-muted hover:text-ink'"
-          @click="activate(item)"
-        >
-          <!-- Sliding active pill -->
-          <Motion
-            v-if="itemActive(item)"
-            :layout-id="pillId"
-            :transition="pillTransition"
-            class="absolute inset-0 z-0 rounded-control bg-brand-soft"
-          />
-          <!-- #item slot for fully custom rows; falls back to icon+label+badge. -->
-          <slot name="item" :item="item" :active="itemActive(item)">
-            <LpIcon
-              v-if="item.icon"
-              :name="item.icon"
-              :size="17"
-              class="relative z-10 shrink-0 transition-colors"
-              :class="itemActive(item) ? 'text-brand' : ''"
-            />
-            <span class="relative z-10 min-w-0 flex-1 truncate">{{ item.label }}</span>
-            <LpBadge
-              v-if="item.badge != null"
-              :tone="itemActive(item) ? 'brand' : 'neutral'"
-              class="relative z-10 shrink-0"
-            >
-              {{ item.badge }}
-            </LpBadge>
-          </slot>
-        </component>
-      </div>
-
-      <!-- Actions slot: buttons / promo card under the nav. -->
-      <div v-if="$slots.actions" class="mt-auto flex flex-col gap-2 pt-2">
+    <LpSidebarNav
+      :groups="groups"
+      :pill-id="railPillId"
+      :item-active="itemActive"
+      :loading="loading"
+      :skeleton-rows="skeletonRows"
+      :skeleton-header="skeletonHeader"
+      @activate="activate"
+    >
+      <template v-if="$slots.item" #item="slotProps">
+        <slot name="item" v-bind="slotProps" />
+      </template>
+      <template v-if="$slots.actions" #actions>
         <slot name="actions" />
-      </div>
-    </div>
+      </template>
+    </LpSidebarNav>
 
     <div v-if="$slots.footer" class="mt-2 shrink-0 border-t border-line pt-3">
       <slot name="footer" />
     </div>
   </nav>
+
+  <!-- Mobile: same nav inside a swipeable drawer (drag-to-close via vaul). -->
+  <LpDrawer
+    v-if="responsive"
+    :open="open"
+    direction="left"
+    size="sm"
+    @update:open="(v) => emit('update:open', v)"
+  >
+    <div class="flex h-full flex-col gap-1">
+      <div v-if="$slots.header" class="mb-2 shrink-0">
+        <slot name="header" />
+      </div>
+
+      <LpSidebarNav
+        :groups="groups"
+        :pill-id="drawerPillId"
+        :item-active="itemActive"
+        :loading="loading"
+        :skeleton-rows="skeletonRows"
+        :skeleton-header="skeletonHeader"
+        @activate="activate"
+      >
+        <template v-if="$slots.item" #item="slotProps">
+          <slot name="item" v-bind="slotProps" />
+        </template>
+        <template v-if="$slots.actions" #actions>
+          <slot name="actions" />
+        </template>
+      </LpSidebarNav>
+
+      <div v-if="$slots.footer" class="mt-2 shrink-0 border-t border-line pt-3">
+        <slot name="footer" />
+      </div>
+    </div>
+  </LpDrawer>
 </template>

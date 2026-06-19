@@ -1,18 +1,19 @@
 <script setup lang="ts">
 /*
  * Notification bell: an icon button with an unread badge that opens a popover
- * feed. Presentational and data-driven — the consumer fetches via the SDK and
- * binds `items` / `unread-count`, and reacts to `mark-read` / `mark-all-read` /
- * `open`. Mirrors the kit convention (cf. LpSidebar): data in, events out, no
- * data fetching inside the component.
+ * feed on click, and a quick-action context menu on right-click. Presentational
+ * and data-driven — the consumer fetches via the SDK and binds `items` /
+ * `unread-count`, and reacts to `mark-read` / `mark-all-read` / `open`. Mirrors
+ * the kit convention (cf. LpSidebar): data in, events out, no data fetching
+ * inside the component.
  */
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
 import { computed } from "vue"
-import { POPOVER_PANEL } from "./dropdown"
 import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
+import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
+import LpPopover from "./LpPopover.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 
 export interface NotificationItem {
@@ -41,6 +42,8 @@ const props = withDefaults(
     title?: string
     /** Cap the badge display (e.g. "9+"). */
     maxBadge?: number
+    /** Right-click menu items; overrides the built-in quick actions. */
+    menuItems?: ContextMenuItemDef[]
   }>(),
   { items: () => [], maxBadge: 9 },
 )
@@ -60,9 +63,30 @@ const badgeLabel = computed(() =>
 )
 const hasUnread = computed(() => unread.value > 0)
 
-function onOpenChange(open: boolean) {
-  emit("update:open", open)
+// Forward open changes (v-model:open) so the consumer can lazy-load the feed
+// when the popover opens. When `open` is left unbound LpPopover stays
+// uncontrolled and reka manages it on trigger click.
+function onOpenChange(open: boolean | undefined) {
+  emit("update:open", !!open)
 }
+
+// Right-click quick actions on the bell. Defaults to "open feed" + "mark all
+// read"; a consumer can replace the whole list via `menuItems`.
+const contextMenu = computed<ContextMenuItemDef[]>(() =>
+  props.menuItems ?? [
+    {
+      label: "Open notifications",
+      icon: "lucide:bell",
+      onSelect: () => emit("update:open", true),
+    },
+    {
+      label: "Mark all read",
+      icon: "lucide:check-check",
+      disabled: !hasUnread.value,
+      onSelect: () => emit("markAllRead"),
+    },
+  ],
+)
 
 function onSelect(item: NotificationItem) {
   if (!item.read) emit("markRead", item.id)
@@ -87,86 +111,86 @@ function timeAgo(iso?: string): string {
 </script>
 
 <template>
-  <PopoverRoot :open="open" @update:open="onOpenChange">
-    <PopoverTrigger as-child>
+  <LpPopover
+    side="bottom"
+    align="end"
+    :side-offset="8"
+    panel-class="w-80 p-0"
+    :open="open"
+    @update:open="onOpenChange"
+  >
+    <template #trigger>
       <slot name="trigger" :unread="unread">
-        <LpButton variant="ghost" size="sm" class="relative" aria-label="Notifications">
-          <LpIcon name="lucide:bell" :size="18" />
-          <LpBadge
-            v-if="hasUnread"
-            tone="danger"
-            class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4"
-          >
-            {{ badgeLabel }}
-          </LpBadge>
-        </LpButton>
-      </slot>
-    </PopoverTrigger>
-
-    <PopoverPortal>
-      <PopoverContent
-        side="bottom"
-        align="end"
-        :side-offset="8"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) w-80 rounded-card p-0 text-sm text-ink outline-none']"
-      >
-        <header class="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
-          <span class="font-semibold">{{ title ?? "Notifications" }}</span>
-          <button
-            v-if="hasUnread"
-            type="button"
-            class="text-xs font-medium text-brand outline-none hover:underline focus-visible:underline"
-            @click="emit('markAllRead')"
-          >
-            Mark all read
-          </button>
-        </header>
-
-        <div v-if="loading" class="space-y-2 p-3">
-          <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-control bg-surface-soft" />
-        </div>
-
-        <LpEmptyState
-          v-else-if="!items.length"
-          icon="lucide:bell-off"
-          :title="emptyLabel ?? 'No notifications'"
-          class="px-3 py-8"
-        />
-
-        <LpScrollArea v-else class="max-h-96" content-class="flex flex-col">
-          <component
-            :is="item.link ? 'a' : 'button'"
-            v-for="item in items"
-            :key="item.id"
-            :href="item.link || undefined"
-            :type="item.link ? undefined : 'button'"
-            class="group/notif flex items-start gap-3 border-b border-line px-3 py-2.5 text-left outline-none transition-colors last:border-b-0 hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
-            :class="item.read ? '' : 'bg-brand-soft/40'"
-            @click="onSelect(item)"
-          >
-            <span
-              class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-control"
-              :class="item.read ? 'bg-surface-soft text-muted' : 'bg-brand-soft text-brand'"
+        <LpContextMenu :items="contextMenu">
+          <LpButton variant="ghost" size="sm" class="relative" aria-label="Notifications">
+            <LpIcon name="lucide:bell" :size="18" />
+            <LpBadge
+              v-if="hasUnread"
+              tone="danger"
+              class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4"
             >
-              <LpIcon :name="item.icon || 'lucide:bell'" :size="16" />
+              {{ badgeLabel }}
+            </LpBadge>
+          </LpButton>
+        </LpContextMenu>
+      </slot>
+    </template>
+
+    <header class="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+      <span class="font-semibold">{{ title ?? "Notifications" }}</span>
+      <button
+        v-if="hasUnread"
+        type="button"
+        class="text-xs font-medium text-brand outline-none hover:underline focus-visible:underline"
+        @click="emit('markAllRead')"
+      >
+        Mark all read
+      </button>
+    </header>
+
+    <div v-if="loading" class="space-y-2 p-3">
+      <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-control bg-surface-soft" />
+    </div>
+
+    <LpEmptyState
+      v-else-if="!items.length"
+      icon="lucide:bell-off"
+      :title="emptyLabel ?? 'No notifications'"
+      class="px-3 py-8"
+    />
+
+    <LpScrollArea v-else class="max-h-96" content-class="flex flex-col">
+      <component
+        :is="item.link ? 'a' : 'button'"
+        v-for="item in items"
+        :key="item.id"
+        :href="item.link || undefined"
+        :type="item.link ? undefined : 'button'"
+        class="group/notif flex items-start gap-3 border-b border-line px-3 py-2.5 text-left outline-none transition-colors last:border-b-0 hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+        :class="item.read ? '' : 'bg-brand-soft/40'"
+        @click="onSelect(item)"
+      >
+        <span
+          class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-control"
+          :class="item.read ? 'bg-surface-soft text-muted' : 'bg-brand-soft text-brand'"
+        >
+          <LpIcon :name="item.icon || 'lucide:bell'" :size="16" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="flex items-center gap-2">
+            <span class="truncate font-medium" :class="item.read ? 'text-muted-strong' : 'text-ink'">
+              {{ item.title }}
             </span>
-            <span class="min-w-0 flex-1">
-              <span class="flex items-center gap-2">
-                <span class="truncate font-medium" :class="item.read ? 'text-muted-strong' : 'text-ink'">
-                  {{ item.title }}
-                </span>
-                <span v-if="!item.read" class="size-1.5 shrink-0 rounded-full bg-brand" />
-              </span>
-              <span v-if="item.body" class="mt-0.5 line-clamp-2 block text-xs text-muted">
-                {{ item.body }}
-              </span>
-              <span v-if="item.createdAt" class="mt-1 block text-[11px] text-muted/80">
-                {{ timeAgo(item.createdAt) }}
-              </span>
-            </span>
-          </component>
-        </LpScrollArea>
-      </PopoverContent>
-    </PopoverPortal>
-  </PopoverRoot>
+            <span v-if="!item.read" class="size-1.5 shrink-0 rounded-full bg-brand" />
+          </span>
+          <span v-if="item.body" class="mt-0.5 line-clamp-2 block text-xs text-muted">
+            {{ item.body }}
+          </span>
+          <span v-if="item.createdAt" class="mt-1 block text-[11px] text-muted/80">
+            {{ timeAgo(item.createdAt) }}
+          </span>
+        </span>
+      </component>
+    </LpScrollArea>
+  </LpPopover>
 </template>

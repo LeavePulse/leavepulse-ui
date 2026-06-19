@@ -22,7 +22,7 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from "vaul-vue"
-import { computed } from "vue"
+import { computed, useSlots } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
@@ -91,7 +91,21 @@ const sizeStyle = computed(() => {
   return isHorizontal.value ? { width: len } : { height: len }
 })
 
-const padClass = computed(() => (showHandle.value && isSheet.value ? "px-5 pb-5 pt-2" : "p-5"))
+const slots = useSlots()
+const hasHeader = computed(() => Boolean(props.title || slots.title))
+
+// Body padding. The handle or the header already own the top edge, so drop the
+// body's top padding when either is present; otherwise pad evenly.
+const padClass = computed(() => {
+  const horizontal = "px-5 pb-5"
+  if (showHandle.value || hasHeader.value) return `${horizontal} pt-0`
+  return "p-5"
+})
+
+// Header padding is edge-independent (the side-drawer bug was deriving it from
+// padClass, which left side drawers with no horizontal inset). Always inset
+// horizontally + separate from the body; trim the top when a handle sits above.
+const headerClass = computed(() => (showHandle.value ? "px-5 pb-4 pt-1" : "px-5 pb-4 pt-5"))
 </script>
 
 <template>
@@ -117,9 +131,9 @@ const padClass = computed(() => (showHandle.value && isSheet.value ? "px-5 pb-5 
         />
 
         <header
-          v-if="title || $slots.title"
+          v-if="hasHeader"
           class="flex items-start justify-between gap-4"
-          :class="padClass.includes('pt-2') ? 'px-5' : 'mb-4'"
+          :class="headerClass"
         >
           <div class="flex flex-col gap-1">
             <DrawerTitle class="text-base font-semibold text-ink">

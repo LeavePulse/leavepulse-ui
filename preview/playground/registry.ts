@@ -25,6 +25,7 @@ import {
   LpLink,
   LpLogViewer,
   LpModal,
+  LpNotificationBell,
   LpNumberField,
   LpOtpInput,
   LpPagination,
@@ -231,12 +232,20 @@ export const registry: ComponentEntry[] = [
   {
     id: "card",
     name: "Card",
-    description: "Surface container in raised / flat / ghost.",
+    description: "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu.",
     components: { LpCard },
+    state: () =>
+      reactive({
+        cardMenu: [
+          { label: "Rename", icon: "lucide:pencil" },
+          { label: "Duplicate", icon: "lucide:copy" },
+          { label: "Delete", icon: "lucide:trash-2", danger: true, separatorBefore: true },
+        ],
+      }),
     template: `<div class="grid w-full grid-cols-3 gap-3">
   <LpCard>Raised</LpCard>
   <LpCard variant="flat">Flat</LpCard>
-  <LpCard variant="flat" interactive>Interactive</LpCard>
+  <LpCard variant="flat" interactive :menu-items="cardMenu">Right-click me</LpCard>
 </div>`,
   },
   {
@@ -256,17 +265,27 @@ export const registry: ComponentEntry[] = [
     id: "sidebar",
     name: "Sidebar",
     description:
-      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Mirrors the cabinet/profile sidebars in the apps.",
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). Mirrors the cabinet/profile sidebars in the apps.",
     components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () =>
       reactive({
         active: "overview",
         loading: false,
+        open: false,
         sections: [
           {
             items: [
               { id: "overview", label: "Overview", icon: "lucide:layout-dashboard" },
-              { id: "servers", label: "Servers", icon: "lucide:server", badge: 12 },
+              {
+                id: "servers",
+                label: "Servers",
+                icon: "lucide:server",
+                badge: 12,
+                menu: [
+                  { label: "Open in new tab", icon: "lucide:external-link" },
+                  { label: "Pin", icon: "lucide:pin" },
+                ],
+              },
               { id: "metrics", label: "Metrics", icon: "lucide:activity" },
             ],
           },
@@ -281,11 +300,23 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div class="flex flex-col gap-3">
-  <label class="flex items-center gap-2 text-xs text-muted">
-    <LpSwitch v-model="loading" /> Loading
-  </label>
+  <div class="flex items-center gap-4">
+    <label class="flex items-center gap-2 text-xs text-muted">
+      <LpSwitch v-model="loading" /> Loading
+    </label>
+    <LpButton variant="soft" size="sm" @click="open = true">
+      <LpIcon name="lucide:menu" :size="16" /> Open drawer (mobile)
+    </LpButton>
+  </div>
   <div class="h-[28rem] w-64 overflow-hidden rounded-card border border-line">
-    <LpSidebar v-model="active" :sections="sections" :loading="loading">
+    <LpSidebar
+      v-model="active"
+      v-model:open="open"
+      responsive
+      mobile-breakpoint="sm"
+      :sections="sections"
+      :loading="loading"
+    >
       <template #header>
         <div class="flex items-center gap-2 px-1 py-1 font-semibold text-ink">
           <span class="grid size-8 place-items-center rounded-lg bg-brand text-ink-inverse">
@@ -368,12 +399,21 @@ export const registry: ComponentEntry[] = [
   {
     id: "avatar",
     name: "Avatar",
-    description: "User image with initials fallback, three sizes.",
+    description: "User image with initials fallback, three sizes. Pass `menuItems` for a right-click account menu.",
     components: { LpAvatar },
+    state: () =>
+      reactive({
+        accountMenu: [
+          { label: "View profile", icon: "lucide:user" },
+          { label: "Account settings", icon: "lucide:settings" },
+          { label: "Sign out", icon: "lucide:log-out", danger: true, separatorBefore: true },
+        ],
+      }),
     template: `<div class="flex items-center gap-3">
   <LpAvatar size="sm" fallback="SA" />
   <LpAvatar size="md" fallback="LP" />
-  <LpAvatar size="lg" alt="System Admin" />
+  <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" />
+  <span class="text-sm text-muted">right-click the last one →</span>
 </div>`,
   },
   {
@@ -537,7 +577,7 @@ export const registry: ComponentEntry[] = [
     id: "contextmenu",
     name: "ContextMenu",
     description:
-      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus. Right-click (or long-press) the target.",
+      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element.",
     components: { LpContextMenu },
     state: () =>
       reactive({
@@ -569,6 +609,55 @@ export const registry: ComponentEntry[] = [
     template: `<LpEmptyState icon="lucide:inbox" title="No servers yet" description="Add your first server to start monitoring.">
   <LpButton variant="solid" size="sm">Add server</LpButton>
 </LpEmptyState>`,
+  },
+  {
+    id: "notificationbell",
+    name: "NotificationBell",
+    description:
+      "Icon button with an unread badge that opens a popover feed on click, plus a right-click menu of quick actions (defaults to Open / Mark all read; override via `menuItems`). Data-driven: bind items / unread-count and handle mark-read / mark-all-read / select — no fetching inside. Rows show icon, title, body, relative time and an unread dot; an unread row is tinted and clears on click.",
+    components: { LpNotificationBell },
+    state: () => {
+      const s = reactive({
+        items: [
+          {
+            id: "1",
+            title: "Payment received",
+            body: "Your payment of €12.99 was received.",
+            icon: "lucide:check-circle",
+            createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+            read: false,
+          },
+          {
+            id: "2",
+            title: "Service resumed",
+            body: "ger-01-p is back online.",
+            icon: "lucide:server",
+            createdAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+            read: false,
+          },
+          {
+            id: "3",
+            title: "Invoice available",
+            body: "Your June invoice is ready to view.",
+            icon: "lucide:receipt-text",
+            createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+            read: true,
+          },
+        ],
+        markRead(id: string) {
+          const n = s.items.find((x) => x.id === id)
+          if (n) n.read = true
+        },
+        markAllRead() {
+          for (const n of s.items) n.read = true
+        },
+      })
+      return s
+    },
+    template: `<div class="flex items-center gap-4">
+  <LpNotificationBell :items="items" @mark-read="markRead" @mark-all-read="markAllRead" />
+  <span class="text-sm text-muted">← click to open · right-click for quick actions</span>
+</div>`,
   },
   {
     id: "skeleton",
@@ -796,8 +885,10 @@ export const registry: ComponentEntry[] = [
   {
     id: "popover",
     name: "Popover · Tooltip",
-    description: "Anchored overlays.",
+    description:
+      "Anchored overlays. Popover takes side/align, `side-offset`, `panel-class` (width/padding/overflow) and a controllable `v-model:open`; left unbound it stays uncontrolled.",
     components: { LpPopover, LpTooltip, LpButton },
+    state: () => reactive({ open: false }),
     template: `<div class="flex items-center gap-3">
   <LpTooltip content="I appear on hover">
     <LpButton variant="outline">Hover me</LpButton>
@@ -806,6 +897,19 @@ export const registry: ComponentEntry[] = [
     <template #trigger><LpButton variant="ghost">Open popover</LpButton></template>
     <p class="font-semibold text-ink">Popover content</p>
     <p class="mt-1 text-muted">Anchored, animated, on the popover z-layer.</p>
+  </LpPopover>
+  <!-- Controlled + configured: wider panel, larger offset, end-aligned. -->
+  <LpPopover
+    v-model:open="open"
+    align="end"
+    :side-offset="10"
+    panel-class="w-72"
+  >
+    <template #trigger>
+      <LpButton variant="outline">Controlled ({{ open ? 'open' : 'closed' }})</LpButton>
+    </template>
+    <p class="font-semibold text-ink">v-model:open</p>
+    <p class="mt-1 text-muted">The trigger label tracks the open state via v-model.</p>
   </LpPopover>
 </div>`,
   },
@@ -857,10 +961,10 @@ export const registry: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, and stickyHeader.",
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, and stickyHeader.",
     components: { LpTable, LpBadge },
-    state: () =>
-      reactive({
+    state: () => {
+      const s = reactive({
         sort: { key: "amount", dir: "desc" },
         selected: ["ORD-1041"],
         columns: [
@@ -874,13 +978,35 @@ export const registry: ComponentEntry[] = [
           { id: "ORD-1040", amount: 24, status: "failed" },
           { id: "ORD-1039", amount: 8, status: "paid" },
         ],
-      }),
+        // Per-row menu: returns items for the right-clicked row.
+        rowMenu(row: { id: string; status: string }) {
+          return [
+            { label: "Copy ID", icon: "lucide:copy", onSelect: () => navigator.clipboard?.writeText(row.id) },
+            {
+              label: "Mark as paid",
+              icon: "lucide:check-circle",
+              disabled: row.status === "paid",
+              onSelect: () => { row.status = "paid" },
+              separatorBefore: true,
+            },
+            {
+              label: "Delete",
+              icon: "lucide:trash-2",
+              danger: true,
+              onSelect: () => { s.rows = s.rows.filter((r) => r.id !== row.id) },
+            },
+          ]
+        },
+      })
+      return s
+    },
     template: `<div class="flex flex-col gap-2">
   <LpTable
     :columns="columns"
     :rows="rows"
     row-key="id"
     selectable
+    :row-menu="rowMenu"
     v-model:selected="selected"
     v-model:sort="sort"
   >
@@ -891,7 +1017,7 @@ export const registry: ComponentEntry[] = [
       </LpBadge>
     </template>
   </LpTable>
-  <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected</p>
+  <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row</p>
 </div>`,
   },
   {
