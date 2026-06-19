@@ -685,7 +685,7 @@ export const registry: ComponentEntry[] = [
     id: "log-viewer",
     name: "Log Viewer",
     description:
-      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines.",
+      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines. `compact` folds consecutive identical lines into one, badged ×N.",
     components: { LpLogViewer, LpInput, LpButton, LpSwitch, LpIcon },
     state: () => {
       const samples: { level: string; source: string; message: string }[] = [
@@ -700,6 +700,7 @@ export const registry: ComponentEntry[] = [
       ]
       const s = reactive({
         wrap: false,
+        compact: false,
         query: "",
         onlyMatches: false,
         n: 0,
@@ -711,6 +712,11 @@ export const registry: ComponentEntry[] = [
         push() {
           const x = samples[s.n++ % samples.length]
           s.lines.push({ ...x, time: Date.now() })
+        },
+        // Repeat the last line — with compact on, watch the ×N badge climb.
+        repeat() {
+          const last = s.lines[s.lines.length - 1]
+          if (last) s.lines.push({ ...last, time: Date.now() })
         },
       })
       return s
@@ -732,13 +738,18 @@ export const registry: ComponentEntry[] = [
     <label class="flex items-center gap-2 text-xs text-muted">
       <LpSwitch v-model="wrap" /> Wrap
     </label>
+    <label class="flex items-center gap-2 text-xs text-muted">
+      <LpSwitch v-model="compact" /> Compact
+    </label>
     <LpButton size="sm" variant="soft" @click="push">Push line</LpButton>
+    <LpButton size="sm" variant="ghost" @click="repeat">Repeat last</LpButton>
   </div>
   <LpLogViewer
     :lines="lines"
     :highlight="query"
     :filter-matches="onlyMatches"
     :wrap="wrap"
+    :compact="compact"
     height="18rem"
   />
 </div>`,

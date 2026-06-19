@@ -36,6 +36,8 @@ const props = withDefaults(
     highlight?: string
     /** When set with `highlight`, hide every line that doesn't match. */
     filterMatches?: boolean
+    /** Collapse consecutive identical lines into one, badged with a ×N count. */
+    compact?: boolean
     /** Pin to the bottom as new lines arrive (until the user scrolls up). */
     tail?: boolean
     /** Fixed height. Anything CSS-valid; defaults to a comfortable terminal. */
@@ -70,13 +72,35 @@ function metaFor(level?: LogLevel) {
 }
 
 // Rows actually rendered, each carrying its ORIGINAL index so line numbers stay
-// truthful when filtering. With filterMatches + a search term, keep only lines
-// whose message contains it (case-insensitive); otherwise pass everything.
-const visibleLines = computed<{ line: LogLine; n: number }[]>(() => {
+// truthful when filtering, plus a `count` for compact mode (1 unless folded).
+// With filterMatches + a search term, keep only lines whose message contains it
+// (case-insensitive); otherwise pass everything.
+const visibleLines = computed<{ line: LogLine; n: number; count: number }[]>(() => {
   const term = props.filterMatches ? props.highlight?.trim().toLowerCase() : ""
-  return props.lines
+  const filtered = props.lines
     .map((line, n) => ({ line, n }))
     .filter(({ line }) => !term || line.message.toLowerCase().includes(term))
+
+  if (!props.compact) return filtered.map((row) => ({ ...row, count: 1 }))
+
+  // Fold runs of consecutive identical lines (same message/level/source, time
+  // ignored). Keeps the FIRST occurrence so its index/time stay meaningful;
+  // non-adjacent repeats are left alone so chronology isn't scrambled.
+  const folded: { line: LogLine; n: number; count: number }[] = []
+  for (const row of filtered) {
+    const prev = folded[folded.length - 1]
+    if (
+      prev &&
+      prev.line.message === row.line.message &&
+      prev.line.level === row.line.level &&
+      prev.line.source === row.line.source
+    ) {
+      prev.count++
+    } else {
+      folded.push({ ...row, count: 1 })
+    }
+  }
+  return folded
 })
 
 // True when filtering has emptied an otherwise non-empty stream.
@@ -194,16 +218,22 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         <span v-if="filteredEmpty" class="text-muted/70">“{{ highlight }}”</span>
       </div>
 
+      <!-- Leave collapses a folded-away duplicate (max-height + opacity + a small
+           lift) while the survivors FLIP-slide up via move-class — so toggling
+           `compact` reads as the dupes melting into the kept line, not a jump. -->
       <TransitionGroup
         v-else
         tag="ol"
         class="py-1"
         enter-active-class="transition duration-200 ease-[var(--ease-emphasized)]"
         enter-from-class="-translate-x-1 opacity-0"
+        leave-active-class="overflow-hidden transition-all duration-200 ease-[var(--ease-emphasized)]"
+        leave-from-class="max-h-8 opacity-100"
+        leave-to-class="max-h-0 -translate-y-1 opacity-0"
         move-class="transition-transform duration-200 ease-[var(--ease-emphasized)]"
       >
         <li
-          v-for="{ line, n } in visibleLines"
+          v-for="{ line, n, count } in visibleLines"
           :key="n"
           class="group flex items-start gap-0 px-0 transition-colors hover:bg-surface-soft/60"
         >
@@ -250,6 +280,20 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
               >{{ part.text }}</mark>
               <template v-else>{{ part.text }}</template>
             </template>
+            <!-- compact: how many consecutive identical lines were folded here.
+                 Keyed on count so each new fold re-mounts the chip and pops it,
+                 cueing where the duplicate just merged. -->
+            <Transition
+              enter-active-class="inline-block transition duration-200 ease-[var(--ease-emphasized)]"
+              enter-from-class="scale-50 opacity-0"
+            >
+              <span
+                v-if="count > 1"
+                :key="count"
+                class="ml-2 select-none rounded-pill bg-surface-soft px-1.5 align-[1px] text-[10px] font-semibold tabular-nums text-muted-strong"
+                :title="`${count} identical lines`"
+              >×{{ count }}</span>
+            </Transition>
           </span>
         </li>
       </TransitionGroup>
