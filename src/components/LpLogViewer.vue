@@ -8,6 +8,7 @@
  * needs.
  */
 import { computed, nextTick, ref, watch } from "vue"
+import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 
@@ -43,6 +44,13 @@ const props = withDefaults(
     /** Fixed height. Anything CSS-valid; defaults to a comfortable terminal. */
     height?: string
     emptyLabel?: string
+    /**
+     * Right-click row menu: built-in copy actions (+ "filter by" when the line
+     * has a source/level). Set false to disable; the row keeps the native menu.
+     */
+    rowMenu?: boolean
+    /** Extra menu items per line, appended below the built-ins with a divider. */
+    extraRowItems?: (line: LogLine, index: number) => ContextMenuItemDef[]
   }>(),
   {
     showTime: true,
@@ -51,8 +59,14 @@ const props = withDefaults(
     tail: true,
     height: "20rem",
     emptyLabel: "No logs yet",
+    rowMenu: true,
   },
 )
+
+const emit = defineEmits<{
+  /** A "Filter by source/level" item was chosen — the consumer applies it. */
+  (e: "filter", by: { source?: string; level?: LogLevel }): void
+}>()
 
 // Level → gutter rail + text colour. Reads only semantic tokens so re-skinning
 // just works. trace/debug stay muted; success is green; warn amber; error/fatal
@@ -117,6 +131,55 @@ function fmtTime(time?: number | string): string {
       String(d.getMilliseconds()).padStart(3, "0")
   }
   return time
+}
+
+// ── row context menu ─────────────────────────────────────────────────
+async function copy(text: string) {
+  try {
+    await navigator.clipboard?.writeText(text)
+  } catch {
+    // Clipboard can reject (insecure context / denied permission); swallow —
+    // the menu action is best-effort and shouldn't throw into the UI.
+  }
+}
+
+// The whole line as one copyable string: "time LEVEL [source] message".
+function lineText(line: LogLine): string {
+  return [fmtTime(line.time), line.level?.toUpperCase(), line.source && `[${line.source}]`, line.message]
+    .filter(Boolean)
+    .join(" ")
+}
+
+// Built-in copy actions + optional "filter by" + consumer extras. Rebuilt per
+// right-click so it reflects the line under the cursor.
+function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
+  if (!props.rowMenu) return []
+  const items: ContextMenuItemDef[] = [
+    { label: "Copy message", icon: "lucide:copy", onSelect: () => copy(line.message) },
+    { label: "Copy line", icon: "lucide:clipboard-list", onSelect: () => copy(lineText(line)) },
+  ]
+  if (line.time != null) {
+    items.push({ label: "Copy timestamp", icon: "lucide:clock", onSelect: () => copy(fmtTime(line.time)) })
+  }
+  if (line.source) {
+    items.push({
+      label: `Filter by [${line.source}]`,
+      icon: "lucide:filter",
+      separatorBefore: true,
+      onSelect: () => emit("filter", { source: line.source }),
+    })
+  }
+  if (line.level) {
+    items.push({
+      label: `Filter by ${line.level}`,
+      icon: "lucide:filter",
+      separatorBefore: !line.source,
+      onSelect: () => emit("filter", { level: line.level }),
+    })
+  }
+  const extra = props.extraRowItems?.(line, index) ?? []
+  if (extra.length) extra[0] = { ...extra[0], separatorBefore: true }
+  return [...items, ...extra]
 }
 
 // Split a message around the (case-insensitive) highlight term so we can wrap
@@ -232,9 +295,12 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         leave-to-class="max-h-0 -translate-y-1 opacity-0"
         move-class="transition-transform duration-200 ease-[var(--ease-emphasized)]"
       >
-        <li
+        <LpContextMenu
           v-for="{ line, n, count } in visibleLines"
           :key="n"
+          :items="menuFor(line, n)"
+        >
+        <li
           class="group flex items-start gap-0 px-0 transition-colors hover:bg-surface-soft/60"
         >
           <!-- level rail -->
@@ -296,6 +362,7 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
             </Transition>
           </span>
         </li>
+        </LpContextMenu>
       </TransitionGroup>
     </LpScrollArea>
 

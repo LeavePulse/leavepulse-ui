@@ -52,8 +52,20 @@ const props = withDefaults(
     scaleBackground?: boolean
     /** Drag fraction (0–1) past which a release dismisses. */
     closeThreshold?: number
+    /**
+     * Auto-tag interactive descendants (input, textarea, select, button, links,
+     * [contenteditable]) with data-vaul-no-drag so a drag can't start on them —
+     * you can select text / use controls without dragging the drawer. On by
+     * default; the drawer still drags from empty space, the handle and header.
+     */
+    noDragControls?: boolean
+    /**
+     * Mark the entire body as non-draggable: the drawer then only drags from the
+     * handle/header. Stronger than noDragControls — use for form-heavy drawers.
+     */
+    noDragContent?: boolean
   }>(),
-  { side: "right", size: "sm", dismissible: true },
+  { side: "right", size: "sm", dismissible: true, noDragControls: true },
 )
 
 const emit = defineEmits<{
@@ -106,6 +118,23 @@ const padClass = computed(() => {
 // padClass, which left side drawers with no horizontal inset). Always inset
 // horizontally + separate from the body; trim the top when a handle sits above.
 const headerClass = computed(() => (showHandle.value ? "px-5 pb-4 pt-1" : "px-5 pb-4 pt-5"))
+
+// vaul aborts a drag whose pointerdown lands on (or inside) a [data-vaul-no-drag]
+// element. We tag interactive descendants so the drawer can't be dragged off a
+// field/control — text selection and clicks work, drag still starts on blank
+// space. Re-runs on update so it covers slot content that mounts/changes later.
+const NO_DRAG_SELECTOR =
+  "input, textarea, select, button, a[href], label, [contenteditable=''], [contenteditable='true']"
+function tagNoDrag(el: HTMLElement, { value }: { value: boolean }) {
+  if (!value) return
+  for (const node of el.querySelectorAll<HTMLElement>(NO_DRAG_SELECTOR)) {
+    node.setAttribute("data-vaul-no-drag", "")
+  }
+}
+const vNoDragControls = {
+  mounted: tagNoDrag,
+  updated: tagNoDrag,
+}
 </script>
 
 <template>
@@ -155,7 +184,12 @@ const headerClass = computed(() => (showHandle.value ? "px-5 pb-4 pt-1" : "px-5 
           </DrawerClose>
         </header>
 
-        <div class="min-h-0 flex-1 overflow-auto" :class="padClass">
+        <div
+          v-no-drag-controls="noDragControls"
+          class="min-h-0 flex-1 overflow-auto"
+          :class="padClass"
+          :data-vaul-no-drag="noDragContent ? '' : undefined"
+        >
           <slot />
         </div>
 

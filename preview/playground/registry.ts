@@ -685,7 +685,7 @@ export const registry: ComponentEntry[] = [
     id: "log-viewer",
     name: "Log Viewer",
     description:
-      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines. `compact` folds consecutive identical lines into one, badged ×N.",
+      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines. `compact` folds consecutive identical lines into one, badged ×N. Right-click a line for copy actions (message / line / timestamp), \"filter by\" source·level (emits @filter), and your own extraRowItems.",
     components: { LpLogViewer, LpInput, LpButton, LpSwitch, LpIcon },
     state: () => {
       const samples: { level: string; source: string; message: string }[] = [
@@ -718,6 +718,15 @@ export const registry: ComponentEntry[] = [
           const last = s.lines[s.lines.length - 1]
           if (last) s.lines.push({ ...last, time: Date.now() })
         },
+        // Right-click → "Filter by …" emits this; here we just drive the search.
+        onFilter(by: { source?: string; level?: string }) {
+          s.query = by.source ?? by.level ?? ""
+          s.onlyMatches = true
+        },
+        // Consumer-supplied extra row actions, appended below the built-ins.
+        extraItems: (line: { source?: string }) => [
+          { label: "Open trace", icon: "lucide:scan-search", onSelect: () => alert("trace for " + (line.source ?? "?")) },
+        ],
       })
       return s
     },
@@ -750,8 +759,11 @@ export const registry: ComponentEntry[] = [
     :filter-matches="onlyMatches"
     :wrap="wrap"
     :compact="compact"
+    :extra-row-items="extraItems"
     height="18rem"
+    @filter="onFilter"
   />
+  <p class="text-xs text-muted">Right-click a line → copy / filter by source·level / Open trace.</p>
 </div>`,
   },
   {
@@ -860,17 +872,21 @@ export const registry: ComponentEntry[] = [
     id: "drawer",
     name: "Drawer",
     description:
-      "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground.",
-    components: { LpDrawer, LpButton },
-    state: () => reactive({ side: false, sheet: false, snap: false }),
+      "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground. Interactive controls inside are auto-excluded from the drag (noDragControls, on by default) so you can select text / use inputs; noDragContent makes the whole body non-draggable (handle/header only).",
+    components: { LpDrawer, LpButton, LpInput },
+    state: () => reactive({ side: false, sheet: false, snap: false, q: "", note: "" }),
     template: `<div class="flex flex-wrap gap-2">
   <LpButton variant="outline" @click="side = true">Side panel</LpButton>
   <LpButton variant="outline" @click="sheet = true">Bottom sheet</LpButton>
   <LpButton variant="outline" @click="snap = true">Snap points</LpButton>
 
-  <!-- Classic side drawer: drag right past the threshold to dismiss. -->
-  <LpDrawer v-model:open="side" direction="right" size="lg" title="Filters" description="Drag the edge or grab the handle to close">
-    <p class="text-sm text-muted">Drawer body — put filter controls here.</p>
+  <!-- Side drawer with a form: drag the input → text selects, drawer stays put. -->
+  <LpDrawer v-model:open="side" direction="right" size="lg" title="Filters" description="Try dragging the input — it selects text instead of moving the drawer">
+    <div class="flex flex-col gap-3">
+      <LpInput v-model="q" placeholder="Search filters…" />
+      <textarea v-model="note" rows="3" class="rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" placeholder="A textarea you can drag-select in" />
+      <p class="text-sm text-muted">The drawer still drags from blank space and the header.</p>
+    </div>
   </LpDrawer>
 
   <!-- Mobile-style bottom sheet with a handle. -->
