@@ -25,6 +25,7 @@ import {
 import { computed, useSlots } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import LpScrollArea from "./LpScrollArea.vue"
 
 type Direction = "top" | "bottom" | "left" | "right"
 
@@ -184,13 +185,18 @@ const vNoDragControls = {
           </DrawerClose>
         </header>
 
+        <!-- Body scrolls via LpScrollArea's overlay bar. The wrapper keeps the
+             no-drag wiring on the OUTER element so vaul still sees one content
+             container (overlay scroll lives one level in); padding moves to the
+             scroll content so the bar floats at the panel edge. -->
         <div
           v-no-drag-controls="noDragControls"
-          class="min-h-0 flex-1 overflow-auto"
-          :class="padClass"
+          class="flex min-h-0 flex-1 flex-col"
           :data-vaul-no-drag="noDragContent ? '' : undefined"
         >
-          <slot />
+          <LpScrollArea class="min-h-0 flex-1" :content-class="padClass">
+            <slot />
+          </LpScrollArea>
         </div>
 
         <footer v-if="$slots.footer" class="flex justify-end gap-2 px-5 pb-5 pt-4">

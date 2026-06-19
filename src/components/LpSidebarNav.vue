@@ -10,6 +10,7 @@ import { usePillTransition } from "../composables/usePillTransition"
 import LpBadge from "./LpBadge.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpScrollArea from "./LpScrollArea.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
 
 const props = withDefaults(
@@ -52,7 +53,9 @@ const pillTransition = usePillTransition()
     </div>
   </div>
 
-  <div v-else class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+  <!-- min-h-full keeps the content as tall as the viewport so the #actions
+       block's mt-auto can still pin it to the bottom. -->
+  <LpScrollArea v-else class="min-h-0 flex-1" content-class="flex min-h-full flex-col gap-4">
     <div v-for="(section, si) in groups" :key="si" class="flex flex-col gap-0.5">
       <p
         v-if="section.title"
@@ -116,5 +119,5 @@ const pillTransition = usePillTransition()
     <div v-if="$slots.actions" class="mt-auto flex flex-col gap-2 pt-2">
       <slot name="actions" />
     </div>
-  </div>
+  </LpScrollArea>
 </template>

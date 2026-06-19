@@ -13,6 +13,7 @@
  *   @import "@leavepulse/ui";
  */
 @import "./tokens/tokens.css";
+@import "./tokens/utilities.css";
 
 @source "./components";
 @source "./composables";

@@ -1,8 +1,9 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpScrollArea from "./LpScrollArea.vue"
 
 export interface TableColumn<Row> {
   key: string
@@ -132,12 +133,40 @@ function toggleRow(key: RowKey, checked: boolean) {
 }
 
 const colSpan = computed(() => props.columns.length + (props.selectable ? 1 : 0))
+
+// With stickyHeader, the overlay scrollbar would otherwise run up under the
+// pinned header. Measure the header height and inset the bar by it so the bar
+// starts below the header. Tracked live (density/content can change it).
+const headEl = ref<HTMLElement | null>(null)
+const headHeight = ref(0)
+let ro: ResizeObserver | undefined
+watch(
+  [headEl, () => props.stickyHeader],
+  ([el, sticky]) => {
+    ro?.disconnect()
+    if (!el || !sticky || typeof ResizeObserver === "undefined") {
+      headHeight.value = 0
+      return
+    }
+    ro = new ResizeObserver(() => {
+      headHeight.value = el.offsetHeight
+    })
+    ro.observe(el)
+    headHeight.value = el.offsetHeight
+  },
+  { immediate: true, flush: "post" },
+)
+onBeforeUnmount(() => ro?.disconnect())
+
+const barInsetTop = computed(() =>
+  props.stickyHeader && headHeight.value ? `${headHeight.value}px` : undefined,
+)
 </script>
 
 <template>
-  <div class="overflow-auto rounded-card border border-line">
+  <LpScrollArea class="rounded-card border border-line" :bar-inset-top="barInsetTop">
     <table class="w-full border-collapse text-sm">
-      <thead :class="stickyHeader ? 'sticky top-0 z-10' : ''">
+      <thead ref="headEl" :class="stickyHeader ? 'sticky top-0 z-10' : ''">
         <tr class="border-b border-line bg-surface-soft">
           <th v-if="selectable" class="w-px px-4 py-3">
             <LpCheckbox
@@ -219,5 +248,5 @@ const colSpan = computed(() => props.columns.length + (props.selectable ? 1 : 0)
         </LpContextMenu>
       </tbody>
     </table>
-  </div>
+  </LpScrollArea>
 </template>

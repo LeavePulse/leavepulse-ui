@@ -8,9 +8,10 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed } from "vue"
+import { computed, useSlots } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import LpScrollArea from "./LpScrollArea.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -48,6 +49,20 @@ const widthClass = computed(() => {
     full: "w-[96vw]",
   }[props.size]
 })
+
+// Body padding, shared by the fillBody flex path and the scroll path. Always
+// inset horizontally; top only when there's no header, bottom only when there's
+// no footer (header/footer own those edges).
+const slots = useSlots()
+const bodyPad = computed(() =>
+  [
+    "px-5",
+    props.title || slots.title ? "" : "pt-5",
+    slots.footer ? "" : "pb-5",
+  ]
+    .filter(Boolean)
+    .join(" "),
+)
 </script>
 
 <template>
@@ -82,16 +97,22 @@ const widthClass = computed(() => {
           </DialogClose>
         </header>
 
+        <!-- fillBody: a plain flex column that owns its own inner scroll regions.
+             Otherwise the body scrolls itself via LpScrollArea's overlay bar. -->
         <div
-          class="min-h-0 flex-1 px-5 text-sm text-ink/90"
-          :class="[
-            fillBody ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
-            $slots.title || title ? '' : 'pt-5',
-            $slots.footer ? '' : 'pb-5',
-          ]"
+          v-if="fillBody"
+          class="flex min-h-0 flex-1 flex-col overflow-hidden text-sm text-ink/90"
+          :class="bodyPad"
         >
           <slot />
         </div>
+        <LpScrollArea
+          v-else
+          class="min-h-0 flex-1 text-sm text-ink/90"
+          :content-class="bodyPad"
+        >
+          <slot />
+        </LpScrollArea>
 
         <footer v-if="$slots.footer" class="flex shrink-0 justify-end gap-2 p-5 pt-4">
           <slot name="footer" />

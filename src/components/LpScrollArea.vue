@@ -18,7 +18,13 @@ import {
 // `contentClass` styles the scrollable CONTENT container (the viewport's inner
 // wrapper) — put list layout here (display:grid / gap / padding), not on the
 // component root, since items live inside reka's viewport.
-defineProps<{ fade?: boolean; contentClass?: string }>()
+// `barInsetTop` (any CSS length) pulls the vertical scrollbar down by that much,
+// so it doesn't run under a sticky header pinned at the top of the viewport.
+const props = defineProps<{
+  fade?: boolean
+  contentClass?: string
+  barInsetTop?: string
+}>()
 
 // Re-emit the native scroll event of the underlying viewport so consumers that
 // drive scroll-following (e.g. log tails) can track position. The listener is
@@ -56,6 +62,7 @@ const barFade =
       orientation="vertical"
       class="group flex w-1 touch-none select-none p-px transition-[width] duration-[var(--duration-fast)] hover:w-1.5"
       :class="barFade"
+      :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
     >
       <ScrollAreaThumb
         class="flex-1 rounded-l-pill bg-brand/40 transition-colors group-hover:bg-brand"

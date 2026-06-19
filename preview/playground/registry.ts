@@ -943,7 +943,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "scrollarea",
     name: "ScrollArea",
-    description: "Drawn overlay scrollbar (themed, hover-grow). `fade` softens edges; `content-class` styles the scrollable content (gap/padding).",
+    description: "Drawn overlay scrollbar (themed, hover-grow). `fade` softens edges; `content-class` styles the scrollable content (gap/padding). The kit uses this for its own scroll regions (Table, Modal/Drawer body, Sidebar) so native bars never reserve viewport width. For app-level scroll: `.lp-scrollbar-none` hides a bar on any element; add `lp-scroll-hide` to <html> to drop the page's native bar site-wide; or import `@leavepulse/ui/scrollbar` to skin native bars to the kit look.",
     components: { LpScrollArea },
     template: `<LpScrollArea fade class="h-40 w-72 rounded-card border border-line" content-class="flex flex-col gap-2 p-3">
   <p v-for="i in 12" :key="i" class="rounded-md bg-surface-soft px-3 py-2 text-sm text-muted">Row {{ i }}</p>
@@ -1005,6 +1005,12 @@ export const registry: ComponentEntry[] = [
           { id: "ORD-1040", amount: 24, status: "failed" },
           { id: "ORD-1039", amount: 8, status: "paid" },
         ],
+        // A longer set so the sticky-header table actually scrolls.
+        manyRows: Array.from({ length: 40 }, (_, i) => ({
+          id: `ORD-${1100 + i}`,
+          amount: ((i * 37) % 90) + 5,
+          status: (["paid", "pending", "failed"] as const)[i % 3],
+        })),
         // Per-row menu: returns items for the right-clicked row.
         rowMenu(row: { id: string; status: string }) {
           return [
@@ -1045,6 +1051,23 @@ export const registry: ComponentEntry[] = [
     </template>
   </LpTable>
   <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row</p>
+
+  <!-- Fixed height + stickyHeader: scrolls via LpScrollArea, header pins to top. -->
+  <p class="mt-2 text-xs font-medium text-muted">stickyHeader — scroll the table, the header stays:</p>
+  <LpTable
+    :columns="columns"
+    :rows="manyRows"
+    row-key="id"
+    sticky-header
+    class="h-64"
+  >
+    <template #cell-amount="{ value }">€{{ value.toFixed(2) }}</template>
+    <template #cell-status="{ value }">
+      <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">
+        {{ value }}
+      </LpBadge>
+    </template>
+  </LpTable>
 </div>`,
   },
   {

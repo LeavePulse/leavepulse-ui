@@ -110,20 +110,27 @@ function onInput(e: Event) {
       </div>
     </div>
 
-    <!-- Body -->
-    <div class="relative" :style="height ? { height } : undefined" :class="height ? 'overflow-auto' : ''">
+    <!-- Body. This is an overlay editor (transparent <textarea> pixel-aligned
+         over the highlighted <pre>) — both layers MUST keep their native,
+         synchronised scroll, so we can't wrap it in LpScrollArea. Instead we hide
+         the native bar from layout flow via .lp-scrollbar-none; scrolling stays. -->
+    <div
+      class="lp-scrollbar-none relative"
+      :style="height ? { height } : undefined"
+      :class="height ? 'overflow-auto' : ''"
+    >
       <!-- Editable: a transparent textarea over the highlighted layer so typing
            shows live colours (classic overlay editor). Scroll/size are shared. -->
       <textarea
         v-if="!locked"
         :value="code"
         spellcheck="false"
-        class="absolute inset-0 size-full resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-relaxed text-transparent caret-brand outline-none"
+        class="lp-scrollbar-none absolute inset-0 size-full resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-relaxed text-transparent caret-brand outline-none"
         :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', lineNumbers ? 'pl-12' : '']"
         @input="onInput"
       />
       <pre
-        class="m-0 overflow-auto p-3 leading-relaxed"
+        class="lp-scrollbar-none m-0 overflow-auto p-3 leading-relaxed"
         :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', !locked ? 'pointer-events-none' : '']"
       ><code class="block"><span
           v-for="(line, i) in highlighted"

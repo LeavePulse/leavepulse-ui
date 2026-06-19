@@ -110,11 +110,29 @@ body::-webkit-scrollbar-button {
   height: 0;
 }
 
-/* Opt-out per element when something needs a hidden scrollbar (carousels etc). */
-.lp-scrollbar-none {
+/*
+ * Per-element opt-out (hide the bar entirely — carousels, the CodeBlock editor,
+ * etc.) lives in utilities.css as `.lp-scrollbar-none`, shipped with the main
+ * import so it's available even without this opt-in skin.
+ */
+
+/*
+ * GLOBAL opt-in: drop the native scrollbar from the layout flow site-wide so it
+ * never reserves viewport width (the page still scrolls — bar is just hidden).
+ * Add the class to <html> at the app root:
+ *   <html class="lp-scroll-hide">
+ * Pair with LpScrollArea (or the skin above) for any region that should still
+ * show a bar. This only hides the document's own bar; nested overflow elements
+ * keep theirs unless they also carry .lp-scrollbar-none.
+ */
+html.lp-scroll-hide {
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.lp-scrollbar-none::-webkit-scrollbar {
+html.lp-scroll-hide::-webkit-scrollbar,
+html.lp-scroll-hide body::-webkit-scrollbar {
   display: none;
+  width: 0;
+  height: 0;
 }

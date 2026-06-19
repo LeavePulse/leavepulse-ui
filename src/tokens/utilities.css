@@ -1,0 +1,23 @@
+/*
+ * Always-on utilities (shipped via the main "@leavepulse/ui" import, unlike the
+ * opt-in scrollbar skin). These are scoped CLASSES — they only affect elements
+ * that explicitly carry them, so they never clobber a host app's globals.
+ */
+
+/*
+ * Hide a native scrollbar while keeping the element scrollable, and crucially
+ * keep it OUT of the layout flow so it never reserves viewport width. Used by
+ * components whose scroll can't be an LpScrollArea overlay (e.g. the CodeBlock
+ * overlay editor, whose transparent textarea + <pre> must scroll natively in
+ * sync), and exposed for app-level use to drop native bars site-wide.
+ */
+.lp-scrollbar-none {
+  scrollbar-width: none; /* Firefox / standards */
+  -ms-overflow-style: none; /* old Edge */
+}
+
+.lp-scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome / Safari */
+  width: 0;
+  height: 0;
+}
