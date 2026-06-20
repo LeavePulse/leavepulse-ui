@@ -648,15 +648,22 @@ export const registry: ComponentEntry[] = [
           const n = s.items.find((x) => x.id === id)
           if (n) n.read = true
         },
+        markUnread(id: string) {
+          const n = s.items.find((x) => x.id === id)
+          if (n) n.read = false
+        },
         markAllRead() {
           for (const n of s.items) n.read = true
+        },
+        dismiss(id: string) {
+          s.items = s.items.filter((x) => x.id !== id)
         },
       })
       return s
     },
     template: `<div class="flex items-center gap-4">
-  <LpNotificationBell :items="items" @mark-read="markRead" @mark-all-read="markAllRead" />
-  <span class="text-sm text-muted">← click to open · right-click for quick actions</span>
+  <LpNotificationBell :items="items" @mark-read="markRead" @mark-unread="markUnread" @mark-all-read="markAllRead" @dismiss="dismiss" />
+  <span class="text-sm text-muted">← click to open · right-click on a row</span>
 </div>`,
   },
   {
