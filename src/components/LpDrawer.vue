@@ -12,6 +12,7 @@
  * solid background) for vaul to find and transform. Without it the drawer still
  * works — the background just doesn't scale.
  */
+import { usePointerSwipe } from "@vueuse/core"
 import {
   DrawerClose,
   DrawerContent,
@@ -22,7 +23,7 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from "vaul-vue"
-import { computed, useSlots } from "vue"
+import { computed, ref, useSlots } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -65,8 +66,26 @@ const props = withDefaults(
      * handle/header. Stronger than noDragControls — use for form-heavy drawers.
      */
     noDragContent?: boolean
+    /**
+     * Open by dragging in from the screen edge (Discord-style). Renders an
+     * invisible edge strip; a pull from it drags a preview panel that follows
+     * the finger, and a release past `edgeOpenThreshold` opens the drawer. Only
+     * meaningful for left/right drawers.
+     */
+    edgeOpen?: boolean
+    /** Width (px) of the edge grab strip. */
+    edgeSize?: number
+    /** Fraction (0–1) of the panel width the pull must reach to open on release. */
+    edgeOpenThreshold?: number
   }>(),
-  { side: "right", size: "sm", dismissible: true, noDragControls: true },
+  {
+    side: "right",
+    size: "sm",
+    dismissible: true,
+    noDragControls: true,
+    edgeSize: 24,
+    edgeOpenThreshold: 0.35,
+  },
 )
 
 const emit = defineEmits<{
@@ -136,9 +155,93 @@ const vNoDragControls = {
   mounted: tagNoDrag,
   updated: tagNoDrag,
 }
+
+// ── Edge-drag-to-open (Discord-style) ──────────────────────────────────────
+// vaul opens/closes programmatically and only drags an *already-open* drawer,
+// so the pull-from-edge gesture is ours: an invisible edge strip captures the
+// pointer, we translate a preview panel that follows the finger, and a release
+// past the threshold flips `open` (vaul then animates the rest). Horizontal
+// drawers only.
+const edgeStrip = ref<HTMLElement | null>(null)
+// 0 (closed) … 1 (fully pulled in). Drives the preview transform + overlay.
+const peek = ref(0)
+const peeking = ref(false)
+
+// Resolve the panel's main-axis size in px to map drag distance → progress.
+function panelPx(): number {
+  const vw = typeof window === "undefined" ? 0 : window.innerWidth
+  // mirror sizeStyle's min(94vw, SIZES[size]rem); 1rem≈16px.
+  const cap = props.width ? Number.parseFloat(props.width) : SIZES[props.size] * 16
+  return Math.min(vw * 0.94, Number.isFinite(cap) ? cap : SIZES[props.size] * 16)
+}
+
+usePointerSwipe(edgeStrip, {
+  threshold: 0,
+  pointerTypes: ["touch", "pen"],
+  onSwipeStart() {
+    if (!props.edgeOpen || props.open) return
+    peeking.value = true
+  },
+  onSwipe(e) {
+    if (!peeking.value) return
+    // Inward pull distance: from the right edge we move left (−x), from the
+    // left edge we move right (+x). Normalise to 0…1 of the panel width.
+    const fromRight = dir.value === "right"
+    const dx = fromRight ? window.innerWidth - e.clientX : e.clientX
+    peek.value = Math.max(0, Math.min(1, dx / panelPx()))
+  },
+  onSwipeEnd() {
+    if (!peeking.value) return
+    const opened = peek.value >= props.edgeOpenThreshold
+    peeking.value = false
+    peek.value = 0
+    if (opened) emit("update:open", true)
+  },
+})
+
+// The preview panel slides with the finger: translate from fully-off (100%)
+// toward 0 as peek → 1. Hidden once the real (vaul) drawer is open.
+const previewStyle = computed(() => {
+  if (!props.edgeOpen || props.open) return { display: "none" }
+  const off = (1 - peek.value) * 100
+  const axis = dir.value === "right" ? off : -off
+  return {
+    transform: `translateX(${axis}%)`,
+    transition: peeking.value ? "none" : "transform 0.18s ease",
+    pointerEvents: "none" as const,
+  }
+})
+
+const edgeStripStyle = computed(() => {
+  const w = `${props.edgeSize}px`
+  return dir.value === "right"
+    ? { right: "0", width: w }
+    : { left: "0", width: w }
+})
 </script>
 
 <template>
+  <!-- Edge-drag-to-open: an invisible grab strip + a finger-following preview
+       of the panel, shown only while closed. Horizontal drawers only. -->
+  <template v-if="edgeOpen && isHorizontal">
+    <div
+      ref="edgeStrip"
+      class="fixed inset-y-0 z-(--z-overlay) touch-none"
+      :style="edgeStripStyle"
+      aria-hidden="true"
+    />
+    <div
+      v-show="peeking || peek > 0"
+      class="pointer-events-none fixed inset-0 z-(--z-overlay) bg-black/50"
+      :style="{ opacity: peek }"
+    />
+    <div :class="contentClass" :style="[sizeStyle, previewStyle]" aria-hidden="true">
+      <div v-if="hasHeader" class="flex items-start justify-between gap-4" :class="headerClass">
+        <span class="text-base font-semibold text-ink">{{ title }}</span>
+      </div>
+    </div>
+  </template>
+
   <DrawerRoot
     :open="open"
     :direction="dir"

@@ -48,6 +48,8 @@ const props = withDefaults(
     open?: boolean
     /** Tailwind breakpoint below which the drawer takes over. */
     mobileBreakpoint?: "sm" | "md" | "lg" | "xl"
+    /** Let a pull from the left screen edge drag the mobile drawer open. */
+    edgeOpen?: boolean
   }>(),
   {
     skeletonRows: 6,
@@ -139,6 +141,7 @@ const railClass = computed(() =>
     :open="open"
     direction="left"
     size="sm"
+    :edge-open="edgeOpen"
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="flex h-full flex-col gap-1">
