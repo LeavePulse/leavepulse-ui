@@ -8,7 +8,7 @@ export default { inheritAttrs: false }
 <script setup lang="ts">
 import { AvatarFallback, AvatarImage, AvatarRoot } from "reka-ui"
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed } from "vue"
+import { computed, onMounted, ref } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 
 const avatar = tv({
@@ -40,12 +40,23 @@ const props = withDefaults(
 const initials = computed(
   () => props.fallback ?? props.alt?.slice(0, 2).toUpperCase() ?? "?",
 )
+
+// reka's AvatarImage resolves the image load on the client, so SSR renders the
+// fallback while the client swaps in <img> — a hydration mismatch for every
+// consumer. Gate the image on mount: server and first client render both show
+// the fallback (identical markup), then the image fades in post-hydration. This
+// keeps the fix in one place instead of each call site wrapping us in
+// <ClientOnly>.
+const mounted = ref(false)
+onMounted(() => {
+  mounted.value = true
+})
 </script>
 
 <template>
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
     <AvatarRoot :class="avatar({ size })" v-bind="$attrs">
-      <AvatarImage v-if="src" :src="src" :alt="alt" class="size-full object-cover" />
+      <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
