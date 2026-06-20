@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /*
  * Notification bell: an icon button with an unread badge that opens a popover
- * feed on click, and a quick-action context menu on right-click. Presentational
- * and data-driven — the consumer fetches via the SDK and binds `items` /
- * `unread-count`, and reacts to `mark-read` / `mark-all-read` / `open`. Mirrors
- * the kit convention (cf. LpSidebar): data in, events out, no data fetching
- * inside the component.
+ * feed on left-click and a quick-action menu on right-click. Each feed row has
+ * its own right-click menu too. Presentational and data-driven — the consumer
+ * fetches via the SDK, binds `items` / `unread-count` / `v-model:open`, and
+ * reacts to `mark-read` / `mark-unread` / `mark-all-read` / `dismiss` /
+ * `select`. Mirrors the kit convention (cf. LpSidebar): data in, events out,
+ * no data fetching inside.
  */
 import { computed } from "vue"
 import LpBadge from "./LpBadge.vue"

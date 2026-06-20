@@ -614,7 +614,7 @@ export const registry: ComponentEntry[] = [
     id: "notificationbell",
     name: "NotificationBell",
     description:
-      "Icon button with an unread badge that opens a popover feed on click, plus a right-click menu of quick actions (defaults to Open / Mark all read; override via `menuItems`). Data-driven: bind items / unread-count and handle mark-read / mark-all-read / select — no fetching inside. Rows show icon, title, body, relative time and an unread dot; an unread row is tinted and clears on click.",
+      "Icon button with an unread badge that opens a popover feed on left-click; right-click for quick actions (Mark all read; override via `menuItems`). Each feed row has its own right-click menu (mark read/unread, open, dismiss). Data-driven: bind items / unread-count and handle mark-read / mark-unread / mark-all-read / dismiss / select — no fetching inside. Rows are rounded tiles showing icon, title, body, relative time and an unread dot.",
     components: { LpNotificationBell },
     state: () => {
       const s = reactive({
