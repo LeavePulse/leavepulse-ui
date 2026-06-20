@@ -68,19 +68,13 @@ const badgeLabel = computed(() =>
 )
 const hasUnread = computed(() => unread.value > 0)
 
-// Right-click quick actions. Because `open` is a defineModel we open the feed
-// ourselves on left-click (the popover is anchor-only), which frees the trigger
-// button to also host LpContextMenu for the right-click menu — the two no
-// longer fight over the popover's click trigger.
+// Right-click quick actions on the bell. "Open" is intentionally omitted — a
+// left-click already opens the feed, so the menu only carries actions you
+// can't get from the click itself. Because `open` is a defineModel we open on
+// left-click ourselves (the popover is anchor-only), which frees the trigger
+// button to also host LpContextMenu without the two fighting over the trigger.
 const contextMenu = computed<ContextMenuItemDef[]>(() =>
   props.menuItems ?? [
-    {
-      label: "Open notifications",
-      icon: "lucide:bell",
-      onSelect: () => {
-        open.value = true
-      },
-    },
     {
       label: "Mark all read",
       icon: "lucide:check-check",
