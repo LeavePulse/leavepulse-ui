@@ -277,7 +277,8 @@ const edgeStripStyle = computed(() => {
       />
       <DrawerContent
         :class="contentClass"
-        :style="[sizeStyle, handingOff ? { transition: 'none' } : null]"
+        :style="sizeStyle"
+        :data-vaul-animate="handingOff ? 'false' : undefined"
       >
         <!-- Drag handle: a pill the user grabs; vaul wires the drag to it. -->
         <DrawerHandle
