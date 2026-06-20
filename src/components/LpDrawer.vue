@@ -83,8 +83,8 @@ const props = withDefaults(
     size: "sm",
     dismissible: true,
     noDragControls: true,
-    edgeSize: 24,
-    edgeOpenThreshold: 0.35,
+    edgeSize: 44,
+    edgeOpenThreshold: 0.3,
   },
 )
 
@@ -166,6 +166,10 @@ const edgeStrip = ref<HTMLElement | null>(null)
 // 0 (closed) … 1 (fully pulled in). Drives the preview transform + overlay.
 const peek = ref(0)
 const peeking = ref(false)
+// True while we hand off from the finger-preview to the real drawer, so vaul's
+// own open animation is suppressed — the preview has already slid it in, a
+// second slide would look like a double-open.
+const handingOff = ref(false)
 
 // Resolve the panel's main-axis size in px to map drag distance → progress.
 function panelPx(): number {
@@ -192,22 +196,37 @@ usePointerSwipe(edgeStrip, {
   },
   onSwipeEnd() {
     if (!peeking.value) return
-    const opened = peek.value >= props.edgeOpenThreshold
     peeking.value = false
-    peek.value = 0
-    if (opened) emit("update:open", true)
+    if (peek.value >= props.edgeOpenThreshold) {
+      // Open: let the preview finish sliding to fully-in, then swap in the real
+      // drawer *without* a vaul slide (handingOff) so there's no second anim.
+      peek.value = 1
+      handingOff.value = true
+      window.setTimeout(() => {
+        emit("update:open", true)
+        // Clear after the real drawer has mounted in place.
+        window.setTimeout(() => {
+          handingOff.value = false
+          peek.value = 0
+        }, 60)
+      }, 160)
+    } else {
+      // Below threshold: snap the preview back out.
+      peek.value = 0
+    }
   },
 })
 
 // The preview panel slides with the finger: translate from fully-off (100%)
-// toward 0 as peek → 1. Hidden once the real (vaul) drawer is open.
+// toward 0 as peek → 1. Kept visible through the hand-off so the real drawer
+// can appear underneath without a flash.
 const previewStyle = computed(() => {
-  if (!props.edgeOpen || props.open) return { display: "none" }
+  if (!props.edgeOpen || (props.open && !handingOff.value)) return { display: "none" }
   const off = (1 - peek.value) * 100
   const axis = dir.value === "right" ? off : -off
   return {
     transform: `translateX(${axis}%)`,
-    transition: peeking.value ? "none" : "transform 0.18s ease",
+    transition: peeking.value ? "none" : "transform 0.16s ease-out",
     pointerEvents: "none" as const,
   }
 })
@@ -256,7 +275,10 @@ const edgeStripStyle = computed(() => {
       <DrawerOverlay
         class="fixed inset-0 z-(--z-overlay) bg-black/50 backdrop-blur-sm data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
-      <DrawerContent :class="contentClass" :style="sizeStyle">
+      <DrawerContent
+        :class="contentClass"
+        :style="[sizeStyle, handingOff ? { transition: 'none' } : null]"
+      >
         <!-- Drag handle: a pill the user grabs; vaul wires the drag to it. -->
         <DrawerHandle
           v-if="showHandle"
