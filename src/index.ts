@@ -43,6 +43,7 @@ export { flagEmoji, loadCountries, matchCountryByValue } from "./components/coun
 export type { Country } from "./components/countries"
 export { default as LpPopover } from "./components/LpPopover.vue"
 export { default as LpProgress } from "./components/LpProgress.vue"
+export { default as LpRadio } from "./components/LpRadio.vue"
 export { default as LpRadioGroup } from "./components/LpRadioGroup.vue"
 export type { RadioOption } from "./components/LpRadioGroup.vue"
 export { default as LpScrollArea } from "./components/LpScrollArea.vue"
