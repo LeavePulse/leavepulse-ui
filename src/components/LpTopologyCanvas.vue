@@ -22,7 +22,7 @@ import {
 import { MiniMap } from "@vue-flow/minimap"
 import { computed, markRaw, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
-import LpServiceNode from "./LpServiceNode.vue"
+import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
 
 // Vue Flow base CSS + canvas chrome theming is shipped via the kit's
 // "@leavepulse/ui/canvas.css" export (a plain CSS file). Component-local CSS
@@ -34,7 +34,8 @@ export type EdgeObserved = "applied" | "pending" | "drift"
 export interface TopologyNode {
   id: string
   position: { x: number; y: number }
-  data: InfraNodeData
+  /** Host/group nodes use InfraNodeData; service nodes use ServiceNodeData. */
+  data: InfraNodeData | ServiceNodeData
   /**
    * Node kind: "infra" (a host card, default), "service" (a small service node
    * placed inside a host frame), or "group" (a host frame that contains
