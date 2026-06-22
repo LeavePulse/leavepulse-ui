@@ -54,6 +54,12 @@ const props = withDefaults(
     divider?: boolean
     /** Max content width inside main (Tailwind class), or null to fill. */
     contentClass?: string
+    /**
+     * Full-bleed main: render the page slot directly into main with NO
+     * scroll-area wrapper and NO padding, so the page owns the whole region
+     * (for a canvas / map / graph that fills the viewport and pans internally).
+     */
+    fullBleed?: boolean
     /** Loading skeleton for the nav. */
     loading?: boolean
   }>(),
@@ -185,7 +191,16 @@ defineExpose({ openDrawer: _openDrawer })
         </div>
       </header>
 
-      <LpScrollArea class="min-h-0 flex-1" :content-class="`px-4 py-6 md:px-6 ${contentClass}`">
+      <!-- full-bleed: page owns the whole region (canvas/map); otherwise the
+           single scroll region with padding. -->
+      <div v-if="fullBleed" class="min-h-0 flex-1 overflow-hidden">
+        <slot />
+      </div>
+      <LpScrollArea
+        v-else
+        class="min-h-0 flex-1"
+        :content-class="`px-4 py-6 md:px-6 ${contentClass}`"
+      >
         <slot />
       </LpScrollArea>
     </div>
