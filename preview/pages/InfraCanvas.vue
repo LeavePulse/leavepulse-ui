@@ -12,7 +12,7 @@ import { Controls } from "@vue-flow/controls"
 import { MarkerType, VueFlow, useVueFlow, type NodeTypesObject } from "@vue-flow/core"
 import { MiniMap } from "@vue-flow/minimap"
 import { computed, markRaw, ref } from "vue"
-import { LpBadge, LpButton } from "../../src"
+import { LpBadge, LpButton, useToast } from "../../src"
 import InfraNode from "./infra/InfraNode.vue"
 
 import "@vue-flow/core/dist/style.css"
@@ -24,21 +24,21 @@ type Obs = "applied" | "pending" | "drift"
 const nodeTypes = { infra: markRaw(InfraNode) } as unknown as NodeTypesObject
 
 const nodes = ref([
-  { id: "api", type: "infra", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, kind: "service" } },
-  { id: "lobby", type: "infra", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, kind: "mc" } },
-  { id: "survival", type: "infra", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, kind: "mc" } },
-  { id: "db42", type: "infra", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, kind: "db" } },
-  { id: "hub43", type: "infra", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, kind: "router" } },
-  { id: "mc43", type: "infra", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, kind: "mc" } },
+  { id: "api", type: "infra", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, kind: "service", project: "infra" } },
+  { id: "lobby", type: "infra", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, kind: "mc", project: "42" } },
+  { id: "survival", type: "infra", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, kind: "mc", project: "42" } },
+  { id: "db42", type: "infra", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, kind: "db", project: "42" } },
+  { id: "hub43", type: "infra", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, kind: "router", project: "43" } },
+  { id: "mc43", type: "infra", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, kind: "mc", project: "43" } },
 ])
 
-const rawEdges = [
+const rawEdges = ref([
   { id: "e1", source: "api", target: "lobby", kind: "cloudflared", observed: "applied" as Obs },
   { id: "e2", source: "lobby", target: "survival", kind: "wg", observed: "applied" as Obs },
   { id: "e3", source: "lobby", target: "db42", kind: "wg", observed: "pending" as Obs },
   { id: "e4", source: "survival", target: "db42", kind: "wg", observed: "pending" as Obs },
   { id: "e5", source: "hub43", target: "mc43", kind: "wg", observed: "drift" as Obs },
-]
+])
 
 function edgeColor(o: Obs): string {
   return o === "drift"
@@ -49,7 +49,7 @@ function edgeColor(o: Obs): string {
 }
 
 const edges = computed(() =>
-  rawEdges.map((e) => ({
+  rawEdges.value.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
@@ -68,15 +68,50 @@ const edges = computed(() =>
   })),
 )
 
-const { onNodeClick, fitView } = useVueFlow()
+const { onNodeClick, onConnect, fitView } = useVueFlow()
+const toast = useToast()
 const selected = ref<string | null>("lobby")
 onNodeClick(({ node }) => (selected.value = node.id))
+
+let edgeSeq = 100
+// Drag from a node handle to another -> create a wireguard edge, but ONLY
+// within the same project: a cross-project edge is rejected, mirroring the
+// server-side isolation invariant (control-service GraphController).
+onConnect((conn) => {
+  const src = nodes.value.find((n) => n.id === conn.source)
+  const dst = nodes.value.find((n) => n.id === conn.target)
+  if (!src || !dst) return
+  if (src.data.project !== dst.data.project) {
+    toast.error(
+      `cross-project edge rejected: ${src.data.project} ✗ ${dst.data.project}`,
+    )
+    return
+  }
+  if (
+    rawEdges.value.some(
+      (e) =>
+        (e.source === conn.source && e.target === conn.target) ||
+        (e.source === conn.target && e.target === conn.source),
+    )
+  ) {
+    toast.info("edge already exists")
+    return
+  }
+  rawEdges.value.push({
+    id: `e${edgeSeq++}`,
+    source: conn.source!,
+    target: conn.target!,
+    kind: "wg",
+    observed: "pending",
+  })
+  toast.success(`wg edge added — reconciling (${src.data.name} ↔ ${dst.data.name})`)
+})
 
 const sel = computed(() => nodes.value.find((n) => n.id === selected.value) ?? null)
 const selPeers = computed(() => {
   if (!sel.value) return []
   const id = sel.value.id
-  return rawEdges
+  return rawEdges.value
     .filter((e) => e.source === id || e.target === id)
     .map((e) => {
       const other = e.source === id ? e.target : e.source
