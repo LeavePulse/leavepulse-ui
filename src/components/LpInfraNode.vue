@@ -1,40 +1,43 @@
 <script setup lang="ts">
-/** Custom Vue Flow node: an infra host/service card on kit tokens. */
+/**
+ * Custom Vue Flow node for LpTopologyCanvas: an infra host/service card on kit
+ * tokens. Not used directly by consumers — LpTopologyCanvas registers it as the
+ * `infra` node type. Exported so apps can override the renderer if needed.
+ */
 import { Handle, Position } from "@vue-flow/core"
 import { computed } from "vue"
 
-type Role = "hypervisor" | "game" | "router" | "edge"
+export interface InfraNodeData {
+  name: string
+  role: string
+  overlay?: string
+  online?: boolean
+  kind?: string
+  project?: string
+}
 
-const props = defineProps<{
-  data: {
-    name: string
-    role: Role
-    overlay: string
-    online: boolean
-    kind: string
-  }
-  selected?: boolean
-}>()
+const props = defineProps<{ data: InfraNodeData; selected?: boolean }>()
 
-const roleVar: Record<Role, string> = {
+const roleVar: Record<string, string> = {
   hypervisor: "var(--color-accent)",
   game: "var(--color-action)",
   router: "var(--color-muted-strong)",
   edge: "var(--color-brand)",
 }
-const accent = computed(() => roleVar[props.data.role])
-const roleIcon: Record<Role, string> = {
+const accent = computed(() => roleVar[props.data.role] ?? "var(--color-line-strong)")
+const roleIcon: Record<string, string> = {
   hypervisor: "▣",
   game: "◈",
   router: "⇄",
   edge: "☁",
 }
+const icon = computed(() => roleIcon[props.data.role] ?? "●")
 </script>
 
 <template>
   <div
     class="lp-infra-node"
-    :class="{ 'lp-infra-node--sel': selected, 'lp-infra-node--off': !data.online }"
+    :class="{ 'lp-infra-node--sel': selected, 'lp-infra-node--off': data.online === false }"
     :style="{ '--accent': accent }"
   >
     <Handle type="target" :position="Position.Left" class="lp-infra-handle" />
@@ -43,13 +46,17 @@ const roleIcon: Record<Role, string> = {
     <div class="lp-infra-node__bar" />
     <div class="lp-infra-node__body">
       <div class="lp-infra-node__top">
-        <span class="lp-infra-node__icon">{{ roleIcon[data.role] }}</span>
+        <span class="lp-infra-node__icon">{{ icon }}</span>
         <span class="lp-infra-node__name">{{ data.name }}</span>
-        <span class="lp-infra-node__dot" :class="data.online ? 'is-on' : 'is-off'" />
+        <span
+          v-if="data.online !== undefined"
+          class="lp-infra-node__dot"
+          :class="data.online ? 'is-on' : 'is-off'"
+        />
       </div>
       <div class="lp-infra-node__meta">
         <span class="lp-infra-node__role">{{ data.role }}</span>
-        <span class="lp-infra-node__ip">{{ data.overlay }}</span>
+        <span v-if="data.overlay" class="lp-infra-node__ip">{{ data.overlay }}</span>
       </div>
     </div>
   </div>

@@ -1,94 +1,53 @@
 <script setup lang="ts">
 /**
- * LeaveInfra topology canvas — preview/demo on Vue Flow (the engine n8n &
- * NetBird use). Real pan/zoom, draggable nodes, bezier edges, dot-grid
- * background, minimap, controls. Custom node = an Lp-token card. Edges are
- * styled by observed state (solid = applied, dashed brand = pending,
- * dashed red = drift). This is the visual spec the real control-panel canvas
- * will mirror — same library, same look.
+ * Preview/demo for the public LpTopologyCanvas kit component. The canvas itself
+ * lives in src/ (LpTopologyCanvas); this page only supplies mock data + the
+ * inspector/legend chrome an app would wrap around it. Drag from a handle to
+ * connect within a project; cross-project connects are rejected (mirrors the
+ * server-side isolation invariant).
  */
-import { Background } from "@vue-flow/background"
-import { Controls } from "@vue-flow/controls"
-import { MarkerType, VueFlow, useVueFlow, type NodeTypesObject } from "@vue-flow/core"
-import { MiniMap } from "@vue-flow/minimap"
-import { computed, markRaw, ref } from "vue"
-import { LpBadge, LpButton, useToast } from "../../src"
-import InfraNode from "./infra/InfraNode.vue"
+import { computed, ref } from "vue"
+import {
+  LpBadge,
+  LpButton,
+  LpTopologyCanvas,
+  useToast,
+  type EdgeObserved,
+  type TopologyEdge,
+  type TopologyNode,
+} from "../../src"
 
-import "@vue-flow/core/dist/style.css"
-import "@vue-flow/core/dist/theme-default.css"
-import "@vue-flow/controls/dist/style.css"
-import "@vue-flow/minimap/dist/style.css"
-
-type Obs = "applied" | "pending" | "drift"
-const nodeTypes = { infra: markRaw(InfraNode) } as unknown as NodeTypesObject
-
-const nodes = ref([
-  { id: "api", type: "infra", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, kind: "service", project: "infra" } },
-  { id: "lobby", type: "infra", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, kind: "mc", project: "42" } },
-  { id: "survival", type: "infra", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, kind: "mc", project: "42" } },
-  { id: "db42", type: "infra", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, kind: "db", project: "42" } },
-  { id: "hub43", type: "infra", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, kind: "router", project: "43" } },
-  { id: "mc43", type: "infra", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, kind: "mc", project: "43" } },
+const nodes = ref<TopologyNode[]>([
+  { id: "api", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, project: "infra" } },
+  { id: "lobby", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, project: "42" } },
+  { id: "survival", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, project: "42" } },
+  { id: "db42", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, project: "42" } },
+  { id: "hub43", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, project: "43" } },
+  { id: "mc43", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, project: "43" } },
 ])
 
-const rawEdges = ref([
-  { id: "e1", source: "api", target: "lobby", kind: "cloudflared", observed: "applied" as Obs },
-  { id: "e2", source: "lobby", target: "survival", kind: "wg", observed: "applied" as Obs },
-  { id: "e3", source: "lobby", target: "db42", kind: "wg", observed: "pending" as Obs },
-  { id: "e4", source: "survival", target: "db42", kind: "wg", observed: "pending" as Obs },
-  { id: "e5", source: "hub43", target: "mc43", kind: "wg", observed: "drift" as Obs },
+const edges = ref<TopologyEdge[]>([
+  { id: "e1", source: "api", target: "lobby", kind: "cloudflared", observed: "applied" },
+  { id: "e2", source: "lobby", target: "survival", kind: "wg", observed: "applied" },
+  { id: "e3", source: "lobby", target: "db42", kind: "wg", observed: "pending" },
+  { id: "e4", source: "survival", target: "db42", kind: "wg", observed: "pending" },
+  { id: "e5", source: "hub43", target: "mc43", kind: "wg", observed: "drift" },
 ])
 
-function edgeColor(o: Obs): string {
-  return o === "drift"
-    ? "var(--color-danger)"
-    : o === "pending"
-      ? "var(--color-muted-strong)"
-      : "var(--color-brand)"
-}
-
-const edges = computed(() =>
-  rawEdges.value.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    type: "default",
-    animated: e.observed !== "applied",
-    label: e.kind,
-    labelBgStyle: { fill: "var(--color-surface)" },
-    labelStyle: { fill: "var(--color-muted-strong)", fontSize: "10px" },
-    style: {
-      stroke: edgeColor(e.observed),
-      strokeWidth: 2,
-      strokeDasharray: e.observed === "applied" ? "0" : "6 5",
-    },
-    markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(e.observed) },
-    data: { observed: e.observed, kind: e.kind },
-  })),
-)
-
-const { onNodeClick, onConnect, fitView } = useVueFlow()
 const toast = useToast()
 const selected = ref<string | null>("lobby")
-onNodeClick(({ node }) => (selected.value = node.id))
-
 let edgeSeq = 100
-// Drag from a node handle to another -> create a wireguard edge, but ONLY
-// within the same project: a cross-project edge is rejected, mirroring the
-// server-side isolation invariant (control-service GraphController).
-onConnect((conn) => {
+
+function onConnect(conn: { source: string | null; target: string | null }) {
   const src = nodes.value.find((n) => n.id === conn.source)
   const dst = nodes.value.find((n) => n.id === conn.target)
   if (!src || !dst) return
   if (src.data.project !== dst.data.project) {
-    toast.error(
-      `cross-project edge rejected: ${src.data.project} ✗ ${dst.data.project}`,
-    )
+    toast.error(`cross-project edge rejected: ${src.data.project} ✗ ${dst.data.project}`)
     return
   }
   if (
-    rawEdges.value.some(
+    edges.value.some(
       (e) =>
         (e.source === conn.source && e.target === conn.target) ||
         (e.source === conn.target && e.target === conn.source),
@@ -97,30 +56,24 @@ onConnect((conn) => {
     toast.info("edge already exists")
     return
   }
-  rawEdges.value.push({
-    id: `e${edgeSeq++}`,
-    source: conn.source!,
-    target: conn.target!,
-    kind: "wg",
-    observed: "pending",
-  })
+  edges.value.push({ id: `e${edgeSeq++}`, source: conn.source!, target: conn.target!, kind: "wg", observed: "pending" })
   toast.success(`wg edge added — reconciling (${src.data.name} ↔ ${dst.data.name})`)
-})
+}
 
 const sel = computed(() => nodes.value.find((n) => n.id === selected.value) ?? null)
 const selPeers = computed(() => {
   if (!sel.value) return []
   const id = sel.value.id
-  return rawEdges.value
+  return edges.value
     .filter((e) => e.source === id || e.target === id)
     .map((e) => {
       const other = e.source === id ? e.target : e.source
       const node = nodes.value.find((n) => n.id === other)!
-      return { name: node.data.name, observed: e.observed, kind: e.kind }
+      return { name: node.data.name, observed: e.observed ?? "applied", kind: e.kind }
     })
 })
 
-function obsTone(o: Obs): "success" | "outline" | "danger" {
+function obsTone(o: EdgeObserved): "success" | "outline" | "danger" {
   return o === "applied" ? "success" : o === "pending" ? "outline" : "danger"
 }
 function toggleOnline() {
@@ -135,21 +88,13 @@ function toggleOnline() {
         <span class="text-sm font-semibold text-ink">Topology</span>
         <LpBadge tone="brand">desired vs observed</LpBadge>
       </div>
-
-      <VueFlow
-        v-model:nodes="nodes"
+      <LpTopologyCanvas
+        :nodes="nodes"
         :edges="edges"
-        :node-types="nodeTypes"
-        :default-viewport="{ zoom: 0.9 }"
-        :min-zoom="0.3"
-        :max-zoom="2"
-        fit-view-on-init
-        class="lp-infra-flow"
-      >
-        <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
-        <MiniMap pannable zoomable node-color="var(--color-surface-soft)" mask-color="rgba(0,0,0,0.55)" />
-        <Controls />
-      </VueFlow>
+        connectable
+        @connect="onConnect"
+        @node-select="(id) => (selected = id)"
+      />
     </div>
 
     <aside class="w-72 shrink-0 border-l border-line bg-surface-raised p-4">
@@ -197,35 +142,7 @@ function toggleOnline() {
         <div class="flex items-center gap-2">
           <span class="h-0.5 w-7 rounded border-t border-dashed" style="border-color: var(--color-danger)" /> drift
         </div>
-        <LpButton size="sm" variant="ghost" class="mt-2 self-start" @click="fitView()">fit view</LpButton>
       </div>
     </aside>
   </div>
 </template>
-
-<style scoped>
-.lp-infra-flow {
-  background: var(--color-surface);
-}
-/* Tone Vue Flow's default chrome to kit tokens. */
-.lp-infra-flow :deep(.vue-flow__controls) {
-  box-shadow: var(--shadow-panel);
-  border-radius: var(--radius-control);
-  overflow: hidden;
-}
-.lp-infra-flow :deep(.vue-flow__controls-button) {
-  background: var(--color-surface-raised);
-  border-bottom: 1px solid var(--color-line);
-  fill: var(--color-muted-strong);
-}
-.lp-infra-flow :deep(.vue-flow__controls-button:hover) {
-  background: var(--color-surface-soft);
-}
-.lp-infra-flow :deep(.vue-flow__minimap) {
-  border-radius: var(--radius-card);
-  border: 1px solid var(--color-line);
-  overflow: hidden;
-}
-.lp-infra-flow :deep(.vue-flow__edge-text) { fill: var(--color-muted-strong); }
-.lp-infra-flow :deep(.vue-flow__edge-textbg) { fill: var(--color-surface); }
-</style>

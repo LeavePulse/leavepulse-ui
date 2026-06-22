@@ -26,6 +26,8 @@ export type { MenuItem } from "./components/LpDropdownMenu.vue"
 export { default as LpEmptyState } from "./components/LpEmptyState.vue"
 export { default as LpFormField } from "./components/LpFormField.vue"
 export { default as LpIcon } from "./components/LpIcon.vue"
+export { default as LpInfraNode } from "./components/LpInfraNode.vue"
+export type { InfraNodeData } from "./components/LpInfraNode.vue"
 export { default as LpInput } from "./components/LpInput.vue"
 export { default as LpLink } from "./components/LpLink.vue"
 export { default as LpLogViewer } from "./components/LpLogViewer.vue"
@@ -66,6 +68,12 @@ export type { TabItem } from "./components/LpTabs.vue"
 export { default as LpTextarea } from "./components/LpTextarea.vue"
 export { default as LpToaster } from "./components/LpToaster.vue"
 export { default as LpTooltip } from "./components/LpTooltip.vue"
+export { default as LpTopologyCanvas } from "./components/LpTopologyCanvas.vue"
+export type {
+  EdgeObserved,
+  TopologyEdge,
+  TopologyNode,
+} from "./components/LpTopologyCanvas.vue"
 export { default as LpUptimeBar } from "./components/LpUptimeBar.vue"
 export type { UptimeSegment, UptimeStatus } from "./components/LpUptimeBar.vue"
 
