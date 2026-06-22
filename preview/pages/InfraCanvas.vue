@@ -1,227 +1,196 @@
 <script setup lang="ts">
 /**
- * LeaveInfra topology canvas — preview/demo.
- *
- * A native-SVG mock of the declarative topology graph the operator panel will
- * show: project swimlanes, nodes carrying a role, edges typed by transport
- * (wireguard / cloudflared), and desired-vs-observed rendering (solid = applied,
- * dashed = pending, red = drift). Built on kit tokens (text-ink / bg-surface-*
- * / border-line utilities) so it follows the active preview theme. No Vue Flow
- * dependency — this is the visual spec the real control-panel canvas mirrors.
+ * LeaveInfra topology canvas — preview/demo on Vue Flow (the engine n8n &
+ * NetBird use). Real pan/zoom, draggable nodes, bezier edges, dot-grid
+ * background, minimap, controls. Custom node = an Lp-token card. Edges are
+ * styled by observed state (solid = applied, dashed brand = pending,
+ * dashed red = drift). This is the visual spec the real control-panel canvas
+ * will mirror — same library, same look.
  */
-import { computed, ref } from "vue"
-import { LpBadge, LpButton, LpCard, LpSwitch } from "../../src"
+import { Background } from "@vue-flow/background"
+import { Controls } from "@vue-flow/controls"
+import { MarkerType, VueFlow, useVueFlow, type NodeTypesObject } from "@vue-flow/core"
+import { MiniMap } from "@vue-flow/minimap"
+import { computed, markRaw, ref } from "vue"
+import { LpBadge, LpButton } from "../../src"
+import InfraNode from "./infra/InfraNode.vue"
 
-type Role = "hypervisor" | "game" | "router" | "edge"
-type EdgeKind = "wireguard" | "cloudflared"
+import "@vue-flow/core/dist/style.css"
+import "@vue-flow/core/dist/theme-default.css"
+import "@vue-flow/controls/dist/style.css"
+import "@vue-flow/minimap/dist/style.css"
+
 type Obs = "applied" | "pending" | "drift"
+const nodeTypes = { infra: markRaw(InfraNode) } as unknown as NodeTypesObject
 
-interface Node {
-  id: string
-  name: string
-  role: Role
-  project: string
-  online: boolean
-  overlay: string
-  x: number
-  y: number
-}
-
-interface Edge {
-  id: string
-  from: string
-  to: string
-  kind: EdgeKind
-  observed: Obs
-}
-
-// Two projects, isolated overlays. The edges fan out from a public hub.
-const nodes = ref<Node[]>([
-  { id: "api", name: "platform-api", role: "edge", project: "infra", online: true, overlay: "10.0.0.2", x: 120, y: 90 },
-  { id: "lobby", name: "lobby", role: "game", project: "42", online: true, overlay: "10.42.0.2", x: 360, y: 70 },
-  { id: "survival", name: "survival", role: "game", project: "42", online: true, overlay: "10.42.0.3", x: 600, y: 70 },
-  { id: "db42", name: "postgres", role: "hypervisor", project: "42", online: false, overlay: "10.42.0.4", x: 480, y: 200 },
-  { id: "hub43", name: "router", role: "router", project: "43", online: true, overlay: "10.43.0.2", x: 360, y: 330 },
-  { id: "mc43", name: "smp", role: "game", project: "43", online: true, overlay: "10.43.0.3", x: 600, y: 330 },
+const nodes = ref([
+  { id: "api", type: "infra", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, kind: "service" } },
+  { id: "lobby", type: "infra", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, kind: "mc" } },
+  { id: "survival", type: "infra", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, kind: "mc" } },
+  { id: "db42", type: "infra", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, kind: "db" } },
+  { id: "hub43", type: "infra", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, kind: "router" } },
+  { id: "mc43", type: "infra", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, kind: "mc" } },
 ])
 
-const edges = ref<Edge[]>([
-  { id: "e1", from: "api", to: "lobby", kind: "cloudflared", observed: "applied" },
-  { id: "e2", from: "lobby", to: "survival", kind: "wireguard", observed: "applied" },
-  { id: "e3", from: "lobby", to: "db42", kind: "wireguard", observed: "pending" },
-  { id: "e4", from: "survival", to: "db42", kind: "wireguard", observed: "pending" },
-  { id: "e5", from: "hub43", to: "mc43", kind: "wireguard", observed: "drift" },
-])
-
-const roleColor: Record<Role, string> = {
-  hypervisor: "var(--color-accent)",
-  game: "var(--color-action)",
-  router: "var(--color-muted-strong)",
-  edge: "var(--color-brand)",
-}
-
-const projects = [
-  { id: "infra", label: "infra · neutral", cidr: "—", x: 40, y: 40, w: 220, h: 110 },
-  { id: "42", label: "project 42", cidr: "10.42.0.0/24", x: 290, y: 30, w: 430, h: 240 },
-  { id: "43", label: "project 43", cidr: "10.43.0.0/24", x: 290, y: 290, w: 430, h: 110 },
+const rawEdges = [
+  { id: "e1", source: "api", target: "lobby", kind: "cloudflared", observed: "applied" as Obs },
+  { id: "e2", source: "lobby", target: "survival", kind: "wg", observed: "applied" as Obs },
+  { id: "e3", source: "lobby", target: "db42", kind: "wg", observed: "pending" as Obs },
+  { id: "e4", source: "survival", target: "db42", kind: "wg", observed: "pending" as Obs },
+  { id: "e5", source: "hub43", target: "mc43", kind: "wg", observed: "drift" as Obs },
 ]
 
-const byId = computed(() => Object.fromEntries(nodes.value.map((n) => [n.id, n])))
-const selected = ref<string | null>("lobby")
-const showPending = ref(true)
+function edgeColor(o: Obs): string {
+  return o === "drift"
+    ? "var(--color-danger)"
+    : o === "pending"
+      ? "var(--color-muted-strong)"
+      : "var(--color-brand)"
+}
 
-const visibleEdges = computed(() =>
-  edges.value.filter((e) => showPending.value || e.observed !== "pending"),
+const edges = computed(() =>
+  rawEdges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: "default",
+    animated: e.observed !== "applied",
+    label: e.kind,
+    labelBgStyle: { fill: "var(--color-surface)" },
+    labelStyle: { fill: "var(--color-muted-strong)", fontSize: "10px" },
+    style: {
+      stroke: edgeColor(e.observed),
+      strokeWidth: 2,
+      strokeDasharray: e.observed === "applied" ? "0" : "6 5",
+    },
+    markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(e.observed) },
+    data: { observed: e.observed, kind: e.kind },
+  })),
 )
 
-function edgeStroke(o: Obs): string {
-  if (o === "drift") return "var(--color-danger)"
-  if (o === "pending") return "var(--color-muted)"
-  return "var(--color-brand)"
-}
-function edgeDash(o: Obs): string {
-  return o === "applied" ? "0" : "6 5"
-}
+const { onNodeClick, fitView } = useVueFlow()
+const selected = ref<string | null>("lobby")
+onNodeClick(({ node }) => (selected.value = node.id))
 
-const sel = computed(() => (selected.value ? byId.value[selected.value] : null))
+const sel = computed(() => nodes.value.find((n) => n.id === selected.value) ?? null)
 const selPeers = computed(() => {
   if (!sel.value) return []
   const id = sel.value.id
-  return edges.value
-    .filter((e) => e.from === id || e.to === id)
+  return rawEdges
+    .filter((e) => e.source === id || e.target === id)
     .map((e) => {
-      const other = e.from === id ? e.to : e.from
-      return { node: byId.value[other], kind: e.kind, observed: e.observed }
+      const other = e.source === id ? e.target : e.source
+      const node = nodes.value.find((n) => n.id === other)!
+      return { name: node.data.name, observed: e.observed, kind: e.kind }
     })
 })
 
 function obsTone(o: Obs): "success" | "outline" | "danger" {
   return o === "applied" ? "success" : o === "pending" ? "outline" : "danger"
 }
+function toggleOnline() {
+  if (sel.value) sel.value.data.online = !sel.value.data.online
+}
 </script>
 
 <template>
   <div class="flex h-full min-h-0 w-full">
-    <!-- canvas -->
-    <div class="relative min-h-0 flex-1 overflow-hidden">
-      <div class="absolute left-4 top-4 z-10 flex items-center gap-3">
+    <div class="relative min-h-0 flex-1">
+      <div class="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-3">
         <span class="text-sm font-semibold text-ink">Topology</span>
         <LpBadge tone="brand">desired vs observed</LpBadge>
-        <label class="flex items-center gap-2 text-xs text-muted">
-          <LpSwitch v-model="showPending" />
-          show pending
-        </label>
       </div>
 
-      <svg class="h-full w-full" viewBox="0 0 760 420" preserveAspectRatio="xMidYMid meet">
-        <!-- project swimlanes -->
-        <g v-for="p in projects" :key="p.id">
-          <rect
-            :x="p.x" :y="p.y" :width="p.w" :height="p.h" rx="14"
-            fill="var(--color-surface-soft)"
-            stroke="var(--color-line)" stroke-dasharray="2 4"
-          />
-          <text :x="p.x + 12" :y="p.y + 20" font-size="11" fill="var(--color-muted-strong)">
-            {{ p.label }}
-          </text>
-          <text :x="p.x + 12" :y="p.y + 34" font-size="9" fill="var(--color-muted)">
-            {{ p.cidr }}
-          </text>
-        </g>
-
-        <!-- edges -->
-        <g v-for="e in visibleEdges" :key="e.id">
-          <line
-            :x1="byId[e.from].x" :y1="byId[e.from].y"
-            :x2="byId[e.to].x" :y2="byId[e.to].y"
-            :stroke="edgeStroke(e.observed)"
-            :stroke-dasharray="edgeDash(e.observed)"
-            stroke-width="2" opacity="0.9"
-          />
-          <text
-            :x="(byId[e.from].x + byId[e.to].x) / 2"
-            :y="(byId[e.from].y + byId[e.to].y) / 2 - 4"
-            font-size="8" text-anchor="middle"
-            :fill="e.kind === 'cloudflared' ? 'var(--color-brand)' : 'var(--color-muted-strong)'"
-          >
-            {{ e.kind === "cloudflared" ? "cloudflared" : "wg" }}
-          </text>
-        </g>
-
-        <!-- nodes -->
-        <g
-          v-for="n in nodes" :key="n.id"
-          class="cursor-pointer" @click="selected = n.id"
-        >
-          <circle
-            :cx="n.x" :cy="n.y" r="22"
-            fill="var(--color-surface-raised)"
-            :stroke="selected === n.id ? 'var(--color-ring)' : roleColor[n.role]"
-            :stroke-width="selected === n.id ? 3 : 2"
-            :opacity="n.online ? 1 : 0.4"
-          />
-          <circle :cx="n.x + 16" :cy="n.y - 16" r="4" :fill="n.online ? 'var(--color-action)' : 'var(--color-danger)'" />
-          <text :x="n.x" :y="n.y + 4" font-size="9" text-anchor="middle" fill="var(--color-ink)" :opacity="n.online ? 1 : 0.5">
-            {{ n.name }}
-          </text>
-          <text :x="n.x" :y="n.y + 38" font-size="8" text-anchor="middle" :fill="roleColor[n.role]">
-            {{ n.role }}
-          </text>
-        </g>
-      </svg>
+      <VueFlow
+        v-model:nodes="nodes"
+        :edges="edges"
+        :node-types="nodeTypes"
+        :default-viewport="{ zoom: 0.9 }"
+        :min-zoom="0.3"
+        :max-zoom="2"
+        fit-view-on-init
+        class="lp-infra-flow"
+      >
+        <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
+        <MiniMap pannable zoomable node-color="var(--color-surface-soft)" mask-color="rgba(0,0,0,0.55)" />
+        <Controls />
+      </VueFlow>
     </div>
 
-    <!-- inspector -->
     <aside class="w-72 shrink-0 border-l border-line bg-surface-raised p-4">
-      <LpCard v-if="sel">
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-semibold text-ink">{{ sel.name }}</span>
-            <LpBadge :tone="sel.online ? 'success' : 'danger'">
-              {{ sel.online ? "online" : "offline" }}
-            </LpBadge>
-          </div>
-          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-            <dt class="text-muted">role</dt>
-            <dd class="text-ink">{{ sel.role }}</dd>
-            <dt class="text-muted">project</dt>
-            <dd class="text-ink">{{ sel.project }}</dd>
-            <dt class="text-muted">overlay</dt>
-            <dd class="font-mono text-ink">{{ sel.overlay }}</dd>
-          </dl>
-
-          <div class="mt-1 text-xs font-semibold uppercase tracking-wider text-muted">
-            peers ({{ selPeers.length }})
-          </div>
-          <div v-if="selPeers.length" class="flex flex-col gap-1.5">
-            <div
-              v-for="p in selPeers" :key="p.node.id"
-              class="flex items-center justify-between rounded-control bg-surface-soft px-2 py-1.5"
-            >
-              <span class="text-xs text-ink">{{ p.node.name }}</span>
-              <LpBadge :tone="obsTone(p.observed)">{{ p.observed }}</LpBadge>
-            </div>
-          </div>
-          <p v-else class="text-xs text-muted">no project peers — isolated.</p>
-
-          <LpButton size="sm" variant="soft" class="mt-1" @click="sel.online = !sel.online">
-            simulate {{ sel.online ? "offline" : "online" }}
-          </LpButton>
+      <template v-if="sel">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-ink">{{ sel.data.name }}</span>
+          <LpBadge :tone="sel.data.online ? 'success' : 'danger'">
+            {{ sel.data.online ? "online" : "offline" }}
+          </LpBadge>
         </div>
-      </LpCard>
+        <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+          <dt class="text-muted">role</dt>
+          <dd class="text-ink">{{ sel.data.role }}</dd>
+          <dt class="text-muted">overlay</dt>
+          <dd class="font-mono text-ink">{{ sel.data.overlay }}</dd>
+        </dl>
+
+        <div class="mt-4 text-xs font-semibold uppercase tracking-wider text-muted">
+          peers ({{ selPeers.length }})
+        </div>
+        <div v-if="selPeers.length" class="mt-2 flex flex-col gap-1.5">
+          <div
+            v-for="(p, i) in selPeers" :key="i"
+            class="flex items-center justify-between rounded-control bg-surface-soft px-2 py-1.5"
+          >
+            <span class="text-xs text-ink">{{ p.name }} <span class="text-muted">· {{ p.kind }}</span></span>
+            <LpBadge :tone="obsTone(p.observed)">{{ p.observed }}</LpBadge>
+          </div>
+        </div>
+        <p v-else class="mt-2 text-xs text-muted">no project peers — isolated.</p>
+
+        <LpButton size="sm" variant="soft" class="mt-4 w-full" @click="toggleOnline">
+          simulate {{ sel.data.online ? "offline" : "online" }}
+        </LpButton>
+      </template>
       <p v-else class="text-sm text-muted">Select a node.</p>
 
-      <div class="mt-4 flex flex-col gap-1.5 text-xs text-muted">
+      <div class="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-xs text-muted">
         <div class="flex items-center gap-2">
-          <span class="inline-block h-0.5 w-6" style="background: var(--color-brand)" /> applied
+          <span class="h-0.5 w-7 rounded" style="background: var(--color-brand)" /> applied
         </div>
         <div class="flex items-center gap-2">
-          <span class="inline-block h-0.5 w-6" style="background: var(--color-muted); border-top: 1px dashed" /> pending (reconciling)
+          <span class="h-0.5 w-7 rounded border-t border-dashed" style="border-color: var(--color-muted-strong)" /> pending
         </div>
         <div class="flex items-center gap-2">
-          <span class="inline-block h-0.5 w-6" style="background: var(--color-danger)" /> drift
+          <span class="h-0.5 w-7 rounded border-t border-dashed" style="border-color: var(--color-danger)" /> drift
         </div>
+        <LpButton size="sm" variant="ghost" class="mt-2 self-start" @click="fitView()">fit view</LpButton>
       </div>
     </aside>
   </div>
 </template>
+
+<style scoped>
+.lp-infra-flow {
+  background: var(--color-surface);
+}
+/* Tone Vue Flow's default chrome to kit tokens. */
+.lp-infra-flow :deep(.vue-flow__controls) {
+  box-shadow: var(--shadow-panel);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.lp-infra-flow :deep(.vue-flow__controls-button) {
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-line);
+  fill: var(--color-muted-strong);
+}
+.lp-infra-flow :deep(.vue-flow__controls-button:hover) {
+  background: var(--color-surface-soft);
+}
+.lp-infra-flow :deep(.vue-flow__minimap) {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  overflow: hidden;
+}
+.lp-infra-flow :deep(.vue-flow__edge-text) { fill: var(--color-muted-strong); }
+.lp-infra-flow :deep(.vue-flow__edge-textbg) { fill: var(--color-surface); }
+</style>
