@@ -51,3 +51,17 @@
 .lp-topology .vue-flow__edge-textbg {
   fill: var(--color-surface);
 }
+
+/* Host-frame (group node) title. Vue Flow's default group label is a dim,
+   centered grey that's nearly invisible on the dark surface — pin it to the
+   top-left of the frame and use the ink token so host names (proxy-vps,
+   app-vps-1, …) read clearly. */
+.lp-topology .vue-flow__node-group {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
