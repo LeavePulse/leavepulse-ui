@@ -13,6 +13,7 @@ import { Background } from "@vue-flow/background"
 import { Controls } from "@vue-flow/controls"
 import {
   MarkerType,
+  SelectionMode,
   VueFlow,
   useVueFlow,
   type Connection,
@@ -20,7 +21,7 @@ import {
   type NodeTypesObject,
 } from "@vue-flow/core"
 import { MiniMap } from "@vue-flow/minimap"
-import { computed, markRaw, type Component } from "vue"
+import { computed, markRaw, watch, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
 
@@ -65,13 +66,25 @@ const props = withDefaults(
     edges: TopologyEdge[]
     /** Allow drag-to-connect (emits `connect`). Default false (read-only). */
     connectable?: boolean
+    /**
+     * Desktop-style marquee selection: drag on empty canvas to rubber-band a
+     * box and select every node inside; the selected set then drags together.
+     * Hold Shift to add to the selection. Panning moves to a right-drag / the
+     * space bar so left-drag is free for selecting. Default false (left-drag
+     * pans, the classic read-only behaviour). Emits `selection-change`.
+     */
+    selectable?: boolean
   }>(),
-  { connectable: false },
+  { connectable: false, selectable: false },
 )
 
 const emit = defineEmits<{
   (e: "connect", value: Connection): void
   (e: "node-select", id: string): void
+  (e: "node-contextmenu", value: { id: string; x: number; y: number }): void
+  (e: "pane-click"): void
+  /** Ids of the marquee/multi-selected nodes (empty when cleared). */
+  (e: "selection-change", ids: string[]): void
   (e: "update:nodes", value: TopologyNode[]): void
 }>()
 
@@ -141,8 +154,29 @@ const flowEdges = computed(() =>
   }),
 )
 
-const { onNodeClick, onConnect, fitView } = useVueFlow()
+const {
+  onNodeClick,
+  onNodeContextMenu,
+  onPaneClick,
+  onConnect,
+  getSelectedNodes,
+  fitView,
+} = useVueFlow()
 onNodeClick(({ node }) => emit("node-select", node.id))
+// Vue Flow has no onSelectionChange hook in this version; the selected set is
+// reactive on the store, so watch it and surface the ids.
+watch(
+  () => getSelectedNodes.value.map((n) => n.id),
+  (ids) => emit("selection-change", ids),
+)
+onNodeContextMenu(({ node, event }) => {
+  // Suppress the browser menu and surface the node + cursor so the host can
+  // render its own actions (open page, focus, filter, copy…).
+  const e = event as MouseEvent
+  e.preventDefault?.()
+  emit("node-contextmenu", { id: node.id, x: e.clientX, y: e.clientY })
+})
+onPaneClick(() => emit("pane-click"))
 onConnect((conn) => emit("connect", conn))
 
 defineExpose({ fitView })
@@ -154,6 +188,11 @@ defineExpose({ fitView })
     :edges="flowEdges"
     :node-types="nodeTypes"
     :nodes-connectable="connectable"
+    :selection-on-drag="selectable"
+    :pan-on-drag="selectable ? [1, 2] : true"
+    :selection-key-code="selectable ? true : null"
+    multi-selection-key-code="Shift"
+    :selection-mode="SelectionMode.Partial"
     :default-viewport="{ zoom: 0.9 }"
     :min-zoom="0.3"
     :max-zoom="2"
