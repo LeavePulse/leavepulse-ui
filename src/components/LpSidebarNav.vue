@@ -102,7 +102,7 @@ const pillTransition = usePillTransition()
               class="relative z-10 shrink-0 transition-colors"
               :class="itemActive(item) ? 'text-brand' : ''"
             />
-            <span class="relative z-10 min-w-0 flex-1 truncate">{{ item.label }}</span>
+            <span class="relative z-10 min-w-0 flex-1 truncate text-left">{{ item.label }}</span>
             <LpBadge
               v-if="item.badge != null"
               :tone="itemActive(item) ? 'brand' : 'neutral'"
