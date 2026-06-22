@@ -50,12 +50,19 @@ const props = withDefaults(
     mobileBreakpoint?: "sm" | "md" | "lg" | "xl"
     /** Let a pull from the left screen edge drag the mobile drawer open. */
     edgeOpen?: boolean
+    /**
+     * Draw a hairline rule between the #header (logo) and the nav. On by
+     * default — it visually anchors the brand above the items. Pass false for a
+     * flush, header-less look.
+     */
+    divider?: boolean
   }>(),
   {
     skeletonRows: 6,
     skeletonHeader: true,
     responsive: false,
     mobileBreakpoint: "md",
+    divider: true,
   },
 )
 
@@ -109,7 +116,11 @@ const railClass = computed(() =>
     :class="railClass"
     aria-label="Sidebar"
   >
-    <div v-if="$slots.header" class="mb-2 shrink-0">
+    <div
+      v-if="$slots.header"
+      class="shrink-0"
+      :class="divider ? 'mb-3 border-b border-line pb-3' : 'mb-2'"
+    >
       <slot name="header" />
     </div>
 
@@ -145,7 +156,11 @@ const railClass = computed(() =>
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="flex h-full flex-col gap-1">
-      <div v-if="$slots.header" class="mb-2 shrink-0">
+      <div
+        v-if="$slots.header"
+        class="shrink-0"
+        :class="divider ? 'mb-3 border-b border-line pb-3' : 'mb-2'"
+      >
         <slot name="header" />
       </div>
 

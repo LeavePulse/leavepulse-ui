@@ -1,5 +1,6 @@
 export { default as LayoutCanvas } from "./components/LayoutCanvas.vue"
 export { default as LpAlert } from "./components/LpAlert.vue"
+export { default as LpAppShell } from "./components/LpAppShell.vue"
 export { default as LpAutocomplete } from "./components/LpAutocomplete.vue"
 export type { AutocompleteOption } from "./components/LpAutocomplete.vue"
 export { default as LpAvatar } from "./components/LpAvatar.vue"
