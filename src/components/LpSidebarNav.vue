@@ -114,10 +114,5 @@ const pillTransition = usePillTransition()
         </component>
       </LpContextMenu>
     </div>
-
-    <!-- Actions slot: buttons / promo card under the nav. -->
-    <div v-if="$slots.actions" class="mt-auto flex flex-col gap-2 pt-2">
-      <slot name="actions" />
-    </div>
   </LpScrollArea>
 </template>

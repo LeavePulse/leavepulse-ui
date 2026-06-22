@@ -136,10 +136,14 @@ const railClass = computed(() =>
       <template v-if="$slots.item" #item="slotProps">
         <slot name="item" v-bind="slotProps" />
       </template>
-      <template v-if="$slots.actions" #actions>
-        <slot name="actions" />
-      </template>
     </LpSidebarNav>
+
+    <!-- Actions (search, "new …") sit just above the footer, pinned to the
+         bottom of the rail and outside the scroll region — not trailing the
+         nav list. -->
+    <div v-if="$slots.actions" class="mt-2 flex shrink-0 flex-col gap-2">
+      <slot name="actions" />
+    </div>
 
     <div v-if="$slots.footer" class="mt-2 shrink-0 border-t border-line pt-3">
       <slot name="footer" />
@@ -176,10 +180,11 @@ const railClass = computed(() =>
         <template v-if="$slots.item" #item="slotProps">
           <slot name="item" v-bind="slotProps" />
         </template>
-        <template v-if="$slots.actions" #actions>
-          <slot name="actions" />
-        </template>
       </LpSidebarNav>
+
+      <div v-if="$slots.actions" class="mt-2 flex shrink-0 flex-col gap-2">
+        <slot name="actions" />
+      </div>
 
       <div v-if="$slots.footer" class="mt-2 shrink-0 border-t border-line pt-3">
         <slot name="footer" />
