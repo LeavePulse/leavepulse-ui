@@ -13,6 +13,7 @@ import { Background } from "@vue-flow/background"
 import { Controls } from "@vue-flow/controls"
 import {
   MarkerType,
+  Panel,
   SelectionMode,
   VueFlow,
   useVueFlow,
@@ -51,12 +52,23 @@ export interface TopologyNode {
   label?: string
 }
 
+/**
+ * Edge semantics, encoded with both colour AND line style so the two kinds read
+ * apart at a glance (and for colour-blind users): "network" = a transport wire
+ * between hosts (solid, brand-cyan); "structural" = a depends_on relation
+ * between services (dotted, violet, thinner). Inferred from `kind` when omitted
+ * (`depends_on` → structural, everything else → network).
+ */
+export type EdgeCategory = "network" | "structural"
+
 export interface TopologyEdge {
   id: string
   source: string
   target: string
   /** transport label shown on the edge (e.g. "wg", "cloudflared"). */
   kind?: string
+  /** Semantic class driving colour + dash. Inferred from `kind` if omitted. */
+  category?: EdgeCategory
   observed?: EdgeObserved
 }
 
@@ -74,14 +86,17 @@ const props = withDefaults(
      * pans, the classic read-only behaviour). Emits `selection-change`.
      */
     selectable?: boolean
+    /** Show the edge-type legend (Network / Depends-on / Pending / Drift). */
+    legend?: boolean
   }>(),
-  { connectable: false, selectable: false },
+  { connectable: false, selectable: false, legend: true },
 )
 
 const emit = defineEmits<{
   (e: "connect", value: Connection): void
   (e: "node-select", id: string): void
   (e: "node-contextmenu", value: { id: string; x: number; y: number }): void
+  (e: "edge-contextmenu", value: { id: string; x: number; y: number }): void
   (e: "pane-click"): void
   /** Ids of the marquee/multi-selected nodes (empty when cleared). */
   (e: "selection-change", ids: string[]): void
@@ -124,17 +139,31 @@ const flowNodes = computed<Node[]>(() =>
   }),
 )
 
-function edgeColor(o: EdgeObserved): string {
-  return o === "drift"
-    ? "var(--color-danger)"
-    : o === "pending"
-      ? "var(--color-muted-strong)"
-      : "var(--color-brand)"
+// Category drives the resting colour + base dash; `depends_on` is structural.
+function edgeCategory(e: TopologyEdge): EdgeCategory {
+  return e.category ?? (e.kind === "depends_on" ? "structural" : "network")
+}
+const CATEGORY_COLOR: Record<EdgeCategory, string> = {
+  network: "var(--color-brand)",
+  structural: "var(--color-accent)",
+}
+// Drift is an alarm and overrides the category colour; otherwise the type's
+// colour stays so the kind is always legible (pending only animates).
+function edgeColor(cat: EdgeCategory, o: EdgeObserved): string {
+  return o === "drift" ? "var(--color-danger)" : CATEGORY_COLOR[cat]
+}
+// Dash encodes BOTH axes: structural is dotted at rest; pending/drift switch to
+// a marching dash. Network applied = solid.
+function edgeDash(cat: EdgeCategory, o: EdgeObserved): string {
+  if (o !== "applied") return "6 5"
+  return cat === "structural" ? "1 6" : "0"
 }
 
 const flowEdges = computed(() =>
   props.edges.map((e) => {
     const obs = e.observed ?? "applied"
+    const cat = edgeCategory(e)
+    const color = edgeColor(cat, obs)
     return {
       id: e.id,
       source: e.source,
@@ -145,11 +174,12 @@ const flowEdges = computed(() =>
       labelBgStyle: { fill: "var(--color-surface)" },
       labelStyle: { fill: "var(--color-muted-strong)", fontSize: "10px" },
       style: {
-        stroke: edgeColor(obs),
-        strokeWidth: 2,
-        strokeDasharray: obs === "applied" ? "0" : "6 5",
+        stroke: color,
+        strokeWidth: cat === "structural" ? 1.5 : 2,
+        strokeDasharray: edgeDash(cat, obs),
+        strokeLinecap: "round" as const,
       },
-      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor(obs) },
+      markerEnd: { type: MarkerType.ArrowClosed, color },
     }
   }),
 )
@@ -157,6 +187,7 @@ const flowEdges = computed(() =>
 const {
   onNodeClick,
   onNodeContextMenu,
+  onEdgeContextMenu,
   onPaneClick,
   onConnect,
   getSelectedNodes,
@@ -175,6 +206,20 @@ onNodeContextMenu(({ node, event }) => {
   const e = event as MouseEvent
   e.preventDefault?.()
   emit("node-contextmenu", { id: node.id, x: e.clientX, y: e.clientY })
+})
+// Legend rows mirror the edge encoding exactly (same colours/dashes).
+const legendItems = [
+  { label: "Network", color: CATEGORY_COLOR.network, width: 2, dash: "0" },
+  { label: "Depends-on", color: CATEGORY_COLOR.structural, width: 1.5, dash: "1 5" },
+  { label: "Pending", color: "var(--color-brand)", width: 2, dash: "6 5" },
+  { label: "Drift", color: "var(--color-danger)", width: 2, dash: "6 5" },
+] as const
+
+onEdgeContextMenu(({ edge, event }) => {
+  // Right-click an edge → host renders edge actions (change transport, remove…).
+  const e = event as MouseEvent
+  e.preventDefault?.()
+  emit("edge-contextmenu", { id: edge.id, x: e.clientX, y: e.clientY })
 })
 onPaneClick(() => emit("pane-click"))
 onConnect((conn) => emit("connect", conn))
@@ -202,6 +247,33 @@ defineExpose({ fitView })
     <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
     <MiniMap pannable zoomable node-color="var(--color-surface-soft)" mask-color="rgba(0,0,0,0.55)" />
     <Controls />
+
+    <!-- Edge-type legend: makes the colour/dash encoding self-explanatory. -->
+    <Panel v-if="legend" position="top-right">
+      <div
+        class="flex flex-col gap-1.5 rounded-card border border-line bg-surface-overlay/90 px-3 py-2 text-[11px] backdrop-blur"
+      >
+        <div
+          v-for="l in legendItems"
+          :key="l.label"
+          class="flex items-center gap-2 text-muted"
+        >
+          <svg width="22" height="6" class="shrink-0" aria-hidden="true">
+            <line
+              x1="0"
+              y1="3"
+              x2="22"
+              y2="3"
+              :stroke="l.color"
+              :stroke-width="l.width"
+              :stroke-dasharray="l.dash"
+              stroke-linecap="round"
+            />
+          </svg>
+          {{ l.label }}
+        </div>
+      </div>
+    </Panel>
   </VueFlow>
 </template>
 
