@@ -12,6 +12,8 @@ export interface ServiceNodeData {
   name: string
   kind?: string // service | database | infra
   stack?: string
+  /** Fade the node back (search miss / not part of the focused node's graph). */
+  dimmed?: boolean
 }
 
 const props = defineProps<{ data: ServiceNodeData; selected?: boolean }>()
@@ -32,8 +34,11 @@ const icon = computed(() => kindIcon[props.data.kind ?? "service"] ?? "◇")
 
 <template>
   <div
-    class="flex w-[132px] items-center gap-1.5 rounded-control border bg-surface-soft px-2 py-1.5 transition-[border-color]"
-    :class="selected ? 'border-[var(--accent)]' : 'border-line'"
+    class="flex w-[132px] items-center gap-1.5 rounded-control border bg-surface-soft px-2 py-1.5 transition-[border-color,opacity]"
+    :class="[
+      selected ? 'border-[var(--accent)]' : 'border-line',
+      data.dimmed ? 'opacity-30' : 'opacity-100',
+    ]"
     :style="{ '--accent': accent }"
   >
     <Handle

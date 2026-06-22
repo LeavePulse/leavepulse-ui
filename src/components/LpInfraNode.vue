@@ -18,6 +18,8 @@ export interface InfraNodeData {
   online?: boolean
   kind?: string
   project?: string
+  /** Fade the node back (search miss / not part of the focused node's graph). */
+  dimmed?: boolean
 }
 
 const props = defineProps<{ data: InfraNodeData; selected?: boolean }>()
@@ -44,7 +46,7 @@ const icon = computed(() => roleIcon[props.data.role] ?? "●")
     :class="selected ? 'border-[var(--accent)]' : 'border-line'"
     :style="{
       '--accent': accent,
-      opacity: data.online === false ? 0.5 : 1,
+      opacity: data.dimmed ? 0.3 : data.online === false ? 0.5 : 1,
       ...(selected
         ? { boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel)' }
         : {}),

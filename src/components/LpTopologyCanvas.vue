@@ -102,6 +102,8 @@ const flowNodes = computed<Node[]>(() =>
         background: "color-mix(in srgb, var(--color-surface-soft) 60%, transparent)",
         border: "1px solid var(--color-line)",
         borderRadius: "var(--radius-card)",
+        opacity: (n.data as { dimmed?: boolean }).dimmed ? "0.35" : "1",
+        transition: "opacity var(--duration-fast)",
       }
       node.label = n.label ?? n.data.name
     }
