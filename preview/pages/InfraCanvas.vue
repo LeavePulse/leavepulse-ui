@@ -24,6 +24,16 @@ const nodes = ref<TopologyNode[]>([
   { id: "db42", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, project: "42" } },
   { id: "hub43", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, project: "43" } },
   { id: "mc43", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, project: "43" } },
+
+  // Service layer demo: two host frames (group nodes) with services inside, and
+  // a depends_on edge crossing the frames (auth-service -> auth-db on a
+  // different host).
+  { id: "host-app", type: "group", position: { x: 40, y: 640 }, width: 300, height: 150, data: { name: "app-vps-1", role: "" }, label: "app-vps-1" },
+  { id: "auth-service", type: "service", parent: "host-app", position: { x: 16, y: 40 }, data: { name: "auth-service", kind: "service" } },
+  { id: "billing-service", type: "service", parent: "host-app", position: { x: 16, y: 80 }, data: { name: "billing-service", kind: "service" } },
+  { id: "host-data", type: "group", position: { x: 460, y: 640 }, width: 300, height: 150, data: { name: "data-vps", role: "" }, label: "data-vps" },
+  { id: "auth-db", type: "service", parent: "host-data", position: { x: 16, y: 40 }, data: { name: "auth-db", kind: "database" } },
+  { id: "nats", type: "service", parent: "host-data", position: { x: 16, y: 80 }, data: { name: "nats", kind: "infra" } },
 ])
 
 const edges = ref<TopologyEdge[]>([
@@ -32,6 +42,10 @@ const edges = ref<TopologyEdge[]>([
   { id: "e3", source: "lobby", target: "db42", kind: "wg", observed: "pending" },
   { id: "e4", source: "survival", target: "db42", kind: "wg", observed: "pending" },
   { id: "e5", source: "hub43", target: "mc43", kind: "wg", observed: "drift" },
+  // depends_on edges crossing host frames (the cross-host service links).
+  { id: "d1", source: "auth-service", target: "auth-db", kind: "depends_on", observed: "applied" },
+  { id: "d2", source: "auth-service", target: "nats", kind: "depends_on", observed: "applied" },
+  { id: "d3", source: "billing-service", target: "auth-db", kind: "depends_on", observed: "applied" },
 ])
 
 const toast = useToast()

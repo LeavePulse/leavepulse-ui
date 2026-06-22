@@ -16,11 +16,13 @@ import {
   VueFlow,
   useVueFlow,
   type Connection,
+  type Node,
   type NodeTypesObject,
 } from "@vue-flow/core"
 import { MiniMap } from "@vue-flow/minimap"
-import { computed, markRaw } from "vue"
+import { computed, markRaw, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
+import LpServiceNode from "./LpServiceNode.vue"
 
 // Vue Flow base CSS + canvas chrome theming is shipped via the kit's
 // "@leavepulse/ui/canvas.css" export (a plain CSS file). Component-local CSS
@@ -33,6 +35,18 @@ export interface TopologyNode {
   id: string
   position: { x: number; y: number }
   data: InfraNodeData
+  /**
+   * Node kind: "infra" (a host card, default), "service" (a small service node
+   * placed inside a host frame), or "group" (a host frame that contains
+   * services). Services set `parent` to their group's id.
+   */
+  type?: "infra" | "service" | "group"
+  /** For service nodes: the id of the host-frame group node they live in. */
+  parent?: string
+  /** For group nodes: pixel size of the frame, and an optional label. */
+  width?: number
+  height?: number
+  label?: string
 }
 
 export interface TopologyEdge {
@@ -60,15 +74,38 @@ const emit = defineEmits<{
   (e: "update:nodes", value: TopologyNode[]): void
 }>()
 
-const nodeTypes = { infra: markRaw(LpInfraNode) } as unknown as NodeTypesObject
+// Vue Flow types node components as `Component<NodeProps>`; our nodes declare
+// their own props (data/selected) which Vue Flow supplies at runtime as part of
+// NodeProps. Widen to `Component` (not the concrete DefineComponent) so the
+// registry types cleanly without a cast.
+const nodeTypes: NodeTypesObject = {
+  infra: markRaw(LpInfraNode) as Component,
+  service: markRaw(LpServiceNode) as Component,
+}
 
-const flowNodes = computed(() =>
-  props.nodes.map((n) => ({
-    id: n.id,
-    type: "infra",
-    position: n.position,
-    data: n.data,
-  })),
+const flowNodes = computed<Node[]>(() =>
+  props.nodes.map((n): Node => {
+    const type = n.type ?? "infra"
+    const node: Node = {
+      id: n.id,
+      type,
+      position: n.position,
+      data: n.data,
+      ...(n.parent ? { parentNode: n.parent } : {}),
+    }
+    if (type === "group") {
+      // A host frame: a Vue Flow group node sized to hold its services.
+      node.style = {
+        width: `${n.width ?? 260}px`,
+        height: `${n.height ?? 160}px`,
+        background: "color-mix(in srgb, var(--color-surface-soft) 60%, transparent)",
+        border: "1px solid var(--color-line)",
+        borderRadius: "var(--radius-card)",
+      }
+      node.label = n.label ?? n.data.name
+    }
+    return node
+  }),
 )
 
 function edgeColor(o: EdgeObserved): string {
