@@ -4,6 +4,7 @@ import { LpScrollArea, LpToaster, presets, useTheme, type PresetName, type Token
 import ComponentPage from "./playground/ComponentPage.vue"
 import { registry } from "./playground/registry"
 import Home from "./pages/Home.vue"
+import InfraCanvas from "./pages/InfraCanvas.vue"
 import Layout from "./pages/Layout.vue"
 import Showcase from "./pages/Showcase.vue"
 
@@ -22,6 +23,7 @@ const crumb = computed(() => {
   if (componentEntry.value) return componentEntry.value.name
   if (pageId.value === "layout") return "Layout canvas"
   if (pageId.value === "showcase") return "Landing showcase"
+  if (pageId.value === "infra") return "Infra canvas"
   return null
 })
 
@@ -101,6 +103,7 @@ const off = "text-muted hover:text-ink"
     <!-- Layout page manages its own scrolling; others use a drawn overlay bar. -->
     <main class="flex min-h-0 flex-1">
       <Layout v-if="pageId === 'layout'" class="w-full" />
+      <InfraCanvas v-else-if="pageId === 'infra'" class="w-full" />
       <LpScrollArea v-else class="min-h-0 flex-1">
         <ComponentPage v-if="componentEntry" :entry="componentEntry" class="w-full" />
         <Showcase v-else-if="pageId === 'showcase'" class="w-full" />

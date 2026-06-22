@@ -18,6 +18,11 @@ const showcasePages = [
     title: "Landing showcase",
     desc: "A landing slice built from kit components — try the lime theme.",
   },
+  {
+    id: "infra",
+    title: "Infra canvas",
+    desc: "LeaveInfra topology graph — project swimlanes, node roles, wg/cloudflared edges, desired-vs-observed. Click a node.",
+  },
 ]
 
 const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
