@@ -1,0 +1,44 @@
+/*
+ * LpTopologyCanvas styles — Vue Flow base CSS + kit-token chrome theming.
+ *
+ * Shipped as a standalone CSS file (the "@leavepulse/ui/canvas.css" export) so
+ * consuming apps get the Vue Flow base styles + canvas chrome with ONE import.
+ * Component-local CSS imports (`import "@vue-flow/core/dist/style.css"` inside a
+ * .vue) don't reach apps through the built dist, and scoped component styles
+ * aren't emitted by the consumer's Tailwind @source either — so canvas styling
+ * lives here. App usage:  @import "@leavepulse/ui/canvas.css";
+ */
+
+@import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/core/dist/theme-default.css";
+@import "@vue-flow/controls/dist/style.css";
+@import "@vue-flow/minimap/dist/style.css";
+
+.lp-topology {
+  background: var(--color-surface);
+}
+
+.lp-topology .vue-flow__controls {
+  box-shadow: var(--shadow-panel);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.lp-topology .vue-flow__controls-button {
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-line);
+  fill: var(--color-muted-strong);
+}
+.lp-topology .vue-flow__controls-button:hover {
+  background: var(--color-surface-soft);
+}
+.lp-topology .vue-flow__minimap {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  overflow: hidden;
+}
+.lp-topology .vue-flow__edge-text {
+  fill: var(--color-muted-strong);
+}
+.lp-topology .vue-flow__edge-textbg {
+  fill: var(--color-surface);
+}

@@ -22,10 +22,10 @@ import { MiniMap } from "@vue-flow/minimap"
 import { computed, markRaw } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 
-import "@vue-flow/core/dist/style.css"
-import "@vue-flow/core/dist/theme-default.css"
-import "@vue-flow/controls/dist/style.css"
-import "@vue-flow/minimap/dist/style.css"
+// Vue Flow base CSS + canvas chrome theming is shipped via the kit's
+// "@leavepulse/ui/canvas.css" export (a plain CSS file). Component-local CSS
+// imports don't reach apps through the built dist, so the consuming app imports
+// that one file. See src/canvas.css.
 
 export type EdgeObserved = "applied" | "pending" | "drift"
 
@@ -126,24 +126,5 @@ defineExpose({ fitView })
   </VueFlow>
 </template>
 
-<style scoped>
-.lp-topology { background: var(--color-surface); }
-.lp-topology :deep(.vue-flow__controls) {
-  box-shadow: var(--shadow-panel);
-  border-radius: var(--radius-control);
-  overflow: hidden;
-}
-.lp-topology :deep(.vue-flow__controls-button) {
-  background: var(--color-surface-raised);
-  border-bottom: 1px solid var(--color-line);
-  fill: var(--color-muted-strong);
-}
-.lp-topology :deep(.vue-flow__controls-button:hover) { background: var(--color-surface-soft); }
-.lp-topology :deep(.vue-flow__minimap) {
-  border-radius: var(--radius-card);
-  border: 1px solid var(--color-line);
-  overflow: hidden;
-}
-.lp-topology :deep(.vue-flow__edge-text) { fill: var(--color-muted-strong); }
-.lp-topology :deep(.vue-flow__edge-textbg) { fill: var(--color-surface); }
-</style>
+<!-- Styling lives in src/canvas.css (shipped via @leavepulse/ui/canvas.css) so
+     the Vue Flow base CSS + chrome theming reaches consuming apps reliably. -->

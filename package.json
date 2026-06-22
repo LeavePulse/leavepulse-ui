@@ -24,7 +24,8 @@
     },
     "./css": "./src/index.css",
     "./tokens.css": "./src/tokens/tokens.css",
-    "./scrollbar.css": "./src/tokens/scrollbar.css"
+    "./scrollbar.css": "./src/tokens/scrollbar.css",
+    "./canvas.css": "./src/canvas.css"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

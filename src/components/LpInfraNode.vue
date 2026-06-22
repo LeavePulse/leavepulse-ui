@@ -3,6 +3,10 @@
  * Custom Vue Flow node for LpTopologyCanvas: an infra host/service card on kit
  * tokens. Not used directly by consumers — LpTopologyCanvas registers it as the
  * `infra` node type. Exported so apps can override the renderer if needed.
+ *
+ * Styled with Tailwind utilities (no scoped <style>) so the consumer's
+ * `@source` over the kit emits these classes — scoped CSS in a published
+ * component doesn't reach apps that only import the kit's token css.
  */
 import { Handle, Position } from "@vue-flow/core"
 import { computed } from "vue"
@@ -36,69 +40,44 @@ const icon = computed(() => roleIcon[props.data.role] ?? "●")
 
 <template>
   <div
-    class="lp-infra-node"
-    :class="{ 'lp-infra-node--sel': selected, 'lp-infra-node--off': data.online === false }"
-    :style="{ '--accent': accent }"
+    class="w-[168px] overflow-hidden rounded-card border bg-surface-raised shadow-panel transition-[border-color,box-shadow]"
+    :class="selected ? 'border-[var(--accent)]' : 'border-line'"
+    :style="{
+      '--accent': accent,
+      opacity: data.online === false ? 0.5 : 1,
+      ...(selected
+        ? { boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel)' }
+        : {}),
+    }"
   >
-    <Handle type="target" :position="Position.Left" class="lp-infra-handle" />
-    <Handle type="source" :position="Position.Right" class="lp-infra-handle" />
+    <Handle
+      type="target"
+      :position="Position.Left"
+      class="!size-2 !border-2 !border-[var(--accent)] !bg-surface"
+    />
+    <Handle
+      type="source"
+      :position="Position.Right"
+      class="!size-2 !border-2 !border-[var(--accent)] !bg-surface"
+    />
 
-    <div class="lp-infra-node__bar" />
-    <div class="lp-infra-node__body">
-      <div class="lp-infra-node__top">
-        <span class="lp-infra-node__icon">{{ icon }}</span>
-        <span class="lp-infra-node__name">{{ data.name }}</span>
+    <div class="h-[3px] bg-[var(--accent)]" />
+    <div class="px-[11px] pb-2.5 pt-[9px]">
+      <div class="flex items-center gap-[7px]">
+        <span class="text-[13px] text-[var(--accent)]">{{ icon }}</span>
+        <span class="flex-1 truncate text-[13px] font-semibold text-ink">{{ data.name }}</span>
         <span
           v-if="data.online !== undefined"
-          class="lp-infra-node__dot"
-          :class="data.online ? 'is-on' : 'is-off'"
+          class="size-[7px] rounded-full"
+          :class="data.online ? 'bg-action shadow-[0_0_6px_var(--color-action)]' : 'bg-danger'"
         />
       </div>
-      <div class="lp-infra-node__meta">
-        <span class="lp-infra-node__role">{{ data.role }}</span>
-        <span v-if="data.overlay" class="lp-infra-node__ip">{{ data.overlay }}</span>
+      <div class="mt-1.5 flex items-center justify-between">
+        <span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+          {{ data.role }}
+        </span>
+        <span v-if="data.overlay" class="font-mono text-[10px] text-muted">{{ data.overlay }}</span>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.lp-infra-node {
-  width: 168px;
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-line);
-  box-shadow: var(--shadow-panel);
-  overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-}
-.lp-infra-node--sel {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel);
-}
-.lp-infra-node--off { opacity: 0.5; }
-.lp-infra-node__bar { height: 3px; background: var(--accent); }
-.lp-infra-node__body { padding: 9px 11px 10px; }
-.lp-infra-node__top { display: flex; align-items: center; gap: 7px; }
-.lp-infra-node__icon { color: var(--accent); font-size: 13px; }
-.lp-infra-node__name {
-  flex: 1; color: var(--color-ink); font-size: 13px; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.lp-infra-node__dot { width: 7px; height: 7px; border-radius: 999px; }
-.lp-infra-node__dot.is-on { background: var(--color-action); box-shadow: 0 0 6px var(--color-action); }
-.lp-infra-node__dot.is-off { background: var(--color-danger); }
-.lp-infra-node__meta {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-top: 6px;
-}
-.lp-infra-node__role {
-  font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--accent); font-weight: 600;
-}
-.lp-infra-node__ip { font-size: 10px; font-family: ui-monospace, monospace; color: var(--color-muted); }
-.lp-infra-handle {
-  width: 8px; height: 8px;
-  background: var(--color-surface); border: 2px solid var(--accent);
-}
-</style>

@@ -6,3 +6,5 @@
  */
 @import "tailwindcss";
 @import "../src/index.css";
+/* LpTopologyCanvas: Vue Flow base CSS + chrome (the consumer imports this). */
+@import "../src/canvas.css";
