@@ -29,6 +29,13 @@ const props = withDefaults(
     lines: LogLine[]
     /** Show the timestamp column. */
     showTime?: boolean
+    /**
+     * Show the per-line level chip (INFO/WARN/…). On by default. Turn off for
+     * raw streams (e.g. docker logs) where most lines have no real level and a
+     * blanket "INFO" chip is just noise — the tonal level RAIL still renders, so
+     * errors/warnings stay visually distinct.
+     */
+    showLevel?: boolean
     /** Show 1-based gutter line numbers. */
     lineNumbers?: boolean
     /** Wrap long lines instead of scrolling horizontally. */
@@ -54,6 +61,7 @@ const props = withDefaults(
   }>(),
   {
     showTime: true,
+    showLevel: true,
     lineNumbers: false,
     wrap: false,
     tail: true,
@@ -324,6 +332,7 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
 
           <!-- level chip -->
           <span
+            v-if="showLevel"
             class="mr-3 w-12 shrink-0 select-none text-[10px] font-semibold uppercase tracking-[0.06em]"
             :class="metaFor(line.level).chip"
           >{{ line.level ?? "info" }}</span>
