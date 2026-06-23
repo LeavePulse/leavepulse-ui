@@ -107,6 +107,11 @@ const RAIL_VISIBILITY: Record<NonNullable<typeof props.mobileBreakpoint>, string
 const railClass = computed(() =>
   props.responsive ? RAIL_VISIBILITY[props.mobileBreakpoint] : "flex",
 )
+
+// This component has a fragment root (the desktop <nav> + the mobile drawer), so
+// Vue can't auto-inherit a consumer-passed `class`. Take attrs over manually and
+// land them on the desktop rail (where a layout class like `shrink-0` belongs).
+defineOptions({ inheritAttrs: false })
 </script>
 
 <template>
@@ -115,6 +120,7 @@ const railClass = computed(() =>
     class="h-full w-60 flex-col gap-1 border-r border-line bg-surface-raised p-3"
     :class="railClass"
     aria-label="Sidebar"
+    v-bind="$attrs"
   >
     <div
       v-if="$slots.header"
