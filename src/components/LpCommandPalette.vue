@@ -35,6 +35,12 @@ export interface Command {
   /** Section heading this command sits under. */
   group?: string
   disabled?: boolean
+  /**
+   * Hidden from the default (empty-query) list — only surfaces once the user
+   * types something it matches. For rarely-used or destructive actions (prune,
+   * decommission, …) that shouldn't clutter the palette but stay reachable.
+   */
+  hidden?: boolean
   onSelect?: () => void
 }
 
@@ -65,7 +71,9 @@ const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 // label > keywords > description, then alphabetical. Mirrors the app palette.
 const ranked = computed<Command[]>(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q) return props.commands
+  // Empty query: show everything EXCEPT hidden commands (they only surface once
+  // typed). With a query, hidden commands rank like any other.
+  if (!q) return props.commands.filter((c) => !c.hidden)
   return props.commands
     .map((c) => {
       const label = c.label.toLowerCase().includes(q)
