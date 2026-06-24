@@ -440,10 +440,18 @@ export const registry: ComponentEntry[] = [
           return { status, label: `Day ${i + 1} — ${status}` }
         }),
       }),
-    template: `<div class="w-96">
+    template: `<div class="w-96 flex flex-col gap-6">
   <LpUptimeBar
     :segments="days"
     title="api.leavepulse.io"
+    start-label="60 days ago"
+    end-label="Today"
+  />
+  <!-- custom per-status colours -->
+  <LpUptimeBar
+    :segments="days"
+    title="custom colours"
+    :colors="{ operational: '#22c55e', degraded: '#eab308', down: '#ef4444', maintenance: '#6366f1' }"
     start-label="60 days ago"
     end-label="Today"
   />

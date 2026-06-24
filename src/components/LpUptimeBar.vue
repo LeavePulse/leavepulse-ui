@@ -30,17 +30,26 @@ const props = withDefaults(
     showUptime?: boolean
     /** Override the headline shown next to the uptime %. */
     title?: string
+    /**
+     * Per-status colours. Any CSS colour (hex, rgb, `var(--token)`). Unset
+     * statuses fall back to the theme tokens below. Pass e.g.
+     * `{ degraded: '#ffb84d' }` to recolour just one state.
+     */
+    colors?: Partial<Record<UptimeStatus, string>>
   }>(),
   { showUptime: true },
 )
 
-const segColor: Record<UptimeStatus, string> = {
-  operational: "bg-action",
-  degraded: "bg-accent",
-  down: "bg-danger",
-  maintenance: "bg-brand",
-  empty: "bg-surface-soft",
+const defaultColor: Record<UptimeStatus, string> = {
+  operational: "var(--color-brand)",
+  degraded: "var(--color-accent)",
+  down: "var(--color-danger)",
+  maintenance: "var(--color-action)",
+  empty: "var(--color-surface-soft)",
 }
+
+const colorFor = (status: UptimeStatus): string =>
+  props.colors?.[status] ?? defaultColor[status]
 
 const statusLabel: Record<UptimeStatus, string> = {
   operational: "Operational",
@@ -83,7 +92,8 @@ const uptimeText = computed(() => {
             <button
               type="button"
               class="min-w-0 flex-1 rounded-xs outline-none transition-[scale,opacity] duration-150 hover:scale-y-110 focus-visible:ring-2 focus-visible:ring-ring"
-              :class="[segColor[seg.status], seg.status === 'empty' ? 'opacity-50' : '']"
+              :class="seg.status === 'empty' ? 'opacity-50' : ''"
+              :style="{ backgroundColor: colorFor(seg.status) }"
               :aria-label="seg.label ?? statusLabel[seg.status]"
             />
           </TooltipTrigger>
@@ -93,7 +103,10 @@ const uptimeText = computed(() => {
               :class="[PANEL_SURFACE, TOOLTIP_ANIM, 'z-(--z-tooltip) px-2.5 py-1.5 text-xs text-ink']"
             >
               <span class="flex items-center gap-1.5">
-                <span class="size-1.5 shrink-0 rounded-full" :class="segColor[seg.status]" />
+                <span
+                  class="size-1.5 shrink-0 rounded-full"
+                  :style="{ backgroundColor: colorFor(seg.status) }"
+                />
                 {{ seg.label ?? statusLabel[seg.status] }}
               </span>
             </TooltipContent>
