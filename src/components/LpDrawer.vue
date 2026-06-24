@@ -77,6 +77,16 @@ const props = withDefaults(
     edgeSize?: number
     /** Fraction (0–1) of the panel width the pull must reach to open on release. */
     edgeOpenThreshold?: number
+    /**
+     * Let the user drag the inner edge to resize the panel (horizontal drawers
+     * only — e.g. a logs panel whose long lines overflow). The new size is kept
+     * for the session. Min/max bound the drag.
+     */
+    resizable?: boolean
+    /** Min main-axis size while resizing (any CSS length). Default 22rem. */
+    minSize?: string
+    /** Max main-axis size while resizing (any CSS length). Default 96vw. */
+    maxSize?: string
   }>(),
   {
     side: "right",
@@ -85,6 +95,8 @@ const props = withDefaults(
     noDragControls: true,
     edgeSize: 44,
     edgeOpenThreshold: 0.3,
+    minSize: "22rem",
+    maxSize: "96vw",
   },
 )
 
@@ -116,12 +128,50 @@ const contentClass = computed(() => {
   return [base, map[dir.value]]
 })
 
+// User-resized main-axis size (px), null until the handle is dragged. Persists
+// for the component's lifetime so reopening keeps the chosen width.
+const resizedPx = ref<number | null>(null)
+
 const sizeStyle = computed(() => {
   // When snapPoints drive the height, let vaul own the main-axis size.
   if (props.snapPoints?.length && isSheet.value) return undefined
+  // A live resize wins over the preset/width.
+  if (props.resizable && isHorizontal.value && resizedPx.value != null) {
+    return { width: `${resizedPx.value}px` }
+  }
   const len = props.width ?? `min(${isHorizontal.value ? "94vw" : "94vh"}, ${SIZES[props.size]}rem)`
   return isHorizontal.value ? { width: len } : { height: len }
 })
+
+// Drag the inner edge to resize. For a right drawer the panel grows as the
+// pointer moves left (width = viewportRight − clientX); mirror for left.
+function startResize(e: PointerEvent) {
+  if (!props.resizable || !isHorizontal.value) return
+  e.preventDefault()
+  const fromRight = dir.value === "right"
+  const toPx = (css: string) => {
+    // Resolve rem/vw to px against the viewport for clamping.
+    if (css.endsWith("rem")) return Number.parseFloat(css) * 16
+    if (css.endsWith("vw")) return (Number.parseFloat(css) / 100) * window.innerWidth
+    return Number.parseFloat(css)
+  }
+  const min = toPx(props.minSize)
+  const max = toPx(props.maxSize)
+  const onMove = (ev: PointerEvent) => {
+    const raw = fromRight ? window.innerWidth - ev.clientX : ev.clientX
+    resizedPx.value = Math.max(min, Math.min(max, raw))
+  }
+  const onUp = () => {
+    window.removeEventListener("pointermove", onMove)
+    window.removeEventListener("pointerup", onUp)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+  }
+  document.body.style.userSelect = "none"
+  document.body.style.cursor = "ew-resize"
+  window.addEventListener("pointermove", onMove)
+  window.addEventListener("pointerup", onUp)
+}
 
 const slots = useSlots()
 const hasHeader = computed(() => Boolean(props.title || slots.title))
@@ -280,6 +330,21 @@ const edgeStripStyle = computed(() => {
         :style="sizeStyle"
         :data-vaul-animate="handingOff ? 'false' : undefined"
       >
+        <!-- Resize grip on the inner edge (horizontal drawers). data-vaul-no-drag
+             so grabbing it resizes the panel instead of starting a vaul drag. -->
+        <div
+          v-if="resizable && isHorizontal"
+          data-vaul-no-drag
+          class="group/resize absolute inset-y-0 z-10 w-1.5 cursor-ew-resize"
+          :class="dir === 'right' ? 'left-0' : 'right-0'"
+          @pointerdown="startResize"
+        >
+          <span
+            class="absolute inset-y-0 w-px bg-line transition-colors group-hover/resize:bg-brand"
+            :class="dir === 'right' ? 'left-0' : 'right-0'"
+          />
+        </div>
+
         <!-- Drag handle: a pill the user grabs; vaul wires the drag to it. -->
         <DrawerHandle
           v-if="showHandle"
