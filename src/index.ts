@@ -123,7 +123,7 @@ export type {
   SurfaceTokens,
   TokenSet,
 } from "./theme/tokens"
-export { dark, leavepulse, light, lime, presets } from "./theme/presets"
+export { amber, dark, leavepulse, light, lime, nord, presets, rose, violet } from "./theme/presets"
 export type { PresetName } from "./theme/presets"
 export { parseConfig, serializeConfig, UI_CONFIG_VERSION } from "./theme/config"
 export type { UiConfig } from "./theme/config"

@@ -9,6 +9,11 @@ defineEmits<{
 
 const showcasePages = [
   {
+    id: "appshell",
+    title: "App shell",
+    desc: "Full application frame — sidebar rail + header + single scroll region, responsive burger drawer, derived page title.",
+  },
+  {
     id: "layout",
     title: "Layout canvas",
     desc: "Drag-to-compose blocks — split, tabs (center-drop), resize, undo/redo via useLayout().",
@@ -33,8 +38,8 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
     <div class="flex flex-col gap-2">
       <h1 class="text-2xl font-semibold text-ink">LeavePulse UI</h1>
       <p class="text-sm text-muted">
-        Token-driven Vue component kit. Switch theme & density (top-right) to
-        see everything re-skin live.
+        Token-driven Vue component kit. Switch the theme (top-right) to see
+        everything re-skin live.
       </p>
     </div>
 
