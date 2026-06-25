@@ -49,7 +49,7 @@ const barFade =
   <ScrollAreaRoot class="relative overflow-hidden" type="hover" :scroll-hide-delay="500">
     <ScrollAreaViewport
       ref="viewportRef"
-      class="size-full min-w-0 [&>div]:!block [&>div]:min-w-0"
+      class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
       :class="fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : ''"
       @scroll.passive="$emit('scroll', $event)"
     >

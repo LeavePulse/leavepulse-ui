@@ -58,6 +58,17 @@ const props = withDefaults(
     rowMenu?: boolean
     /** Extra menu items per line, appended below the built-ins with a divider. */
     extraRowItems?: (line: LogLine, index: number) => ContextMenuItemDef[]
+    /**
+     * Recognise common log formats inside each `message` and lift the level,
+     * timestamp and [source] out of the text into the dedicated columns. When a
+     * line already carries an explicit `level`/`time`/`source`, those win and
+     * the message is left untouched. Off by default (raw). Handles e.g.:
+     *   "2025-01-02T03:04:05.123Z INFO [auth] user logged in"
+     *   "[2025-01-02 03:04:05] WARN: disk almost full"
+     *   "ERROR something broke"
+     * so a duplicate level word / timestamp doesn't repeat in the message body.
+     */
+    parse?: boolean
   }>(),
   {
     showTime: true,
@@ -68,6 +79,7 @@ const props = withDefaults(
     height: "20rem",
     emptyLabel: "No logs yet",
     rowMenu: true,
+    parse: false,
   },
 )
 
@@ -93,13 +105,90 @@ function metaFor(level?: LogLevel) {
   return levelMeta[level ?? "info"]
 }
 
+// ── format recognition (opt-in via `parse`) ──────────────────────────────
+// Map a recognised level word to a canonical LogLevel; unknown → undefined.
+const LEVEL_WORDS: Record<string, LogLevel> = {
+  trace: "trace",
+  debug: "debug",
+  info: "info",
+  notice: "info",
+  warn: "warn",
+  warning: "warn",
+  error: "error",
+  err: "error",
+  fatal: "fatal",
+  crit: "fatal",
+  critical: "fatal",
+  panic: "fatal",
+  success: "success",
+  ok: "success",
+}
+// Leading ISO-8601 / "YYYY-MM-DD HH:MM:SS" timestamp, optionally bracketed.
+const TS_RE =
+  /^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?)\]?\s+/
+// A leading LEVEL token, optionally followed by ':' .
+const LEVEL_RE = /^([A-Za-z]{2,8})\s*:?\s+/
+// A leading "[source]" tag.
+const SOURCE_RE = /^\[([^\]]{1,40})\]\s+/
+
+// Pull level/time/source out of a raw message; only fields not already set on
+// the line are filled, and only the recognised prefixes are stripped from the
+// body — so an unrecognised line is returned unchanged.
+function parseLine(line: LogLine): LogLine {
+  if (!props.parse) return line
+  let msg = line.message
+  let time = line.time
+  let level = line.level
+  let source = line.source
+
+  // 1) timestamp prefix
+  if (time == null) {
+    const m = TS_RE.exec(msg)
+    if (m) {
+      time = m[1]
+      msg = msg.slice(m[0].length)
+    }
+  } else {
+    // strip a duplicate leading timestamp even if time is already set
+    const m = TS_RE.exec(msg)
+    if (m) msg = msg.slice(m[0].length)
+  }
+
+  // 2) level word
+  const lm = LEVEL_RE.exec(msg)
+  if (lm) {
+    const canon = LEVEL_WORDS[lm[1].toLowerCase()]
+    if (canon) {
+      if (level == null) level = canon
+      msg = msg.slice(lm[0].length) // drop the duplicate word from the body
+    }
+  }
+
+  // 3) [source] tag
+  if (source == null) {
+    const sm = SOURCE_RE.exec(msg)
+    if (sm) {
+      source = sm[1]
+      msg = msg.slice(sm[0].length)
+    }
+  }
+
+  return msg === line.message && time === line.time && level === line.level && source === line.source
+    ? line
+    : { ...line, message: msg, time, level, source }
+}
+
+const parsedLines = computed<LogLine[]>(() =>
+  props.parse ? props.lines.map(parseLine) : props.lines,
+)
+
 // Rows actually rendered, each carrying its ORIGINAL index so line numbers stay
 // truthful when filtering, plus a `count` for compact mode (1 unless folded).
 // With filterMatches + a search term, keep only lines whose message contains it
 // (case-insensitive); otherwise pass everything.
 const visibleLines = computed<{ line: LogLine; n: number; count: number }[]>(() => {
   const term = props.filterMatches ? props.highlight?.trim().toLowerCase() : ""
-  const filtered = props.lines
+  const filtered = parsedLines.value
     .map((line, n) => ({ line, n }))
     .filter(({ line }) => !term || line.message.toLowerCase().includes(term))
 
