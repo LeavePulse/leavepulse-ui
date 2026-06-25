@@ -22,6 +22,7 @@
       "style": "./src/index.css",
       "import": "./dist/index.js"
     },
+    "./nuxt": "./src/nuxt.ts",
     "./css": "./src/index.css",
     "./tokens.css": "./src/tokens/tokens.css",
     "./scrollbar.css": "./src/tokens/scrollbar.css",
@@ -37,9 +38,10 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
+    "gen:names": "node scripts/gen-component-names.mjs",
+    "build": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
-    "prepublishOnly": "vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
+    "prepublishOnly": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
     "typecheck": "vue-tsc --noEmit",
     "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
@@ -49,6 +51,7 @@
     "@iconify-json/lucide": "^1.2.0",
     "@iconify/vue": "^5.0.0",
     "@internationalized/date": "^3.5.0",
+    "@nuxt/kit": "^3.0.0 || ^4.0.0",
     "@vueuse/core": "^12.0.0 || ^13.0.0 || ^14.0.0",
     "motion-v": "^2.2.0",
     "reka-ui": "^2.9.0",
@@ -57,6 +60,11 @@
     "tailwindcss": "^4.0.0",
     "vaul-vue": "^0.4.0",
     "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.112",
