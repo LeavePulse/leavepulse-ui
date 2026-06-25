@@ -7,7 +7,17 @@
  * and async). Tokens map to kit colour classes so highlighting follows the theme.
  */
 
-export type CodeLang = "ts" | "js" | "json" | "bash" | "html" | "python" | "rust" | "plain"
+export type CodeLang =
+  | "ts"
+  | "js"
+  | "json"
+  | "bash"
+  | "html"
+  | "python"
+  | "rust"
+  | "yaml"
+  | "toml"
+  | "plain"
 
 export interface Token {
   text: string
@@ -90,7 +100,15 @@ export function tokenizeLine(line: string, lang: CodeLang): Token[] {
     else if (ident != null) {
       const after = line.slice(m.index + full.length).trimStart()
       const before = line.slice(0, m.index).trimEnd()
-      out.push({ text: full, cls: classifyIdent(ident, before, after) })
+      // YAML (`key:`) / TOML (`key =`) leading key gets the property colour, like
+      // JSON keys — only when it's the first token of the line (the key position).
+      const isConfigKey =
+        (lang === "yaml" && before === "" && after.startsWith(":")) ||
+        (lang === "toml" && before === "" && after.startsWith("="))
+      out.push({
+        text: full,
+        cls: isConfigKey ? C.property : classifyIdent(ident, before, after),
+      })
     } else if (punct != null) out.push({ text: full, cls: C.punct })
     last = m.index + full.length
   }
