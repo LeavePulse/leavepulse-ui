@@ -55,7 +55,12 @@ const theme = useTheme()
 const list = computed<TokenSet[]>(() =>
   props.themes && props.themes.length ? props.themes : Object.values(presets),
 )
-const activeName = computed(() => props.modelValue ?? list.value[0]?.name ?? "")
+// Active theme name: an explicit modelValue wins (controlled use); otherwise the
+// kit's self-managed `currentName` (so a consumer needs NO ref/bootstrap — the
+// kit remembers the theme like an i18n locale). Falls back to the first theme.
+const activeName = computed(
+  () => props.modelValue ?? (theme.currentName.value || list.value[0]?.name || ""),
+)
 const active = computed<TokenSet | undefined>(
   () => list.value.find((t) => t.name === activeName.value) ?? list.value[0],
 )
@@ -65,12 +70,11 @@ const ICON_SIZE = { sm: 15, md: 16, lg: 18 } as const
 
 const wantsLabel = computed(() => props.showLabel || props.variant === "pill")
 
-// Apply a theme: drive the engine (with or without the reveal), then notify.
+// Apply a theme through the kit's self-managed setter (it persists + updates
+// the shared `current`), then notify. The reveal animates from the click point.
 function applyTheme(t: TokenSet, ev?: MouseEvent) {
-  if (props.transition && ev) {
-    theme.applyWithTransition(t, { x: ev.clientX, y: ev.clientY })
-  } else if (props.transition) {
-    theme.applyWithTransition(t)
+  if (props.transition) {
+    theme.setTheme(t, ev ? { x: ev.clientX, y: ev.clientY } : undefined)
   } else {
     theme.apply(t)
   }

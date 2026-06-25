@@ -4,6 +4,7 @@
  * anti-flash bootstrap (paint the cached theme before mount) and JSON
  * serialize/parse with validation.
  */
+import { computed, readonly, shallowRef, type ComputedRef, type DeepReadonly, type Ref } from "vue"
 import {
   COLOR_VARS,
   DEFAULT_SURFACE,
@@ -20,6 +21,38 @@ import {
 } from "./tokens"
 
 const CACHE_KEY = "leavepulse-ui-theme"
+
+// ── self-managed theme state (singleton) ─────────────────────────────────
+// The kit owns the active theme — like an i18n locale — so every consumer
+// shares one source of truth instead of each wiring its own ref + bootstrap.
+// Module-level (created once per app), reactive, and lazily hydrated from the
+// cache on the client. SSR-safe: hydration only touches localStorage in a
+// browser; on the server `current` stays null until the client mounts.
+const _current = shallowRef<TokenSet | null>(null)
+let _hydrated = false
+
+// The fallback used when nothing is cached yet. Consumers can override it via
+// initTheme(fallback); defaults to whatever the first apply() sets.
+let _fallback: TokenSet | null = null
+
+function hydrateOnce(): void {
+  if (_hydrated || typeof window === "undefined") return
+  _hydrated = true
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (cached) {
+      _current.value = parseTheme(cached)
+      applyTheme(_current.value)
+      return
+    }
+  } catch {
+    /* ignore — fall through to fallback */
+  }
+  if (_fallback) {
+    _current.value = _fallback
+    applyTheme(_fallback)
+  }
+}
 
 export function applyTheme(theme: TokenSet, root: HTMLElement = document.documentElement): void {
   for (const [key, cssVar] of Object.entries(COLOR_VARS)) {
@@ -189,11 +222,54 @@ export function cacheTheme(theme: TokenSet): void {
   }
 }
 
-export function useTheme() {
+export interface UseTheme {
+  /** The active theme, kept in sync by the kit. Null until hydrated (SSR/first
+   *  paint) — reactive, so a switcher binds straight to it. */
+  current: DeepReadonly<Ref<TokenSet | null>>
+  /** The active theme's name (""="not yet hydrated"). */
+  currentName: ComputedRef<string>
+  /** Set + persist a theme (with the circular reveal if `origin`/transition).
+   *  This is the one call a switcher needs — it updates `current` too. */
+  setTheme: (theme: TokenSet, origin?: RevealOrigin) => void
+  /** Seed the fallback (used when nothing is cached) and hydrate now. Call once
+   *  at app start (client) — optional; the first useTheme() hydrates anyway. */
+  init: (fallback: TokenSet) => TokenSet
+  apply: (theme: TokenSet) => void
+  applyWithTransition: (theme: TokenSet, origin?: RevealOrigin) => void
+  serialize: typeof serializeTheme
+  parse: typeof parseTheme
+  bootstrap: typeof bootstrapTheme
+}
+
+export function useTheme(): UseTheme {
+  // Lazily hydrate the singleton the first time anyone asks (client only).
+  hydrateOnce()
+
+  // The single "set a theme" path the kit owns: apply, cache, and update the
+  // shared reactive state so every consumer + switcher reflects it.
+  const setTheme = (theme: TokenSet, origin?: RevealOrigin) => {
+    if (origin) applyThemeWithTransition(theme, origin)
+    else applyThemeWithTransition(theme)
+    cacheTheme(theme)
+    _current.value = theme
+  }
+
   return {
+    current: readonly(_current),
+    currentName: computed(() => _current.value?.name ?? ""),
+    setTheme,
+    init: (fallback: TokenSet) => {
+      _fallback = fallback
+      if (!_hydrated) hydrateOnce()
+      if (!_current.value) {
+        _current.value = bootstrapTheme(fallback)
+      }
+      return _current.value
+    },
     apply: (theme: TokenSet) => {
       applyTheme(theme)
       cacheTheme(theme)
+      _current.value = theme
     },
     /**
      * Apply + cache a theme with the circular reveal animation. Pass the click
@@ -203,6 +279,7 @@ export function useTheme() {
     applyWithTransition: (theme: TokenSet, origin?: RevealOrigin) => {
       applyThemeWithTransition(theme, origin)
       cacheTheme(theme)
+      _current.value = theme
     },
     serialize: serializeTheme,
     parse: parseTheme,
