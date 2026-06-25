@@ -52,6 +52,17 @@ const props = withDefaults(
     height?: string
     emptyLabel?: string
     /**
+     * When true, a "loading older…" row is shown pinned at the top — set it while
+     * fetching a previous page in response to `reach-top`, clear it when done.
+     */
+    loadingOlder?: boolean
+    /**
+     * When true, the viewer emits `reach-top` as the user scrolls near the top so
+     * the consumer can prepend older history (infinite scroll-back). The viewer
+     * preserves the scroll position across a prepend so the view doesn't jump.
+     */
+    loadOlder?: boolean
+    /**
      * Right-click row menu: built-in copy actions (+ "filter by" when the line
      * has a source/level). Set false to disable; the row keeps the native menu.
      */
@@ -86,6 +97,12 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** A "Filter by source/level" item was chosen — the consumer applies it. */
   (e: "filter", by: { source?: string; level?: LogLevel }): void
+  /**
+   * The user scrolled near the top with `loadOlder` on — fetch the previous
+   * page. Re-armed only after the scroll leaves the top zone, so one trip up
+   * fires once. The viewer keeps the scroll anchored when the page prepends.
+   */
+  (e: "reach-top"): void
 }>()
 
 // Level → gutter rail + text colour. Reads only semantic tokens so re-skinning
@@ -322,8 +339,43 @@ function atBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR
 }
 
+// Distance from the top that arms a scroll-back fetch (a few rows of slack so
+// the next page is on its way before the user hits the very top).
+const TOP_NEAR = 80
+// Armed = ready to fire reach-top; cleared until the scroll leaves the top zone
+// so one trip to the top emits exactly once.
+let topArmed = true
+
 function onScroll(e: Event) {
-  pinned.value = atBottom(e.target as HTMLElement)
+  const el = e.target as HTMLElement
+  pinned.value = atBottom(el)
+  if (!props.loadOlder) return
+  if (el.scrollTop <= TOP_NEAR) {
+    if (topArmed && !props.loadingOlder) {
+      topArmed = false
+      emit("reach-top")
+    }
+  } else {
+    topArmed = true
+  }
+}
+
+// Preserve scroll position across a prepend: when older lines are added at the
+// top, scrollTop must grow by the height they introduced or the view jumps. We
+// snapshot scrollHeight before the lines change and restore the offset after.
+let prevScrollHeight = 0
+let prevScrollTop = 0
+function captureScrollAnchor() {
+  const el = viewport()
+  if (!el) return
+  prevScrollHeight = el.scrollHeight
+  prevScrollTop = el.scrollTop
+}
+function restoreScrollAnchor() {
+  const el = viewport()
+  if (!el) return
+  const added = el.scrollHeight - prevScrollHeight
+  if (added > 0) el.scrollTop = prevScrollTop + added
 }
 
 // Glide to the bottom. Honours OS reduce-motion. For auto-tail we skip the
@@ -344,15 +396,28 @@ function scrollToBottom() {
   pinned.value = true
 }
 
-// New lines: if tailing and pinned, glide the bottom into view after the DOM
-// settles. Two frames — one for the DOM, one so the row's enter transition has
-// started growing the scroll height before we chase it.
+// Snapshot the scroll anchor BEFORE the DOM updates for a line change (flush:pre)
+// so a prepend can be compensated post-update. Only matters when NOT pinned to
+// the bottom (i.e. the user is reading history up the stream).
+watch(
+  () => props.lines.length,
+  () => {
+    if (!pinned.value) captureScrollAnchor()
+  },
+  { flush: "pre" },
+)
+
+// After the DOM updates: tail to the bottom if pinned, else keep the view glued
+// to where it was so a top prepend (older history) doesn't yank it.
 watch(
   () => props.lines.length,
   async () => {
-    if (!props.tail || !pinned.value) return
     await nextTick()
-    requestAnimationFrame(() => rideToBottom(true))
+    if (props.tail && pinned.value) {
+      requestAnimationFrame(() => rideToBottom(true))
+    } else {
+      restoreScrollAnchor()
+    }
   },
 )
 
@@ -378,11 +443,22 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         <span v-if="filteredEmpty" class="text-muted/70">“{{ highlight }}”</span>
       </div>
 
+      <template v-else>
+        <!-- Older-history loading row, pinned at the top while a scroll-back page
+             is fetched (driven by `loadingOlder`) — sits ABOVE the lines so it
+             doesn't replace them. -->
+        <div
+          v-if="loadingOlder"
+          class="flex items-center justify-center gap-2 py-2 text-muted"
+        >
+          <LpIcon name="lucide:loader-circle" :size="14" class="animate-spin" />
+          <span class="text-[11px]">loading older…</span>
+        </div>
+
       <!-- Leave collapses a folded-away duplicate (max-height + opacity + a small
            lift) while the survivors FLIP-slide up via move-class — so toggling
            `compact` reads as the dupes melting into the kept line, not a jump. -->
       <TransitionGroup
-        v-else
         tag="ol"
         class="py-1"
         enter-active-class="transition duration-200 ease-[var(--ease-emphasized)]"
@@ -462,6 +538,7 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         </li>
         </LpContextMenu>
       </TransitionGroup>
+      </template>
     </LpScrollArea>
 
     <!-- jump-to-latest: shown only when tailing and scrolled away. The
