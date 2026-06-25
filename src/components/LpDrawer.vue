@@ -382,10 +382,13 @@ const edgeStripStyle = computed(() => {
              scroll content so the bar floats at the panel edge. -->
         <div
           v-no-drag-controls="noDragControls"
-          class="flex min-h-0 flex-1 flex-col"
+          class="flex min-h-0 min-w-0 flex-1 flex-col"
           :data-vaul-no-drag="noDragContent ? '' : undefined"
         >
-          <LpScrollArea class="min-h-0 flex-1" :content-class="padClass">
+          <!-- min-w-0 on the body + scroll content so a wide child (e.g. a log
+               viewer's min-w-max rows with wrap off) scrolls INSIDE itself
+               instead of stretching the whole panel into a horizontal scroll. -->
+          <LpScrollArea class="min-h-0 min-w-0 flex-1" :content-class="`min-w-0 ${padClass}`">
             <slot />
           </LpScrollArea>
         </div>
