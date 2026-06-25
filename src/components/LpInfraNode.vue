@@ -18,6 +18,10 @@ export interface InfraNodeData {
   online?: boolean
   kind?: string
   project?: string
+  /** Control-plane firewall rule count on this host (badge when > 0). */
+  firewallCount?: number
+  /** Service count on this host (badge when defined — services toggle on). */
+  serviceCount?: number
   /** Fade the node back (search miss / not part of the focused node's graph). */
   dimmed?: boolean
 }
@@ -79,6 +83,25 @@ const icon = computed(() => roleIcon[props.data.role] ?? "●")
           {{ data.role }}
         </span>
         <span v-if="data.overlay" class="font-mono text-[10px] text-muted">{{ data.overlay }}</span>
+      </div>
+      <div
+        v-if="data.firewallCount || data.serviceCount !== undefined"
+        class="mt-1.5 flex items-center gap-1.5"
+      >
+        <span
+          v-if="data.firewallCount"
+          class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
+          :title="`${data.firewallCount} firewall rule(s)`"
+        >
+          <span>⛨</span>{{ data.firewallCount }}
+        </span>
+        <span
+          v-if="data.serviceCount !== undefined"
+          class="inline-flex items-center gap-1 rounded-pill bg-surface-soft px-1.5 py-0.5 text-[9px] font-medium text-muted"
+          :title="`${data.serviceCount} service(s)`"
+        >
+          <span>◇</span>{{ data.serviceCount }}
+        </span>
       </div>
     </div>
   </div>

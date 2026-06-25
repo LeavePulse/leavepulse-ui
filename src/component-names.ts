@@ -28,6 +28,7 @@ export const COMPONENT_NAMES = [
   "LpIcon",
   "LpInfraNode",
   "LpInput",
+  "LpLaneNode",
   "LpLink",
   "LpLogViewer",
   "LpModal",

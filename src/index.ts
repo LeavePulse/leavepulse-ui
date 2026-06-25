@@ -74,9 +74,11 @@ export { default as LpToaster } from "./components/LpToaster.vue"
 export { default as LpTooltip } from "./components/LpTooltip.vue"
 export { default as LpTopologyCanvas } from "./components/LpTopologyCanvas.vue"
 export type {
+  CanvasViewport,
   EdgeCategory,
   EdgeObserved,
   TopologyEdge,
+  TopologyLane,
   TopologyNode,
 } from "./components/LpTopologyCanvas.vue"
 export { default as LpUptimeBar } from "./components/LpUptimeBar.vue"

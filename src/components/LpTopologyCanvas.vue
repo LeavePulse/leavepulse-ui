@@ -24,6 +24,7 @@ import {
 import { MiniMap } from "@vue-flow/minimap"
 import { computed, markRaw, watch, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
+import LpLaneNode from "./LpLaneNode.vue"
 import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
 
 // Vue Flow base CSS + canvas chrome theming is shipped via the kit's
@@ -72,6 +73,30 @@ export interface TopologyEdge {
   observed?: EdgeObserved
 }
 
+/**
+ * A background swimlane: a sized zone (one per project / overlay network) drawn
+ * beneath the nodes. The consumer computes the geometry; the canvas renders it
+ * as a non-interactive Vue Flow node so it pans/zooms in lockstep with the
+ * graph. Lanes are layered below real nodes and never intercept pointer events.
+ */
+export interface TopologyLane {
+  id: string
+  label: string
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Optional accent colour token for the lane border + label. */
+  accent?: string
+}
+
+/** Canvas viewport transform — for restoring a saved pan/zoom. */
+export interface CanvasViewport {
+  x: number
+  y: number
+  zoom: number
+}
+
 const props = withDefaults(
   defineProps<{
     nodes: TopologyNode[]
@@ -88,8 +113,13 @@ const props = withDefaults(
     selectable?: boolean
     /** Show the edge-type legend (Network / Depends-on / Pending / Drift). */
     legend?: boolean
+    /**
+     * Background swimlanes drawn beneath the nodes (one per project / overlay).
+     * Non-interactive; pan/zoom with the graph. Empty = no lanes.
+     */
+    lanes?: TopologyLane[]
   }>(),
-  { connectable: false, selectable: false, legend: true },
+  { connectable: false, selectable: false, legend: true, lanes: () => [] },
 )
 
 const emit = defineEmits<{
@@ -101,6 +131,16 @@ const emit = defineEmits<{
   /** Ids of the marquee/multi-selected nodes (empty when cleared). */
   (e: "selection-change", ids: string[]): void
   (e: "update:nodes", value: TopologyNode[]): void
+  /** A node finished being dragged — its new canvas position (for persistence). */
+  (
+    e: "node-drag-stop",
+    value: { id: string; position: { x: number; y: number } },
+  ): void
+  /** Pan/zoom settled — the new viewport (for per-user persistence). */
+  (
+    e: "viewport-change",
+    value: { zoom: number; x: number; y: number },
+  ): void
 }>()
 
 // Vue Flow types node components as `Component<NodeProps>`; our nodes declare
@@ -110,9 +150,29 @@ const emit = defineEmits<{
 const nodeTypes: NodeTypesObject = {
   infra: markRaw(LpInfraNode) as Component,
   service: markRaw(LpServiceNode) as Component,
+  lane: markRaw(LpLaneNode) as Component,
 }
 
-const flowNodes = computed<Node[]>(() =>
+// Lanes render as non-interactive Vue Flow nodes BENEATH the graph: prepended
+// so they paint first, with selecting/dragging/connecting off and a low z so
+// real nodes always sit on top. They pan/zoom with the viewport for free.
+const laneNodes = computed<Node[]>(() =>
+  props.lanes.map(
+    (l): Node => ({
+      id: `lane-${l.id}`,
+      type: "lane",
+      position: { x: l.x, y: l.y },
+      data: { label: l.label, accent: l.accent, width: l.width, height: l.height },
+      selectable: false,
+      draggable: false,
+      connectable: false,
+      focusable: false,
+      zIndex: 0,
+    }),
+  ),
+)
+
+const graphNodes = computed<Node[]>(() =>
   props.nodes.map((n): Node => {
     const type = n.type ?? "infra"
     const node: Node = {
@@ -120,6 +180,7 @@ const flowNodes = computed<Node[]>(() =>
       type,
       position: n.position,
       data: n.data,
+      zIndex: 1,
       ...(n.parent ? { parentNode: n.parent } : {}),
     }
     if (type === "group") {
@@ -138,6 +199,12 @@ const flowNodes = computed<Node[]>(() =>
     return node
   }),
 )
+
+// Lanes first (painted beneath), then the graph nodes on top.
+const flowNodes = computed<Node[]>(() => [
+  ...laneNodes.value,
+  ...graphNodes.value,
+])
 
 // Category drives the resting colour + base dash; `depends_on` is structural.
 function edgeCategory(e: TopologyEdge): EdgeCategory {
@@ -190,10 +257,26 @@ const {
   onEdgeContextMenu,
   onPaneClick,
   onConnect,
+  onNodeDragStop,
+  onMoveEnd,
   getSelectedNodes,
   fitView,
+  setViewport,
 } = useVueFlow()
 onNodeClick(({ node }) => emit("node-select", node.id))
+// Drag settled → surface the node's final position so the host can persist it.
+onNodeDragStop(({ node }) =>
+  emit("node-drag-stop", { id: node.id, position: { ...node.position } }),
+)
+// Pan/zoom settled → surface the viewport so the host can persist it per user.
+onMoveEnd(({ flowTransform }) => {
+  if (flowTransform)
+    emit("viewport-change", {
+      zoom: flowTransform.zoom,
+      x: flowTransform.x,
+      y: flowTransform.y,
+    })
+})
 // Vue Flow has no onSelectionChange hook in this version; the selected set is
 // reactive on the store, so watch it and surface the ids.
 watch(
@@ -224,7 +307,13 @@ onEdgeContextMenu(({ edge, event }) => {
 onPaneClick(() => emit("pane-click"))
 onConnect((conn) => emit("connect", conn))
 
-defineExpose({ fitView })
+// Restore a saved viewport (pan/zoom). The host calls this after loading the
+// user's persisted CanvasViewport on mount.
+async function applyViewport(v: CanvasViewport): Promise<void> {
+  await setViewport({ x: v.x, y: v.y, zoom: v.zoom })
+}
+
+defineExpose({ fitView, setViewport: applyViewport })
 </script>
 
 <template>
