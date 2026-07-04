@@ -66,6 +66,8 @@ export type { Step } from "./components/LpStepper.vue"
 export { default as LpSwitch } from "./components/LpSwitch.vue"
 export { default as LpTable } from "./components/LpTable.vue"
 export type { SortState, TableColumn } from "./components/LpTable.vue"
+export { default as LpTableOfContents } from "./components/LpTableOfContents.vue"
+export type { TocLink } from "./components/LpTableOfContents.vue"
 export { default as LpTabs } from "./components/LpTabs.vue"
 export type { TabItem } from "./components/LpTabs.vue"
 export { default as LpTextarea } from "./components/LpTextarea.vue"
@@ -118,6 +120,8 @@ export {
 } from "./theme/useTheme"
 export type { RevealOrigin } from "./theme/useTheme"
 export { DEFAULT_SURFACE } from "./theme/tokens"
+export { defineTheme } from "./theme/define"
+export type { ThemeOverrides } from "./theme/define"
 export type {
   ColorTokens,
   DensityTokens,

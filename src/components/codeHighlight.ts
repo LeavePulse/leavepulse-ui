@@ -1,10 +1,13 @@
 /*
  * Tiny, dependency-free syntax highlighter for LpCodeBlock. NOT a full parser —
- * a single regex tokenizer that covers strings, comments, numbers, keywords,
- * booleans and punctuation well enough for snippets (config, API examples, CLI).
- * For pixel-perfect IDE highlighting a consumer can pass pre-highlighted HTML
- * instead; this keeps the kit zero-dependency and synchronous (shiki is heavy
- * and async). Tokens map to kit colour classes so highlighting follows the theme.
+ * a single regex tokenizer that covers strings, comments, annotations, numbers,
+ * keywords, booleans and punctuation well enough for snippets (config, API
+ * examples, CLI, JVM build files). Languages are just extra keyword sets over
+ * the same tokenizer; JS/TS, Python, Rust, and the JVM trio (Kotlin/Java/Groovy)
+ * share most of it. For pixel-perfect IDE highlighting a consumer can pass
+ * pre-highlighted HTML instead; this keeps the kit zero-dependency and
+ * synchronous (shiki is heavy and async). Tokens map to kit colour classes so
+ * highlighting follows the theme.
  */
 
 export type CodeLang =
@@ -17,6 +20,9 @@ export type CodeLang =
   | "rust"
   | "yaml"
   | "toml"
+  | "kotlin"
+  | "java"
+  | "groovy"
   | "plain"
 
 export interface Token {
@@ -53,6 +59,18 @@ const KEYWORDS = new Set([
   "fn", "mut", "impl", "trait", "struct", "mod", "pub", "use", "crate",
   "self", "Self", "move", "ref", "where", "dyn", "unsafe", "loop", "macro",
   "use", "super", "static",
+  // kotlin
+  "fun", "val", "object", "companion", "data", "sealed", "override", "open",
+  "internal", "lateinit", "init", "when", "is", "vararg", "inline", "reified",
+  "suspend", "operator", "infix", "tailrec", "external", "annotation",
+  "constructor", "by", "get", "set", "field", "it", "run", "let", "apply",
+  "also", "with",
+  // java (extra, beyond shared C-family already above)
+  "package", "implements", "abstract", "final", "synchronized", "volatile",
+  "transient", "native", "strictfp", "protected", "throws", "boolean", "int",
+  "long", "short", "byte", "char", "float", "double", "String", "record",
+  // groovy adds few over java: def, trait already covered; add its extras
+  "def", "each", "closure",
 ])
 
 const BOOLEANS = new Set([
@@ -67,9 +85,10 @@ const MASTER = new RegExp(
   [
     "(\\/\\/[^\\n]*|#[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)", // 1 comment
     "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`(?:\\\\.|[^`\\\\])*`)", // 2 string
-    "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:e[+-]?\\d+)?\\b)", // 3 number
-    "([A-Za-z_$][\\w$]*)", // 4 identifier (keyword/bool/func/prop/plain)
-    "([{}()\\[\\];:,.<>=+\\-*/%!&|?]+)", // 5 punctuation
+    "(@[A-Za-z_$][\\w$]*)", // 3 annotation (@Override, @ConfigSerializable — JVM)
+    "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:e[+-]?\\d+)?[fFlLdD]?\\b)", // 4 number (JVM suffixes)
+    "([A-Za-z_$][\\w$]*)", // 5 identifier (keyword/bool/func/prop/plain)
+    "([{}()\\[\\];:,.<>=+\\-*/%!&|?]+)", // 6 punctuation
   ].join("|"),
   "g",
 )
@@ -90,8 +109,9 @@ export function tokenizeLine(line: string, lang: CodeLang): Token[] {
   MASTER.lastIndex = 0
   while ((m = MASTER.exec(line)) !== null) {
     if (m.index > last) out.push({ text: line.slice(last, m.index), cls: "" })
-    const [full, comment, str, num, ident, punct] = m
+    const [full, comment, str, annotation, num, ident, punct] = m
     if (comment != null) out.push({ text: full, cls: C.comment })
+    else if (annotation != null) out.push({ text: full, cls: C.func })
     else if (str != null) {
       // JSON: a quoted token immediately followed by ":" is a key.
       const isKey = lang === "json" && line.slice(m.index + full.length).trimStart().startsWith(":")

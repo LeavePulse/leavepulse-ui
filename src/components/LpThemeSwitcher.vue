@@ -11,7 +11,7 @@
  * and the choice survives a reload (anti-flash bootstrap). The component never
  * fetches; it just drives the theme engine.
  */
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
 import { presets } from "../theme/presets"
 import type { TokenSet } from "../theme/tokens"
 import { useTheme } from "../theme/useTheme"
@@ -33,6 +33,13 @@ const props = withDefaults(
     variant?: "swatch" | "icon" | "pill"
     /** Show the active theme's name next to the trigger (forced on for "pill"). */
     showLabel?: boolean
+    /**
+     * Default theme applied on mount when nothing is cached yet — the theme NAME
+     * (must be in `themes`) or a TokenSet. Lets a consuming app pick its default
+     * declaratively (<LpThemeSwitcher :default="'Violet'">) with no separate
+     * bootstrap plugin; a previously saved choice still wins over it.
+     */
+    default?: string | TokenSet
     /** Animate theme changes with the circular reveal. On by default. */
     transition?: boolean
     size?: "sm" | "md" | "lg"
@@ -64,6 +71,19 @@ const activeName = computed(
 const active = computed<TokenSet | undefined>(
   () => list.value.find((t) => t.name === activeName.value) ?? list.value[0],
 )
+
+// Apply the consumer's default on mount when nothing is cached yet. init()
+// hydrates from the cache first (a saved choice wins), so this only takes effect
+// on a first visit / cleared storage. Resolving a name goes through the offered
+// list, so <LpThemeSwitcher :default="'Violet'"> just works.
+onMounted(() => {
+  if (props.default == null) return
+  const fallback =
+    typeof props.default === "string"
+      ? list.value.find((t) => t.name === props.default)
+      : props.default
+  if (fallback) theme.init(fallback)
+})
 
 const SIZES = { sm: "size-7", md: "size-8", lg: "size-9" } as const
 const ICON_SIZE = { sm: 15, md: 16, lg: 18 } as const

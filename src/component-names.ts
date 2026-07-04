@@ -54,6 +54,7 @@ export const COMPONENT_NAMES = [
   "LpStepper",
   "LpSwitch",
   "LpTable",
+  "LpTableOfContents",
   "LpTabs",
   "LpTextarea",
   "LpThemeSwitcher",
