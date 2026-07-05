@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Motion } from "motion-v"
+import { Motion, useReducedMotion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { ref, useId } from "vue"
+import { computed, ref, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 
@@ -41,6 +41,16 @@ const hovered = ref<string | null>(null)
 // Pill move spring (snaps to instant under reduced motion); shared with the
 // other pill-indicator components.
 const pillTransition = usePillTransition()
+
+// Panel height spring: when the active #panel differs in height, the wrapper
+// grows/shrinks smoothly instead of snapping. Same feel as the drag layout in
+// LayoutNode; collapses to instant under reduced motion.
+const reduceMotion = useReducedMotion()
+const panelLayoutTransition = computed(() =>
+  reduceMotion.value
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 },
+)
 
 function pillUnder(value: string, active?: string): boolean {
   return hovered.value ? hovered.value === value : active === value
@@ -86,17 +96,24 @@ function pillUnder(value: string, active?: string): boolean {
       </TabsTrigger>
     </TabsList>
 
-    <!-- Animated panels: only rendered if a per-item #panel slot is provided. -->
-    <template v-if="$slots.panel">
+    <!-- Animated panels: only rendered if a per-item #panel slot is provided.
+         The Motion wrapper layout-animates its height so switching to a taller
+         or shorter panel grows/shrinks smoothly instead of snapping. -->
+    <Motion
+      v-if="$slots.panel"
+      :layout="true"
+      :transition="panelLayoutTransition"
+      class="mt-3 overflow-hidden"
+    >
       <TabsContent
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="mt-3 outline-none data-[state=active]:animate-[tab-in_200ms_var(--ease-emphasized)]"
+        class="outline-none data-[state=active]:animate-[tab-in_200ms_var(--ease-emphasized)]"
       >
         <slot name="panel" :value="item.value" />
       </TabsContent>
-    </template>
+    </Motion>
 
     <slot />
   </TabsRoot>
