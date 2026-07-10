@@ -380,9 +380,15 @@ const edgeStripStyle = computed(() => {
              no-drag wiring on the OUTER element so vaul still sees one content
              container (overlay scroll lives one level in); padding moves to the
              scroll content so the bar floats at the panel edge. -->
+        <!-- select-text (arbitrary + important): vaul injects a global
+             `[data-vaul-drawer]{user-select:none}` rule for pointer devices to
+             stop a swipe-drag from selecting text. That also kills legitimate
+             selection/Ctrl+C in the body (e.g. log lines), so we override it back
+             to selectable here. Drag-to-dismiss still starts on the handle/header
+             and empty space, not on this text. -->
         <div
           v-no-drag-controls="noDragControls"
-          class="flex min-h-0 min-w-0 flex-1 flex-col"
+          class="flex min-h-0 min-w-0 flex-1 flex-col [-webkit-user-select:text]! [user-select:text]!"
           :data-vaul-no-drag="noDragContent ? '' : undefined"
         >
           <!-- min-w-0 on the body + scroll content so a wide child (e.g. a log

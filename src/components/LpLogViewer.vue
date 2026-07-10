@@ -108,14 +108,18 @@ const emit = defineEmits<{
 // Level → gutter rail + text colour. Reads only semantic tokens so re-skinning
 // just works. trace/debug stay muted; success is green; warn amber; error/fatal
 // red (fatal gets a filled chip to stand apart from plain error).
-const levelMeta: Record<LogLevel, { rail: string; text: string; chip: string }> = {
-  trace: { rail: "bg-line-strong", text: "text-muted", chip: "text-muted" },
-  debug: { rail: "bg-line-strong", text: "text-muted-strong", chip: "text-muted-strong" },
-  info: { rail: "bg-brand", text: "text-ink", chip: "text-brand" },
-  success: { rail: "bg-action", text: "text-ink", chip: "text-action" },
-  warn: { rail: "bg-accent", text: "text-ink", chip: "text-accent" },
-  error: { rail: "bg-danger", text: "text-ink", chip: "text-danger" },
-  fatal: { rail: "bg-danger", text: "text-ink", chip: "rounded-xs bg-danger px-1 text-ink-inverse" },
+// `sel` tints ::selection in the row's semantic colour (info→brand, warn→accent,
+// error/fatal→danger) via Tailwind's `selection:` variant — the highlight then
+// matches the level instead of the browser default. Static classes (not built
+// from a var) so Tailwind emits them from the @source scan.
+const levelMeta: Record<LogLevel, { rail: string; text: string; chip: string; sel: string }> = {
+  trace: { rail: "bg-line-strong", text: "text-muted", chip: "text-muted", sel: "selection:bg-muted/40" },
+  debug: { rail: "bg-line-strong", text: "text-muted-strong", chip: "text-muted-strong", sel: "selection:bg-muted-strong/40" },
+  info: { rail: "bg-brand", text: "text-ink", chip: "text-brand", sel: "selection:bg-brand/40" },
+  success: { rail: "bg-action", text: "text-ink", chip: "text-action", sel: "selection:bg-action/40" },
+  warn: { rail: "bg-accent", text: "text-ink", chip: "text-accent", sel: "selection:bg-accent/40" },
+  error: { rail: "bg-danger", text: "text-ink", chip: "text-danger", sel: "selection:bg-danger/40" },
+  fatal: { rail: "bg-danger", text: "text-ink", chip: "rounded-xs bg-danger px-1 text-ink-inverse", sel: "selection:bg-danger/40" },
 }
 
 function metaFor(level?: LogLevel) {
@@ -262,6 +266,30 @@ function lineText(line: LogLine): string {
   return [fmtTime(line.time), line.level?.toUpperCase(), line.source && `[${line.source}]`, line.message]
     .filter(Boolean)
     .join(" ")
+}
+
+// The context menu runs in ANCHOR mode (no reka trigger on the rows) — a reka
+// trigger binds pointerdown and captures the drag, which kills mouse text
+// selection across rows. So rows stay plain <li>, we catch `contextmenu`
+// ourselves, resolve the clicked row, and open the menu at the cursor via a
+// virtual anchor (LpContextMenu.openAt).
+const menuRef = ref<{ openAt: (x: number, y: number) => void } | null>(null)
+const menuRow = ref<{ line: LogLine; n: number } | null>(null)
+const menuItems = computed<ContextMenuItemDef[]>(() =>
+  menuRow.value ? menuFor(menuRow.value.line, menuRow.value.n) : [],
+)
+
+// Right-click a row: resolve it via [data-log-row], then open the menu at the
+// pointer. preventDefault suppresses the native menu only when we have items.
+function onRowContext(e: MouseEvent) {
+  if (!props.rowMenu) return
+  const el = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-log-row]")
+  const n = el ? Number(el.dataset.logRow) : NaN
+  const row = Number.isNaN(n) ? undefined : visibleLines.value.find((r) => r.n === n)
+  menuRow.value = row ? { line: row.line, n: row.n } : null
+  if (!menuRow.value || menuItems.value.length === 0) return
+  e.preventDefault()
+  menuRef.value?.openAt(e.clientX, e.clientY)
 }
 
 // Built-in copy actions + optional "filter by" + consumer extras. Rebuilt per
@@ -455,9 +483,14 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
           <span class="text-[11px]">loading older…</span>
         </div>
 
-      <!-- Leave collapses a folded-away duplicate (max-height + opacity + a small
-           lift) while the survivors FLIP-slide up via move-class — so toggling
-           `compact` reads as the dupes melting into the kept line, not a jump. -->
+      <!-- ANCHOR-mode context menu (see LpContextMenu.anchor): rows stay plain
+           <li> with NO reka trigger, so a mouse drag selects text across rows
+           freely. We catch `contextmenu`, resolve the clicked row (data-log-row)
+           and open the menu at the cursor. Leave collapses a folded-away
+           duplicate (max-height + opacity + a small lift) while the survivors
+           FLIP-slide up via move-class — so toggling `compact` reads as the
+           dupes melting into the kept line. -->
+      <LpContextMenu ref="menuRef" :items="menuItems" anchor>
       <TransitionGroup
         tag="ol"
         class="py-1"
@@ -467,21 +500,26 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         leave-from-class="max-h-8 opacity-100"
         leave-to-class="max-h-0 -translate-y-1 opacity-0"
         move-class="transition-transform duration-200 ease-[var(--ease-emphasized)]"
+        @contextmenu="onRowContext"
       >
-        <LpContextMenu
+        <li
           v-for="{ line, n, count } in visibleLines"
           :key="n"
-          :items="menuFor(line, n)"
-        >
-        <li
-          class="group flex items-start gap-0 px-0 transition-colors hover:bg-surface-soft/60"
+          :data-log-row="n"
+          class="group relative flex items-start gap-0 px-0 leading-5 transition-colors hover:bg-surface-soft/60"
+          :class="metaFor(line.level).sel"
         >
           <!-- level rail -->
+          <!-- Level rail: absolutely positioned so it spans the FULL row height
+               regardless of content — self-stretch only reached the flex line box
+               (shorter than the relaxed line-height), which left visible gaps
+               between rows. A spacer keeps the text indented past it. -->
           <span
-            class="mr-2 w-0.5 shrink-0 self-stretch"
+            class="absolute inset-y-0 left-0 w-0.5"
             :class="metaFor(line.level).rail"
             aria-hidden="true"
           />
+          <span class="mr-2 w-0.5 shrink-0" aria-hidden="true" />
 
           <!-- line number -->
           <span
@@ -492,20 +530,20 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
           <!-- timestamp -->
           <span
             v-if="showTime"
-            class="mr-3 shrink-0 select-none tabular-nums text-muted"
+            class="mr-3 shrink-0 tabular-nums text-muted"
           >{{ fmtTime(line.time) }}</span>
 
           <!-- level chip -->
           <span
             v-if="showLevel"
-            class="mr-3 w-12 shrink-0 select-none text-[10px] font-semibold uppercase tracking-[0.06em]"
+            class="mr-3 w-12 shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em]"
             :class="metaFor(line.level).chip"
           >{{ line.level ?? "info" }}</span>
 
           <!-- source tag -->
           <span
             v-if="line.source"
-            class="mr-2 shrink-0 select-none text-muted-strong"
+            class="mr-2 shrink-0 text-muted-strong"
           >[{{ line.source }}]</span>
 
           <!-- message -->
@@ -536,8 +574,8 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
             </Transition>
           </span>
         </li>
-        </LpContextMenu>
       </TransitionGroup>
+      </LpContextMenu>
       </template>
     </LpScrollArea>
 
