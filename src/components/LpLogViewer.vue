@@ -268,28 +268,32 @@ function lineText(line: LogLine): string {
     .join(" ")
 }
 
-// The context menu runs in ANCHOR mode (no reka trigger on the rows) — a reka
-// trigger binds pointerdown and captures the drag, which kills mouse text
-// selection across rows. So rows stay plain <li>, we catch `contextmenu`
-// ourselves, resolve the clicked row, and open the menu at the cursor via a
-// virtual anchor (LpContextMenu.openAt).
-const menuRef = ref<{ openAt: (x: number, y: number) => void } | null>(null)
+// One LpContextMenu wraps the whole list (not each row) so a mouse drag can
+// select text across rows — a per-row reka trigger would bind pointerdown and
+// pin the selection to one row. On right-click we resolve which row is under the
+// cursor (data-log-row) and rebuild the menu items for it before reka opens.
 const menuRow = ref<{ line: LogLine; n: number } | null>(null)
 const menuItems = computed<ContextMenuItemDef[]>(() =>
   menuRow.value ? menuFor(menuRow.value.line, menuRow.value.n) : [],
 )
 
-// Right-click a row: resolve it via [data-log-row], then open the menu at the
-// pointer. preventDefault suppresses the native menu only when we have items.
+// Resolve the right-clicked row so menuItems reflects it before reka's trigger
+// opens the menu (runs on the same contextmenu event, ahead of the open).
 function onRowContext(e: MouseEvent) {
   if (!props.rowMenu) return
   const el = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-log-row]")
   const n = el ? Number(el.dataset.logRow) : NaN
   const row = Number.isNaN(n) ? undefined : visibleLines.value.find((r) => r.n === n)
   menuRow.value = row ? { line: row.line, n: row.n } : null
-  if (!menuRow.value || menuItems.value.length === 0) return
-  e.preventDefault()
-  menuRef.value?.openAt(e.clientX, e.clientY)
+}
+
+// vaul (the drawer lib) treats a left-button pointerdown on a side drawer as the
+// start of a swipe-to-dismiss (`shouldDrag` returns true unconditionally for
+// left/right drawers) and its preventDefault kills text selection. Stop that
+// pointerdown from bubbling to vaul — left button only, so scroll and the
+// right-click context menu still reach it.
+function onRowPointerDown(e: PointerEvent) {
+  if (e.button === 0) e.stopPropagation()
 }
 
 // Built-in copy actions + optional "filter by" + consumer extras. Rebuilt per
@@ -483,14 +487,16 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
           <span class="text-[11px]">loading older…</span>
         </div>
 
-      <!-- ANCHOR-mode context menu (see LpContextMenu.anchor): rows stay plain
-           <li> with NO reka trigger, so a mouse drag selects text across rows
-           freely. We catch `contextmenu`, resolve the clicked row (data-log-row)
-           and open the menu at the cursor. Leave collapses a folded-away
-           duplicate (max-height + opacity + a small lift) while the survivors
-           FLIP-slide up via move-class — so toggling `compact` reads as the
-           dupes melting into the kept line. -->
-      <LpContextMenu ref="menuRef" :items="menuItems" anchor>
+      <!-- ONE context menu wraps the whole list (not each row): @contextmenu
+           resolves which row was right-clicked so menuItems reflects it before
+           reka opens. @pointerdown stops a left-button drag from reaching vaul
+           (which would start a swipe-dismiss and cancel text selection); the
+           right button still bubbles so the menu opens. reka's own trigger
+           pointerdown is touch/pen-only, so it doesn't interfere with the mouse.
+           Leave collapses a folded-away duplicate (max-height + opacity + a small
+           lift) while the survivors FLIP-slide up via move-class — so toggling
+           `compact` reads as the dupes melting into the kept line. -->
+      <LpContextMenu :items="menuItems" :always="rowMenu">
       <TransitionGroup
         tag="ol"
         class="py-1"
@@ -501,6 +507,7 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
         leave-to-class="max-h-0 -translate-y-1 opacity-0"
         move-class="transition-transform duration-200 ease-[var(--ease-emphasized)]"
         @contextmenu="onRowContext"
+        @pointerdown="onRowPointerDown"
       >
         <li
           v-for="{ line, n, count } in visibleLines"
