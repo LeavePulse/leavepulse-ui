@@ -16,7 +16,16 @@ export default defineNuxtModule({
   meta: { name: "@leavepulse/ui", configKey: "leavepulseUi" },
   setup() {
     for (const name of COMPONENT_NAMES) {
-      addComponent({ name, export: name, filePath: "@leavepulse/ui" })
+      // Point each component at its own dist chunk rather than the barrel
+      // ("@leavepulse/ui"). Importing through the barrel makes the bundler pull
+      // the whole kit; a per-component path lets it ship only the components an
+      // app actually uses (plus their real deps — e.g. @vue-flow only when a
+      // canvas component is used).
+      addComponent({
+        name,
+        export: "default",
+        filePath: `@leavepulse/ui/dist/components/${name}.vue.js`,
+      })
     }
   },
 })
