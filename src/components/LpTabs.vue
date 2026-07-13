@@ -20,8 +20,10 @@ withDefaults(
      * "contained" (default) wraps the triggers in a bordered, filled bar.
      * "plain" drops the container chrome — a flat row of tabs with only the
      * sliding pill marking the active one (for nav bars over a custom surface).
+     * "underline" is a flat row over a hairline baseline, marking the active
+     * tab with a sliding bottom bar instead of a pill (page-section nav style).
      */
-    variant?: "contained" | "plain"
+    variant?: "contained" | "plain" | "underline"
     /** Tint the active pill + label with the brand colour (nav-bar style). */
     accent?: boolean
     /** Stretch the bar to full width with equal-share triggers. */
@@ -67,6 +69,7 @@ function pillUnder(value: string, active?: string): boolean {
       :class="[
         block ? 'flex w-full' : 'inline-flex',
         variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
+        variant === 'underline' ? 'border-b border-line' : '',
       ]"
       @pointerleave="hovered = null"
     >
@@ -74,22 +77,32 @@ function pillUnder(value: string, active?: string): boolean {
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="relative inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="relative inline-flex items-center justify-center gap-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
         :class="[
           block ? 'flex-1' : '',
+          variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : 'rounded-md px-3 py-1.5',
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
           hovered === item.value ? 'text-ink' : 'text-muted',
         ]"
         @pointerenter="hovered = item.value"
       >
+        <!-- Active marker: a bottom bar in "underline", a filled pill otherwise.
+             Both slide between tabs via the shared motion layoutId. -->
         <Motion
           v-if="pillUnder(item.value, modelValue)"
           :layout-id="pillId"
           :transition="pillTransition"
-          class="absolute inset-0 z-0 rounded-md shadow-sm"
-          :class="accent
-            ? 'border border-brand/35 bg-brand/12'
-            : 'border border-line bg-surface-raised'"
+          :class="variant === 'underline'
+            ? [
+                'absolute inset-x-0 -bottom-px z-0 h-0.5 rounded-full',
+                accent ? 'bg-brand' : 'bg-ink',
+              ]
+            : [
+                'absolute inset-0 z-0 rounded-md shadow-sm',
+                accent
+                  ? 'border border-brand/35 bg-brand/12'
+                  : 'border border-line bg-surface-raised',
+              ]"
         />
         <LpIcon v-if="item.icon" :name="item.icon" :size="14" class="relative z-10" />
         <span class="relative z-10">{{ item.label }}</span>

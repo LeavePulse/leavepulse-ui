@@ -9,6 +9,8 @@ dist/
 dist-preview/
 
 # Local env / editor noise
+.env
+.env.*
 *.log
 .DS_Store
 .vscode/

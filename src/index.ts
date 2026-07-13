@@ -72,6 +72,7 @@ export { default as LpTabs } from "./components/LpTabs.vue"
 export type { TabItem } from "./components/LpTabs.vue"
 export { default as LpTextarea } from "./components/LpTextarea.vue"
 export { default as LpThemeSwitcher } from "./components/LpThemeSwitcher.vue"
+export { default as LpTilt } from "./components/LpTilt.vue"
 export { default as LpToaster } from "./components/LpToaster.vue"
 export { default as LpTooltip } from "./components/LpTooltip.vue"
 export { default as LpTopologyCanvas } from "./components/LpTopologyCanvas.vue"
@@ -137,6 +138,8 @@ export type { UiConfig } from "./theme/config"
 
 export { useInputFilter } from "./composables/useInputFilter"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"
+export { useTilt } from "./composables/useTilt"
+export type { UseTilt, UseTiltOptions } from "./composables/useTilt"
 export { useToast } from "./composables/useToast"
 export type {
   ToastAction,
