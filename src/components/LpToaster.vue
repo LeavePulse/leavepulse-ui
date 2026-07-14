@@ -209,8 +209,14 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
       />
     </ToastRoot>
 
-    <ToastViewport
-      class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 outline-none"
-    />
+    <!-- Teleported to body so the viewport escapes any stacking context the
+         consumer's app root creates (e.g. an opaque `#app { z-index }` wrapper).
+         Modals portal to body too, so both compare at the same root level and
+         --z-toast (200) > --z-modal (110) wins as intended. -->
+    <Teleport to="body">
+      <ToastViewport
+        class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 outline-none"
+      />
+    </Teleport>
   </ToastProvider>
 </template>

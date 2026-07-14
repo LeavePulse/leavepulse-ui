@@ -90,6 +90,10 @@ const ICON_SIZE = { sm: 15, md: 16, lg: 18 } as const
 
 const wantsLabel = computed(() => props.showLabel || props.variant === "pill")
 
+// Labelless icon variant renders as a plain square icon button (no border/fill),
+// so it sits inline with other toolbar icon buttons. Other variants stay framed.
+const bareIcon = computed(() => props.variant === "icon" && !wantsLabel.value)
+
 // Apply a theme through the kit's self-managed setter (it persists + updates
 // the shared `current`), then notify. The reveal animates from the click point.
 function applyTheme(t: TokenSet, ev?: MouseEvent) {
@@ -138,8 +142,15 @@ const triggerLabel = computed(
       type="button"
       :aria-label="triggerLabel"
       :title="triggerLabel"
-      class="inline-flex items-center gap-2 rounded-control border border-line bg-surface-raised px-1.5 text-ink outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-      :class="wantsLabel ? 'py-1 pr-2.5' : ''"
+      class="inline-flex items-center justify-center gap-2 rounded-control outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      :class="
+        bareIcon
+          ? [SIZES[size], 'text-muted hover:bg-surface-soft hover:text-ink']
+          : [
+              'border border-line bg-surface-raised px-1.5 text-ink hover:border-line-strong',
+              wantsLabel ? 'py-1 pr-2.5' : '',
+            ]
+      "
       @click="cycle"
     >
       <!-- swatch: brand over surface, hinting the theme at a glance -->

@@ -122,10 +122,12 @@ defineOptions({ inheritAttrs: false })
     aria-label="Sidebar"
     v-bind="$attrs"
   >
+    <!-- Edge-to-edge (negative margins cancel the rail p-3) and h-16 to match the
+         app header, so its bottom hairline continues the header's border-b. -->
     <div
       v-if="$slots.header"
-      class="shrink-0"
-      :class="divider ? 'mb-3 border-b border-line pb-3' : 'mb-2'"
+      class="-mx-3 -mt-3 mb-3 flex h-16 shrink-0 items-center px-3"
+      :class="divider ? 'border-b border-line' : ''"
     >
       <slot name="header" />
     </div>
