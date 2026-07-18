@@ -178,9 +178,10 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
               v-for="(action, i) in t.actions"
               :key="i"
               type="button"
-              class="rounded-control border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink outline-none transition-[border-color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:border-line-strong hover:bg-surface-soft/70 active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
+              class="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink outline-none transition-[border-color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:border-line-strong hover:bg-surface-soft/70 active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
               @click="runAction(t, action)"
             >
+              <LpIcon v-if="action.icon" :name="action.icon" :size="14" />
               {{ action.label }}
             </button>
           </div>

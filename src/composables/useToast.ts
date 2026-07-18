@@ -4,6 +4,8 @@ export type ToastVariant = "info" | "success" | "warning" | "error"
 
 export interface ToastAction {
   label: string
+  /** Optional leading icon (any name LpIcon accepts, e.g. "lucide:copy"). */
+  icon?: string
   onClick: () => void | Promise<void>
 }
 
