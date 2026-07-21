@@ -7,7 +7,7 @@
  * viewport element and re-emits the native scroll event — exactly what tailing
  * needs.
  */
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, TransitionGroup, watch } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -354,6 +354,52 @@ function splitHighlight(message: string): Part[] {
   return parts
 }
 
+// ── virtualisation ───────────────────────────────────────────────────
+// A live log stream can reach tens of thousands of rows; rendering them all
+// (a v-for over the whole list, each row a flex box with a highlight-split and,
+// worse, a TransitionGroup computing FLIP offsets for every node on each push)
+// pins the main thread and the viewer stops responding. So past a threshold we
+// render only the slice inside the viewport plus a small overscan, padding the
+// rest with two spacer rows. This needs a uniform row height, which only holds
+// when lines don't wrap — with `wrap` (or short lists) we fall back to the
+// plain full render that keeps the fold/enter transitions.
+const ROW_HEIGHT = 20 // px; matches leading-5 (1.25rem) monospace rows
+const VIRTUALISE_ABOVE = 200 // rows; below this the full render is cheap enough
+const OVERSCAN = 12 // rows rendered beyond each edge to cover fast scrolls
+
+const virtualise = computed(() => !props.wrap && visibleLines.value.length > VIRTUALISE_ABOVE)
+
+const viewportHeight = ref(0)
+const scrollTop = ref(0)
+
+// Window of rows to actually render when virtualising: [start, end) by index
+// into visibleLines, widened by OVERSCAN on both sides and clamped.
+const virtualRange = computed(() => {
+  const total = visibleLines.value.length
+  if (!virtualise.value) return { start: 0, end: total }
+  const visibleCount = Math.ceil(viewportHeight.value / ROW_HEIGHT) + 1
+  const start = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN)
+  const end = Math.min(total, start + visibleCount + OVERSCAN * 2)
+  return { start, end }
+})
+
+const renderedLines = computed(() => {
+  if (!virtualise.value) return visibleLines.value
+  const { start, end } = virtualRange.value
+  return visibleLines.value.slice(start, end)
+})
+
+// Spacer heights that stand in for the un-rendered rows above/below the window,
+// so the scrollbar and scroll position stay honest.
+const padTop = computed(() =>
+  virtualise.value ? virtualRange.value.start * ROW_HEIGHT : 0,
+)
+const padBottom = computed(() =>
+  virtualise.value
+    ? (visibleLines.value.length - virtualRange.value.end) * ROW_HEIGHT
+    : 0,
+)
+
 // ── tail / auto-scroll ───────────────────────────────────────────────
 const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 const pinned = ref(true) // currently glued to the bottom
@@ -381,6 +427,10 @@ let topArmed = true
 function onScroll(e: Event) {
   const el = e.target as HTMLElement
   pinned.value = atBottom(el)
+  // Feed the virtual window. Reading clientHeight here keeps it in sync with
+  // runtime resizes (drawer drag, window resize) without a ResizeObserver.
+  scrollTop.value = el.scrollTop
+  if (el.clientHeight !== viewportHeight.value) viewportHeight.value = el.clientHeight
   if (!props.loadOlder) return
   if (el.scrollTop <= TOP_NEAR) {
     if (topArmed && !props.loadingOlder) {
@@ -454,6 +504,28 @@ watch(
 )
 
 const showJump = computed(() => props.tail && !pinned.value && props.lines.length > 0)
+
+// Seed the viewport height before the first scroll so the initial virtual
+// window is correct (otherwise a tall list would render a single overscan slice
+// until the user scrolls).
+onMounted(() => {
+  const el = viewport()
+  if (el) viewportHeight.value = el.clientHeight
+})
+
+// FLIP / enter / leave classes for the full-render TransitionGroup, bound via
+// v-bind so the same list element can fall back to a plain <ol> when virtualised
+// (a component :is can't carry TransitionGroup-only props inertly otherwise).
+const transitionProps = {
+  tag: "ol",
+  "enter-active-class": "transition duration-200 ease-[var(--ease-emphasized)]",
+  "enter-from-class": "-translate-x-1 opacity-0",
+  "leave-active-class":
+    "overflow-hidden transition-all duration-200 ease-[var(--ease-emphasized)]",
+  "leave-from-class": "max-h-8 opacity-100",
+  "leave-to-class": "max-h-0 -translate-y-1 opacity-0",
+  "move-class": "transition-transform duration-200 ease-[var(--ease-emphasized)]",
+}
 </script>
 
 <template>
@@ -496,21 +568,28 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
            Leave collapses a folded-away duplicate (max-height + opacity + a small
            lift) while the survivors FLIP-slide up via move-class — so toggling
            `compact` reads as the dupes melting into the kept line. -->
+      <!-- Component switches on `virtualise`: a plain <ol> when we render only a
+           windowed slice (FLIP/enter/leave transitions can't run over a moving
+           virtual window, and computing them for thousands of nodes is exactly
+           the cost we're avoiding), or a TransitionGroup for the full render on
+           small lists, where the fold/enter animations are affordable and nice.
+           Spacer rows stand in for the un-rendered slices above/below. -->
       <LpContextMenu :items="menuItems" :always="rowMenu">
-      <TransitionGroup
-        tag="ol"
+      <component
+        :is="virtualise ? 'ol' : TransitionGroup"
+        v-bind="virtualise ? {} : transitionProps"
         class="py-1"
-        enter-active-class="transition duration-200 ease-[var(--ease-emphasized)]"
-        enter-from-class="-translate-x-1 opacity-0"
-        leave-active-class="overflow-hidden transition-all duration-200 ease-[var(--ease-emphasized)]"
-        leave-from-class="max-h-8 opacity-100"
-        leave-to-class="max-h-0 -translate-y-1 opacity-0"
-        move-class="transition-transform duration-200 ease-[var(--ease-emphasized)]"
         @contextmenu="onRowContext"
         @pointerdown="onRowPointerDown"
       >
         <li
-          v-for="{ line, n, count } in visibleLines"
+          v-if="virtualise && padTop > 0"
+          key="pad-top"
+          :style="{ height: padTop + 'px' }"
+          aria-hidden="true"
+        />
+        <li
+          v-for="{ line, n, count } in renderedLines"
           :key="n"
           :data-log-row="n"
           class="group relative flex items-start gap-0 px-0 leading-5 transition-colors hover:bg-surface-soft/60"
@@ -581,7 +660,13 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
             </Transition>
           </span>
         </li>
-      </TransitionGroup>
+        <li
+          v-if="virtualise && padBottom > 0"
+          key="pad-bottom"
+          :style="{ height: padBottom + 'px' }"
+          aria-hidden="true"
+        />
+      </component>
       </LpContextMenu>
       </template>
     </LpScrollArea>
