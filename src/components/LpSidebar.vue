@@ -165,6 +165,7 @@ defineOptions({ inheritAttrs: false })
     direction="left"
     size="sm"
     :edge-open="edgeOpen"
+    :edge-breakpoint="mobileBreakpoint"
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="flex h-full flex-col gap-1">

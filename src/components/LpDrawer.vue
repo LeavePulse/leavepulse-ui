@@ -73,6 +73,14 @@ const props = withDefaults(
      * meaningful for left/right drawers.
      */
     edgeOpen?: boolean
+    /**
+     * Tailwind breakpoint above which the edge strip is disabled. Edge
+     * swipe-to-open only makes sense on mobile: the strip listens for
+     * touch/pen pointers only, so on a desktop it can never open the drawer
+     * but still overlays the screen edge and swallows clicks. Pass the same
+     * breakpoint at which the host switches to the drawer (LpSidebar does).
+     */
+    edgeBreakpoint?: "sm" | "md" | "lg" | "xl"
     /** Width (px) of the edge grab strip. */
     edgeSize?: number
     /** Fraction (0–1) of the panel width the pull must reach to open on release. */
@@ -287,6 +295,19 @@ const edgeStripStyle = computed(() => {
     ? { right: "0", width: w }
     : { left: "0", width: w }
 })
+
+// The strip must only exist below the host's mobile breakpoint. It is hidden
+// with the same Tailwind breakpoint classes the rest of the mobile logic
+// (LpSidebar rail, burger) uses — no JS media query needed.
+const EDGE_STRIP_HIDDEN: Record<NonNullable<typeof props.edgeBreakpoint>, string> = {
+  sm: "sm:hidden",
+  md: "md:hidden",
+  lg: "lg:hidden",
+  xl: "xl:hidden",
+}
+const edgeStripClass = computed(() =>
+  props.edgeBreakpoint ? EDGE_STRIP_HIDDEN[props.edgeBreakpoint] : "",
+)
 </script>
 
 <template>
@@ -296,6 +317,7 @@ const edgeStripStyle = computed(() => {
     <div
       ref="edgeStrip"
       class="fixed inset-y-0 z-(--z-overlay) touch-none"
+      :class="edgeStripClass"
       :style="edgeStripStyle"
       aria-hidden="true"
     />
