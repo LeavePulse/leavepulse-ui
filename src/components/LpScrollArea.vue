@@ -47,17 +47,6 @@ const barFade =
 
 <template>
   <ScrollAreaRoot class="relative overflow-hidden" type="hover" :scroll-hide-delay="500">
-    <ScrollAreaViewport
-      ref="viewportRef"
-      class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
-      :class="fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : ''"
-      @scroll.passive="$emit('scroll', $event)"
-    >
-      <div :class="contentClass">
-        <slot />
-      </div>
-    </ScrollAreaViewport>
-
     <ScrollAreaScrollbar
       orientation="vertical"
       class="group flex w-1 touch-none select-none p-px transition-[width] duration-[var(--duration-fast)] hover:w-1.5"
@@ -78,5 +67,16 @@ const barFade =
         class="flex-1 rounded-t-pill bg-brand/40 transition-colors group-hover:bg-brand"
       />
     </ScrollAreaScrollbar>
+
+    <ScrollAreaViewport
+      ref="viewportRef"
+      class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
+      :class="fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : ''"
+      @scroll.passive="$emit('scroll', $event)"
+    >
+      <div :class="contentClass">
+        <slot />
+      </div>
+    </ScrollAreaViewport>
   </ScrollAreaRoot>
 </template>
