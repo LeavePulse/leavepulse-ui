@@ -7,7 +7,7 @@
  * viewport element and re-emits the native scroll event — exactly what tailing
  * needs.
  */
-import { computed, nextTick, onMounted, ref, TransitionGroup, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, TransitionGroup, watch } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -505,12 +505,31 @@ watch(
 
 const showJump = computed(() => props.tail && !pinned.value && props.lines.length > 0)
 
-// Seed the viewport height before the first scroll so the initial virtual
-// window is correct (otherwise a tall list would render a single overscan slice
-// until the user scrolls).
-onMounted(() => {
+// Track the viewport height for the whole lifetime, not just at mount. Reading
+// it once was a deadlock when the viewer mounted inside a container that had no
+// height yet (a drawer mid open-animation, a hidden tab): the virtual window
+// collapsed to a single row, so there was nothing to scroll, and `onScroll` —
+// the only other place that refreshed the height — could never fire to correct
+// it. The list looked stuck and wouldn't scroll at all.
+let viewportResize: ResizeObserver | null = null
+
+function measureViewport() {
   const el = viewport()
   if (el) viewportHeight.value = el.clientHeight
+}
+
+onMounted(() => {
+  measureViewport()
+  const el = viewport()
+  if (el && typeof ResizeObserver !== "undefined") {
+    viewportResize = new ResizeObserver(measureViewport)
+    viewportResize.observe(el)
+  }
+})
+
+onBeforeUnmount(() => {
+  viewportResize?.disconnect()
+  viewportResize = null
 })
 
 // FLIP / enter / leave classes for the full-render TransitionGroup, bound via
