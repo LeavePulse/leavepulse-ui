@@ -41,8 +41,11 @@ const viewportEl = computed<HTMLElement | null>(
 )
 defineExpose({ viewportEl })
 
+// `opacity-0` + the hidden-state fade is what keeps the bar invisible at rest:
+// with force-mount the element stays in the DOM, so a one-shot fade-out alone
+// would snap back to visible once the animation finished.
 const barFade =
-  "data-[state=visible]:animate-[fade-in_180ms_ease] data-[state=hidden]:animate-[fade-out_240ms_ease]"
+  "opacity-0 data-[state=visible]:animate-[fade-in_180ms_ease] data-[state=visible]:opacity-100 data-[state=hidden]:animate-[fade-out_240ms_ease]"
 </script>
 
 <template>
@@ -52,8 +55,14 @@ const barFade =
          grabbable strip. A 4px-wide hit area is near-impossible to catch with a
          mouse. Padding (not width) carries the extra room so the thumb stays
          flush against the wall. -->
+    <!-- force-mount: reka only sets the viewport's `overflow-y: scroll` while a
+         vertical scrollbar is MOUNTED, and with type="hover" that happens on
+         first hover — so before the pointer ever entered, the region silently
+         refused to scroll (wheel included). Mounting it up front fixes that;
+         the bar still only becomes visible on hover, via `barFade` below. -->
     <ScrollAreaScrollbar
       orientation="vertical"
+      force-mount
       class="group flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
       :class="barFade"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
