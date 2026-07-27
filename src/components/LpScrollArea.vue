@@ -47,24 +47,29 @@ const barFade =
 
 <template>
   <ScrollAreaRoot class="relative overflow-hidden" type="hover" :scroll-hide-delay="500">
+    <!-- The bar itself is a pointer target far wider than it looks: the visible
+         rail is the thumb, sized below, while the track pads it out to a
+         grabbable strip. A 4px-wide hit area is near-impossible to catch with a
+         mouse. Padding (not width) carries the extra room so the thumb stays
+         flush against the wall. -->
     <ScrollAreaScrollbar
       orientation="vertical"
-      class="group flex w-1 touch-none select-none p-px transition-[width] duration-[var(--duration-fast)] hover:w-1.5"
+      class="group flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
       :class="barFade"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
     >
       <ScrollAreaThumb
-        class="flex-1 rounded-l-pill bg-brand/40 transition-colors group-hover:bg-brand"
+        class="w-1 rounded-l-pill bg-brand/40 transition-[width,background-color] duration-[var(--duration-fast)] group-hover:w-1.5 group-hover:bg-brand"
       />
     </ScrollAreaScrollbar>
 
     <ScrollAreaScrollbar
       orientation="horizontal"
-      class="group flex h-1 flex-col touch-none select-none p-px transition-[height] duration-[var(--duration-fast)] hover:h-1.5"
+      class="group flex h-3.5 flex-col touch-none select-none justify-end px-px pb-px pt-2.5"
       :class="barFade"
     >
       <ScrollAreaThumb
-        class="flex-1 rounded-t-pill bg-brand/40 transition-colors group-hover:bg-brand"
+        class="h-1 rounded-t-pill bg-brand/40 transition-[height,background-color] duration-[var(--duration-fast)] group-hover:h-1.5 group-hover:bg-brand"
       />
     </ScrollAreaScrollbar>
 
