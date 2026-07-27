@@ -69,10 +69,10 @@ const bodyPad = computed(() =>
   <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        class="fixed inset-0 z-(--z-overlay) bg-black/50 backdrop-blur-sm data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        class="fixed inset-0 z-(--z-overlay) bg-black/50 backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
       />
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-(--z-modal) flex max-h-[min(90vh,calc(100dvh-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        class="fixed left-1/2 top-1/2 z-(--z-modal) flex max-h-[min(90vh,calc(100dvh-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[pop-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_120ms_cubic-bezier(0.4,0,1,1)]"
         :class="widthClass"
         :style="width ? { width } : undefined"
       >

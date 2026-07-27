@@ -125,16 +125,22 @@
     opacity: 0;
   }
 }
+/*
+ * Centred-dialog enter/exit. The scale alone read as a pop on the spot, so the
+ * panel also rises a few pixels into place — it arrives from somewhere instead
+ * of appearing. Exit drops back the same way but shorter and on an accelerating
+ * curve, since a dismissal shouldn't be savoured.
+ */
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
+    transform: translate(-50%, calc(-50% + 8px)) scale(0.97);
   }
 }
 @keyframes pop-out {
   to {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
+    transform: translate(-50%, calc(-50% + 4px)) scale(0.985);
   }
 }
 /*
