@@ -20,8 +20,13 @@ import {
 // component root, since items live inside reka's viewport.
 // `barInsetTop` (any CSS length) pulls the vertical scrollbar down by that much,
 // so it doesn't run under a sticky header pinned at the top of the viewport.
+// `smooth` eases wheel and keyboard scrolling. Opt-in rather than default:
+// it also applies to `scrollTo({ behavior: "auto" })`, which consumers that
+// drive the scroll themselves (a log tail jumping to the newest line) rely on
+// being instant.
 const props = defineProps<{
   fade?: boolean
+  smooth?: boolean
   contentClass?: string
   barInsetTop?: string
 }>()
@@ -85,7 +90,10 @@ const barFade =
     <ScrollAreaViewport
       ref="viewportRef"
       class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
-      :class="fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : ''"
+      :class="[
+        smooth ? 'scroll-smooth motion-reduce:scroll-auto' : '',
+        fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : '',
+      ]"
       @scroll.passive="$emit('scroll', $event)"
     >
       <div :class="contentClass">
