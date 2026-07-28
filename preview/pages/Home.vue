@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { LpBadge, LpCard } from "../../src"
 import { registry } from "../playground/registry"
+import { href, navigate, type Route } from "../playground/router"
 
-defineEmits<{
-  (e: "open-component", id: string): void
-  (e: "open-page", id: string): void
-}>()
+// Cards are <a> elements with real hrefs so middle-click / cmd-click open a new
+// tab and the status bar previews the target; a plain click is intercepted for
+// a client-side navigation.
+function go(e: MouseEvent, route: Route) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+  e.preventDefault()
+  navigate(route)
+}
 
 const showcasePages = [
   {
@@ -47,18 +52,18 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
     <section class="flex flex-col gap-4">
       <h2 :class="heading">Components</h2>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <button
+        <a
           v-for="c in registry"
           :key="c.id"
-          type="button"
+          :href="href({ kind: 'component', id: c.id })"
           class="rounded-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @click="$emit('open-component', c.id)"
+          @click="go($event, { kind: 'component', id: c.id })"
         >
           <LpCard interactive class="flex h-full flex-col gap-2">
             <span class="font-semibold text-ink">{{ c.name }}</span>
             <span class="text-sm text-muted">{{ c.description }}</span>
           </LpCard>
-        </button>
+        </a>
       </div>
     </section>
 
@@ -66,19 +71,19 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
     <section class="flex flex-col gap-4">
       <h2 :class="heading">Showcase</h2>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <button
+        <a
           v-for="p in showcasePages"
           :key="p.id"
-          type="button"
+          :href="href({ kind: 'page', id: p.id })"
           class="rounded-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @click="$emit('open-page', p.id)"
+          @click="go($event, { kind: 'page', id: p.id })"
         >
           <LpCard interactive class="flex h-full flex-col gap-2">
             <span class="font-semibold text-ink">{{ p.title }}</span>
             <span class="flex-1 text-sm text-muted">{{ p.desc }}</span>
             <LpBadge tone="brand">Open</LpBadge>
           </LpCard>
-        </button>
+        </a>
       </div>
     </section>
   </div>

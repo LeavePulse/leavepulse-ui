@@ -321,6 +321,12 @@ function onToggle(node: FileNode) {
 
 function onSelect(node: FileNode) {
   if (node.disabled) return
+  // Clicking the highlighted row again clears it — a selection you can't undo
+  // without picking something else is a trap.
+  if (props.selected === node.id) {
+    emit("update:selected", "")
+    return
+  }
   emit("update:selected", node.id)
   emit("select", node)
   if (node.kind === "file") emit("open", node)
@@ -456,13 +462,16 @@ defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary }
     :description="emptyDescription"
   />
 
-  <div v-else class="flex min-h-0 flex-col">
+  <!-- h-full so the tree fills whatever box the caller gave it and the scroll
+       area below gets a bounded height; without it the rows just grow past the
+       container and nothing ever scrolls. -->
+  <div v-else class="flex h-full min-h-0 flex-col">
     <LpScrollArea class="min-h-0 flex-1">
       <ul
         ref="root"
         role="tree"
         :aria-multiselectable="checkable"
-        class="flex flex-col"
+        class="flex min-w-0 flex-col"
         @keydown="onKeydown"
       >
         <LpFileTreeNode

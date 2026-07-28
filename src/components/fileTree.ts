@@ -196,6 +196,31 @@ export function checkStateOf(node: FileNode, checked: ReadonlySet<string>): Chec
   return any ? "indeterminate" : "unchecked"
 }
 
+/**
+ * How much of a directory's subtree is ticked, counting FILES only (folders are
+ * containers, not payload). Lets a row say "3 / 12" so a half-filled checkbox
+ * isn't the only clue that a folder is partially selected.
+ */
+export function checkedCount(
+  node: FileNode,
+  checked: ReadonlySet<string>,
+): { checked: number; total: number } {
+  let count = 0
+  let total = 0
+  function walk(list: FileNode[]) {
+    for (const child of list) {
+      if (child.kind === "file") {
+        total++
+        if (checked.has(child.id)) count++
+      } else if (child.children?.length) {
+        walk(child.children)
+      }
+    }
+  }
+  walk(node.children ?? [])
+  return { checked: count, total }
+}
+
 /** Ids of every ancestor directory of `id`, so callers can reveal a deep node. */
 export function ancestorIds(nodes: FileNode[], id: string): string[] {
   const path: string[] = []

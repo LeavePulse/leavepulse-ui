@@ -11,6 +11,7 @@
  */
 import { computed } from "vue"
 import {
+  checkedCount,
   checkStateOf,
   fileIcon,
   formatModified,
@@ -82,6 +83,17 @@ const sizeLabel = computed(() => {
   return bytes === undefined ? "" : formatSize(bytes)
 })
 
+/**
+ * "3 / 12" on a directory whose subtree is partly ticked. Only shown while it
+ * actually differs from the whole — a fully ticked or untouched folder reads
+ * fine from the checkbox alone, and a count on every row would be noise.
+ */
+const countLabel = computed(() => {
+  if (!props.checkable || !isDir.value) return ""
+  const { checked, total } = checkedCount(props.node, props.checked)
+  return total && checked && checked < total ? `${checked} / ${total}` : ""
+})
+
 const modifiedLabel = computed(() =>
   props.showModified && props.node.modified !== undefined
     ? formatModified(props.node.modified)
@@ -141,6 +153,7 @@ function onActivate() {
 <template>
   <li
     role="treeitem"
+    class="min-w-0"
     :aria-level="depth + 1"
     :aria-selected="isSelected"
     :aria-expanded="canExpand ? isOpen : undefined"
@@ -151,7 +164,7 @@ function onActivate() {
       <div
         :data-node-id="node.id"
         :tabindex="isFocused ? 0 : -1"
-        class="group/row relative flex cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
         :class="[
           node.disabled
             ? 'cursor-not-allowed text-muted/50'
@@ -206,6 +219,15 @@ function onActivate() {
           </slot>
         </span>
 
+        <!-- Partial-selection counter: says outright how much of the folder is
+             ticked, which a half-state checkbox alone doesn't convey. -->
+        <span
+          v-if="countLabel"
+          class="shrink-0 rounded-pill bg-brand-soft px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-brand"
+        >
+          {{ countLabel }}
+        </span>
+
         <!-- Metadata columns: tabular figures so sizes line up down the tree. -->
         <span v-if="node.meta" class="shrink-0 text-xs text-muted">{{ node.meta }}</span>
         <span
@@ -230,7 +252,7 @@ function onActivate() {
       @enter="onBranchEnter"
       @leave="onBranchLeave"
     >
-      <ul v-if="isOpen && hasChildren" role="group" class="flex flex-col overflow-hidden">
+      <ul v-if="isOpen && hasChildren" role="group" class="flex min-w-0 flex-col overflow-hidden">
         <LpFileTreeNode
           v-for="(child, i) in children"
           :key="child.id"

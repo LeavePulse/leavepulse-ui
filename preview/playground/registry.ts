@@ -19,6 +19,8 @@ import {
   LpDatePicker,
   LpDropdownMenu,
   LpEmptyState,
+  LpFileTree,
+  type FileNode,
   LpFormField,
   LpIcon,
   LpInput,
@@ -33,6 +35,7 @@ import {
   LpPhoneInput,
   LpPopover,
   LpProgress,
+  LpRadio,
   LpRadioGroup,
   LpScrollArea,
   LpSelect,
@@ -42,10 +45,13 @@ import {
   LpStepper,
   LpSwitch,
   LpTable,
+  LpTableOfContents,
   LpSegmented,
   LpSidebar,
   LpTabs,
   LpTextarea,
+  LpThemeSwitcher,
+  LpTilt,
   LpTooltip,
   LpUptimeBar,
   useToast,
@@ -206,13 +212,28 @@ export const registry: ComponentEntry[] = [
   {
     id: "switch",
     name: "Switch · Checkbox · Radio",
-    description: "Boolean and choice controls.",
-    components: { LpSwitch, LpCheckbox, LpRadioGroup },
-    state: () => reactive({ on: true, checked: true, plan: "pro", radioOpts }),
-    template: `<div class="flex items-start gap-8">
-  <LpSwitch v-model="on" />
-  <LpCheckbox v-model="checked" label="Remember me" />
-  <LpRadioGroup v-model="plan" :options="radioOpts" />
+    description:
+      "Boolean and choice controls. LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
+    components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
+    state: () => reactive({ on: true, checked: true, plan: "pro", tier: "pro", radioOpts }),
+    template: `<div class="flex flex-col gap-6">
+  <div class="flex items-start gap-8">
+    <LpSwitch v-model="on" />
+    <LpCheckbox v-model="checked" label="Remember me" />
+    <LpRadioGroup v-model="plan" :options="radioOpts" />
+  </div>
+
+  <!-- LpRadio children: custom row content instead of the options shorthand. -->
+  <LpRadioGroup v-model="tier">
+    <div class="flex flex-col gap-2">
+      <LpRadio value="free" label="Free" />
+      <LpRadio value="pro">
+        <span class="font-medium text-ink">Pro</span>
+        <span class="text-muted"> — €9/mo, custom row markup</span>
+      </LpRadio>
+      <LpRadio value="ent" label="Enterprise" disabled />
+    </div>
+  </LpRadioGroup>
 </div>`,
   },
   {
@@ -1095,6 +1116,183 @@ export const registry: ComponentEntry[] = [
     template: `<div class="flex flex-col items-center gap-3">
   <LpPagination v-model:page="page" :total="240" :page-size="10" />
   <p class="text-xs text-muted">Page {{ page }} of 24</p>
+</div>`,
+  },
+  {
+    id: "file-tree",
+    name: "FileTree",
+    description:
+      "File/folder tree: directories-first ordering, type-derived icons, size/modified columns, per-row context menus and lazy children (a dir with no `children` emits `expand` once). `checkable` turns it into a picker — tri-state folders, cascading ticks, and a rolled-up summary of what's selected. Arrows navigate, →/← expand, Space ticks.",
+    components: { LpFileTree, LpSwitch },
+    state: () => {
+      const s = reactive({
+        nodes: [
+          {
+            id: "/instance",
+            name: ".minecraft",
+            kind: "dir",
+            children: [
+              {
+                id: "/instance/saves",
+                name: "saves",
+                kind: "dir",
+                modified: Date.now() - 3600_000,
+                children: [
+                  { id: "/instance/saves/world", name: "world", kind: "dir", size: 412_000_000, modified: Date.now() - 3600_000, children: [] },
+                  { id: "/instance/saves/flat", name: "flat", kind: "dir", size: 18_400_000, modified: Date.now() - 86_400_000 * 9, children: [] },
+                ],
+              },
+              {
+                id: "/instance/config",
+                name: "config",
+                kind: "dir",
+                children: [
+                  { id: "/instance/config/options.txt", name: "options.txt", kind: "file", size: 3_100, modified: Date.now() - 7200_000 },
+                  { id: "/instance/config/servers.dat", name: "servers.dat", kind: "file", size: 812, modified: Date.now() - 86_400_000 },
+                ],
+              },
+              // No `children` key → lazy: expanding emits `expand`.
+              { id: "/instance/mods", name: "mods", kind: "dir", size: 96_800_000 },
+              { id: "/instance/logs", name: "logs", kind: "dir", children: [] },
+              { id: "/instance/options.txt", name: "options.txt", kind: "file", size: 2_400, modified: Date.now() - 1800_000 },
+              { id: "/instance/launcher.lock", name: "launcher.lock", kind: "file", size: 0, disabled: true, meta: "in use" },
+            ],
+          },
+        ] as FileNode[],
+        expanded: ["/instance"] as string[],
+        checked: ["/instance/config"] as string[],
+        loadingIds: [] as string[],
+        selected: "",
+        checkable: true,
+        stats: "",
+        onExpand(node: FileNode) {
+          if (node.id !== "/instance/mods") return
+          // Pretend to fetch the directory listing.
+          s.loadingIds = [node.id]
+          setTimeout(() => {
+            const find = (list: FileNode[]): FileNode | undefined => {
+              for (const n of list) {
+                if (n.id === node.id) return n
+                const hit = n.children && find(n.children)
+                if (hit) return hit
+              }
+            }
+            const dir = find(s.nodes)
+            if (dir) {
+              dir.children = [
+                { id: "/instance/mods/sodium.jar", name: "sodium.jar", kind: "file", size: 4_200_000, modified: Date.now() - 86_400_000 * 3 },
+                { id: "/instance/mods/lithium.jar", name: "lithium.jar", kind: "file", size: 1_100_000, modified: Date.now() - 86_400_000 * 3 },
+                { id: "/instance/mods/iris.jar", name: "iris.jar", kind: "file", size: 8_600_000, modified: Date.now() - 86_400_000 * 12 },
+              ]
+              decorate(dir.children)
+            }
+            s.loadingIds = []
+          }, 900)
+        },
+      })
+      const decorate = (list: FileNode[]) => {
+        for (const n of list) {
+          n.menu = [
+            { label: "Copy path", icon: "lucide:clipboard" },
+            { label: "Reveal in files", icon: "lucide:external-link" },
+            { label: "Exclude from backup", icon: "lucide:x", danger: true },
+          ]
+          if (n.children) decorate(n.children)
+        }
+      }
+      decorate(s.nodes)
+      return s
+    },
+    template: `<div class="flex w-[26rem] flex-col gap-2">
+  <label class="flex items-center gap-2 text-xs text-muted">
+    <LpSwitch v-model="checkable" /> checkable (backup picker)
+  </label>
+
+  <div class="h-80 rounded-card border border-line bg-surface-raised p-2">
+    <LpFileTree
+      :nodes="nodes"
+      :loading-ids="loadingIds"
+      :checkable="checkable"
+      show-size
+      show-modified
+      v-model:selected="selected"
+      v-model:expanded="expanded"
+      v-model:checked="checked"
+      @expand="onExpand"
+      @summary="(s) => (stats = s.files + ' files / ' + s.dirs + ' folders / ' + s.sizeLabel)"
+    />
+  </div>
+  <p class="text-xs text-muted">
+    "mods" loads lazily · tick a folder to take its whole subtree · right-click a row
+  </p>
+  <p class="text-xs text-muted">summary event → {{ stats || '—' }}</p>
+</div>`,
+  },
+  {
+    id: "theme-switcher",
+    name: "ThemeSwitcher",
+    description:
+      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads.",
+    components: { LpThemeSwitcher },
+    template: `<div class="flex items-center gap-6">
+  <LpThemeSwitcher variant="swatch" />
+  <LpThemeSwitcher variant="icon" />
+  <LpThemeSwitcher variant="pill" />
+</div>`,
+  },
+  {
+    id: "toc",
+    name: "TableOfContents",
+    description:
+      "On-this-page rail with scroll-spy: nested heading links, an indicator that slides to the section in view, and smooth-scroll on click.",
+    components: { LpTableOfContents },
+    state: () =>
+      reactive({
+        links: [
+          { id: "toc-install", text: "Install" },
+          {
+            id: "toc-usage",
+            text: "Usage",
+            children: [
+              { id: "toc-nuxt", text: "Nuxt module" },
+              { id: "toc-vite", text: "Vite" },
+            ],
+          },
+          { id: "toc-theming", text: "Theming" },
+        ],
+      }),
+    template: `<div class="flex gap-8">
+  <LpTableOfContents :links="links" class="w-52 shrink-0" />
+  <!-- Scrollable article so the spy has something to track. -->
+  <div class="h-72 flex-1 overflow-y-auto rounded-card border border-line p-4">
+    <section v-for="l in [links[0], links[1], links[1].children[0], links[1].children[1], links[2]]" :key="l.id" :id="l.id" class="mb-6">
+      <h3 class="mb-2 font-semibold text-ink">{{ l.text }}</h3>
+      <p class="text-sm text-muted">Scroll this panel — the rail tracks the heading in view.</p>
+      <p class="mt-2 text-sm text-muted">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.</p>
+    </section>
+  </div>
+</div>`,
+  },
+  {
+    id: "tilt",
+    name: "Tilt",
+    description:
+      "Pointer-tracking 3D tilt wrapper — rotates toward the cursor with an optional glare sweep and hover lift. Wrap any card.",
+    components: { LpTilt, LpCard, LpBadge },
+    template: `<div class="flex flex-wrap gap-6">
+  <LpTilt class="w-56">
+    <LpCard class="flex flex-col gap-2">
+      <span class="font-semibold text-ink">Default tilt</span>
+      <span class="text-sm text-muted">Move the pointer across the card.</span>
+    </LpCard>
+  </LpTilt>
+  <LpTilt glare :max="16" :lift="8" class="w-56">
+    <LpCard class="flex flex-col gap-2">
+      <span class="font-semibold text-ink">Glare + stronger</span>
+      <span class="text-sm text-muted">max=16, lift=8, glare on.</span>
+      <LpBadge tone="brand">Hover me</LpBadge>
+    </LpCard>
+  </LpTilt>
 </div>`,
   },
 ]

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue"
+import { computed, ref, watchEffect } from "vue"
 import {
   type ContextMenuItemDef,
+  LpButton,
   LpContextMenu,
+  LpEmptyState,
   LpIcon,
   LpScrollArea,
   LpToaster,
@@ -14,31 +16,59 @@ import {
 } from "../src"
 import ComponentPage from "./playground/ComponentPage.vue"
 import { registry } from "./playground/registry"
+import { href, navigate, useRoute } from "./playground/router"
 import AppShellDemo from "./pages/AppShellDemo.vue"
 import Home from "./pages/Home.vue"
 import InfraCanvas from "./pages/InfraCanvas.vue"
 import Layout from "./pages/Layout.vue"
 import Showcase from "./pages/Showcase.vue"
 
-// Routes: "home" | "component:<id>" | "page:<id>"
-const route = ref("home")
+// Real URLs (/component/<id>, /page/<id>) so Back/Forward and reload work.
+const route = useRoute()
 
-const componentEntry = computed(() =>
-  route.value.startsWith("component:")
-    ? registry.find((c) => c.id === route.value.slice("component:".length))
-    : undefined,
-)
-const pageId = computed(() =>
-  route.value.startsWith("page:") ? route.value.slice("page:".length) : undefined,
-)
+const componentEntry = computed(() => {
+  const r = route.value
+  // Bind to a local first: the narrowing wouldn't survive into the find callback.
+  return r.kind === "component" ? registry.find((c) => c.id === r.id) : undefined
+})
+const pageId = computed(() => (route.value.kind === "page" ? route.value.id : undefined))
+
+const PAGE_TITLES: Record<string, string> = {
+  layout: "Layout canvas",
+  showcase: "Landing showcase",
+  infra: "Infra canvas",
+  appshell: "App shell",
+}
+
 const crumb = computed(() => {
   if (componentEntry.value) return componentEntry.value.name
-  if (pageId.value === "layout") return "Layout canvas"
-  if (pageId.value === "showcase") return "Landing showcase"
-  if (pageId.value === "infra") return "Infra canvas"
-  if (pageId.value === "appshell") return "App shell"
-  return null
+  return pageId.value ? (PAGE_TITLES[pageId.value] ?? pageId.value) : null
 })
+
+// A hand-typed or stale URL should say so rather than silently showing Home.
+const notFound = computed(
+  () =>
+    (route.value.kind === "component" && !componentEntry.value) ||
+    (route.value.kind === "page" && !(pageId.value! in PAGE_TITLES)),
+)
+
+/** The unmatched path, for the not-found copy. */
+const missingPath = computed(() =>
+  route.value.kind === "home" ? "/" : `/${route.value.kind}/${route.value.id}`,
+)
+
+// Keep the tab title in step with the route — it's what Back/Forward history
+// entries are labelled with.
+watchEffect(() => {
+  document.title = crumb.value ? `${crumb.value} · LeavePulse UI` : "LeavePulse UI"
+})
+
+function goHome(e: MouseEvent) {
+  // Let the browser handle modified clicks (new tab / new window).
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+  e.preventDefault()
+  navigate({ kind: "home" })
+}
 
 // Themes are JSON now — the switcher applies a TokenSet via the engine.
 const { apply, applyWithTransition } = useTheme()
@@ -102,10 +132,11 @@ const on = "bg-surface-soft text-ink"
 <template>
   <div class="flex h-full flex-col">
     <nav class="flex items-center gap-3 border-b border-line bg-surface-raised px-4 py-2.5">
-      <button class="text-sm font-bold text-ink" @click="route = 'home'">
+      <!-- A real link: middle-click / cmd-click open it in a new tab. -->
+      <a :href="href({ kind: 'home' })" class="text-sm font-bold text-ink" @click="goHome">
         LeavePulse UI
-      </button>
-      <template v-if="crumb">
+      </a>
+      <template v-if="crumb && !notFound">
         <span class="text-muted">/</span>
         <span class="text-sm text-ink">{{ crumb }}</span>
       </template>
@@ -131,18 +162,21 @@ const on = "bg-surface-soft text-ink"
 
     <!-- Layout page manages its own scrolling; others use a drawn overlay bar. -->
     <main class="flex min-h-0 flex-1">
-      <Layout v-if="pageId === 'layout'" class="w-full" />
-      <InfraCanvas v-else-if="pageId === 'infra'" class="w-full" />
+      <Layout v-if="!notFound && pageId === 'layout'" class="w-full" />
+      <InfraCanvas v-else-if="!notFound && pageId === 'infra'" class="w-full" />
       <LpScrollArea v-else class="min-h-0 flex-1">
-        <ComponentPage v-if="componentEntry" :entry="componentEntry" class="w-full" />
+        <LpEmptyState
+          v-if="notFound"
+          icon="lucide:compass"
+          title="Nothing here"
+          :description="`No demo at ${missingPath}.`"
+        >
+          <LpButton variant="soft" @click="navigate({ kind: 'home' })">Back to index</LpButton>
+        </LpEmptyState>
+        <ComponentPage v-else-if="componentEntry" :entry="componentEntry" class="w-full" />
         <Showcase v-else-if="pageId === 'showcase'" class="w-full" />
         <AppShellDemo v-else-if="pageId === 'appshell'" class="w-full" />
-        <Home
-          v-else
-          class="w-full"
-          @open-component="(id) => (route = `component:${id}`)"
-          @open-page="(id) => (route = `page:${id}`)"
-        />
+        <Home v-else class="w-full" />
       </LpScrollArea>
     </main>
 

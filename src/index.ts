@@ -30,6 +30,7 @@ export type { FileTreeSummary } from "./components/LpFileTree.vue"
 export type { CheckState, FileNode } from "./components/fileTree"
 export {
   ancestorIds,
+  checkedCount,
   checkStateOf,
   fileIcon,
   formatModified,
