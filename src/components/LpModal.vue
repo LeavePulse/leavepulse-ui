@@ -71,8 +71,17 @@ const bodyPad = computed(() =>
       <DialogOverlay
         class="fixed inset-0 z-(--z-overlay) bg-black/50 backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
       />
+      <!-- Centred by a full-screen flex wrapper rather than by translating the
+           panel off its own centre. With `top:50% / -translate-y-1/2` the panel
+           is pinned by its MIDDLE, so every height change — content arriving,
+           an image loading, a list filling in — moved it up and down by half
+           the difference, and while the open animation was still running that
+           read as a stutter. Anchoring the wrapper instead means the panel only
+           grows downward and the animation has nothing to fight.
+           `pointer-events-none` lets clicks through to the overlay behind it. -->
+      <div class="fixed inset-0 z-(--z-modal) flex items-center justify-center p-4 pointer-events-none">
       <DialogContent
-        class="fixed left-1/2 top-1/2 z-(--z-modal) flex max-h-[min(90vh,calc(100dvh-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[pop-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_120ms_cubic-bezier(0.4,0,1,1)]"
+        class="pointer-events-auto flex max-h-full flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
         :class="widthClass"
         :style="width ? { width } : undefined"
       >
@@ -118,6 +127,7 @@ const bodyPad = computed(() =>
           <slot name="footer" />
         </footer>
       </DialogContent>
+      </div>
     </DialogPortal>
   </DialogRoot>
 </template>

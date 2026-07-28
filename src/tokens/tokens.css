@@ -147,6 +147,8 @@
  * scaling it re-runs that layout every frame — the content visibly squashed and
  * the animation stuttered. A short rise reads as arriving just as well.
  */
+/* For panels that translate off their own centre (the command palette pins its
+   left edge with -translate-x-1/2). */
 @keyframes pop-in {
   from {
     opacity: 0;
@@ -157,6 +159,20 @@
   to {
     opacity: 0;
     transform: translate(-50%, calc(-50% + 5px));
+  }
+}
+/* For panels a flex/grid parent already centres, so the animation only has to
+   supply the rise — no -50% to preserve. LpModal uses these. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes rise-out {
+  to {
+    opacity: 0;
+    transform: translateY(5px);
   }
 }
 /*
