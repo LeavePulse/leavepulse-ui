@@ -78,10 +78,15 @@ const bodyPad = computed(() =>
            the difference, and while the open animation was still running that
            read as a stutter. Anchoring the wrapper instead means the panel only
            grows downward and the animation has nothing to fight.
-           `pointer-events-none` lets clicks through to the overlay behind it. -->
-      <div class="fixed inset-0 z-(--z-modal) flex items-center justify-center p-4 pointer-events-none">
+           `pointer-events-none` lets clicks through to the overlay behind it.
+
+           The panel keeps its OWN max-height rather than inheriting one from
+           this wrapper: `max-h-full` on a centred flex child resolves against a
+           box it is free to overflow, so a tall body stopped handing its
+           overflow to the scroll area below and simply ran off-screen. -->
+      <div class="fixed inset-0 z-(--z-modal) flex items-center justify-center pointer-events-none">
       <DialogContent
-        class="pointer-events-auto flex max-h-full flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
+        class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
         :class="widthClass"
         :style="width ? { width } : undefined"
       >
