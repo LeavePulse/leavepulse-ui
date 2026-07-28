@@ -97,9 +97,16 @@ const items = computed<AutocompleteOption[]>(() =>
   ),
 )
 
+// The field's text IS the value here, so a chosen option would otherwise filter
+// the list down to itself: reopening the field showed a single row, and the
+// other options only came back after erasing what was already selected. The
+// filter therefore applies to what the user TYPES, and stops applying as soon
+// as a value is picked (or the field is reopened untouched).
+const typing = ref(false)
+
 const filtered = computed(() => {
   const q = text.value.trim().toLowerCase()
-  if (!props.filter || !q) return items.value
+  if (!props.filter || !typing.value || !q) return items.value
   return items.value.filter((o) => {
     const hay = `${o.label ?? o.value} ${o.description ?? ""}`.toLowerCase()
     return hay.includes(q)
@@ -136,18 +143,28 @@ const anchorSize = {
   lg: "h-(--size-control-lg) text-sm",
 }
 
+function onInput(event: Event) {
+  typing.value = true
+  text.value = (event.target as HTMLInputElement).value
+}
+
 function onFocus() {
+  // Arriving at a field that already holds a value shows every option, not just
+  // the one it currently holds.
+  typing.value = false
   focused.value = true
   if (canOpen.value) open.value = true
 }
 
 function choose(opt: AutocompleteOption) {
+  typing.value = false
   emit("update:modelValue", opt.value)
   emit("select", opt.value)
   open.value = false
 }
 
 function clear() {
+  typing.value = false
   emit("update:modelValue", "")
   open.value = false
 }
@@ -188,7 +205,7 @@ function clear() {
         class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted"
         @beforeinput="onBeforeInput"
         @paste="onPaste"
-        @input="text = ($event.target as HTMLInputElement).value"
+        @input="onInput"
         @focus="onFocus"
         @blur="focused = false"
       />

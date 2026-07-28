@@ -551,9 +551,13 @@ const transitionProps = {
   <div
     class="relative overflow-hidden rounded-card border border-line bg-surface font-mono text-xs leading-relaxed"
   >
+    <!-- `instant`: this viewer decides for itself when a jump animates (see
+         rideToBottom) and restores scrollTop directly after prepending older
+         lines. A CSS smooth scroll would override both. -->
     <LpScrollArea
       ref="scrollRef"
       fade
+      instant
       :content-class="wrap ? '' : 'min-w-max'"
       :style="{ height }"
       @scroll="onScroll"

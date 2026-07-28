@@ -20,16 +20,21 @@ import {
 // component root, since items live inside reka's viewport.
 // `barInsetTop` (any CSS length) pulls the vertical scrollbar down by that much,
 // so it doesn't run under a sticky header pinned at the top of the viewport.
-// `smooth` eases wheel and keyboard scrolling. Opt-in rather than default:
-// it also applies to `scrollTo({ behavior: "auto" })`, which consumers that
-// drive the scroll themselves (a log tail jumping to the newest line) rely on
-// being instant.
-const props = defineProps<{
-  fade?: boolean
-  smooth?: boolean
-  contentClass?: string
-  barInsetTop?: string
-}>()
+// Wheel and keyboard scrolling ease by default. `instant` opts back out, and
+// any consumer that DRIVES the scroll itself needs it: CSS scroll-behaviour
+// also governs programmatic scrolling, overriding `scrollTo({behavior:"auto"})`
+// and animating even a plain `scrollTop = n`. A log tail pinning itself to the
+// newest line, or restoring a position after prepending rows, has to land
+// instantly — see LpLogViewer.
+const props = withDefaults(
+  defineProps<{
+    fade?: boolean
+    instant?: boolean
+    contentClass?: string
+    barInsetTop?: string
+  }>(),
+  { instant: false },
+)
 
 // Re-emit the native scroll event of the underlying viewport so consumers that
 // drive scroll-following (e.g. log tails) can track position. The listener is
@@ -91,7 +96,7 @@ const barFade =
       ref="viewportRef"
       class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
       :class="[
-        smooth ? 'scroll-smooth motion-reduce:scroll-auto' : '',
+        instant ? '' : 'scroll-smooth motion-reduce:scroll-auto',
         fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : '',
       ]"
       @scroll.passive="$emit('scroll', $event)"
