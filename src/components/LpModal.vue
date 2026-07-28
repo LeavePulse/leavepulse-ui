@@ -37,6 +37,13 @@ const props = withDefaults(
 
 defineEmits<{ (e: "update:open", value: boolean): void }>()
 
+// Spread rather than a plain `:aria-describedby` binding: with a description
+// the key must be absent entirely so reka-ui's own generated id survives, and
+// only the description-less case overrides it away.
+const describedByAttrs = computed(() =>
+  props.description ? {} : { "aria-describedby": undefined },
+)
+
 const widthClass = computed(() => {
   if (props.width) return ""
   return {
@@ -85,10 +92,18 @@ const bodyPad = computed(() =>
            box it is free to overflow, so a tall body stopped handing its
            overflow to the scroll area below and simply ran off-screen. -->
       <div class="fixed inset-0 z-(--z-modal) flex items-center justify-center pointer-events-none">
+      <!-- Without a description reka-ui warns on every open, and the opt-out it
+           checks for is an ABSENT `aria-describedby` — despite the message
+           naming the string "undefined" (a leftover from Radix, where
+           `aria-describedby={undefined}` is how you drop the attribute).
+           Dropping it here is what silences the warning; a caller that does
+           pass a description keeps the generated id and the link to
+           DialogDescription. -->
       <DialogContent
         class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
         :class="widthClass"
         :style="width ? { width } : undefined"
+        v-bind="describedByAttrs"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
           <div class="flex flex-col gap-1">
