@@ -30,6 +30,11 @@ const card = tv({
     // NOTE: in Tailwind v4 `translate-*` writes the native `translate` property
     // (not `transform`), so the transition list MUST name `translate` explicitly
     // or the lift snaps while the rest eases.
+    //
+    // The glow reaches past the card, so a clipping ancestor (scroll area,
+    // dialog body) will slice it unless the list reserves room — see the
+    // `.lp-glow-room` helper in tokens.css, whose spread tokens describe exactly
+    // the distance this shadow travels.
     interactive: {
       true: "cursor-pointer transition-[translate,box-shadow,border-color] duration-medium ease-[var(--ease-emphasized)] hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-[var(--lp-card-glow)] hover:[--surface-panel-shadow:var(--lp-card-glow)] [--lp-card-glow:0_8px_24px_-6px_color-mix(in_srgb,var(--color-brand)_38%,transparent)] motion-reduce:transition-none motion-reduce:hover:translate-y-0",
     },
@@ -47,8 +52,10 @@ const props = withDefaults(
     interactive?: boolean
     /** Right-click menu for the card. Omit (or pass []) to keep the native one. */
     menuItems?: ContextMenuItemDef[]
+    /** Element to render as. A card inside a <ul> has to be an `li` to be valid. */
+    as?: string
   }>(),
-  { variant: "raised", padded: true, interactive: false },
+  { variant: "raised", padded: true, interactive: false, as: "div" },
 )
 
 const classes = computed(() =>
@@ -61,11 +68,11 @@ const classes = computed(() =>
        (inheritAttrs:false above), so the card surface looks identical whether or
        not it's wrapped in a context menu. -->
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <div :class="classes" v-bind="$attrs">
+    <component :is="as" :class="classes" v-bind="$attrs">
       <slot />
-    </div>
+    </component>
   </LpContextMenu>
-  <div v-else :class="classes" v-bind="$attrs">
+  <component :is="as" v-else :class="classes" v-bind="$attrs">
     <slot />
-  </div>
+  </component>
 </template>

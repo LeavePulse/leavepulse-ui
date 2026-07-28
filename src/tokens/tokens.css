@@ -60,6 +60,16 @@
   /* ── depth ───────────────────────────────────── */
   --shadow-panel: 0 16px 48px rgba(0, 0, 0, 0.32);
 
+  /* How far an interactive card's hover glow spreads past its own box, and how
+     far the card lifts. A scroll area or any `overflow: hidden` parent clips
+     whatever crosses its edge, so a list of cards has to reserve this much room
+     around itself or the glow gets sliced off — see the `.lp-glow-room` helper.
+     Derived from LpCard's glow (0 8px 24px -6px): blur 24 minus spread 6 = 18
+     sideways and up, plus the 8px downward offset below. */
+  --lp-glow-spread: 18px;
+  --lp-glow-spread-bottom: 26px;
+  --lp-card-lift: 2px;
+
   /* ── surface / skin ──────────────────────────────
      The skin axis (flat default). applyTheme() overrides these at runtime per
      TokenSet.surface; components paint panels via .lp-skin-panel which reads
@@ -131,16 +141,22 @@
  * of appearing. Exit drops back the same way but shorter and on an accelerating
  * curve, since a dismissal shouldn't be savoured.
  */
+/*
+ * Centred-dialog enter/exit. Deliberately translate + fade with NO scale: the
+ * panel is a flex column with a max-height and its own scroll regions, and
+ * scaling it re-runs that layout every frame — the content visibly squashed and
+ * the animation stuttered. A short rise reads as arriving just as well.
+ */
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 8px)) scale(0.97);
+    transform: translate(-50%, calc(-50% + 10px));
   }
 }
 @keyframes pop-out {
   to {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 4px)) scale(0.985);
+    transform: translate(-50%, calc(-50% + 5px));
   }
 }
 /*
@@ -292,6 +308,30 @@
 .lp-skin-panel > * {
   position: relative;
   z-index: 1;
+}
+
+/*
+ * Room for a hover glow. An interactive card's glow spreads past the card's own
+ * box, so inside anything that clips — a scroll area, a dialog body, a panel
+ * with `overflow: hidden` — the glow gets sliced off flat against the edge, and
+ * a card sitting at the very top or bottom of a list loses it entirely. The
+ * same clip takes the focus ring, which is likewise drawn outside the border;
+ * the glow is the wider of the two, so reserving for it covers both.
+ *
+ * Put this on the element that LAYS OUT the cards (the <ul>, the grid), not on
+ * the clipping parent: it pads the content inward by exactly the distance the
+ * glow travels, so the glow lands on padding instead of on the clip boundary.
+ * Negative margins pull that padding back out, so the cards stay where they
+ * were and nothing shifts — only the overflow gets somewhere to go.
+ *
+ * Bottom gets more room than the top because the glow is offset downward, and
+ * the top gets the lift added back, since a hovered card rises into it.
+ */
+.lp-glow-room {
+  padding: calc(var(--lp-glow-spread) + var(--lp-card-lift)) var(--lp-glow-spread)
+    var(--lp-glow-spread-bottom);
+  margin: calc(-1 * (var(--lp-glow-spread) + var(--lp-card-lift))) calc(-1 * var(--lp-glow-spread))
+    calc(-1 * var(--lp-glow-spread-bottom));
 }
 
 /* ── circular theme reveal (View Transitions) ────
