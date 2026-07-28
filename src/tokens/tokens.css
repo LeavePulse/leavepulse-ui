@@ -279,6 +279,21 @@
     transform: translateY(0);
   }
 }
+/*
+ * Tree/list row reveal: a row fades in while sliding from its parent's indent,
+ * so an expanding branch reads as unfolding outward rather than popping. Used by
+ * LpFileTree, which staggers it per row via --row-delay.
+ */
+@keyframes tree-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
 /*
  * Skin painter. A raised panel opts in with .lp-skin-panel and gets the active
@@ -319,10 +334,13 @@
  * the glow is the wider of the two, so reserving for it covers both.
  *
  * Put this on the element that LAYS OUT the cards (the <ul>, the grid), not on
- * the clipping parent: it pads the content inward by exactly the distance the
- * glow travels, so the glow lands on padding instead of on the clip boundary.
- * Negative margins pull that padding back out, so the cards stay where they
- * were and nothing shifts — only the overflow gets somewhere to go.
+ * the clipping parent: it insets the cards by exactly the distance the glow
+ * travels, so the glow lands on that padding instead of on the clip boundary.
+ *
+ * Deliberately plain padding, with NO negative margin to cancel it: the whole
+ * point is to keep the glow inside the clip, and pulling the box back out with
+ * margins would push it straight back under the blade. The cards therefore sit
+ * a little in from the edge — that inset IS the fix, not a side effect.
  *
  * Bottom gets more room than the top because the glow is offset downward, and
  * the top gets the lift added back, since a hovered card rises into it.
@@ -330,8 +348,6 @@
 .lp-glow-room {
   padding: calc(var(--lp-glow-spread) + var(--lp-card-lift)) var(--lp-glow-spread)
     var(--lp-glow-spread-bottom);
-  margin: calc(-1 * (var(--lp-glow-spread) + var(--lp-card-lift))) calc(-1 * var(--lp-glow-spread))
-    calc(-1 * var(--lp-glow-spread-bottom));
 }
 
 /* ── circular theme reveal (View Transitions) ────

@@ -25,6 +25,19 @@ export { default as LpDrawer } from "./components/LpDrawer.vue"
 export { default as LpDropdownMenu } from "./components/LpDropdownMenu.vue"
 export type { MenuItem } from "./components/LpDropdownMenu.vue"
 export { default as LpEmptyState } from "./components/LpEmptyState.vue"
+export { default as LpFileTree } from "./components/LpFileTree.vue"
+export type { FileTreeSummary } from "./components/LpFileTree.vue"
+export type { CheckState, FileNode } from "./components/fileTree"
+export {
+  ancestorIds,
+  checkStateOf,
+  fileIcon,
+  formatModified,
+  formatSize,
+  sortNodes,
+  subtreeIds,
+  subtreeSize,
+} from "./components/fileTree"
 export { default as LpFormField } from "./components/LpFormField.vue"
 export { default as LpIcon } from "./components/LpIcon.vue"
 export { default as LpInfraNode } from "./components/LpInfraNode.vue"

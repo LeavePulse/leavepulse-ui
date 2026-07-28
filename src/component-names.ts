@@ -24,6 +24,8 @@ export const COMPONENT_NAMES = [
   "LpDrawer",
   "LpDropdownMenu",
   "LpEmptyState",
+  "LpFileTree",
+  "LpFileTreeNode",
   "LpFormField",
   "LpIcon",
   "LpInfraNode",
