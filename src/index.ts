@@ -1,4 +1,26 @@
 export { default as LayoutCanvas } from "./components/LayoutCanvas.vue"
+export { default as LpAddressInput } from "./components/LpAddressInput.vue"
+export { default as LpMapPicker } from "./components/LpMapPicker.vue"
+export {
+  OSM_TILES,
+  createNominatimProvider,
+  emptyAddress,
+  formatAddress,
+  project,
+  tileUrl,
+  unproject,
+} from "./components/address"
+export type {
+  AddressField,
+  AddressLabels,
+  AddressSuggestion,
+  AddressValue,
+  GeocodeProvider,
+  GeocodeQuery,
+  LatLon,
+  NominatimOptions,
+  TileSource,
+} from "./components/address"
 export { default as LpAlert } from "./components/LpAlert.vue"
 export { default as LpAppShell } from "./components/LpAppShell.vue"
 export { default as LpAutocomplete } from "./components/LpAutocomplete.vue"
@@ -27,11 +49,12 @@ export type { MenuItem } from "./components/LpDropdownMenu.vue"
 export { default as LpEmptyState } from "./components/LpEmptyState.vue"
 export { default as LpFileTree } from "./components/LpFileTree.vue"
 export type { FileTreeSummary } from "./components/LpFileTree.vue"
-export type { CheckState, FileNode } from "./components/fileTree"
+export type { CheckState, FileNode, NodeStats } from "./components/fileTree"
 export {
   ancestorIds,
   checkedCount,
   checkStateOf,
+  computeStats,
   fileIcon,
   formatModified,
   formatSize,
@@ -44,12 +67,18 @@ export { default as LpIcon } from "./components/LpIcon.vue"
 export { default as LpInfraNode } from "./components/LpInfraNode.vue"
 export type { InfraNodeData } from "./components/LpInfraNode.vue"
 export { default as LpInput } from "./components/LpInput.vue"
+export { default as LpLightbox } from "./components/LpLightbox.vue"
+export type { LightboxItem } from "./components/lightbox"
+export { fileNameOf } from "./components/lightbox"
 export { default as LpLink } from "./components/LpLink.vue"
 export { default as LpLogViewer } from "./components/LpLogViewer.vue"
 export type { LogLevel, LogLine } from "./components/LpLogViewer.vue"
 export { default as LpModal } from "./components/LpModal.vue"
 export { default as LpNotificationBell } from "./components/LpNotificationBell.vue"
-export type { NotificationItem } from "./components/LpNotificationBell.vue"
+export type {
+  NotificationItem,
+  NotificationLabels,
+} from "./components/LpNotificationBell.vue"
 export { default as LpNumberField } from "./components/LpNumberField.vue"
 export { default as LpOtpInput } from "./components/LpOtpInput.vue"
 export { default as LpPagination } from "./components/LpPagination.vue"
@@ -154,6 +183,8 @@ export { useInputFilter } from "./composables/useInputFilter"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"
 export { useTilt } from "./composables/useTilt"
 export type { UseTilt, UseTiltOptions } from "./composables/useTilt"
+export { useZoomPan } from "./composables/useZoomPan"
+export type { UseZoomPan, UseZoomPanOptions } from "./composables/useZoomPan"
 export { useToast } from "./composables/useToast"
 export type {
   ToastAction,

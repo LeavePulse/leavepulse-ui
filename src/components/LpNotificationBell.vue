@@ -31,6 +31,22 @@ export interface NotificationItem {
   read?: boolean
 }
 
+/**
+ * Every user-facing string the bell renders on its own. Apps with i18n pass
+ * their translations in; the English defaults keep the component usable bare.
+ * Without this the header/row menus would be hardcoded English in every locale.
+ */
+export interface NotificationLabels {
+  title?: string
+  markAllRead?: string
+  markAsRead?: string
+  markAsUnread?: string
+  open?: string
+  dismiss?: string
+  empty?: string
+  ariaLabel?: string
+}
+
 const props = withDefaults(
   defineProps<{
     items?: NotificationItem[]
@@ -43,9 +59,29 @@ const props = withDefaults(
     maxBadge?: number
     /** Right-click menu items; overrides the built-in quick actions. */
     menuItems?: ContextMenuItemDef[]
+    /** Translations for the strings the bell renders itself. */
+    labels?: NotificationLabels
+    /**
+     * Formats `item.createdAt` for display. Defaults to a compact English
+     * relative time ("just now", "5m", "3h"); pass your own to localise it.
+     */
+    formatTime?: (iso: string) => string
   }>(),
   { items: () => [], maxBadge: 9 },
 )
+
+// Single lookup for every label, so the template never repeats the fallbacks.
+// `title` stays a top-level prop for compatibility and wins over labels.title.
+const l = computed(() => ({
+  title: props.title ?? props.labels?.title ?? "Notifications",
+  markAllRead: props.labels?.markAllRead ?? "Mark all read",
+  markAsRead: props.labels?.markAsRead ?? "Mark as read",
+  markAsUnread: props.labels?.markAsUnread ?? "Mark as unread",
+  open: props.labels?.open ?? "Open",
+  dismiss: props.labels?.dismiss ?? "Dismiss",
+  empty: props.emptyLabel ?? props.labels?.empty ?? "No notifications",
+  ariaLabel: props.labels?.ariaLabel ?? props.labels?.title ?? "Notifications",
+}))
 
 // Popover open state. A defineModel (not a plain `open` prop) gives a local
 // fallback, so the bell still opens when the consumer only listens to
@@ -77,7 +113,7 @@ const hasUnread = computed(() => unread.value > 0)
 const contextMenu = computed<ContextMenuItemDef[]>(() =>
   props.menuItems ?? [
     {
-      label: "Mark all read",
+      label: l.value.markAllRead,
       icon: "lucide:check-check",
       disabled: !hasUnread.value,
       onSelect: () => emit("markAllRead"),
@@ -97,26 +133,26 @@ function rowMenu(item: NotificationItem): ContextMenuItemDef[] {
   const actions: ContextMenuItemDef[] = []
   if (item.read) {
     actions.push({
-      label: "Mark as unread",
+      label: l.value.markAsUnread,
       icon: "lucide:dot",
       onSelect: () => emit("markUnread", item.id),
     })
   } else {
     actions.push({
-      label: "Mark as read",
+      label: l.value.markAsRead,
       icon: "lucide:check",
       onSelect: () => emit("markRead", item.id),
     })
   }
   if (item.link) {
     actions.push({
-      label: "Open",
+      label: l.value.open,
       icon: "lucide:external-link",
       onSelect: () => emit("select", item),
     })
   }
   actions.push({
-    label: "Dismiss",
+    label: l.value.dismiss,
     icon: "lucide:x",
     danger: true,
     separatorBefore: true,
@@ -126,8 +162,10 @@ function rowMenu(item: NotificationItem): ContextMenuItemDef[] {
 }
 
 // Compact relative time ("just now", "5m", "3h", "2d"); falls back to a date.
+// A `formatTime` prop takes over entirely — that's the localisation seam.
 function timeAgo(iso?: string): string {
   if (!iso) return ""
+  if (props.formatTime) return props.formatTime(iso)
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ""
   const secs = Math.max(0, Math.round((Date.now() - then) / 1000))
@@ -160,7 +198,7 @@ function timeAgo(iso?: string): string {
           variant="ghost"
           size="sm"
           class="relative"
-          aria-label="Notifications"
+          :aria-label="l.ariaLabel"
           @click="open = !open"
         >
           <LpIcon name="lucide:bell" :size="18" />
@@ -176,14 +214,14 @@ function timeAgo(iso?: string): string {
     </template>
 
     <header class="flex items-center justify-between gap-2 px-3 py-2.5">
-      <span class="text-sm font-semibold">{{ title ?? "Notifications" }}</span>
+      <span class="text-sm font-semibold">{{ l.title }}</span>
       <button
         v-if="hasUnread"
         type="button"
         class="rounded-md px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
         @click="emit('markAllRead')"
       >
-        Mark all read
+        {{ l.markAllRead }}
       </button>
     </header>
 
@@ -194,7 +232,7 @@ function timeAgo(iso?: string): string {
     <LpEmptyState
       v-else-if="!items.length"
       icon="lucide:bell-off"
-      :title="emptyLabel ?? 'No notifications'"
+      :title="l.empty"
       class="px-3 py-10"
     />
 

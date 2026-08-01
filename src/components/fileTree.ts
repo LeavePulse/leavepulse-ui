@@ -221,6 +221,81 @@ export function checkedCount(
   return { checked: count, total }
 }
 
+/** Everything a row needs to render, precomputed once per node. */
+export interface NodeStats {
+  state: CheckState
+  /** Ticked files in the subtree, and how many there are in total. */
+  checked: number
+  total: number
+  /** Rolled-up subtree size, or undefined when nothing carries one. */
+  size?: number
+}
+
+/**
+ * Derive every row's state in ONE post-order pass over the tree, keyed by node
+ * id. Calling `checkStateOf`/`subtreeSize`/`checkedCount` per row instead makes
+ * each row walk its own subtree, which is quadratic on a deep tree and shows up
+ * as a stutter the moment a directory holds a few thousand files.
+ */
+export function computeStats(
+  nodes: FileNode[],
+  checked: ReadonlySet<string>,
+): Map<string, NodeStats> {
+  const stats = new Map<string, NodeStats>()
+
+  function visit(node: FileNode): NodeStats {
+    if (node.kind === "file" || !node.children?.length) {
+      // A leaf, or a directory whose children aren't loaded: fall back to its
+      // own membership so an unexpanded folder can still be ticked whole.
+      const isChecked = checked.has(node.id)
+      const self: NodeStats = {
+        state: isChecked ? "checked" : "unchecked",
+        checked: node.kind === "file" && isChecked ? 1 : 0,
+        total: node.kind === "file" ? 1 : 0,
+        size: node.size,
+      }
+      stats.set(node.id, self)
+      return self
+    }
+
+    let all = true
+    let any = false
+    let count = 0
+    let total = 0
+    let bytes = 0
+    let sized = node.size !== undefined
+
+    for (const child of node.children) {
+      const childStats = visit(child)
+      if (childStats.state === "checked") any = true
+      else if (childStats.state === "indeterminate") {
+        any = true
+        all = false
+      } else all = false
+      count += childStats.checked
+      total += childStats.total
+      if (childStats.size !== undefined) {
+        bytes += childStats.size
+        sized = true
+      }
+    }
+
+    const self: NodeStats = {
+      state: all ? "checked" : any ? "indeterminate" : "unchecked",
+      checked: count,
+      total,
+      // An explicit size on the directory wins: a server-side listing usually
+      // knows the real figure without the children being loaded.
+      size: node.size ?? (sized ? bytes : undefined),
+    }
+    stats.set(node.id, self)
+    return self
+  }
+
+  for (const node of nodes) visit(node)
+  return stats
+}
+
 /** Ids of every ancestor directory of `id`, so callers can reveal a deep node. */
 export function ancestorIds(nodes: FileNode[], id: string): string[] {
   const path: string[] = []

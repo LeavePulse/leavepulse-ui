@@ -25,6 +25,13 @@ const props = withDefaults(
     /** Themes to offer. Defaults to all built-in presets. */
     themes?: TokenSet[]
     /**
+     * Themes the LEFT-click cycles through — names from `themes`, or TokenSets.
+     * Defaults to the full list (cycle everything). Pass two, e.g.
+     * `:cycle-themes="['Dark', 'Light']"`, for a quick dark/light toggle while
+     * the right-click menu still offers every theme.
+     */
+    cycleThemes?: (string | TokenSet)[]
+    /**
      * Trigger style:
      *  - "swatch" (default): a square showing the active theme's brand colour.
      *  - "icon": a sun/moon icon following the active theme's mode.
@@ -106,9 +113,24 @@ function applyTheme(t: TokenSet, ev?: MouseEvent) {
   emit("change", t)
 }
 
-// Left-click → next theme in the list (wraps), revealing from the click point.
+// The left-click rotation, which can be narrower than the offered `themes` —
+// names resolve against that list. Falls back to the full list, so a switcher
+// with no `cycleThemes` keeps cycling everything as before.
+const cycleList = computed<TokenSet[]>(() => {
+  if (!props.cycleThemes?.length) return list.value
+  const resolved = props.cycleThemes
+    .map((t) =>
+      typeof t === "string" ? list.value.find((x) => x.name === t) : t,
+    )
+    .filter((t): t is TokenSet => Boolean(t))
+  return resolved.length ? resolved : list.value
+})
+
+// Left-click → next theme in the rotation (wraps), revealing from the click
+// point. When the active theme is outside the rotation (picked from the
+// right-click menu), findIndex gives -1 and we land on its first entry.
 function cycle(ev: MouseEvent) {
-  const arr = list.value
+  const arr = cycleList.value
   if (!arr.length) return
   const i = arr.findIndex((t) => t.name === activeName.value)
   const next = arr[(i + 1) % arr.length]

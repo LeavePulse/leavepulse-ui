@@ -4,6 +4,7 @@
 export const COMPONENT_NAMES = [
   "LayoutCanvas",
   "LayoutNode",
+  "LpAddressInput",
   "LpAlert",
   "LpAppShell",
   "LpAutocomplete",
@@ -31,8 +32,10 @@ export const COMPONENT_NAMES = [
   "LpInfraNode",
   "LpInput",
   "LpLaneNode",
+  "LpLightbox",
   "LpLink",
   "LpLogViewer",
+  "LpMapPicker",
   "LpModal",
   "LpNotificationBell",
   "LpNumberField",

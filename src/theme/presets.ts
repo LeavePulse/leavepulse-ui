@@ -13,8 +13,14 @@ const interFont = {
   mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
 }
 
+/*
+ * NOTE on naming: the exported CONST names are frozen for compatibility (apps
+ * import `dark` / `leavepulse` directly), but the display `name` changed —
+ * `leavepulse` is now the one called "Dark" (it is the product's dark theme),
+ * and this near-black neutral became "Onyx" to free that label up.
+ */
 export const dark: TokenSet = {
-  name: "Dark",
+  name: "Onyx",
   mode: "dark",
   colors: {
     surface: "#080b0d",
@@ -127,7 +133,7 @@ const glassSurface: SurfaceTokens = {
  * look when it switches its CSS-var dictionary over to the kit.
  */
 export const leavepulse: TokenSet = {
-  name: "LeavePulse",
+  name: "Dark",
   mode: "dark",
   colors: {
     surface: "#020618",

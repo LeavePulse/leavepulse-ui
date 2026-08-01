@@ -11,14 +11,12 @@
  */
 import { computed } from "vue"
 import {
-  checkedCount,
-  checkStateOf,
   fileIcon,
   formatModified,
   formatSize,
   sortNodes,
-  subtreeSize,
   type FileNode,
+  type NodeStats,
 } from "./fileTree"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu from "./LpContextMenu.vue"
@@ -38,6 +36,8 @@ const props = defineProps<{
   /** Render a tri-state checkbox per row (multi-select mode). */
   checkable: boolean
   checked: Set<string>
+  /** Per-node state, derived once by the root for the whole tree. */
+  stats: Map<string, NodeStats>
   showSize: boolean
   showModified: boolean
 }>()
@@ -71,15 +71,17 @@ const children = computed(() => {
   return props.sort ? sortNodes(list) : list
 })
 
+const stat = computed(() => props.stats.get(props.node.id))
+
 const checkState = computed(() =>
-  props.checkable ? checkStateOf(props.node, props.checked) : "unchecked",
+  props.checkable ? (stat.value?.state ?? "unchecked") : "unchecked",
 )
 
 // A directory shows the rolled-up size of what's under it, so a backup picker
 // can answer "how much is this folder" without expanding it.
 const sizeLabel = computed(() => {
   if (!props.showSize) return ""
-  const bytes = subtreeSize(props.node)
+  const bytes = stat.value?.size
   return bytes === undefined ? "" : formatSize(bytes)
 })
 
@@ -90,7 +92,7 @@ const sizeLabel = computed(() => {
  */
 const countLabel = computed(() => {
   if (!props.checkable || !isDir.value) return ""
-  const { checked, total } = checkedCount(props.node, props.checked)
+  const { checked = 0, total = 0 } = stat.value ?? {}
   return total && checked && checked < total ? `${checked} / ${total}` : ""
 })
 
@@ -213,7 +215,7 @@ function onActivate() {
           :class="node.disabled ? '' : isDir ? 'text-brand' : 'text-muted'"
         />
 
-        <span class="min-w-0 flex-1 truncate">
+        <span class="min-w-0 flex-1 shrink-[2] truncate">
           <slot name="row" :node="node" :depth="depth" :expanded="isOpen" :selected="isSelected">
             {{ node.name }}
           </slot>
@@ -228,8 +230,12 @@ function onActivate() {
           {{ countLabel }}
         </span>
 
-        <!-- Metadata columns: tabular figures so sizes line up down the tree. -->
-        <span v-if="node.meta" class="shrink-0 text-xs text-muted">{{ node.meta }}</span>
+        <!-- Metadata columns: tabular figures so sizes line up down the tree.
+             `meta` is free text, so it truncates rather than pushing the size
+             column off the row. -->
+        <span v-if="node.meta" class="min-w-0 shrink truncate text-xs text-muted">
+          {{ node.meta }}
+        </span>
         <span
           v-if="modifiedLabel"
           class="shrink-0 text-xs tabular-nums text-muted/80"
@@ -268,6 +274,7 @@ function onActivate() {
           :icon-size="iconSize"
           :checkable="checkable"
           :checked="checked"
+          :stats="stats"
           :show-size="showSize"
           :show-modified="showModified"
           @select="emit('select', $event)"

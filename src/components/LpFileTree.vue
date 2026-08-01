@@ -21,11 +21,10 @@
 import { computed, ref, watch } from "vue"
 import {
   ancestorIds,
-  checkStateOf,
+  computeStats,
   formatSize,
   sortNodes,
   subtreeIds,
-  subtreeSize,
   type FileNode,
 } from "./fileTree"
 import LpEmptyState from "./LpEmptyState.vue"
@@ -135,18 +134,26 @@ watch(
   },
 )
 
-/** Index every node by id once per data change — the tree walks it a lot. */
-const byId = computed(() => {
-  const map = new Map<string, FileNode>()
-  function walk(list: FileNode[]) {
+/**
+ * Index every node by id, plus each node's parent id, in one pass per data
+ * change. The parent map turns "reconcile my ancestors" into a walk up the
+ * chain instead of a search through the whole tree on every tick.
+ */
+const index = computed(() => {
+  const byId = new Map<string, FileNode>()
+  const parentOfId = new Map<string, string>()
+  function walk(list: FileNode[], parent?: string) {
     for (const node of list) {
-      map.set(node.id, node)
-      if (node.children) walk(node.children)
+      byId.set(node.id, node)
+      if (parent !== undefined) parentOfId.set(node.id, parent)
+      if (node.children) walk(node.children, node.id)
     }
   }
   walk(props.nodes)
-  return map
+  return { byId, parentOfId }
 })
+
+const byId = computed(() => index.value.byId)
 
 /**
  * What the ticked set adds up to. Directories are counted but not sized — their
@@ -159,30 +166,47 @@ const summary = computed<FileTreeSummary>(() => {
   let dirs = 0
   let bytes = 0
   let sized = false
-  for (const id of checkedIds.value) {
-    const node = byId.value.get(id)
-    if (!node) continue
-    if (node.kind === "dir") {
-      dirs++
-      // Only when nothing inside it is ticked (unexpanded/lazy folder).
-      const inside = node.children?.length
-        ? subtreeIds(node).some((child) => child !== id && checkedIds.value.has(child))
-        : false
-      if (!inside) {
-        const size = subtreeSize(node)
-        if (size !== undefined) {
-          bytes += size
+
+  // Walk the tree, not the ticked set: a fully ticked directory can be counted
+  // whole and its subtree skipped, which keeps this linear in what's selected
+  // rather than in the size of the instance.
+  function walk(list: FileNode[]) {
+    for (const node of list) {
+      const stat = stats.value.get(node.id)
+      if (!stat || stat.state === "unchecked") continue
+
+      if (node.kind === "file") {
+        files++
+        if (node.size !== undefined) {
+          bytes += node.size
           sized = true
         }
+        continue
       }
-    } else {
-      files++
-      if (node.size !== undefined) {
-        bytes += node.size
+
+      dirs++
+      if (stat.state === "checked" && stat.size !== undefined) {
+        // Whole directory: take its rolled-up size and don't descend.
+        bytes += stat.size
         sized = true
+        files += stat.total
+        countDirs(node.children ?? [])
+        continue
       }
+      walk(node.children ?? [])
     }
   }
+
+  // A fully ticked directory still contributes its nested folders to the count.
+  function countDirs(list: FileNode[]) {
+    for (const node of list) {
+      if (node.kind !== "dir") continue
+      dirs++
+      countDirs(node.children ?? [])
+    }
+  }
+
+  walk(props.nodes)
   return {
     files,
     dirs,
@@ -212,13 +236,17 @@ function onCheck(node: FileNode, value: boolean) {
     if (value) next.add(id)
     else next.delete(id)
   }
-  // Walk ancestors outward, re-deriving each from its children.
-  for (const ancestorId of ancestorIds(props.nodes, node.id).reverse()) {
+  // Walk straight up the parent chain, re-deriving each ancestor from its
+  // children — nearest first, so each one sees the level below already settled.
+  let ancestorId = index.value.parentOfId.get(node.id)
+  while (ancestorId !== undefined) {
     const ancestor = byId.value.get(ancestorId)
-    if (!ancestor?.children?.length) continue
-    const all = ancestor.children.every((c) => c.disabled || next.has(c.id))
-    if (all) next.add(ancestorId)
-    else next.delete(ancestorId)
+    if (ancestor?.children?.length) {
+      const all = ancestor.children.every((c) => c.disabled || next.has(c.id))
+      if (all) next.add(ancestorId)
+      else next.delete(ancestorId)
+    }
+    ancestorId = index.value.parentOfId.get(ancestorId)
   }
   setChecked(next)
 }
@@ -239,6 +267,10 @@ function clearChecked() {
 const requested = new Set<string>()
 
 const roots = computed(() => (props.sort ? sortNodes(props.nodes) : props.nodes))
+
+// One pass for the whole tree; every row reads its entry by id instead of
+// walking its own subtree on each render.
+const stats = computed(() => computeStats(props.nodes, checkedIds.value))
 
 /** Rows currently visible, in render order — the axis the arrow keys walk. */
 const visible = computed(() => {
@@ -334,8 +366,7 @@ function onSelect(node: FileNode) {
 
 /** Nearest expanded ancestor of `id`, or undefined at the top level. */
 function parentOf(id: string): FileNode | undefined {
-  const trail = ancestorIds(props.nodes, id)
-  const parentId = trail.at(-1)
+  const parentId = index.value.parentOfId.get(id)
   return parentId ? visible.value.find((n) => n.id === parentId) : undefined
 }
 
@@ -397,7 +428,7 @@ function onKeydown(e: KeyboardEvent) {
       // In checkable mode Space is the tick — the standard tree behaviour for a
       // multi-select tree — and Enter stays "open/activate".
       if (props.checkable) {
-        onCheck(node, checkStateOf(node, checkedIds.value) !== "checked")
+        onCheck(node, stats.value.get(node.id)?.state !== "checked")
         break
       }
       onSelect(node)
@@ -446,7 +477,7 @@ defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary }
 </script>
 
 <template>
-  <div v-if="loading" class="flex flex-col gap-1">
+  <div v-if="loading" class="flex h-full w-full min-w-0 flex-col gap-1 overflow-hidden">
     <div
       v-for="n in skeletonRows"
       :key="n"
@@ -464,9 +495,10 @@ defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary }
 
   <!-- h-full so the tree fills whatever box the caller gave it and the scroll
        area below gets a bounded height; without it the rows just grow past the
-       container and nothing ever scrolls. -->
-  <div v-else class="flex h-full min-h-0 flex-col">
-    <LpScrollArea class="min-h-0 flex-1">
+       container and nothing ever scrolls. min-w-0/w-full for the same reason
+       sideways: a long path must truncate inside the box rather than widen it. -->
+  <div v-else class="flex h-full w-full min-w-0 flex-col">
+    <LpScrollArea class="min-h-0 w-full min-w-0 flex-1">
       <ul
         ref="root"
         role="tree"
@@ -487,6 +519,7 @@ defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary }
           :icon-size="iconSize"
           :checkable="checkable"
           :checked="checkedIds"
+          :stats="stats"
           :show-size="showSize"
           :show-modified="showModified"
           @select="onSelect"

@@ -1,7 +1,9 @@
 import { reactive, type Component } from "vue"
 import {
+  LpAddressInput,
   LpAlert,
   LpAutocomplete,
+  LpMapPicker,
   LpAvatar,
   LpBadge,
   LpBreadcrumbs,
@@ -24,6 +26,8 @@ import {
   LpFormField,
   LpIcon,
   LpInput,
+  LpLightbox,
+  type LightboxItem,
   LpLink,
   LpLogViewer,
   LpModal,
@@ -515,6 +519,30 @@ export const registry: ComponentEntry[] = [
   <p v-if="detail" class="text-xs text-muted">
     {{ detail.country ? detail.country.name : "unknown" }} · code +{{ detail.dialCode || "?" }} · national {{ detail.number || "—" }}
   </p>
+</div>`,
+  },
+  {
+    id: "address",
+    name: "AddressInput",
+    description:
+      "Postal address form with live suggestions on the street and city fields, plus a map to drop a pin when typing won't do — the picked point is reverse-geocoded back into the fields. v-model is { line, city, postalCode, country, lat, lon }. The geocoder (`provider`), tile server (`tiles`) and the map itself (the `map` slot) are all replaceable; the picker is loaded on demand, so forms that never open the map don't pay for it.",
+    components: { LpAddressInput },
+    state: () => reactive({ value: { line: "", city: "", postalCode: "", country: "" } }),
+    template: `<div class="w-full max-w-xl">
+  <LpAddressInput v-model="value" second-line />
+  <p class="mt-3 text-xs text-muted">{{ JSON.stringify(value) }}</p>
+</div>`,
+  },
+  {
+    id: "map-picker",
+    name: "MapPicker",
+    description:
+      "The picker on its own: drag to pan, wheel or the buttons to zoom, click to drop the pin. v-model is { lat, lon }. Raster {z}/{x}/{y} tiles from any server via `tiles` — no mapping library, so nothing extra reaches the bundle.",
+    components: { LpMapPicker },
+    state: () => reactive({ point: { lat: 50.0875, lon: 14.4213 } }),
+    template: `<div class="w-full max-w-xl">
+  <LpMapPicker v-model="point" :zoom="14" height="18rem" />
+  <p class="mt-2 text-xs text-muted">{{ point.lat.toFixed(5) }}, {{ point.lon.toFixed(5) }}</p>
 </div>`,
   },
   {
@@ -1293,6 +1321,67 @@ export const registry: ComponentEntry[] = [
       <LpBadge tone="brand">Hover me</LpBadge>
     </LpCard>
   </LpTilt>
+</div>`,
+  },
+  {
+    id: "lightbox",
+    name: "Lightbox",
+    description:
+      "Full-screen image viewer: arrows or swipe to page, wheel zooms toward the cursor, drag pans, double-click toggles fit/2x, pinch on touch, rotate, download, copy. Esc or a backdrop click closes; a filmstrip tracks the set. Keyboard: ←/→, Home/End, +/−, 0, R.",
+    components: { LpLightbox, LpButton },
+    state: () => {
+      // Inline SVGs so the demo needs no network (and works in a Tauri shell).
+      const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
+<rect width="${w}" height="${h}" fill="url(#g)"/>
+<g fill="none" stroke="rgba(255,255,255,.22)" stroke-width="2">
+${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="${40 + i * 46}"/>`).join("")}
+</g>
+<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"
+ font-family="Inter,system-ui,sans-serif" font-size="${Math.round(h / 9)}" font-weight="700"
+ fill="rgba(255,255,255,.92)">${label}</text>
+<text x="50%" y="${h - 40}" text-anchor="middle" font-family="Inter,system-ui,sans-serif"
+ font-size="26" fill="rgba(255,255,255,.6)">${w} × ${h}</text></svg>`,
+        )
+
+      return reactive({
+        open: false,
+        index: 0,
+        shots: [
+          { src: plate("Spawn", "#0ea5e9", "#1e3a8a"), title: "2026-07-28_09.14.22.png", description: "1200 × 800 · 412 KB" },
+          { src: plate("Nether", "#f97316", "#7f1d1d", 1600, 900), title: "2026-07-27_23.01.10.png", description: "1600 × 900 · 780 KB" },
+          { src: plate("Base", "#22c55e", "#14532d", 900, 1200), title: "2026-07-26_18.44.03.png", description: "900 × 1200 · 640 KB — portrait" },
+          { src: plate("End", "#a855f7", "#312e81"), title: "2026-07-25_07.30.55.png", description: "1200 × 800 · 505 KB" },
+        ] as LightboxItem[],
+      })
+    },
+    template: `<div class="flex flex-col gap-3">
+  <div class="flex flex-wrap gap-2">
+    <button
+      v-for="(shot, i) in shots"
+      :key="i"
+      type="button"
+      class="size-24 overflow-hidden rounded-card outline-none ring-1 ring-line transition-[scale,box-shadow] hover:scale-[1.03] hover:ring-brand focus-visible:ring-2 focus-visible:ring-ring"
+      @click="index = i; open = true"
+    >
+      <img :src="shot.src" :alt="shot.title" class="size-full object-cover" />
+    </button>
+  </div>
+  <p class="text-xs text-muted">
+    Click a thumbnail · wheel = zoom to cursor · drag = pan (or swipe to page at fit) ·
+    double-click = fit/2x · ←/→ Home/End +/− 0 R
+  </p>
+
+  <LpLightbox
+    v-model:open="open"
+    v-model:index="index"
+    :items="shots"
+    copyable
+  />
 </div>`,
   },
 ]

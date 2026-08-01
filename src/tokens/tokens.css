@@ -312,6 +312,60 @@
 }
 
 /*
+ * Lightbox. The image grows in from slightly under full size so opening reads as
+ * the picture coming toward you rather than a panel appearing; the exit is
+ * shorter and on an accelerating curve, since a dismissal shouldn't be savoured.
+ */
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+@keyframes lightbox-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+/*
+ * Frame change. Paging slides the incoming picture in from the side it came
+ * from, so the direction of travel matches the arrow that was pressed. The
+ * component sets --frame-from per navigation.
+ */
+@keyframes lightbox-frame-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--frame-from, 24px));
+  }
+}
+/* Chrome (toolbar, caption, filmstrip) drifts in after the image lands. */
+@keyframes lightbox-chrome-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--chrome-from, 8px));
+  }
+}
+
+/*
+ * Map. Tiles arrive over the network in whatever order they finish, so each one
+ * fades in on load — popping in at full opacity makes a pan look like tearing.
+ * The pin drops onto the point instead of appearing, which reads as placement
+ * rather than a redraw.
+ */
+@keyframes map-tile-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes map-pin-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.8);
+  }
+}
+
+/*
  * Skin painter. A raised panel opts in with .lp-skin-panel and gets the active
  * skin (flat → glass) purely from the surface tokens: border width, an overlay
  * gradient layer, backdrop blur/saturate, and a layered + inset shadow. Driven
