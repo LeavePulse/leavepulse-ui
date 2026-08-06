@@ -20,7 +20,10 @@ import {
   type TokenSet,
 } from "./tokens"
 
-const CACHE_KEY = "leavepulse-ui-theme"
+// Bump the suffix whenever the token *shape* changes (e.g. the HUD redesign
+// zeroed all radii): a stale cached theme carries the old values and would mask
+// the new defaults, so invalidating the key forces a fresh apply from presets.
+const CACHE_KEY = "leavepulse-ui-theme-v2-hud"
 
 // ── self-managed theme state (singleton) ─────────────────────────────────
 // The kit owns the active theme — like an i18n locale — so every consumer

@@ -262,9 +262,9 @@ const imageStyle = computed(() => ({
 }))
 
 const BTN =
-  "flex size-9 items-center justify-center rounded-control text-white/80 outline-none transition-colors duration-[var(--duration-fast)] hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+  "flex size-9 items-center justify-center rounded-control text-white/80 outline-none transition-colors duration-[var(--duration-fast)] hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] disabled:pointer-events-none disabled:opacity-40"
 const ARROW =
-  "absolute top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-pill bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-0"
+  "absolute top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-pill bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] disabled:pointer-events-none disabled:opacity-0"
 </script>
 
 <template>
@@ -419,7 +419,7 @@ const ARROW =
               :data-index="i"
               type="button"
               :style="{ '--thumb-delay': `${Math.min(i * 30, 240)}ms` }"
-              class="size-14 shrink-0 overflow-hidden rounded-control outline-none ring-2 transition-[opacity,box-shadow,scale] duration-[var(--duration-fast)] hover:scale-105 focus-visible:ring-ring animate-[lightbox-chrome-in_var(--duration-medium)_var(--ease-emphasized)_both] [animation-delay:var(--thumb-delay)] motion-reduce:animate-none"
+              class="size-14 shrink-0 overflow-hidden rounded-control outline-none ring-2 transition-[opacity,box-shadow,scale] duration-[var(--duration-fast)] hover:scale-105 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] animate-[lightbox-chrome-in_var(--duration-medium)_var(--ease-emphasized)_both] [animation-delay:var(--thumb-delay)] motion-reduce:animate-none"
               :class="i === current ? 'opacity-100 ring-brand' : 'opacity-45 ring-transparent hover:opacity-80'"
               :aria-label="entry.title ?? `Image ${i + 1}`"
               @click="go(i)"

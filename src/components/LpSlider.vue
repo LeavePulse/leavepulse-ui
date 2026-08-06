@@ -47,7 +47,7 @@ function onCommit(v: number[] | undefined) {
     </SliderTrack>
     <SliderThumb
       :aria-label="ariaLabel"
-      class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
+      class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
     />
   </SliderRoot>
 </template>

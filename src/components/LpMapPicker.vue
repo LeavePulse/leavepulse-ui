@@ -538,7 +538,7 @@ onBeforeUnmount(() => {
 defineExpose({ zoomIn: () => zoomBy(1), zoomOut: () => zoomBy(-1), recentre, locate })
 
 const CONTROL =
-  "flex size-8 items-center justify-center rounded-control bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+  "flex size-8 items-center justify-center rounded-control bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] disabled:pointer-events-none disabled:opacity-40"
 </script>
 
 <template>
@@ -548,7 +548,7 @@ const CONTROL =
   >
     <div
       ref="viewport"
-      class="absolute inset-0 touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="absolute inset-0 touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
       :class="disabled ? 'cursor-not-allowed opacity-55' : panning ? 'cursor-grabbing' : 'cursor-grab'"
       :tabindex="disabled ? -1 : 0"
       role="application"

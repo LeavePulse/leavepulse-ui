@@ -37,7 +37,7 @@ const revealClass =
     :href="href"
     :target="target"
     :rel="rel"
-    class="inline-flex items-center gap-1 underline-offset-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+    class="inline-flex items-center gap-1 underline-offset-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
     :class="[
       colorClass,
       variant === 'reveal' ? revealClass : 'hover:underline',

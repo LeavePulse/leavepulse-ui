@@ -28,12 +28,12 @@ defineEmits<{ (e: "update:modelValue", value: string): void }>()
       >
         <RadioGroupItem
           :value="opt.value"
-          class="flex size-[18px] items-center justify-center rounded-full border border-line-strong bg-surface-soft outline-none transition-[color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:group-hover:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
+          class="flex size-[18px] items-center justify-center rounded-none border border-line-strong bg-surface-soft outline-none transition-[color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:group-hover:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] data-[state=checked]:border-brand data-[state=checked]:shadow-[var(--glow-brand)] disabled:cursor-not-allowed disabled:opacity-55"
         >
           <RadioGroupIndicator
             class="flex data-[state=checked]:animate-[indicator-in_140ms_var(--ease-emphasized)]"
           >
-            <span class="size-2 rounded-full bg-brand" />
+            <span class="size-2 rounded-none bg-brand" />
           </RadioGroupIndicator>
         </RadioGroupItem>
         {{ opt.label }}

@@ -150,7 +150,7 @@ const sizeClass = {
 
 <template>
   <div
-    class="flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring"
+    class="flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring focus-within:shadow-[var(--glow-brand)]"
     :class="[
       sizeClass[size],
       invalid
@@ -199,7 +199,7 @@ const sizeClass = {
               :model-value="query"
               :placeholder="searchPlaceholder"
               auto-focus
-              class="h-(--size-control-sm) w-full rounded-md border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
+              class="h-(--size-control-sm) w-full rounded-none border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
               @input="query = ($event.target as HTMLInputElement).value"
             />
           </div>

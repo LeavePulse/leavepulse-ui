@@ -66,7 +66,7 @@ const pillTransition = usePillTransition()
       :key="opt.value"
       :value="opt.value"
       :aria-label="opt.label ? undefined : opt.value"
-      class="relative inline-flex h-full items-center justify-center gap-1.5 rounded-md px-3 font-medium outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] focus-visible:ring-2 focus-visible:ring-ring data-[state=on]:text-ink data-[state=off]:text-muted data-[state=off]:hover:text-ink disabled:cursor-not-allowed disabled:opacity-55"
+      class="relative inline-flex h-full items-center justify-center gap-1.5 rounded-none px-3 font-medium outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] data-[state=on]:text-ink data-[state=off]:text-muted data-[state=off]:hover:text-ink disabled:cursor-not-allowed disabled:opacity-55"
       :class="block ? 'flex-1' : ''"
     >
       <!-- Sliding pill behind the active segment. -->
@@ -74,7 +74,7 @@ const pillTransition = usePillTransition()
         v-if="opt.value === modelValue"
         :layout-id="pillId"
         :transition="pillTransition"
-        class="absolute inset-0 z-0 rounded-md border border-line bg-surface-raised shadow-sm"
+        class="absolute inset-0 z-0 rounded-none border border-line bg-surface-raised shadow-sm"
       />
       <LpIcon v-if="opt.icon" :name="opt.icon" :size="14" class="relative z-10 shrink-0" />
       <span v-if="opt.label" class="relative z-10">{{ opt.label }}</span>

@@ -164,7 +164,7 @@ const triggerLabel = computed(
       type="button"
       :aria-label="triggerLabel"
       :title="triggerLabel"
-      class="inline-flex items-center justify-center gap-2 rounded-control outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      class="inline-flex items-center justify-center gap-2 rounded-control outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
       :class="
         bareIcon
           ? [SIZES[size], 'text-muted hover:bg-surface-soft hover:text-ink']

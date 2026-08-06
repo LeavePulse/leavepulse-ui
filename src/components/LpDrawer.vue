@@ -387,7 +387,7 @@ const edgeStripClass = computed(() =>
             </DrawerDescription>
           </div>
           <DrawerClose
-            class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            class="group flex shrink-0 items-center rounded-none p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
             aria-label="Close"
           >
             <LpIcon

@@ -188,7 +188,7 @@ const barInsetTop = computed(() =>
             <button
               v-if="col.sortable"
               type="button"
-              class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
                 sort?.key === col.key ? 'text-ink' : '',

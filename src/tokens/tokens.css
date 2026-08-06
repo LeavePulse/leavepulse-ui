@@ -47,9 +47,16 @@
   --color-ring: rgba(0, 188, 255, 0.45);
 
   /* ── shape ───────────────────────────────────── */
-  --radius-control: 8px;
-  --radius-card: 14px;
-  --radius-pill: 9999px;
+  /* HUD/neon: everything is square. Runtime themes (presets) also ship 0, this
+     is the pre-hydration default so the first paint is already sharp. */
+  --radius-control: 0px;
+  --radius-card: 0px;
+  --radius-pill: 0px;
+
+  /* Reusable accent glow — keyed to whatever the active theme's brand is, so it
+     tints per theme (lime, cyan, rose…). Used by buttons, focus, hover. */
+  --glow-brand: 0 0 18px -4px color-mix(in srgb, var(--color-brand) 55%, transparent);
+  --glow-brand-strong: 0 0 26px -2px color-mix(in srgb, var(--color-brand) 72%, transparent);
 
   /* ── density ─────────────────────────────────── */
   --spacing-unit: 4px; /* base rhythm; scaled per density mode */

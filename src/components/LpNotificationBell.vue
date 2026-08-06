@@ -218,7 +218,7 @@ function timeAgo(iso?: string): string {
       <button
         v-if="hasUnread"
         type="button"
-        class="rounded-md px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
+        class="rounded-none px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
         @click="emit('markAllRead')"
       >
         {{ l.markAllRead }}

@@ -166,7 +166,7 @@ function onActivate() {
       <div
         :data-node-id="node.id"
         :tabindex="isFocused ? 0 : -1"
-        class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
         :class="[
           node.disabled
             ? 'cursor-not-allowed text-muted/50'
