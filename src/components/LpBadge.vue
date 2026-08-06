@@ -3,7 +3,8 @@ import { tv, type VariantProps } from "tailwind-variants"
 import { computed } from "vue"
 
 const badge = tv({
-  base: "inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-xs font-medium",
+  // HUD: mono, uppercase, tracked — reads as a technical status tag, not a pill.
+  base: "inline-flex items-center gap-1.5 rounded-pill px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-[0.08em]",
   variants: {
     tone: {
       neutral: "bg-surface-soft text-muted-strong",

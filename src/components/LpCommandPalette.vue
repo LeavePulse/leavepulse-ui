@@ -256,7 +256,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey))
               type="button"
               :data-cmd-index="flatIndexOf(c)"
               :disabled="c.disabled"
-              class="lp-cmd-item flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
+              class="lp-cmd-item flex w-full items-center gap-3 rounded-none px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
               :class="flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60'"
               @click="run(c)"
               @pointerenter="selectedIndex = flatIndexOf(c)"

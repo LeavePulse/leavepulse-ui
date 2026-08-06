@@ -69,7 +69,7 @@ function clear() {
       <button
         type="button"
         :disabled="disabled"
-        class="group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
+        class="group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
         :class="[
           shellSize[size],
           invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',

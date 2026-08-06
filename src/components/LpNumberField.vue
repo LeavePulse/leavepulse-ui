@@ -28,7 +28,7 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
     :max="max"
     :step="step"
     :disabled="disabled"
-    class="flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
+    class="flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-[color,background-color,border-color,box-shadow] duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring focus-within:shadow-[var(--glow-brand)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
     @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
   >
     <NumberFieldDecrement

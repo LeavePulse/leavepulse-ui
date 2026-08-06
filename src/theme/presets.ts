@@ -6,7 +6,8 @@ import type { SurfaceTokens, TokenSet } from "./tokens"
  * and persist the result as JSON.
  */
 
-const sharedShape = { radiusControl: 8, radiusCard: 14, radiusPill: 9999 }
+// HUD/neon direction: every corner is square across all themes.
+const sharedShape = { radiusControl: 0, radiusCard: 0, radiusPill: 0 }
 const sharedDensity = { spacingUnit: 4, controlSm: 32, controlMd: 38, controlLg: 44 }
 const interFont = {
   sans: '"Inter", "Segoe UI", system-ui, sans-serif',
@@ -101,8 +102,7 @@ export const lime: TokenSet = {
     lineStrong: "rgba(196, 240, 66, 0.3)",
     ring: "rgba(196, 240, 66, 0.4)",
   },
-  // a sharper theme — overrides the shape axis too
-  shape: { radiusControl: 4, radiusCard: 6, radiusPill: 4 },
+  shape: { ...sharedShape },
   density: { ...sharedDensity },
   // a distinct typeface so the theme has its own voice (not just colour)
   font: {
@@ -156,7 +156,7 @@ export const leavepulse: TokenSet = {
     lineStrong: "rgba(255, 255, 255, 0.15)",
     ring: "rgba(0, 188, 255, 0.35)",
   },
-  shape: { ...sharedShape, radiusControl: 12 },
+  shape: { ...sharedShape },
   density: { ...sharedDensity },
   font: {
     sans: '"Inter", "IBM Plex Sans", "Segoe UI", sans-serif',

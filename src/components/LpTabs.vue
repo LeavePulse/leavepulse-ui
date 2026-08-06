@@ -12,7 +12,7 @@ export interface TabItem {
   icon?: string
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue?: string
     items: TabItem[]
@@ -28,8 +28,14 @@ withDefaults(
     accent?: boolean
     /** Stretch the bar to full width with equal-share triggers. */
     block?: boolean
+    /**
+     * When true (default) the active indicator glides under the *hovered* tab,
+     * springing back to the selected one on pointer-leave. Set false to pin it
+     * to the selected tab — the pill no longer tracks the cursor.
+     */
+    hoverFollow?: boolean
   }>(),
-  { variant: "contained", accent: false, block: false },
+  { variant: "contained", accent: false, block: false, hoverFollow: true },
 )
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
@@ -57,6 +63,12 @@ const panelLayoutTransition = computed(() =>
 function pillUnder(value: string, active?: string): boolean {
   return hovered.value ? hovered.value === value : active === value
 }
+
+// Only track the hovered tab when cursor-follow is on; otherwise `hovered`
+// stays null so the pill (and the label tint) key off the selected tab alone.
+function onEnter(value: string): void {
+  if (props.hoverFollow) hovered.value = value
+}
 </script>
 
 <template>
@@ -77,14 +89,14 @@ function pillUnder(value: string, active?: string): boolean {
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="relative inline-flex items-center justify-center gap-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="relative inline-flex items-center justify-center gap-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
         :class="[
           block ? 'flex-1' : '',
-          variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : 'rounded-md px-3 py-1.5',
+          variant === 'underline' ? 'rounded-t-none px-3 pt-1.5 pb-2' : 'rounded-none px-3 py-1.5',
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
           hovered === item.value ? 'text-ink' : 'text-muted',
         ]"
-        @pointerenter="hovered = item.value"
+        @pointerenter="onEnter(item.value)"
       >
         <!-- Active marker: a bottom bar in "underline", a filled pill otherwise.
              Both slide between tabs via the shared motion layoutId. -->
@@ -98,7 +110,7 @@ function pillUnder(value: string, active?: string): boolean {
                 accent ? 'bg-brand' : 'bg-ink',
               ]
             : [
-                'absolute inset-0 z-0 rounded-md shadow-sm',
+                'absolute inset-0 z-0 rounded-none shadow-sm',
                 accent
                   ? 'border border-brand/35 bg-brand/12'
                   : 'border border-line bg-surface-raised',

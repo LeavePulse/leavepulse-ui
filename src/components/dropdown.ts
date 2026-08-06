@@ -49,7 +49,7 @@ export const POPOVER_PANEL = PANEL_SURFACE + " " + POPOVER_ANIM
  * stagger. `flex` + gap are included; add justify/extra layout if needed.
  */
 export const OPTION_ITEM =
-  "flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-ink outline-none " +
+  "flex cursor-pointer items-center gap-2 rounded-none px-2.5 py-1.5 text-sm text-ink outline-none " +
   "animate-[option-in_180ms_var(--ease-emphasized)_both] " +
   "group-data-[side=top]:animate-[option-in-up_180ms_var(--ease-emphasized)_both] " +
   "data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand"

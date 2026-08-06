@@ -96,7 +96,7 @@ function go(p: number) {
 // Geometry + interaction. No text/bg colour here — the pill paints the active
 // fill, the per-state text colour below sits on top.
 const navBase =
-  "relative flex size-(--size-control-sm) items-center justify-center rounded-control text-sm outline-none transition-[color,border-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
+  "relative flex size-(--size-control-sm) items-center justify-center rounded-control text-sm outline-none transition-[color,border-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
 
 const navArrow =
   "border border-line text-muted hover:border-line-strong hover:text-ink disabled:hover:border-line disabled:hover:text-muted"

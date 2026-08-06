@@ -276,7 +276,8 @@ export const registry: ComponentEntry[] = [
   {
     id: "tabs",
     name: "Tabs",
-    description: "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows.",
+    description:
+      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. hover-follow=false pins the indicator to the selected tab so it no longer tracks the cursor.",
     components: { LpTabs },
     state: () => reactive({ tab: "a", items: tabItems }),
     template: `<div class="flex flex-col gap-3">
@@ -284,6 +285,7 @@ export const registry: ComponentEntry[] = [
   <LpTabs v-model="tab" :items="items" block />
   <LpTabs v-model="tab" :items="items" variant="plain" />
   <LpTabs v-model="tab" :items="items" variant="plain" accent />
+  <LpTabs v-model="tab" :items="items" :hover-follow="false" />
 </div>`,
   },
   {

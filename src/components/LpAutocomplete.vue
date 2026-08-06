@@ -180,7 +180,7 @@ function clear() {
     class="relative"
   >
     <ComboboxAnchor
-      class="flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
+      class="flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-ink transition-[color,background-color,border-color,box-shadow] duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring focus-within:shadow-[var(--glow-brand)] data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
       :class="[
         anchorSize[size],
         isInvalidState

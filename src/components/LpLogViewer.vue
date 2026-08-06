@@ -706,7 +706,7 @@ const transitionProps = {
       <div v-if="showJump" class="absolute inset-x-0 bottom-3 flex justify-center">
         <button
           type="button"
-          class="group flex items-center gap-1.5 rounded-pill border border-line bg-surface-overlay px-3 py-1 text-xs font-medium text-ink shadow-[var(--shadow-panel)] backdrop-blur outline-none transition-colors hover:bg-surface-soft focus-visible:ring-2 focus-visible:ring-ring"
+          class="group flex items-center gap-1.5 rounded-pill border border-line bg-surface-overlay px-3 py-1 text-xs font-medium text-ink shadow-[var(--shadow-panel)] backdrop-blur outline-none transition-colors hover:bg-surface-soft focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
           @click="scrollToBottom"
         >
           <LpIcon

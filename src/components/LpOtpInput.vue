@@ -72,7 +72,7 @@ const cellSize = {
         cellSize[size],
         'rounded-control border bg-surface-soft text-center font-semibold text-ink caret-brand',
         'outline-none transition-colors duration-[var(--duration-fast)]',
-        'focus:border-brand focus:ring-2 focus:ring-ring',
+        'focus:border-brand focus:ring-2 focus:ring-ring focus:shadow-[var(--glow-brand)]',
         'disabled:cursor-not-allowed disabled:opacity-55',
         invalid ? 'border-danger focus:border-danger focus:ring-danger-soft' : 'border-line',
       ]"

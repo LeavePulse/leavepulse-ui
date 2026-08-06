@@ -67,7 +67,7 @@ function disabledFor(date: DateValue): boolean {
 }
 
 const navBtn =
-  "flex size-8 items-center justify-center rounded-control text-muted outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft hover:text-ink active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
+  "flex size-8 items-center justify-center rounded-control text-muted outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft hover:text-ink active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]"
 </script>
 
 <template>
@@ -124,7 +124,7 @@ const navBtn =
             <CalendarCellTrigger
               :day="weekDate"
               :month="month.value"
-              class="flex size-8 items-center justify-center rounded-control text-sm text-ink outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[outside-view]:text-muted/40 data-[today]:font-semibold data-[today]:not-data-[selected]:text-brand data-[selected]:bg-brand data-[selected]:font-semibold data-[selected]:text-ink-inverse data-[selected]:hover:bg-brand-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-35 data-[unavailable]:pointer-events-none data-[unavailable]:line-through data-[unavailable]:opacity-35"
+              class="flex size-8 items-center justify-center rounded-control text-sm text-ink outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)] data-[outside-view]:text-muted/40 data-[today]:font-semibold data-[today]:not-data-[selected]:text-brand data-[selected]:bg-brand data-[selected]:font-semibold data-[selected]:text-ink-inverse data-[selected]:hover:bg-brand-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-35 data-[unavailable]:pointer-events-none data-[unavailable]:line-through data-[unavailable]:opacity-35"
             />
           </CalendarCell>
         </CalendarGridRow>

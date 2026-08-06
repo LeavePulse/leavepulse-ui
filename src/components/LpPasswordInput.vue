@@ -35,7 +35,7 @@ defineExpose({
     <template #trailing>
       <button
         type="button"
-        class="group rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:text-ink"
+        class="group rounded-none p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:text-ink"
         :aria-label="visible ? 'Hide password' : 'Show password'"
         @click="visible = !visible"
       >

@@ -15,8 +15,9 @@ const shell = tv({
   base: [
     "flex w-full items-center bg-surface-soft text-ink",
     "rounded-control border border-line",
-    "transition-colors duration-[var(--duration-fast)]",
-    "focus-within:border-brand focus-within:ring-2 focus-within:ring-ring",
+    "transition-[color,background-color,border-color,box-shadow] duration-[var(--duration-fast)]",
+    // HUD focus: crisp accent border + ring + a soft accent glow bloom.
+    "focus-within:border-brand focus-within:ring-2 focus-within:ring-ring focus-within:shadow-[var(--glow-brand)]",
     "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55",
   ],
   variants: {

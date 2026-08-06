@@ -16,8 +16,8 @@ const card = tv({
     variant: {
       // raised opts into the skin painter (.lp-skin-panel) so it follows the
       // active surface tokens (flat → glass) instead of a fixed shadow.
-      raised: "lp-skin-panel border-line",
-      flat: "border-line",
+      raised: "lp-skin-panel border-line lp-hud-corners",
+      flat: "border-line lp-hud-corners",
       ghost: "border-transparent bg-transparent",
     },
     padded: { true: "p-5", false: "" },

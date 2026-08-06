@@ -21,3 +21,26 @@
   width: 0;
   height: 0;
 }
+
+/*
+ * HUD corner brackets. Draws four accent L-marks at the box corners using
+ * background gradients only (no ::before/::after) — so it never collides with
+ * a component that already owns its pseudo-elements (e.g. .lp-skin-panel's
+ * overlay). Brand-tinted, so it re-skins with the active theme.
+ */
+.lp-hud-corners {
+  --lp-corner: 10px;
+  --lp-corner-color: color-mix(in srgb, var(--color-brand) 45%, transparent);
+  background-image:
+    linear-gradient(var(--lp-corner-color) 0 0), linear-gradient(var(--lp-corner-color) 0 0),
+    linear-gradient(var(--lp-corner-color) 0 0), linear-gradient(var(--lp-corner-color) 0 0),
+    linear-gradient(var(--lp-corner-color) 0 0), linear-gradient(var(--lp-corner-color) 0 0),
+    linear-gradient(var(--lp-corner-color) 0 0), linear-gradient(var(--lp-corner-color) 0 0);
+  background-repeat: no-repeat;
+  background-size:
+    var(--lp-corner) 1px, 1px var(--lp-corner), var(--lp-corner) 1px, 1px var(--lp-corner),
+    var(--lp-corner) 1px, 1px var(--lp-corner), var(--lp-corner) 1px, 1px var(--lp-corner);
+  background-position:
+    top left, top left, top right, top right,
+    bottom left, bottom left, bottom right, bottom right;
+}

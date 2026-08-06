@@ -4,22 +4,29 @@ import { computed, type Component } from "vue"
 
 const button = tv({
   base: [
-    "inline-flex select-none items-center justify-center gap-2 font-semibold",
+    "inline-flex select-none items-center justify-center gap-2 font-semibold tracking-[0.01em]",
     "rounded-control transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]",
     // tactile press: dips slightly on click, springs back on release.
     "active:scale-[0.97] motion-reduce:active:scale-100",
-    "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    // HUD focus: crisp ring + accent glow bloom.
+    "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:shadow-[var(--glow-brand)]",
     "disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:cursor-not-allowed aria-disabled:opacity-55",
   ],
   variants: {
     variant: {
-      solid: "bg-brand text-ink-inverse hover:bg-brand-hover",
+      // primary CTA: solid accent that always carries a faint neon bloom,
+      // intensifying on hover.
+      solid:
+        "bg-brand text-ink-inverse shadow-[var(--glow-brand)] hover:bg-brand-hover hover:shadow-[var(--glow-brand-strong)]",
       action:
         "bg-action text-ink-inverse shadow-[0_14px_28px_color-mix(in_srgb,var(--color-action)_24%,transparent)] hover:bg-action-hover",
-      outline: "border border-line-strong text-ink hover:border-brand hover:bg-white/[0.04]",
-      // raised surface tile with a border — a visible, neutral filled button
-      soft: "border border-line bg-surface-raised/80 text-ink hover:border-line-strong hover:bg-surface-soft",
-      ghost: "text-ink hover:bg-white/[0.06]",
+      // the iconic HUD button: hollow accent outline that lights up + blooms.
+      outline:
+        "border border-brand/45 bg-transparent text-brand hover:border-brand hover:bg-[color-mix(in_srgb,var(--color-brand)_12%,transparent)] hover:shadow-[var(--glow-brand)]",
+      // neutral surface tile whose edge charges to the accent on hover.
+      soft: "border border-line bg-surface-raised/70 text-ink hover:border-brand/60 hover:bg-surface-soft",
+      ghost:
+        "text-ink hover:text-brand hover:bg-[color-mix(in_srgb,var(--color-brand)_10%,transparent)]",
       muted: "text-muted hover:bg-white/[0.04] hover:text-ink",
       // high-contrast light fill (e.g. a "download" CTA on a dark hero)
       light: "border border-white/20 bg-white text-ink-inverse hover:bg-white/90",
