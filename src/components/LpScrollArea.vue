@@ -59,7 +59,13 @@ const barFade =
 </script>
 
 <template>
-  <ScrollAreaRoot class="relative overflow-hidden" type="hover" :scroll-hide-delay="500">
+  <!-- A flex column, not a plain block: the viewport below sizes itself with
+       `flex-1 min-h-0` rather than `height:100%`. A percentage height resolves
+       against the root's own height, which in the common case — a root stretched
+       by `flex-1` inside a capped panel — is itself content-derived, so the
+       viewport grew to the full content height and scrolled nothing while the
+       root clipped the overflow. -->
+  <ScrollAreaRoot class="relative flex flex-col overflow-hidden" type="hover" :scroll-hide-delay="500">
     <!-- The bar itself is a pointer target far wider than it looks: the visible
          rail is the thumb, sized below, while the track pads it out to a
          grabbable strip. A 4px-wide hit area is near-impossible to catch with a
@@ -94,7 +100,7 @@ const barFade =
 
     <ScrollAreaViewport
       ref="viewportRef"
-      class="size-full min-w-0 [&>div]:!block [&>div]:!min-w-0"
+      class="w-full min-h-0 min-w-0 flex-1 [&>div]:!block [&>div]:!min-w-0"
       :class="[
         instant ? '' : 'scroll-smooth motion-reduce:scroll-auto',
         fade ? '[mask-image:linear-gradient(to_bottom,transparent_0,black_14px,black_calc(100%-14px),transparent_100%)]' : '',
