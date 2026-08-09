@@ -1,10 +1,8 @@
 name: publish
 
-# Publishes @leavepulse/ui to npmjs AND GitHub Packages on a version tag.
-# Both, because consumers are split: the kit's home is npmjs, but apps that also
-# depend on @leavepulse/sdk* pin the whole @leavepulse scope to GitHub Packages
-# (npm resolves registries per scope, not per package), so a kit release that
-# only lands on npmjs is invisible to them.
+# Publishes @leavepulse/ui to npmjs on a version tag. The whole @leavepulse
+# scope lives on npmjs — sdk, control-sdk and sdk-nuxt publish there too, so
+# consumers point the scope at one registry.
 # Cut a release with:  git tag v0.1.0 && git push origin v0.1.0
 on:
   push:
@@ -18,7 +16,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   publish:
@@ -48,13 +45,3 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # `publishConfig.registry` wins over a `--registry` flag, so retarget it
-      # in place (the edit is CI-local and never committed) before republishing
-      # the same build to GitHub Packages.
-      - name: Publish to GitHub Packages
-        run: |
-          npm pkg set publishConfig.registry=https://npm.pkg.github.com
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

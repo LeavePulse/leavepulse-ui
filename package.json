@@ -28,7 +28,10 @@
     "./scrollbar.css": "./src/tokens/scrollbar.css",
     "./canvas.css": "./src/canvas.css",
     "./package.json": "./package.json",
-    "./dist/*": "./dist/*"
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*"
+    }
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
