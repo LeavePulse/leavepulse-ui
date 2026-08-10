@@ -83,8 +83,14 @@ const barFade =
       :class="barFade"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
     >
+      <!-- Sized with min-width, not width: reka sets an inline
+           `width: var(--reka-scroll-area-thumb-width)` on the thumb, and for a
+           VERTICAL bar it only ever defines the height variable — the width one
+           stays empty, so the inline rule resolves to 0 and beat a plain `w-1`,
+           leaving an invisible thumb. A minimum wins over that without fighting
+           the positioning reka owns. -->
       <ScrollAreaThumb
-        class="w-1 rounded-l-pill bg-brand/40 transition-[width,background-color] duration-[var(--duration-fast)] group-hover:w-1.5 group-hover:bg-brand"
+        class="min-w-1 rounded-l-pill bg-brand/40 transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
       />
     </ScrollAreaScrollbar>
 
@@ -94,7 +100,7 @@ const barFade =
       :class="barFade"
     >
       <ScrollAreaThumb
-        class="h-1 rounded-t-pill bg-brand/40 transition-[height,background-color] duration-[var(--duration-fast)] group-hover:h-1.5 group-hover:bg-brand"
+        class="min-h-1 rounded-t-pill bg-brand/40 transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
       />
     </ScrollAreaScrollbar>
 
