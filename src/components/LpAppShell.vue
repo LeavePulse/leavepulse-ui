@@ -83,10 +83,23 @@ const flatItems = computed<SidebarItem[]>(() =>
 
 // Default active test: exact match for "/", prefix match (on a segment
 // boundary) otherwise — so "/billing" doesn't light up on "/billing-x".
+function matchesPath(item: SidebarItem): boolean {
+  if (item.id === "/") return props.path === "/"
+  return props.path === item.id || props.path!.startsWith(`${item.id}/`)
+}
+
+// Only the LONGEST match lights up. A parent whose id prefixes its children —
+// "/dcim" over "/dcim/power" — otherwise stays lit alongside whichever child is
+// open, and two highlighted items read as two current pages.
 function defaultActive(item: SidebarItem): boolean {
   if (props.path == null) return item.id === props.modelValue
-  if (item.id === "/") return props.path === "/"
-  return props.path === item.id || props.path.startsWith(`${item.id}/`)
+  if (!matchesPath(item)) return false
+  return !flatItems.value.some(
+    (other) =>
+      other.id !== item.id &&
+      other.id.length > item.id.length &&
+      matchesPath(other),
+  )
 }
 const activeTest = computed(() => props.isActive ?? defaultActive)
 
