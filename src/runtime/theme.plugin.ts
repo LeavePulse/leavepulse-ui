@@ -16,11 +16,9 @@
  * holds the full token values, including themes the server cannot name — keeps
  * winning.
  */
-// Imported through the package barrel on purpose. This file is shipped as
-// source and compiled by the CONSUMING app, where "@leavepulse/ui" resolves to
-// dist — the same module instance the kit's components use. A relative "../theme/…"
-// would load a second copy of the theme singleton from src/, leaving components
-// subscribed to a different reactive state than the one this plugin drives.
+// Through the barrel, not "../theme/…": this file is compiled by the consuming
+// app, where the barrel resolves to the same dist instance the components use.
+// A relative path would load a second copy of the theme singleton.
 import {
   bootstrapTheme,
   leavepulse,
@@ -30,10 +28,6 @@ import {
   themeToCssRule,
   type TokenSet,
 } from "@leavepulse/ui"
-// "#imports" is Nuxt's virtual module: it resolves in the consuming app, which
-// is what compiles this file. (No @ts-expect-error here — the kit's own build
-// excludes src/runtime, so the directive would be unused there and error in the
-// consumer, where the import type-checks fine.)
 import { defineNuxtPlugin, useCookie, useHead, useRuntimeConfig } from "#imports"
 
 export default defineNuxtPlugin(() => {
@@ -45,8 +39,6 @@ export default defineNuxtPlugin(() => {
   const fallback =
     themes.find((theme) => theme.name === options.defaultTheme) ?? leavepulse
 
-  // Read-only here: the cookie is written by cacheTheme() in the browser, which
-  // is the one place a theme choice is recorded.
   const cookie = useCookie<string | null>(THEME_COOKIE, { readonly: true })
   const initial = themeFromCookie(cookie.value, themes) ?? fallback
 
