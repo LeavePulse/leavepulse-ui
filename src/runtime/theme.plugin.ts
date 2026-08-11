@@ -30,7 +30,10 @@ import {
   themeToCssRule,
   type TokenSet,
 } from "@leavepulse/ui"
-// @ts-expect-error — resolved by Nuxt in the consuming app, not by the kit build
+// "#imports" is Nuxt's virtual module: it resolves in the consuming app, which
+// is what compiles this file. (No @ts-expect-error here — the kit's own build
+// excludes src/runtime, so the directive would be unused there and error in the
+// consumer, where the import type-checks fine.)
 import { defineNuxtPlugin, useCookie, useHead, useRuntimeConfig } from "#imports"
 
 export default defineNuxtPlugin(() => {
