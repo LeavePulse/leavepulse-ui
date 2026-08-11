@@ -220,6 +220,47 @@ export function cacheTheme(theme: TokenSet): void {
   } catch {
     /* storage unavailable — non-fatal */
   }
+  writeThemeCookie(theme.name)
+}
+
+/*
+ * SSR handoff. localStorage is invisible to the server, so an SSR app would
+ * render the default theme and only repaint after hydration — a visible flash on
+ * every reload. The cookie rides along with the request, letting the server
+ * inline the user's real theme in the first frame (see themeFromCookie).
+ *
+ * Only the NAME is stored: a full TokenSet is ~1KB of JSON that would be sent on
+ * every request. The server resolves the name against the themes it knows, and
+ * localStorage stays the client's source of truth for the full token values.
+ */
+export const THEME_COOKIE = "lp-theme"
+
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+function writeThemeCookie(name: string): void {
+  if (typeof document === "undefined") return
+  // lax: the theme must survive a top-level navigation (which is what SSR
+  // renders) without riding cross-site subrequests.
+  document.cookie =
+    `${THEME_COOKIE}=${encodeURIComponent(name)}` +
+    `; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`
+}
+
+/**
+ * Resolve a theme name (as read from the `lp-theme` cookie) against a set of
+ * known themes. Returns `null` when the name is absent or unknown, so the caller
+ * can fall back to its own default.
+ *
+ * Server-side counterpart to `cacheTheme`: pair it with `themeToCssRule` to
+ * inline the right variables into `<head>` during SSR.
+ */
+export function themeFromCookie(
+  cookieValue: string | null | undefined,
+  themes: readonly TokenSet[],
+): TokenSet | null {
+  if (!cookieValue) return null
+  const name = decodeURIComponent(cookieValue)
+  return themes.find((theme) => theme.name === name) ?? null
 }
 
 export interface UseTheme {

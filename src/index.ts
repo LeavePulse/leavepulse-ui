@@ -158,6 +158,8 @@ export {
   bootstrapTheme,
   parseTheme,
   serializeTheme,
+  THEME_COOKIE,
+  themeFromCookie,
   themeToCssRule,
   themeToCssVars,
   useTheme,

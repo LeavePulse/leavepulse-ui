@@ -4,5 +4,8 @@
     "types": []
   },
   "include": ["src"],
-  "exclude": ["src/nuxt.ts"]
+  // Both are shipped as source and compiled by the consuming Nuxt app: they
+  // import "#imports" (Nuxt-only) and, in the plugin's case, the package barrel
+  // — neither of which resolves inside the kit's own build.
+  "exclude": ["src/nuxt.ts", "src/runtime/**"]
 }
