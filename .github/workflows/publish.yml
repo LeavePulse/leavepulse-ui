@@ -1,12 +1,8 @@
 name: publish
 
-# Publishes @leavepulse/ui to GitHub Packages on a version tag — the registry
-# named by publishConfig in package.json, and the one consumers actually resolve
-# from (see the npm.pkg.github.com URLs in their lockfiles).
-#
-# This used to target npmjs, where the @leavepulse scope does not exist: every
-# release from v0.17.2 on failed with `404 PUT .../@leavepulse%2fui`, so the tag
-# was cut but nothing shipped.
+# Publishes @leavepulse/ui to npmjs on a version tag. The whole @leavepulse
+# scope lives on npmjs — sdk, control-sdk and sdk-nuxt publish there too, so
+# consumers point the scope at one registry.
 # Cut a release with:  git tag v0.1.0 && git push origin v0.1.0
 on:
   push:
@@ -20,8 +16,6 @@ concurrency:
 
 permissions:
   contents: read
-  # Required to publish to GitHub Packages with the workflow's own GITHUB_TOKEN.
-  packages: write
 
 jobs:
   publish:
@@ -33,12 +27,12 @@ jobs:
         with:
           bun-version: latest
 
-      # node + the GitHub Packages registry, so `npm publish` authenticates via
+      # node + the npm registry, so `npm publish` authenticates via
       # NODE_AUTH_TOKEN. bun builds; npm publishes.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
           scope: "@leavepulse"
 
       - name: Install dependencies
@@ -47,9 +41,7 @@ jobs:
       - name: Build library
         run: bun run build
 
-      - name: Publish to GitHub Packages
+      - name: Publish to npm
         run: npm publish
         env:
-          # The workflow's own token: publishing to GitHub Packages needs no
-          # separate secret, unlike npmjs.
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
