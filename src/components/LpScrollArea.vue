@@ -101,24 +101,51 @@ function onViewportScroll(event: Event) {
 // that fills in, a panel that resizes, or content short enough to need no fade
 // at all never fire a scroll event. Watched only when `fade` is on, since
 // nothing else here depends on the measurements.
-let edgeObserver: ResizeObserver | undefined
+let edgeResize: ResizeObserver | undefined
+let edgeMutation: MutationObserver | undefined
+
+function stopEdgeWatch() {
+  edgeResize?.disconnect()
+  edgeMutation?.disconnect()
+  edgeResize = undefined
+  edgeMutation = undefined
+}
 
 watch(
   [viewportEl, () => props.fade],
   ([el, enabled]) => {
-    edgeObserver?.disconnect()
-    edgeObserver = undefined
-    if (!el || !enabled || typeof ResizeObserver === "undefined") return
-    measureEdges(el)
-    edgeObserver = new ResizeObserver(() => measureEdges(el))
-    edgeObserver.observe(el)
-    // The content box grows independently of the viewport's own size.
-    for (const child of Array.from(el.children)) edgeObserver.observe(child)
+    stopEdgeWatch()
+    if (!el || !enabled) return
+
+    const remeasure = () => measureEdges(el)
+    remeasure()
+
+    if (typeof ResizeObserver !== "undefined") {
+      edgeResize = new ResizeObserver(remeasure)
+      edgeResize.observe(el)
+      // Watching the children too, since a grid that reflows into more rows
+      // grows the content box without the viewport's own size moving.
+      for (const child of Array.from(el.children)) edgeResize.observe(child)
+    }
+    // Rows arriving after the first paint are the common case — a list waiting
+    // on a query renders empty, and observing only the boxes that existed then
+    // left the fade off until something else happened to trigger a measure.
+    if (typeof MutationObserver !== "undefined") {
+      edgeMutation = new MutationObserver(() => {
+        if (edgeResize) {
+          edgeResize.disconnect()
+          edgeResize.observe(el)
+          for (const child of Array.from(el.children)) edgeResize.observe(child)
+        }
+        remeasure()
+      })
+      edgeMutation.observe(el, { childList: true, subtree: true })
+    }
   },
   { immediate: true, flush: "post" },
 )
 
-onBeforeUnmount(() => edgeObserver?.disconnect())
+onBeforeUnmount(stopEdgeWatch)
 
 function onThumbPointerDown() {
   dragging.value = true
