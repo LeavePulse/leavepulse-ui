@@ -1211,6 +1211,20 @@ export const registry: ComponentEntry[] = [
               },
               // No `children` key → lazy: expanding emits `expand`.
               { id: "/instance/mods", name: "mods", kind: "dir", size: 96_800_000 },
+              // Deliberately huge: expanding a real instance's resourcepacks dir
+              // is the worst case the tree has to stay smooth on.
+              {
+                id: "/instance/resourcepacks",
+                name: "resourcepacks",
+                kind: "dir",
+                children: Array.from({ length: 222 }, (_, i) => ({
+                  id: `/instance/resourcepacks/pack-${i}.zip`,
+                  name: `pack-${String(i).padStart(3, "0")}.zip`,
+                  kind: "file" as const,
+                  size: 40_000 + i * 5_137,
+                  modified: Date.now() - 86_400_000 * (i % 30),
+                })),
+              },
               { id: "/instance/logs", name: "logs", kind: "dir", children: [] },
               { id: "/instance/options.txt", name: "options.txt", kind: "file", size: 2_400, modified: Date.now() - 1800_000 },
               { id: "/instance/launcher.lock", name: "launcher.lock", kind: "file", size: 0, disabled: true, meta: "in use" },
