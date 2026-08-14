@@ -57,6 +57,25 @@ const panelLayoutTransition = computed(() =>
 function pillUnder(value: string, active?: string): boolean {
   return hovered.value ? hovered.value === value : active === value
 }
+
+/*
+ * Drop focus after a mouse pick.
+ *
+ * Tabs implement the ARIA roving-focus pattern: while a trigger holds focus,
+ * ←/→ move between tabs. That is correct for keyboard users, but a *click*
+ * also leaves focus on the trigger — so afterwards the arrow keys silently
+ * belong to the tab strip, and any arrow-key handling the surrounding app has
+ * (walking a grid, moving a selection) appears to be broken until the user
+ * clicks somewhere else.
+ *
+ * Blurring on pointerup restores the arrows to the page without touching the
+ * keyboard path: Tab/←/→ navigation still focuses triggers and still works,
+ * because those never fire a pointer event.
+ */
+function releaseFocusAfterPointer(event: PointerEvent) {
+  const target = event.currentTarget
+  if (target instanceof HTMLElement) target.blur()
+}
 </script>
 
 <template>
@@ -85,6 +104,7 @@ function pillUnder(value: string, active?: string): boolean {
           hovered === item.value ? 'text-ink' : 'text-muted',
         ]"
         @pointerenter="hovered = item.value"
+        @pointerup="releaseFocusAfterPointer"
       >
         <!-- Active marker: a bottom bar in "underline", a filled pill otherwise.
              Both slide between tabs via the shared motion layoutId. -->
