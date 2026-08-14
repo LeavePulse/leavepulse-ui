@@ -212,7 +212,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey))
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        class="lp-scrim fixed inset-0 z-(--z-overlay) backdrop-blur-sm data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
         class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"

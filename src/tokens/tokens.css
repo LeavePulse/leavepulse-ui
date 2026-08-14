@@ -436,12 +436,32 @@
  */
 .lp-scrim {
   background-color: rgb(0 0 0 / var(--scrim-opacity, 0.5));
+  backdrop-filter: blur(var(--scrim-blur, 4px));
+  -webkit-backdrop-filter: blur(var(--scrim-blur, 4px));
 }
 
+/*
+ * The blur lives here rather than on each overlay as a `backdrop-blur-*`
+ * utility: a utility sits outside this rule and the fallback below cannot
+ * unset it, so on WebKitGTK every scrim carried a filter that never painted
+ * while the engines that do paint it disagreed with the token. One owner for
+ * both halves keeps the two cases in step.
+ */
 :root[data-lp-no-backdrop] .lp-scrim {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   --scrim-opacity: 0.62;
+}
+
+/*
+ * A lightbox is the one scrim that hides a whole page behind a photo, and it is
+ * usually opened FROM a dialog — so it is the layer the mild shared tint serves
+ * worst: without the blur, the content behind stayed readable around the image.
+ * It gets its own value instead of raising the shared one, which would darken
+ * every stacked pair.
+ */
+:root[data-lp-no-backdrop] .lp-scrim--deep {
+  --scrim-opacity: 0.78;
 }
 
 /* The overlay gradient rides above the base fill but under the content. */

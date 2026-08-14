@@ -345,7 +345,7 @@ const edgeStripClass = computed(() =>
   >
     <DrawerPortal>
       <DrawerOverlay
-        class="lp-scrim fixed inset-0 z-(--z-overlay) backdrop-blur-sm data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DrawerContent
         :class="contentClass"

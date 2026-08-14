@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
   <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        class="lp-scrim fixed inset-0 z-(--z-overlay) backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
       />
       <!-- Centred by a full-screen flex wrapper rather than by translating the
            panel off its own centre. With `top:50% / -translate-y-1/2` the panel

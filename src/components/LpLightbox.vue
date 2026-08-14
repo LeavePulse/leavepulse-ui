@@ -273,7 +273,7 @@ const ARROW =
       <!-- Sits on the lightbox rung, not the shared modal one: opening this
            from inside a dialog must cover that dialog, not tie with it. -->
       <DialogOverlay
-        class="lp-scrim fixed inset-0 z-(--z-lightbox-overlay) backdrop-blur-sm data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        class="lp-scrim lp-scrim--deep fixed inset-0 z-(--z-lightbox-overlay) data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
       />
       <DialogContent
         class="fixed inset-0 z-(--z-lightbox) flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
