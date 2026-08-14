@@ -8,7 +8,8 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, useSlots } from "vue"
+import type { ComponentPublicInstance } from "vue"
+import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -70,6 +71,118 @@ const bodyPad = computed(() =>
     .filter(Boolean)
     .join(" "),
 )
+
+/*
+ * Height is content-derived, so a body that arrives late — a placeholder swapped
+ * for the loaded thing — resizes the panel in a single frame, right on top of
+ * the open animation. CSS alone can't smooth it: `height: auto` isn't
+ * interpolable, and the keyword-interpolation escape hatches
+ * (`interpolate-size`, `calc-size()`) are Chromium-only, so they would do
+ * nothing in the WebKitGTK launcher. Measuring and pinning a pixel height is
+ * what works on every engine.
+ *
+ * The pin is always the panel's own natural height, so `max-h` still clips and
+ * the body keeps `flex-1 min-h-0` — an over-tall panel hands its overflow to the
+ * scroll area exactly as before. A panel whose size never moves is pinned once
+ * and never transitions.
+ */
+// reka renders a real element but exposes it as a component instance, so the
+// panel is reached through $el.
+const panelRef = ref<ComponentPublicInstance | null>(null)
+const tweening = ref(false)
+const resizing = ref(false)
+
+/** Kept in step with the `duration-fast` utility on the panel. */
+const TWEEN_MS = 160
+
+let ro: ResizeObserver | undefined
+let mo: MutationObserver | undefined
+let raf = 0
+let settleTimer: ReturnType<typeof setTimeout> | undefined
+
+// The height is driven imperatively rather than through a style binding. By the
+// time replacement content is in the DOM the panel has already reflowed to its
+// new size, so a bound value would only ever be written once, with no earlier
+// height for the transition to start from. Writing the OLD height, forcing a
+// reflow, then writing the new one gives the transition both ends.
+const retune = (el: HTMLElement) => {
+  const from = el.offsetHeight
+  el.style.height = ""
+  const to = el.offsetHeight
+  if (to === 0) return
+  if (to === from) {
+    el.style.height = `${to}px`
+    return
+  }
+  el.style.height = `${from}px`
+  void el.offsetHeight
+  el.style.height = `${to}px`
+
+  // While the panel is still catching up, the body is shorter than the content
+  // it already holds, so the scroll area would flash a bar for an overflow that
+  // resolves itself the moment the transition lands.
+  resizing.value = true
+  clearTimeout(settleTimer)
+  settleTimer = setTimeout(() => {
+    resizing.value = false
+  }, TWEEN_MS)
+}
+
+// Keyed off `open` rather than the ref: the panel is portalled and remounts on
+// every open, and the teardown has to run on close, when the ref is already gone.
+watch(
+  () => props.open,
+  (isOpen) => {
+    ro?.disconnect()
+    mo?.disconnect()
+    ro = undefined
+    mo = undefined
+    cancelAnimationFrame(raf)
+    clearTimeout(settleTimer)
+    tweening.value = false
+    resizing.value = false
+
+    const el = panelRef.value?.$el
+    if (!isOpen || !(el instanceof HTMLElement)) return
+
+    el.style.height = `${el.offsetHeight}px`
+    // The opening panel must not animate its height in from the pre-content box,
+    // so the transition only arms once that first pin has painted.
+    raf = requestAnimationFrame(() => {
+      tweening.value = true
+    })
+
+    // Two triggers, since either can move the height alone: the resize observer
+    // catches a child growing in place (an image decoding, a list filling in),
+    // the mutation observer catches one subtree swapped for another, where every
+    // observed box may keep its size. Children are observed, never the panel —
+    // that would feed the pin straight back in.
+    const watchChildren = () => {
+      if (!ro) return
+      ro.disconnect()
+      for (const child of Array.from(el.children)) ro.observe(child)
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => retune(el))
+      watchChildren()
+    }
+    if (typeof MutationObserver !== "undefined") {
+      mo = new MutationObserver(() => {
+        watchChildren()
+        retune(el)
+      })
+      mo.observe(el, { childList: true, subtree: true, characterData: true })
+    }
+  },
+  { flush: "post" },
+)
+
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  mo?.disconnect()
+  cancelAnimationFrame(raf)
+  clearTimeout(settleTimer)
+})
 </script>
 
 <template>
@@ -100,8 +213,9 @@ const bodyPad = computed(() =>
            pass a description keeps the generated id and the link to
            DialogDescription. -->
       <DialogContent
-        class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
-        :class="widthClass"
+        ref="panelRef"
+        class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
+        :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="width ? { width } : undefined"
         v-bind="describedByAttrs"
       >
@@ -135,9 +249,14 @@ const bodyPad = computed(() =>
         >
           <slot />
         </div>
+        <!-- While the panel is still growing it is briefly shorter than the body
+             it already holds, so the scroll area raises a bar for an overflow
+             that resolves itself as the transition lands. Hiding just the bar
+             for the length of the tween leaves scrolling itself untouched. -->
         <LpScrollArea
           v-else
           class="min-h-0 flex-1 text-sm text-ink/90"
+          :class="resizing ? '[&_[data-scrollbarimpl]]:invisible' : ''"
           :content-class="bodyPad"
         >
           <slot />
