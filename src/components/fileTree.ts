@@ -104,11 +104,18 @@ export function fileIcon(node: FileNode, expanded = false): string {
   return EXT_ICONS[ext] ?? "lucide:file"
 }
 
+/*
+ * Built once. `String.localeCompare` with options constructs a collator on every
+ * call, which on a few thousand nodes costs tens of milliseconds — enough to
+ * drop frames while a dialog is animating open.
+ */
+const NAME_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" })
+
 /** Directories first, then case-insensitive by name — the file-manager order. */
 export function sortNodes(nodes: FileNode[]): FileNode[] {
   return [...nodes].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1
-    return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+    return NAME_COLLATOR.compare(a.name, b.name)
   })
 }
 

@@ -108,12 +108,16 @@ let settleTimer: ReturnType<typeof setTimeout> | undefined
 const retune = (el: HTMLElement) => {
   const from = el.offsetHeight
   el.style.height = ""
+  // `max-h` comes from a class, so the panel already reports the clipped figure
+  // once the cap bites. Pinning that would leave a short panel sitting over
+  // content it can no longer grow to fit, so the natural height is measured with
+  // the cap lifted and the clamp is left to CSS afterwards.
+  el.style.maxHeight = "none"
   const to = el.offsetHeight
-  if (to === 0) return
-  if (to === from) {
-    el.style.height = `${to}px`
-    return
-  }
+  el.style.maxHeight = ""
+  // Nothing moved, so there is nothing to ease — and leaving the height unset
+  // keeps the panel free to size itself.
+  if (to === 0 || to === from) return
   el.style.height = `${from}px`
   void el.offsetHeight
   el.style.height = `${to}px`
@@ -125,6 +129,10 @@ const retune = (el: HTMLElement) => {
   clearTimeout(settleTimer)
   settleTimer = setTimeout(() => {
     resizing.value = false
+    // Released once the panel has arrived. A height left pinned in pixels stops
+    // being a starting point and becomes a cap: content that grows afterwards
+    // is clipped, and `max-h` can no longer size the panel itself.
+    el.style.height = ""
   }, TWEEN_MS)
 }
 
@@ -147,9 +155,12 @@ watch(
 
     el.style.height = `${el.offsetHeight}px`
     // The opening panel must not animate its height in from the pre-content box,
-    // so the transition only arms once that first pin has painted.
+    // so the transition only arms once that first pin has painted. The pin is
+    // dropped in the same frame: it exists to give the first `retune` something
+    // to start from, and holding it would cap the panel at its opening size.
     raf = requestAnimationFrame(() => {
       tweening.value = true
+      el.style.height = ""
     })
 
     // Two triggers, since either can move the height alone: the resize observer
