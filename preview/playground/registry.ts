@@ -905,16 +905,46 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside.",
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example.",
     components: { LpModal, LpButton },
-    state: () => reactive({ open: false }),
-    template: `<div>
+    state: () => {
+      const s = reactive({
+        open: false,
+        lazy: false,
+        loading: true,
+        openLazy() {
+          s.loading = true
+          s.lazy = true
+          setTimeout(() => {
+            s.loading = false
+          }, 900)
+        },
+      })
+      return s
+    },
+    template: `<div class="flex flex-wrap gap-2">
   <LpButton variant="solid" @click="open = true">Open modal</LpButton>
+  <LpButton variant="outline" @click="openLazy()">Open with late content</LpButton>
+
   <LpModal v-model:open="open" size="lg" title="Confirm action" description="A token-driven modal on reka Dialog.">
     <p>Body content. Escape or overlay-click closes it.</p>
     <template #footer>
       <LpButton variant="ghost" @click="open = false">Cancel</LpButton>
       <LpButton variant="solid" @click="open = false">Confirm</LpButton>
+    </template>
+  </LpModal>
+
+  <!-- Opens around a placeholder, then grows into the loaded body. -->
+  <LpModal v-model:open="lazy" size="lg" title="Server details">
+    <p v-if="loading" class="text-muted">Loading…</p>
+    <div v-else class="flex flex-col gap-3">
+      <p>The panel eased to this height instead of jumping to it.</p>
+      <p class="text-muted">Region eu-central · 8 vCPU · 32 GB RAM · 2 TB NVMe</p>
+      <p class="text-muted">Uptime 71 days. Last backup 4 hours ago, verified.</p>
+      <p class="text-muted">Reopen it to watch the transition again.</p>
+    </div>
+    <template #footer>
+      <LpButton variant="ghost" @click="lazy = false">Close</LpButton>
     </template>
   </LpModal>
 </div>`,
