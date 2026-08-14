@@ -4,6 +4,7 @@ import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useRovingFocus } from "../composables/useRovingFocus"
 
 export interface TableColumn<Row> {
   key: string
@@ -134,6 +135,54 @@ function toggleRow(key: RowKey, checked: boolean) {
 
 const colSpan = computed(() => props.columns.length + (props.selectable ? 1 : 0))
 
+/*
+ * Keyboard navigation over the rows. A table is one Tab stop, not one per row:
+ * a few hundred rows would otherwise be a few hundred Tab presses, which is the
+ * same as having no keyboard support at all.
+ *
+ * Typeahead matches the FIRST column, which in practice is the name — the thing
+ * a person looking for a row would type. Rows are addressed by their key so the
+ * cursor survives a re-sort.
+ */
+const rovingItems = computed(() =>
+  displayRows.value.map((row, index) => ({
+    id: String(keyFor(row, index)),
+    label: String(row[props.columns[0]?.key ?? ""] ?? ""),
+  })),
+)
+
+const rowByKey = computed(() => {
+  const map = new Map<string, T>()
+  displayRows.value.forEach((row, index) => map.set(String(keyFor(row, index)), row))
+  return map
+})
+
+const roving = useRovingFocus(rovingItems, {
+  onActivate: (id) => {
+    const row = rowByKey.value.get(id)
+    if (!row) return
+    // Space ticks the box where the table has one, since that is what a
+    // selectable list is for; Enter always means "open this row".
+    emit("rowClick", row)
+  },
+})
+
+function onRowKeydown(event: KeyboardEvent) {
+  // Space ticks rather than activates when the table is selectable — the
+  // standard split for a multi-select list.
+  if (event.key === " " && props.selectable && roving.activeId.value) {
+    event.preventDefault()
+    const key = roving.activeId.value
+    const row = rowByKey.value.get(key)
+    if (row) {
+      const rowKey = keyFor(row, displayRows.value.indexOf(row))
+      toggleRow(rowKey, !selectedSet.value.has(rowKey))
+    }
+    return
+  }
+  roving.onKeydown(event)
+}
+
 // With stickyHeader, the overlay scrollbar would otherwise run up under the
 // pinned header. Measure the header height and inset the bar by it so the bar
 // starts below the header. Tracked live (density/content can change it).
@@ -213,7 +262,11 @@ const barInsetTop = computed(() =>
           </th>
         </tr>
       </thead>
-      <tbody>
+      <!-- The keydown lives on the rows, not here: only a focused row should
+           steer, and a stray key from a control inside a cell must not move the
+           cursor. The container is bound only so the composable can find rows
+           to focus. -->
+      <tbody :ref="(el) => roving.setContainer(el as HTMLElement | null)">
         <tr v-if="displayRows.length === 0">
           <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
             <LpIcon :name="emptyIcon" :size="22" class="mx-auto mb-2 opacity-60" />
@@ -230,9 +283,11 @@ const barInsetTop = computed(() =>
           :items="menuFor(row)"
         >
           <tr
-            class="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-soft/60"
+            class="border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
             :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
+            v-bind="roving.itemProps(String(keyFor(row, index)))"
             @click="emit('rowClick', row)"
+            @keydown="onRowKeydown"
           >
             <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
               <LpCheckbox

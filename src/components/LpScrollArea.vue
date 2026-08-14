@@ -92,15 +92,32 @@ function measureEdges(el: HTMLElement) {
   atBottom.value = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
 }
 
+/**
+ * reka hard-codes `tabindex="0"` on the viewport so a scrollable region can be
+ * reached and scrolled by keyboard. That is right when there IS something to
+ * scroll and wrong when there isn't: in a dialog whose body fits, the first Tab
+ * landed on the box itself, nothing moved on screen, and the shortcut read as
+ * broken. The attribute is set after `$attrs`, so a prop cannot override it —
+ * it has to come off the element.
+ *
+ * Kept in sync with content size rather than set once: a list that fills in
+ * later becomes scrollable without anything else changing.
+ */
+function syncViewportFocusable(el: HTMLElement) {
+  const scrollable = el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth
+  if (scrollable) el.setAttribute("tabindex", "0")
+  else el.removeAttribute("tabindex")
+}
+
 function onViewportScroll(event: Event) {
   if (props.fade) measureEdges(event.target as HTMLElement)
   emit("scroll", event)
 }
 
-// Scrolling is not the only thing that changes which edges hide content: a list
-// that fills in, a panel that resizes, or content short enough to need no fade
-// at all never fire a scroll event. Watched only when `fade` is on, since
-// nothing else here depends on the measurements.
+// Scrolling is not the only thing that changes what we measure: a list that
+// fills in, a panel that resizes, or content short enough to need no fade at
+// all never fire a scroll event. Runs regardless of `fade` — the focusable
+// state has to track content size even where the fade is off.
 let edgeResize: ResizeObserver | undefined
 let edgeMutation: MutationObserver | undefined
 
@@ -115,9 +132,12 @@ watch(
   [viewportEl, () => props.fade],
   ([el, enabled]) => {
     stopEdgeWatch()
-    if (!el || !enabled) return
+    if (!el) return
 
-    const remeasure = () => measureEdges(el)
+    const remeasure = () => {
+      if (enabled) measureEdges(el)
+      syncViewportFocusable(el)
+    }
     remeasure()
 
     if (typeof ResizeObserver !== "undefined") {

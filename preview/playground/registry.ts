@@ -1040,16 +1040,44 @@ export const registry: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "tooltip",
+    name: "Tooltip",
+    description:
+      "Themed replacement for the native `title` attribute, which the OS draws (so it looks different on every platform), delays about a second, cannot wrap, and is read inconsistently by screen readers. Opens on keyboard focus as well as hover and closes on Escape. Use `label` when the tip IS the control's name — an icon button — and it becomes the accessible name; leave it off when the control already has a name and the tip only adds to it. `side`, `delay` and `side-offset` tune placement and timing.",
+    components: { LpTooltip, LpButton, LpIcon },
+    state: () => reactive({}),
+    template: `<div class="flex flex-wrap items-center gap-3">
+  <!-- Names the button: it has no visible text of its own. -->
+  <LpTooltip content="Delete instance" label>
+    <LpButton variant="ghost"><LpIcon name="lucide:trash-2" :size="16" /></LpButton>
+  </LpTooltip>
+
+  <!-- Describes a button that already has a name. -->
+  <LpTooltip content="Copies the whole folder — this can take a while">
+    <LpButton variant="outline">Duplicate</LpButton>
+  </LpTooltip>
+
+  <LpTooltip content="Appears below instead" side="bottom">
+    <LpButton variant="ghost">Side</LpButton>
+  </LpTooltip>
+
+  <LpTooltip content="No waiting" :delay="0">
+    <LpButton variant="ghost">Instant</LpButton>
+  </LpTooltip>
+
+  <LpTooltip content="A longer explanation that wraps onto several lines instead of running off the edge of the screen the way a native title would.">
+    <LpButton variant="ghost">Long text</LpButton>
+  </LpTooltip>
+</div>`,
+  },
+  {
     id: "popover",
-    name: "Popover · Tooltip",
+    name: "Popover",
     description:
       "Anchored overlays. Popover takes side/align, `side-offset`, `panel-class` (width/padding/overflow) and a controllable `v-model:open`; left unbound it stays uncontrolled.",
-    components: { LpPopover, LpTooltip, LpButton },
+    components: { LpPopover, LpButton },
     state: () => reactive({ open: false }),
     template: `<div class="flex items-center gap-3">
-  <LpTooltip content="I appear on hover">
-    <LpButton variant="outline">Hover me</LpButton>
-  </LpTooltip>
   <LpPopover>
     <template #trigger><LpButton variant="ghost">Open popover</LpButton></template>
     <p class="font-semibold text-ink">Popover content</p>

@@ -21,3 +21,18 @@
   width: 0;
   height: 0;
 }
+
+/*
+ * The focus ring for focus we MOVED rather than the user walking to it.
+ *
+ * `:focus-visible` is the browser's own heuristic and deliberately excludes
+ * programmatic focus: a dialog opened by mouse focuses its first field, the
+ * pseudo-class does not match, and no ring is drawn — so the keyboard looks
+ * dead while working perfectly. Components that place focus themselves set this
+ * attribute and drop it on blur, leaving focus-visible in charge everywhere
+ * else. Mirrors `focus-visible:ring-2 ring-ring`.
+ */
+[data-lp-focus-ring] {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-ring);
+}

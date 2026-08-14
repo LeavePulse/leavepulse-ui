@@ -32,8 +32,18 @@ const props = withDefaults(
      * regions (e.g. multi-pane catalogues) — the panes scroll, not the modal.
      */
     fillBody?: boolean
+    /**
+     * Where the keyboard lands when the dialog opens. Default `"auto"` picks
+     * the first meaningful control in the body — a field to type in, or failing
+     * that the primary action — instead of the close button, which is what
+     * happens if the DOM order is left to decide.
+     *
+     * `"none"` leaves reka's own behaviour alone; pass a CSS selector to name
+     * the element yourself.
+     */
+    autoFocus?: "auto" | "none" | string
   }>(),
-  { size: "md" },
+  { size: "md", autoFocus: "auto" },
 )
 
 defineEmits<{ (e: "update:open", value: boolean): void }>()
@@ -89,6 +99,58 @@ const bodyPad = computed(() =>
 // reka renders a real element but exposes it as a component instance, so the
 // panel is reached through $el.
 const panelRef = ref<ComponentPublicInstance | null>(null)
+
+/**
+ * Controls that are worth landing on when the dialog opens, in order of
+ * preference. A field the user is going to type in wins over a button, since
+ * typing is the reason most dialogs exist.
+ */
+const AUTO_FOCUS_ORDER = [
+  "input:not([type=hidden]):not([disabled]):not([readonly])",
+  "textarea:not([disabled]):not([readonly])",
+  "select:not([disabled])",
+  "[data-lp-autofocus]",
+  "button:not([disabled]):not([data-lp-dialog-close])",
+  "[href]",
+  "[tabindex]:not([tabindex='-1'])",
+]
+
+/**
+ * reka focuses the first tabbable node, which in this layout is the close
+ * button in the header — the one control nobody opens a dialog to press. Worse,
+ * a dialog opened by mouse gets a programmatic focus, and `:focus-visible` does
+ * not match programmatic focus, so the ring never drew and the keyboard looked
+ * dead even though it worked.
+ *
+ * Both are fixed here: pick a meaningful target, and mark it so the ring shows.
+ */
+function onOpenAutoFocus(event: Event) {
+  if (props.autoFocus === "none") return
+  const panel = panelRef.value?.$el
+  if (!(panel instanceof HTMLElement)) return
+
+  const selectors =
+    props.autoFocus === "auto" ? AUTO_FOCUS_ORDER : [props.autoFocus]
+  for (const selector of selectors) {
+    const target = panel.querySelector<HTMLElement>(selector)
+    if (!target || target.hasAttribute("disabled")) continue
+    event.preventDefault()
+    // `focus-visible` is the browser's own heuristic and cannot be forced, so
+    // the ring is driven off an attribute the kit owns. Removed as soon as the
+    // element loses focus, leaving normal focus-visible behaviour in charge.
+    target.setAttribute("data-lp-focus-ring", "")
+    target.addEventListener(
+      "blur",
+      () => target.removeAttribute("data-lp-focus-ring"),
+      { once: true },
+    )
+    target.focus()
+    if (target instanceof HTMLInputElement && target.type === "text") {
+      target.select()
+    }
+    return
+  }
+}
 const tweening = ref(false)
 const resizing = ref(false)
 
@@ -248,6 +310,7 @@ onBeforeUnmount(() => {
         :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="width ? { width } : undefined"
         v-bind="describedByAttrs"
+        @open-auto-focus="onOpenAutoFocus"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
           <div class="flex flex-col gap-1">
@@ -258,7 +321,10 @@ onBeforeUnmount(() => {
               {{ description }}
             </DialogDescription>
           </div>
+          <!-- Marked so the auto-focus pass skips it: it is first in the DOM
+               and last in usefulness. Still reachable by Tab and Escape. -->
           <DialogClose
+            data-lp-dialog-close
             class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Close"
           >

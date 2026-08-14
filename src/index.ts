@@ -188,6 +188,8 @@ export { useHotkeys, isAppleKeyboard, appleModifierLabel } from "./composables/u
 export type { HotkeyBinding } from "./composables/useHotkeys"
 export { useInputFilter } from "./composables/useInputFilter"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"
+export { useRovingFocus } from "./composables/useRovingFocus"
+export type { RovingItem, UseRovingFocusOptions } from "./composables/useRovingFocus"
 export { useSettled } from "./composables/useSettled"
 export type { UseSettledOptions } from "./composables/useSettled"
 export { useTilt } from "./composables/useTilt"
