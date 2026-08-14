@@ -184,6 +184,8 @@ export type { UiConfig } from "./theme/config"
 
 export { useInputFilter } from "./composables/useInputFilter"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"
+export { useSettled } from "./composables/useSettled"
+export type { UseSettledOptions } from "./composables/useSettled"
 export { useTilt } from "./composables/useTilt"
 export type { UseTilt, UseTiltOptions } from "./composables/useTilt"
 export { useZoomPan } from "./composables/useZoomPan"
