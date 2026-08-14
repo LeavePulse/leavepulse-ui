@@ -321,6 +321,23 @@
 }
 
 /*
+ * Mirror of tree-row-in, for rows that arrive from the trailing edge: a list
+ * swapping placeholders for loaded content reads as the real rows sliding in
+ * over them rather than blinking into place. Stagger it per row the way
+ * OPTION_ITEM does, capping the delay so a long list still lands promptly.
+ */
+@keyframes row-in-trailing {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/*
  * Lightbox. The image grows in from slightly under full size so opening reads as
  * the picture coming toward you rather than a panel appearing; the exit is
  * shorter and on an accelerating curve, since a dismissal shouldn't be savoured.
