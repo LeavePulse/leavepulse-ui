@@ -22,6 +22,10 @@
  * Either way the trigger keeps a real accessible name, which is what `title`
  * alone could not guarantee. reka opens the tip on keyboard focus as well as
  * hover and closes it on Escape, satisfying WCAG 1.4.13.
+ *
+ * Do NOT wrap the `#trigger` of LpDropdownMenu, LpPopover or LpContextMenu:
+ * those bind their handlers to the slot's direct child, so a wrapper swallows
+ * them and the control stops opening. Put `aria-label` on the trigger instead.
  */
 import {
   TooltipContent,
