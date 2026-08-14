@@ -184,10 +184,15 @@ function onThumbPointerDown() {
          first hover — so before the pointer ever entered, the region silently
          refused to scroll (wheel included). Mounting it up front fixes that;
          the bar still only becomes visible on hover, via `barFade` below. -->
+    <!-- z-1: reka positions the bar absolutely but leaves it on `z-index: auto`,
+         and it sits BEFORE the viewport in the DOM — so any positioned row in
+         the content painted over it, and a row with an opaque hover background
+         swallowed the thumb wherever the pointer went. The bar only has to
+         clear its own content, not the page, so a local step is enough. -->
     <ScrollAreaScrollbar
       orientation="vertical"
       force-mount
-      class="group flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
+      class="group z-1 flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
       :class="barFade"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
     >
@@ -205,7 +210,7 @@ function onThumbPointerDown() {
 
     <ScrollAreaScrollbar
       orientation="horizontal"
-      class="group flex h-3.5 flex-col touch-none select-none justify-end px-px pb-px pt-2.5"
+      class="group z-1 flex h-3.5 flex-col touch-none select-none justify-end px-px pb-px pt-2.5"
       :class="barFade"
     >
       <ScrollAreaThumb
