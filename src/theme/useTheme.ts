@@ -5,6 +5,7 @@
  * serialize/parse with validation.
  */
 import { computed, readonly, shallowRef, type ComputedRef, type DeepReadonly, type Ref } from "vue"
+import { detectBackdropFilter } from "./backdrop"
 import {
   COLOR_VARS,
   DEFAULT_SURFACE,
@@ -75,6 +76,9 @@ export function applyTheme(theme: TokenSet, root: HTMLElement = document.documen
   }
   root.dataset.themeMode = theme.mode
   root.style.colorScheme = theme.mode
+  // Engine capability, not theme data — but this is the one path every consumer
+  // already calls, so the glass fallback lands without extra wiring.
+  detectBackdropFilter(root)
 }
 
 /** Point a circular theme reveal expands from (viewport px). */

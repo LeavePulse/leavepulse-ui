@@ -165,6 +165,7 @@ export {
   useTheme,
 } from "./theme/useTheme"
 export type { RevealOrigin } from "./theme/useTheme"
+export { detectBackdropFilter, isBrokenBackdropEngine, NO_BACKDROP_ATTR } from "./theme/backdrop"
 export { DEFAULT_SURFACE } from "./theme/tokens"
 export { defineTheme } from "./theme/define"
 export type { ThemeOverrides } from "./theme/define"

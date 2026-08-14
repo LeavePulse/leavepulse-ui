@@ -120,6 +120,15 @@
   --z-popover: 120;
   --z-tooltip: 130;
   --z-toast: 200;
+
+  /* A lightbox is usually opened FROM a dialog — click a thumbnail in a modal
+     and the full image comes up over it. Sharing --z-overlay/--z-modal left
+     that order to DOM insertion alone, so the lightbox's own scrim landed on
+     top of the modal panel and swallowed it while double-darkening the page
+     behind. Its own rung above the modal (but below tooltip/toast, which must
+     outrank everything) makes the stack explicit. */
+  --z-lightbox-overlay: 140;
+  --z-lightbox: 150;
 }
 
 /* ── overlay enter/exit animations ───────────────
@@ -377,6 +386,45 @@
   box-shadow: var(--surface-panel-inset), var(--surface-panel-shadow);
   backdrop-filter: blur(var(--surface-panel-blur)) saturate(var(--surface-panel-saturate));
   -webkit-backdrop-filter: blur(var(--surface-panel-blur)) saturate(var(--surface-panel-saturate));
+}
+
+/*
+ * No-backdrop fallback. WebKitGTK — the engine behind Tauri on Linux — parses
+ * backdrop-filter and reports it through both CSS.supports() and @supports,
+ * then composites it as a no-op: the layer tints but never blurs. Since the
+ * lie makes @supports useless here, detectBackdropFilter() sets this flag on
+ * <html> instead, and every glass surface trades the blur it cannot get for
+ * the opacity it can. Without it a translucent panel over busy content reads
+ * as unfinished rather than frosted.
+ */
+:root[data-lp-no-backdrop] {
+  --surface-panel-blur: 0px;
+  --surface-panel-saturate: 100%;
+}
+
+:root[data-lp-no-backdrop] .lp-skin-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * Scrims lean on the same trick. `.lp-scrim` marks the full-screen overlay
+ * behind a dialog; where the blur lands the tint stays light, and where it
+ * cannot the tint carries the separation on its own.
+ *
+ * The bump is deliberately mild. Scrims stack — a lightbox opened from a modal
+ * paints two — and opacity compounds, so a value tuned to look right alone goes
+ * nearly black in a pair. 0.62 reads as a clear backdrop on its own and still
+ * leaves the stacked case legible.
+ */
+.lp-scrim {
+  background-color: rgb(0 0 0 / var(--scrim-opacity, 0.5));
+}
+
+:root[data-lp-no-backdrop] .lp-scrim {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  --scrim-opacity: 0.62;
 }
 
 /* The overlay gradient rides above the base fill but under the content. */
