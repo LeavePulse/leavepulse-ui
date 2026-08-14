@@ -99,6 +99,10 @@ let ro: ResizeObserver | undefined
 let mo: MutationObserver | undefined
 let raf = 0
 let settleTimer: ReturnType<typeof setTimeout> | undefined
+/** Where the panel last settled, so a retune has a height to ease FROM. */
+let lastHeight = 0
+/** True while a tween owns the height, so observers don't cancel it midway. */
+let inFlight = false
 
 // The height is driven imperatively rather than through a style binding. By the
 // time replacement content is in the DOM the panel has already reflowed to its
@@ -106,7 +110,12 @@ let settleTimer: ReturnType<typeof setTimeout> | undefined
 // height for the transition to start from. Writing the OLD height, forcing a
 // reflow, then writing the new one gives the transition both ends.
 const retune = (el: HTMLElement) => {
-  const from = el.offsetHeight
+  // One swap wakes both observers — the mutation as content lands, the resize as
+  // it reflows — and the second call would clear the pin the first just wrote.
+  if (inFlight) return
+  // Remembered, not measured: by the time either observer fires the panel has
+  // already reflowed, so the element can only report where it is going.
+  const from = lastHeight
   el.style.height = ""
   // `max-h` comes from a class, so the panel already reports the clipped figure
   // once the cap bites. Pinning that would leave a short panel sitting over
@@ -115,24 +124,30 @@ const retune = (el: HTMLElement) => {
   el.style.maxHeight = "none"
   const to = el.offsetHeight
   el.style.maxHeight = ""
+  lastHeight = to
   // Nothing moved, so there is nothing to ease — and leaving the height unset
   // keeps the panel free to size itself.
-  if (to === 0 || to === from) return
+  if (to === 0 || from === 0 || to === from) return
   el.style.height = `${from}px`
   void el.offsetHeight
   el.style.height = `${to}px`
 
+  inFlight = true
   // While the panel is still catching up, the body is shorter than the content
   // it already holds, so the scroll area would flash a bar for an overflow that
   // resolves itself the moment the transition lands.
   resizing.value = true
   clearTimeout(settleTimer)
   settleTimer = setTimeout(() => {
+    inFlight = false
     resizing.value = false
     // Released once the panel has arrived. A height left pinned in pixels stops
     // being a starting point and becomes a cap: content that grows afterwards
     // is clipped, and `max-h` can no longer size the panel itself.
     el.style.height = ""
+    // Re-read rather than trusting `to`: `max-h` may have clamped the panel
+    // short of it, and the next tween has to start from where it really sits.
+    lastHeight = el.offsetHeight
   }, TWEEN_MS)
 }
 
@@ -150,9 +165,13 @@ watch(
     tweening.value = false
     resizing.value = false
 
+    lastHeight = 0
+    inFlight = false
+
     const el = panelRef.value?.$el
     if (!isOpen || !(el instanceof HTMLElement)) return
 
+    lastHeight = el.offsetHeight
     el.style.height = `${el.offsetHeight}px`
     // The opening panel must not animate its height in from the pre-content box,
     // so the transition only arms once that first pin has painted. The pin is
