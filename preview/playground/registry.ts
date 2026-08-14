@@ -11,6 +11,7 @@ import {
   LpCard,
   LpCheckbox,
   LpConfirmDialog,
+  LpShortcutsDialog,
   LpDisclosure,
   LpDivider,
   LpDrawer,
@@ -960,6 +961,41 @@ export const registry: ComponentEntry[] = [
   <LpConfirmDialog v-model:open="open" danger title="Delete server?" description="This cannot be undone." confirmLabel="Delete">
     The server and its data will be permanently removed.
   </LpConfirmDialog>
+</div>`,
+  },
+  {
+    id: "shortcuts-dialog",
+    name: "ShortcutsDialog",
+    description:
+      "Keyboard reference, conventionally on F1. Groups are passed in as data — a binding knows its key but not what to call it, and one that only exists while its section is mounted would come and go from a list meant to be a reference. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards. Pairs with useHotkeys, which treats Ctrl and Meta as one modifier so only the label differs.",
+    components: { LpShortcutsDialog, LpButton },
+    state: () =>
+      reactive({
+        open: false,
+        groups: [
+          {
+            title: "Navigation",
+            entries: [
+              { combo: "Ctrl+K", label: "Command palette" },
+              { combo: "Ctrl+F", label: "Search" },
+              { combo: "Alt+←", label: "Back" },
+              { combo: "Alt+→", label: "Forward" },
+            ],
+          },
+          {
+            title: "View",
+            entries: [
+              { combo: "Ctrl++", label: "Zoom in" },
+              { combo: "Ctrl+-", label: "Zoom out" },
+              { combo: "←→↑↓", label: "Move selection" },
+              { combo: "F1", label: "This reference" },
+            ],
+          },
+        ],
+      }),
+    template: `<div>
+  <LpButton variant="outline" @click="open = true">Show shortcuts</LpButton>
+  <LpShortcutsDialog v-model:open="open" :groups="groups" description="Everything the keyboard can do here." />
 </div>`,
   },
   {

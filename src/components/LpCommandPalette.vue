@@ -18,9 +18,10 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useHotkeys } from "../composables/useHotkeys"
 
 export interface Command {
   id: string
@@ -196,16 +197,22 @@ watch(
   },
 )
 
-function onHotkey(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-    e.preventDefault()
-    emit("update:open", !props.open)
-  }
-}
-onMounted(() => {
-  if (props.hotkey) window.addEventListener("keydown", onHotkey)
-})
-onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey))
+// Through useHotkeys rather than a listener of its own: the palette is the one
+// shortcut that has to work from inside a text field, and `code` is what makes
+// it fire on a layout where Ctrl-K arrives as "л".
+useHotkeys(() =>
+  props.hotkey
+    ? [
+        {
+          key: "k",
+          code: "KeyK",
+          ctrl: true,
+          allowInInput: true,
+          handler: () => emit("update:open", !props.open),
+        },
+      ]
+    : [],
+)
 </script>
 
 <template>

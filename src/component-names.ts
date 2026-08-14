@@ -51,6 +51,7 @@ export const COMPONENT_NAMES = [
   "LpSegmented",
   "LpSelect",
   "LpServiceNode",
+  "LpShortcutsDialog",
   "LpSidebar",
   "LpSidebarNav",
   "LpSkeleton",
