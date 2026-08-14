@@ -556,7 +556,6 @@ const transitionProps = {
          lines. A CSS smooth scroll would override both. -->
     <LpScrollArea
       ref="scrollRef"
-      fade
       instant
       :content-class="wrap ? '' : 'min-w-max'"
       :style="{ height }"

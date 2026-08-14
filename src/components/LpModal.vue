@@ -283,11 +283,8 @@ onBeforeUnmount(() => {
              it already holds, so the scroll area raises a bar for an overflow
              that resolves itself as the transition lands. Hiding just the bar
              for the length of the tween leaves scrolling itself untouched. -->
-        <!-- Faded because a capped panel cuts its body mid-row, and a hard edge
-             at the crop reads as the content ending there. -->
         <LpScrollArea
           v-else
-          fade
           class="min-h-0 flex-1 text-sm text-ink/90"
           :class="resizing ? '[&_[data-scrollbarimpl]]:invisible' : ''"
           :content-class="bodyPad"

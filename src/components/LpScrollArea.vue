@@ -15,7 +15,10 @@ import {
 } from "reka-ui"
 
 // `fade` softens whichever of the top/bottom edges currently has content beyond
-// it, so a clipped list reads as continuing rather than as cut off.
+// it, so a clipped list reads as continuing rather than as cut off. On by
+// default: a hard crop through a row looks like damage wherever it happens, and
+// every consumer wanted it. Pass `:fade="false"` where the edge must stay
+// crisp — content that has to be read to its last pixel.
 // `contentClass` styles the scrollable CONTENT container (the viewport's inner
 // wrapper) — put list layout here (display:grid / gap / padding), not on the
 // component root, since items live inside reka's viewport.
@@ -34,7 +37,7 @@ const props = withDefaults(
     contentClass?: string
     barInsetTop?: string
   }>(),
-  { instant: false },
+  { fade: true, instant: false },
 )
 
 // Re-emit the native scroll event of the underlying viewport so consumers that

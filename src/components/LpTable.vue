@@ -164,7 +164,13 @@ const barInsetTop = computed(() =>
 </script>
 
 <template>
-  <LpScrollArea class="rounded-card border border-line" :bar-inset-top="barInsetTop">
+  <!-- No top fade: a sticky header sits in the masked band and would be dimmed
+       by it. The bottom edge is left crisp with it for symmetry. -->
+  <LpScrollArea
+    :fade="false"
+    class="rounded-card border border-line"
+    :bar-inset-top="barInsetTop"
+  >
     <table class="w-full border-collapse text-sm">
       <thead ref="headEl" :class="stickyHeader ? 'sticky top-0 z-10' : ''">
         <tr class="border-b border-line bg-surface-soft">
