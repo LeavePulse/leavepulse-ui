@@ -22,6 +22,13 @@ export interface InfraNodeData {
   firewallCount?: number
   /** Service count on this host (badge when defined — services toggle on). */
   serviceCount?: number
+  /**
+   * How old this node's readings are, human-readable ("28d"). An unreachable
+   * machine keeps serving its last snapshot, which reads as current unless the
+   * card says otherwise — so when set, the counts below are struck through and
+   * the age is shown in their place.
+   */
+  staleFor?: string
   /** Fade the node back (search miss / not part of the focused node's graph). */
   dimmed?: boolean
 }
@@ -85,7 +92,7 @@ const icon = computed(() => roleIcon[props.data.role] ?? "●")
         <span v-if="data.overlay" class="font-mono text-[10px] text-muted">{{ data.overlay }}</span>
       </div>
       <div
-        v-if="data.firewallCount || data.serviceCount !== undefined"
+        v-if="data.firewallCount || data.serviceCount !== undefined || data.staleFor"
         class="mt-1.5 flex items-center gap-1.5"
       >
         <span
@@ -98,9 +105,21 @@ const icon = computed(() => roleIcon[props.data.role] ?? "●")
         <span
           v-if="data.serviceCount !== undefined"
           class="inline-flex items-center gap-1 rounded-pill bg-surface-soft px-1.5 py-0.5 text-[9px] font-medium text-muted"
-          :title="`${data.serviceCount} service(s)`"
+          :class="data.staleFor ? 'line-through decoration-danger/70' : ''"
+          :title="
+            data.staleFor
+              ? `${data.serviceCount} service(s) as of ${data.staleFor} ago — not current`
+              : `${data.serviceCount} service(s)`
+          "
         >
           <span>◇</span>{{ data.serviceCount }}
+        </span>
+        <span
+          v-if="data.staleFor"
+          class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
+          :title="`No contact for ${data.staleFor} — everything shown here is that old`"
+        >
+          <span>⚠</span>{{ data.staleFor }} old
         </span>
       </div>
     </div>
