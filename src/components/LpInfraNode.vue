@@ -33,30 +33,59 @@ export interface InfraNodeData {
   dimmed?: boolean
 }
 
-const props = defineProps<{ data: InfraNodeData; selected?: boolean }>()
+const props = defineProps<{
+  data: InfraNodeData
+  selected?: boolean
+  /** Extra/overriding role styles, merged over the defaults below. */
+  roles?: Record<string, InfraRoleStyle>
+}>()
 
-const roleVar: Record<string, string> = {
-  hypervisor: "var(--color-accent)",
-  game: "var(--color-action)",
-  router: "var(--color-muted-strong)",
-  edge: "var(--color-brand)",
+/*
+ * Role → look. Colours are token references, never literals, so a theme (or a
+ * consumer) restyles the graph without forking this component; the glyph keeps
+ * the encoding readable without colour. `roles` overrides or extends the table
+ * for a fleet whose vocabulary differs — anything unmapped stays neutral rather
+ * than silently borrowing another role's meaning.
+ */
+export interface InfraRoleStyle {
+  /** CSS colour — normally a var() reference, e.g. var(--color-node-edge). */
+  color: string
+  icon: string
 }
-const accent = computed(() => roleVar[props.data.role] ?? "var(--color-line-strong)")
-const roleIcon: Record<string, string> = {
-  hypervisor: "▣",
-  game: "◈",
-  router: "⇄",
-  edge: "☁",
+const DEFAULT_ROLES: Record<string, InfraRoleStyle> = {
+  compute: { color: "var(--color-node-compute)", icon: "▣" },
+  host: { color: "var(--color-node-compute)", icon: "▣" },
+  worker: { color: "var(--color-node-compute)", icon: "◱" },
+  hypervisor: { color: "var(--color-node-compute)", icon: "▦" },
+  game: { color: "var(--color-node-compute)", icon: "◈" },
+  storage: { color: "var(--color-node-transit)", icon: "▤" },
+  database: { color: "var(--color-node-transit)", icon: "▤" },
+  router: { color: "var(--color-node-transit)", icon: "⇄" },
+  proxy: { color: "var(--color-node-transit)", icon: "⇅" },
+  edge: { color: "var(--color-node-edge)", icon: "☁" },
+  public: { color: "var(--color-node-edge)", icon: "◉" },
 }
-const icon = computed(() => roleIcon[props.data.role] ?? "●")
+const UNKNOWN_ROLE: InfraRoleStyle = { color: "var(--color-node-unknown)", icon: "●" }
+
+const role = computed<InfraRoleStyle>(
+  () => ({ ...DEFAULT_ROLES, ...(props.roles ?? {}) })[props.data.role] ?? UNKNOWN_ROLE,
+)
+const accent = computed(() => role.value.color)
+const icon = computed(() => role.value.icon)
+// A tinted edge rather than a grey one: with only the top stripe carrying the
+// role, a canvas of cards read as one undifferentiated grid.
+const accentLine = computed(
+  () => `color-mix(in srgb, ${accent.value} 35%, var(--color-line))`,
+)
 </script>
 
 <template>
   <div
     class="w-[168px] overflow-hidden rounded-card border bg-surface-raised shadow-panel transition-[border-color,box-shadow]"
-    :class="selected ? 'border-[var(--accent)]' : 'border-line'"
+    :class="selected ? 'border-[var(--accent)]' : 'border-[var(--accent-line)]'"
     :style="{
       '--accent': accent,
+      '--accent-line': accentLine,
       opacity: data.dimmed ? 0.3 : data.online === false ? 0.5 : 1,
       ...(selected
         ? { boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel)' }

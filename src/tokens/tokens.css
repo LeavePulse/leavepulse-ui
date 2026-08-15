@@ -46,6 +46,17 @@
   --color-line-strong: rgba(255, 255, 255, 0.18);
   --color-ring: rgba(0, 188, 255, 0.45);
 
+  /* ── color: infra roles ──────────────────────────
+     What a machine on a topology DOES, in three families: it runs work, it
+     carries traffic, or it is the way in from outside. Derived from the palette
+     above so a theme gets them for free, and named so a consumer whose fleet
+     doesn't split this way can repoint them without forking the component.
+     Anything unmapped falls back to --color-node-unknown. */
+  --color-node-compute: var(--color-action);
+  --color-node-transit: var(--color-accent);
+  --color-node-edge: var(--color-brand);
+  --color-node-unknown: var(--color-line-strong);
+
   /* ── shape ───────────────────────────────────── */
   --radius-control: 8px;
   --radius-card: 14px;
