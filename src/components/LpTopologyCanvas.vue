@@ -130,6 +130,13 @@ const props = withDefaults(
      * Non-interactive; pan/zoom with the graph. Empty = no lanes.
      */
     lanes?: TopologyLane[]
+    /**
+     * Minimap and zoom controls. On by default — a full-page map needs both —
+     * but a graph embedded at a few hundred pixels has nothing to navigate, and
+     * the overlays then cover a real share of the picture.
+     */
+    minimap?: boolean
+    controls?: boolean
   }>(),
   {
     connectable: false,
@@ -137,6 +144,8 @@ const props = withDefaults(
     legend: true,
     legendPosition: "bottom-left",
     lanes: () => [],
+    minimap: true,
+    controls: true,
   },
 )
 
@@ -361,8 +370,14 @@ defineExpose({ fitView, setViewport: applyViewport })
     class="lp-topology"
   >
     <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
-    <MiniMap pannable zoomable node-color="var(--color-surface-soft)" mask-color="rgba(0,0,0,0.55)" />
-    <Controls />
+    <MiniMap
+      v-if="minimap"
+      pannable
+      zoomable
+      node-color="var(--color-surface-soft)"
+      mask-color="rgba(0,0,0,0.55)"
+    />
+    <Controls v-if="controls" />
 
     <!-- Edge-type legend: makes the colour/dash encoding self-explanatory. -->
     <Panel v-if="legend" :position="legendPosition" :class="legendOffset">
