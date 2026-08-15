@@ -10,6 +10,9 @@ const badge = tv({
       brand: "bg-brand-soft text-brand",
       action: "bg-action/15 text-action",
       success: "bg-action/15 text-action",
+      // Partial trouble, which every status surface eventually needs: without
+      // it a half-failed thing has to render as either fine or broken.
+      warning: "bg-accent/15 text-accent",
       danger: "bg-danger-soft text-danger",
       outline: "border border-line text-ink",
     },
