@@ -71,6 +71,12 @@ export interface TopologyEdge {
   /** Semantic class driving colour + dash. Inferred from `kind` if omitted. */
   category?: EdgeCategory
   observed?: EdgeObserved
+  /**
+   * Push the edge into the background, matching the node data's `dimmed`. A
+   * focus highlight has to fade the edges too — dimming only the nodes leaves
+   * every unrelated line at full strength.
+   */
+  dimmed?: boolean
 }
 
 /**
@@ -114,12 +120,24 @@ const props = withDefaults(
     /** Show the edge-type legend (Network / Depends-on / Pending / Drift). */
     legend?: boolean
     /**
+     * Where the legend sits. Defaults to bottom-left: hosts commonly float a
+     * toolbar across the top, which would cover a top-anchored legend, and the
+     * minimap owns the bottom-right.
+     */
+    legendPosition?: "top-left" | "top-right" | "bottom-left" | "bottom-right"
+    /**
      * Background swimlanes drawn beneath the nodes (one per project / overlay).
      * Non-interactive; pan/zoom with the graph. Empty = no lanes.
      */
     lanes?: TopologyLane[]
   }>(),
-  { connectable: false, selectable: false, legend: true, lanes: () => [] },
+  {
+    connectable: false,
+    selectable: false,
+    legend: true,
+    legendPosition: "bottom-left",
+    lanes: () => [],
+  },
 )
 
 const emit = defineEmits<{
@@ -236,7 +254,7 @@ const flowEdges = computed(() =>
       source: e.source,
       target: e.target,
       type: "default",
-      animated: obs !== "applied",
+      animated: obs !== "applied" && !e.dimmed,
       label: e.kind,
       labelBgStyle: { fill: "var(--color-surface)" },
       labelStyle: { fill: "var(--color-muted-strong)", fontSize: "10px" },
@@ -245,6 +263,7 @@ const flowEdges = computed(() =>
         strokeWidth: cat === "structural" ? 1.5 : 2,
         strokeDasharray: edgeDash(cat, obs),
         strokeLinecap: "round" as const,
+        opacity: e.dimmed ? 0.12 : 1,
       },
       markerEnd: { type: MarkerType.ArrowClosed, color },
     }
@@ -290,6 +309,14 @@ onNodeContextMenu(({ node, event }) => {
   e.preventDefault?.()
   emit("node-contextmenu", { id: node.id, x: e.clientX, y: e.clientY })
 })
+// Vue Flow's zoom Controls sit bottom-left and the MiniMap bottom-right; clear
+// whichever the legend shares a corner with so they don't stack.
+const legendOffset = computed(() => {
+  if (props.legendPosition === "bottom-left") return "!left-12"
+  if (props.legendPosition === "bottom-right") return "!bottom-40"
+  return ""
+})
+
 // Legend rows mirror the edge encoding exactly (same colours/dashes).
 const legendItems = [
   { label: "Network", color: CATEGORY_COLOR.network, width: 2, dash: "0" },
@@ -338,7 +365,7 @@ defineExpose({ fitView, setViewport: applyViewport })
     <Controls />
 
     <!-- Edge-type legend: makes the colour/dash encoding self-explanatory. -->
-    <Panel v-if="legend" position="top-right">
+    <Panel v-if="legend" :position="legendPosition" :class="legendOffset">
       <div
         class="flex flex-col gap-1.5 rounded-card border border-line bg-surface-overlay/90 px-3 py-2 text-[11px] backdrop-blur"
       >

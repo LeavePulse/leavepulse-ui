@@ -72,10 +72,12 @@ const widthClass = computed(() => {
 // inset horizontally; top only when there's no header, bottom only when there's
 // no footer (header/footer own those edges).
 const slots = useSlots()
+// The body clips overflow and focus rings are drawn outside their control, so a
+// field flush against the top edge lost its ring; pt-1 clears the ring's width.
 const bodyPad = computed(() =>
   [
     "px-5",
-    props.title || slots.title ? "" : "pt-5",
+    props.title || slots.title ? "pt-1" : "pt-5",
     slots.footer ? "" : "pb-5",
   ]
     .filter(Boolean)
