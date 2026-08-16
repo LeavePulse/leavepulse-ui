@@ -140,16 +140,19 @@ function onOpenAutoFocus(event: Event) {
     // `focus-visible` is the browser's own heuristic and cannot be forced, so
     // the ring is driven off an attribute the kit owns. Removed as soon as the
     // element loses focus, leaving normal focus-visible behaviour in charge.
-    target.setAttribute("data-lp-focus-ring", "")
-    target.addEventListener(
-      "blur",
-      () => target.removeAttribute("data-lp-focus-ring"),
-      { once: true },
-    )
-    target.focus()
-    if (target instanceof HTMLInputElement && target.type === "text") {
-      target.select()
+    //
+    // Skipped for a control whose own shell already draws a ring on
+    // focus-within: our fields put the border and ring on the wrapper, so
+    // adding one to the bare <input> stacks a second ring inside the first.
+    if (!target.closest("[data-lp-ring-owner]")) {
+      target.setAttribute("data-lp-focus-ring", "")
+      target.addEventListener(
+        "blur",
+        () => target.removeAttribute("data-lp-focus-ring"),
+        { once: true },
+      )
     }
+    target.focus()
     return
   }
 }

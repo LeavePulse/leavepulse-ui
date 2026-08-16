@@ -118,6 +118,7 @@ defineExpose({
     :style="hasField ? rootStyle : undefined"
   >
     <div
+      data-lp-ring-owner
       :class="[shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : rootClass]"
       :style="hasField ? undefined : rootStyle"
     >
@@ -133,7 +134,7 @@ defineExpose({
         :disabled="disabled"
         :aria-invalid="isInvalidState || undefined"
         :class="[
-          'min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted',
+          'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
           hasLeading ? 'pl-2' : padX[size ?? 'md'],
           hasTrailing ? '' : padX[size ?? 'md'],
         ]"

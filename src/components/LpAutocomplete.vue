@@ -180,6 +180,7 @@ function clear() {
     class="relative"
   >
     <ComboboxAnchor
+      data-lp-ring-owner
       class="flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
       :class="[
         anchorSize[size],
@@ -202,7 +203,7 @@ function clear() {
         :disabled="disabled"
         :aria-invalid="isInvalidState || undefined"
         auto-focus
-        class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted"
+        class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
         @beforeinput="onBeforeInput"
         @paste="onPaste"
         @input="onInput"

@@ -150,6 +150,7 @@ const sizeClass = {
 
 <template>
   <div
+    data-lp-ring-owner
     class="flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring"
     :class="[
       sizeClass[size],
@@ -232,7 +233,7 @@ const sizeClass = {
       type="tel"
       inputmode="tel"
       autocomplete="tel"
-      class="min-w-0 flex-1 bg-transparent px-3 outline-none placeholder:text-muted"
+      class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent px-3 outline-none placeholder:text-muted"
       @beforeinput="onBeforeInput"
       @paste="onPaste"
       @input="onInput"

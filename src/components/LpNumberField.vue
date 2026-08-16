@@ -28,6 +28,7 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
     :max="max"
     :step="step"
     :disabled="disabled"
+    data-lp-ring-owner
     class="flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
     @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
   >
