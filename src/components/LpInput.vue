@@ -14,7 +14,11 @@ import LpIcon from "./LpIcon.vue"
 const shell = tv({
   base: [
     "flex w-full items-center bg-surface-soft text-ink",
-    "rounded-control border border-line",
+    // `overflow-hidden` because rounding a box does NOT clip what is inside it:
+    // the shell carries the radius while the bare <input> is square, so any
+    // paint of its own — the background a browser applies to an autofilled
+    // field, most visibly — reached into the rounded corners.
+    "overflow-hidden rounded-control border border-line",
     "transition-colors duration-[var(--duration-fast)]",
     "focus-within:border-brand focus-within:ring-2 focus-within:ring-ring",
     "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55",
