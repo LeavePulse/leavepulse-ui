@@ -156,6 +156,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "connect", value: Connection): void
   (e: "node-select", id: string): void
+  /** Double-click — the host's "open this" gesture, distinct from selecting. */
+  (e: "node-activate", id: string): void
   (e: "node-contextmenu", value: { id: string; x: number; y: number }): void
   (e: "edge-contextmenu", value: { id: string; x: number; y: number }): void
   (e: "pane-click"): void
@@ -285,6 +287,7 @@ const flowEdges = computed(() =>
 
 const {
   onNodeClick,
+  onNodeDoubleClick,
   onNodeContextMenu,
   onEdgeContextMenu,
   onPaneClick,
@@ -296,6 +299,9 @@ const {
   setViewport,
 } = useVueFlow()
 onNodeClick(({ node }) => emit("node-select", node.id))
+// A node usually has two levels of interest — pick it out, or open it — and a
+// single click cannot carry both. Hosts that only need one can ignore this.
+onNodeDoubleClick(({ node }) => emit("node-activate", node.id))
 // Drag settled → surface the node's final position so the host can persist it.
 onNodeDragStop(({ node }) =>
   emit("node-drag-stop", { id: node.id, position: { ...node.position } }),
