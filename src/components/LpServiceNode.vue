@@ -52,6 +52,13 @@ const icon = computed(() => kindIcon[props.data.kind ?? "service"] ?? "◇")
       class="!size-1.5 !border !border-[var(--accent)] !bg-surface"
     />
     <span class="text-[11px] text-[var(--accent)]">{{ icon }}</span>
-    <span class="flex-1 truncate text-[11px] font-medium text-ink">{{ data.name }}</span>
+    <span class="min-w-0 flex-1">
+      <span class="block truncate text-[11px] font-medium text-ink">{{ data.name }}</span>
+      <!-- `stack` was accepted and then silently dropped, so anything a host
+           put there vanished. It is the one line of context that fits. -->
+      <span v-if="data.stack" class="block truncate text-[9px] text-muted">
+        {{ data.stack }}
+      </span>
+    </span>
   </div>
 </template>
