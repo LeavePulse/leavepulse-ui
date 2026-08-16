@@ -125,6 +125,10 @@ const props = withDefaults(
      * minimap owns the bottom-right.
      */
     legendPosition?: "top-left" | "top-right" | "bottom-left" | "bottom-right"
+    /** Rename legend rows to match what this graph's edges actually mean. */
+    legendLabels?: Partial<
+      Record<"network" | "structural" | "pending" | "drift", string>
+    >
     /**
      * Background swimlanes drawn beneath the nodes (one per project / overlay).
      * Non-interactive; pan/zoom with the graph. Empty = no lanes.
@@ -327,12 +331,20 @@ const legendOffset = computed(() => {
 })
 
 // Legend rows mirror the edge encoding exactly (same colours/dashes).
-const legendItems = [
-  { label: "Network", color: CATEGORY_COLOR.network, width: 2, dash: "0" },
-  { label: "Depends-on", color: CATEGORY_COLOR.structural, width: 1.5, dash: "1 5" },
-  { label: "Pending", color: "var(--color-brand)", width: 2, dash: "6 5" },
-  { label: "Drift", color: "var(--color-danger)", width: 2, dash: "6 5" },
-] as const
+// What each encoding MEANS depends on what the host is drawing: the same solid
+// line is a transport on a machine graph and a call on a service graph, so
+// "Network" would be wrong half the time. `legendLabels` renames any row.
+const legendItems = computed(() => [
+  { label: props.legendLabels?.network ?? "Network", color: CATEGORY_COLOR.network, width: 2, dash: "0" },
+  {
+    label: props.legendLabels?.structural ?? "Depends-on",
+    color: CATEGORY_COLOR.structural,
+    width: 1.5,
+    dash: "1 5",
+  },
+  { label: props.legendLabels?.pending ?? "Pending", color: "var(--color-brand)", width: 2, dash: "6 5" },
+  { label: props.legendLabels?.drift ?? "Drift", color: "var(--color-danger)", width: 2, dash: "6 5" },
+])
 
 onEdgeContextMenu(({ edge, event }) => {
   // Right-click an edge → host renders edge actions (change transport, remove…).
