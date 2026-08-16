@@ -26,6 +26,7 @@ import { computed, markRaw, watch, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 import LpLaneNode from "./LpLaneNode.vue"
 import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
+import LpWaypointEdge from "./LpWaypointEdge.vue"
 
 // Vue Flow base CSS + canvas chrome theming is shipped via the kit's
 // "@leavepulse/ui/canvas.css" export (a plain CSS file). Component-local CSS
@@ -77,6 +78,11 @@ export interface TopologyEdge {
    * every unrelated line at full strength.
    */
   dimmed?: boolean
+  /**
+   * Points the edge should curve through, when the host's layout knows where
+   * the gaps are. Requires `edgeType: "waypoints"`; ignored otherwise.
+   */
+  waypoints?: { x: number; y: number }[]
 }
 
 /**
@@ -131,7 +137,7 @@ const props = withDefaults(
      * LAYERED one — a long edge crosses the cards standing between its columns.
      * `smoothstep` routes orthogonally through the gaps instead.
      */
-    edgeType?: "default" | "smoothstep" | "step" | "straight"
+    edgeType?: "default" | "smoothstep" | "step" | "straight" | "waypoints"
     /** Rename legend rows to match what this graph's edges actually mean. */
     legendLabels?: Partial<
       Record<"network" | "structural" | "pending" | "drift", string>
@@ -192,6 +198,9 @@ const nodeTypes: NodeTypesObject = {
   service: markRaw(LpServiceNode) as Component,
   lane: markRaw(LpLaneNode) as Component,
 }
+// `waypoints` curves through the points an edge carries, for layouts that know
+// where the gaps are; with none it falls back to the plain bezier.
+const edgeTypes = { waypoints: markRaw(LpWaypointEdge) as Component }
 
 // Lanes render as non-interactive Vue Flow nodes BENEATH the graph: prepended
 // so they paint first, with selecting/dragging/connecting off and a low z so
@@ -276,6 +285,7 @@ const flowEdges = computed(() =>
       source: e.source,
       target: e.target,
       type: props.edgeType ?? "default",
+      data: { waypoints: e.waypoints },
       animated: obs !== "applied" && !e.dimmed,
       label: e.kind,
       labelBgStyle: { fill: "var(--color-surface)" },
@@ -382,6 +392,7 @@ defineExpose({ fitView, setViewport: applyViewport })
     :nodes="flowNodes"
     :edges="flowEdges"
     :node-types="nodeTypes"
+    :edge-types="edgeTypes"
     :nodes-connectable="connectable"
     :selection-on-drag="selectable"
     :pan-on-drag="selectable ? [1, 2] : true"

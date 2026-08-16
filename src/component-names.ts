@@ -68,5 +68,6 @@ export const COMPONENT_NAMES = [
   "LpToaster",
   "LpTooltip",
   "LpTopologyCanvas",
-  "LpUptimeBar"
+  "LpUptimeBar",
+  "LpWaypointEdge"
 ] as const
