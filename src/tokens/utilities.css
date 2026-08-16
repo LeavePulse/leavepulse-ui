@@ -61,10 +61,16 @@
   transition: background-color 100000s ease-in-out 0s;
 }
 
-/* Firefox names it differently and does honour a background here. */
-.lp-autofill:autofill,
-.lp-autofill:-moz-autofill {
-  background-color: var(--color-surface-soft);
-  color: var(--color-ink);
+/*
+ * Firefox uses the standard name. Kept in its OWN rule: a selector list is
+ * dropped whole when any part of it fails to parse, so pairing this with the
+ * `-webkit-` prefixed one would silently lose it in every browser that knows
+ * only one of the two — which is exactly how this looked fixed while doing
+ * nothing on Firefox.
+ */
+.lp-autofill:autofill {
+  box-shadow: inset 0 0 0 1000px var(--color-surface-soft);
+  -webkit-text-fill-color: var(--color-ink);
+  caret-color: var(--color-ink);
   filter: none;
 }
