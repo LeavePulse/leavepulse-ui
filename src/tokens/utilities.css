@@ -38,26 +38,31 @@
 }
 
 /*
- * Autofilled fields keep the field's own colours.
+ * Autofilled fields, in the kit's own palette.
  *
- * A browser paints its own background on an autofilled control, and it wins
- * over `background` outright. Our inputs draw their surface and border on the
- * WRAPPER, so that paint lands on the bare <input> inside — a band of colour
- * that stops short of the field's real height and reads as a rendering fault.
+ * A browser paints its own background on an autofilled control and it beats any
+ * `background`, so the state cannot simply be styled — it has to be covered.
+ * Keeping it VISIBLE is the point: a filled-in field should still say it was
+ * filled in by the password manager. What it must not do is look broken, and
+ * the browser default did two things that read as a rendering fault.
  *
- * The background cannot be overridden, so it is covered: a large inset shadow
- * repaints the control in the field's own surface colour, and the text colour
- * is forced back with `-webkit-text-fill-color`, which the autofill style also
- * hijacks. The transition delay keeps Chrome from flashing its yellow during
- * the fade it runs on load.
+ * First, our fields draw their surface and border on the WRAPPER, so the paint
+ * landed on the bare <input> inside — a band of colour stopping short of the
+ * field's real height. The input now stretches the full inner height.
+ *
+ * Second, the wrapper is what carries the rounded corners, so an inset shadow
+ * on a square <input> filled the rounded frame with square corners. The radius
+ * is inherited here so the tint follows the same shape as the field.
  */
 .lp-autofill:-webkit-autofill,
 .lp-autofill:-webkit-autofill:hover,
 .lp-autofill:-webkit-autofill:focus,
 .lp-autofill:-webkit-autofill:active {
-  box-shadow: inset 0 0 0 1000px var(--color-surface-soft);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1000px var(--color-brand-soft);
   -webkit-text-fill-color: var(--color-ink);
   caret-color: var(--color-ink);
+  /* Outruns the fade Chrome plays on load, which would flash its yellow. */
   transition: background-color 100000s ease-in-out 0s;
 }
 
@@ -69,7 +74,8 @@
  * nothing on Firefox.
  */
 .lp-autofill:autofill {
-  box-shadow: inset 0 0 0 1000px var(--color-surface-soft);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1000px var(--color-brand-soft);
   -webkit-text-fill-color: var(--color-ink);
   caret-color: var(--color-ink);
   filter: none;
