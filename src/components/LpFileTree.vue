@@ -155,6 +155,12 @@ const index = computed(() => {
 
 const byId = computed(() => index.value.byId)
 
+// One pass for the whole tree; every row reads its entry by id instead of
+// walking its own subtree on each render. Declared before `summary`, which
+// reads it and is watched eagerly — a `const` below that watcher is still in
+// its temporal dead zone when the watcher first runs.
+const stats = computed(() => computeStats(props.nodes, checkedIds.value))
+
 /**
  * What the ticked set adds up to. Directories are counted but not sized — their
  * bytes arrive through the files inside them, so summing both would double-count.
@@ -267,10 +273,6 @@ function clearChecked() {
 const requested = new Set<string>()
 
 const roots = computed(() => (props.sort ? sortNodes(props.nodes) : props.nodes))
-
-// One pass for the whole tree; every row reads its entry by id instead of
-// walking its own subtree on each render.
-const stats = computed(() => computeStats(props.nodes, checkedIds.value))
 
 /** Rows currently visible, in render order — the axis the arrow keys walk. */
 const visible = computed(() => {
