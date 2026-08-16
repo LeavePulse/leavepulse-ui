@@ -125,6 +125,13 @@ const props = withDefaults(
      * minimap owns the bottom-right.
      */
     legendPosition?: "top-left" | "top-right" | "bottom-left" | "bottom-right"
+    /**
+     * Edge shape. The default bezier bulges away from the straight line between
+     * its ends, which suits a free-form graph and cuts through everything in a
+     * LAYERED one — a long edge crosses the cards standing between its columns.
+     * `smoothstep` routes orthogonally through the gaps instead.
+     */
+    edgeType?: "default" | "smoothstep" | "step" | "straight"
     /** Rename legend rows to match what this graph's edges actually mean. */
     legendLabels?: Partial<
       Record<"network" | "structural" | "pending" | "drift", string>
@@ -268,7 +275,7 @@ const flowEdges = computed(() =>
       id: e.id,
       source: e.source,
       target: e.target,
-      type: "default",
+      type: props.edgeType ?? "default",
       animated: obs !== "applied" && !e.dimmed,
       label: e.kind,
       labelBgStyle: { fill: "var(--color-surface)" },
