@@ -160,9 +160,15 @@ const sizeClass = {
       disabled ? 'cursor-not-allowed opacity-55' : '',
     ]"
   >
+    <!-- reset-search-term-on-{select,blur}: as in LpSelect, the trigger shows
+         the selection and the box only filters, so reka seeding the chosen value
+         into it would pin the list to one country. Harmless today because the
+         select handler clears `query` by hand, declared so it stays that way. -->
     <ComboboxRoot
       v-model:open="open"
       :ignore-filter="true"
+      :reset-search-term-on-select="false"
+      :reset-search-term-on-blur="false"
       :disabled="disabled"
       class="flex"
     >
