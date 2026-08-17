@@ -103,6 +103,9 @@ const emit = defineEmits<{
   (e: "update:checked", ids: string[]): void
   /** Ticked set changed, with the rolled-up stats already computed. */
   (e: "summary", summary: FileTreeSummary): void
+  /* Not prevented here: a caller that wants the native menu on some rows needs
+     the event intact to decide. */
+  (e: "contextmenu", node: FileNode, event: MouseEvent): void
 }>()
 
 defineSlots<{
@@ -528,6 +531,7 @@ defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary }
           @toggle="onToggle"
           @focus="focusedId = $event.id"
           @check="onCheck"
+          @contextmenu="(n, e) => emit('contextmenu', n, e)"
         >
           <template #row="slotProps">
             <slot name="row" v-bind="slotProps" />

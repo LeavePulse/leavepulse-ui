@@ -47,6 +47,7 @@ const emit = defineEmits<{
   (e: "toggle", node: FileNode): void
   (e: "focus", node: FileNode): void
   (e: "check", node: FileNode, value: boolean): void
+  (e: "contextmenu", node: FileNode, event: MouseEvent): void
 }>()
 
 // Declared explicitly: the component renders itself, so an inferred slot type
@@ -176,6 +177,7 @@ function onActivate() {
         ]"
         :style="{ paddingLeft: `${depth * 14 + 6}px` }"
         @click.stop="onActivate"
+        @contextmenu="emit('contextmenu', node, $event)"
       >
         <!-- Chevron sits in a fixed-width slot so names line up whether or not
              the row can expand. Leaves get the same gutter, left empty. -->
@@ -281,6 +283,7 @@ function onActivate() {
           @toggle="emit('toggle', $event)"
           @focus="emit('focus', $event)"
           @check="(n, v) => emit('check', n, v)"
+          @contextmenu="(n, e) => emit('contextmenu', n, e)"
         >
           <template #row="slotProps">
             <slot name="row" v-bind="slotProps" />
