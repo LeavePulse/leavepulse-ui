@@ -18,7 +18,10 @@ export interface ColorTokens {
   brandSoft: string
   action: string
   actionHover: string
+  actionSoft: string
   accent: string
+  accentHover: string
+  accentSoft: string
   danger: string
   dangerHover: string
   dangerSoft: string
@@ -99,7 +102,10 @@ export const COLOR_VARS: Record<keyof ColorTokens, string> = {
   brandSoft: "--color-brand-soft",
   action: "--color-action",
   actionHover: "--color-action-hover",
+  actionSoft: "--color-action-soft",
   accent: "--color-accent",
+  accentHover: "--color-accent-hover",
+  accentSoft: "--color-accent-soft",
   danger: "--color-danger",
   dangerHover: "--color-danger-hover",
   dangerSoft: "--color-danger-soft",

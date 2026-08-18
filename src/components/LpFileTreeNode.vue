@@ -178,8 +178,17 @@ function onActivate() {
         @click.stop="onActivate"
       >
         <!-- Chevron sits in a fixed-width slot so names line up whether or not
-             the row can expand. Leaves get the same gutter, left empty. -->
-        <span class="flex size-4 shrink-0 items-center justify-center">
+             the row can expand. Leaves get the same gutter, left empty.
+
+             It is its own hit target, like the checkbox: opening a folder to
+             see what is in it is a different intent from selecting it, and on
+             a tree that drives a details pane the two must not be the same
+             click. The row as a whole still does both. -->
+        <span
+          class="flex size-4 shrink-0 items-center justify-center"
+          :class="canExpand ? 'cursor-pointer rounded-sm hover:bg-line' : ''"
+          @click.stop="canExpand && !node.disabled ? emit('toggle', node) : undefined"
+        >
           <LpIcon
             v-if="isLoading"
             name="lucide:loader-circle"

@@ -36,7 +36,10 @@
   --color-brand-soft: rgba(0, 188, 255, 0.16);
   --color-action: #39e58c;
   --color-action-hover: #4dffa1;
+  --color-action-soft: rgba(57, 229, 140, 0.14);
   --color-accent: #f0b35a;
+  --color-accent-hover: #f2bf74;
+  --color-accent-soft: rgba(240, 179, 90, 0.14);
   --color-danger: #ff6f6f;
   --color-danger-hover: #ff8585;
   --color-danger-soft: rgba(255, 111, 111, 0.14);
