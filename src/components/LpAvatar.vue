@@ -15,9 +15,11 @@ const avatar = tv({
   base: "inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-surface-soft font-medium text-muted-strong",
   variants: {
     size: {
+      xs: "size-5 text-[10px]",
       sm: "size-7 text-xs",
       md: "size-9 text-sm",
       lg: "size-12 text-base",
+      xl: "size-16 text-lg",
     },
     // People read as circles; things (servers, projects, orgs) read as
     // rounded squares — the same distinction platform icons make.
@@ -39,6 +41,8 @@ const props = withDefaults(
     alt?: string
     fallback?: string
     size?: AvatarVariants["size"]
+    /** Explicit pixel size, wins over `size` — for avatars keyed to a layout. */
+    pixelSize?: number
     /** Silhouette: circle for people, soft/square for servers and projects. */
     shape?: AvatarVariants["shape"]
     /** Draws a hairline ring, for avatars laid over imagery or other avatars. */
@@ -47,6 +51,18 @@ const props = withDefaults(
     menuItems?: ContextMenuItemDef[]
   }>(),
   { size: "md", shape: "circle", ring: false },
+)
+
+// A pixel size drives both box and glyph, so the initials keep their
+// proportion instead of staying at the preset's step.
+const sizeStyle = computed(() =>
+  props.pixelSize
+    ? {
+        width: `${props.pixelSize}px`,
+        height: `${props.pixelSize}px`,
+        fontSize: `${Math.max(10, Math.round(props.pixelSize * 0.4))}px`,
+      }
+    : undefined,
 )
 
 const initials = computed(
@@ -67,12 +83,12 @@ onMounted(() => {
 
 <template>
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <AvatarRoot :class="avatar({ size, shape, ring })" v-bind="$attrs">
+    <AvatarRoot :class="avatar({ size: pixelSize ? undefined : size, shape, ring })" :style="sizeStyle" v-bind="$attrs">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
-  <AvatarRoot v-else :class="avatar({ size, shape, ring })" v-bind="$attrs">
+  <AvatarRoot v-else :class="avatar({ size: pixelSize ? undefined : size, shape, ring })" :style="sizeStyle" v-bind="$attrs">
     <AvatarImage v-if="src" :src="src" :alt="alt" class="size-full object-cover" />
     <AvatarFallback>{{ initials }}</AvatarFallback>
   </AvatarRoot>

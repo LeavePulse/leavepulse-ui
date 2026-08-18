@@ -489,10 +489,20 @@ export const registry: ComponentEntry[] = [
   {
     id: "stepper",
     name: "Stepper",
-    description: "Multi-step progress indicator.",
+    description: "Multi-step progress indicator. `current` takes an index or a step key; pass `completed` when a flow finishes steps out of order.",
     components: { LpStepper },
-    state: () => reactive({ steps: [{ label: "Account" }, { label: "Profile" }, { label: "Done" }] }),
-    template: `<LpStepper :steps="steps" :current="1" />`,
+    state: () =>
+      reactive({
+        steps: [
+          { key: "account", label: "Account" },
+          { key: "profile", label: "Profile", icon: "lucide:user" },
+          { key: "done", label: "Done" },
+        ],
+      }),
+    template: `<div class="flex w-full flex-col gap-6">
+  <LpStepper :steps="steps" :current="1" />
+  <LpStepper :steps="steps" current="profile" :completed="['account', 'done']" />
+</div>`,
   },
   {
     id: "breadcrumbs",

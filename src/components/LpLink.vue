@@ -24,11 +24,13 @@ const props = withDefaults(
     as?: string | Component
     /**
      * "default" — plain hover underline.
+     * "underline" — underlined at rest; for links inside running prose,
+     *   where hover-only underlines leave the link invisible until pointed at.
      * "reveal"  — an underline bar that grows in from the left on hover
      *   (origin-left scale-x 0→1). The LeavePulse landing "monitoring" link feel;
      *   good for inline prose links and nav items that want a bit of motion.
      */
-    variant?: "default" | "reveal"
+    variant?: "default" | "underline" | "reveal"
   }>(),
   { variant: "default", as: "a" },
 )
@@ -72,7 +74,11 @@ const revealClass =
     class="inline-flex items-center gap-1 underline-offset-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
     :class="[
       colorClass,
-      variant === 'reveal' ? revealClass : 'hover:underline',
+      variant === 'reveal'
+        ? revealClass
+        : variant === 'underline'
+          ? 'underline decoration-current/40 hover:decoration-current'
+          : 'hover:underline',
     ]"
   >
     <slot />
