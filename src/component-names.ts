@@ -7,6 +7,7 @@ export const COMPONENT_NAMES = [
   "LpAddressInput",
   "LpAlert",
   "LpAppShell",
+  "LpAutoSize",
   "LpAutocomplete",
   "LpAvatar",
   "LpBadge",

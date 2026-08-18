@@ -11,6 +11,12 @@
  *  - a default `isActive` (path prefix-match) and a default page title derived
  *    from the nav items, so the header title and the active pill never drift.
  *
+ * The header bar's two content-driven regions — the title block and the actions
+ * cluster — ease between sizes rather than snapping (LpAutoSize). Those regions
+ * change constantly in normal use: actions teleport in per route or per section
+ * tab, and every label is translated, so their measurements move under the
+ * user. Without the easing each change re-lays the bar in a single frame.
+ *
  * Everything product-specific goes through slots: #logo (brand in the rail
  * header), #sidebar-actions / #sidebar-footer (pass-through to LpSidebar),
  * #header-actions (right side of the top bar — bell, search, theme switch),
@@ -18,7 +24,8 @@
  * Overlays that aren't part of the frame (command palette, toaster) live in the
  * host next to <LpAppShell>.
  */
-import { computed, ref, watch } from "vue"
+import { computed, watch } from "vue"
+import LpAutoSize from "./LpAutoSize.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -195,13 +202,26 @@ defineExpose({ openDrawer: _openDrawer })
           <LpIcon name="lucide:menu" :size="18" />
         </LpButton>
 
-        <slot name="header-title">
-          <h1 class="truncate text-lg font-semibold">{{ pageTitle }}</h1>
-        </slot>
+        <!-- The title block eases its height: a page that adds a subtitle, or a
+             translation that wraps a long title onto a second line, otherwise
+             re-lays the whole bar in one frame. Width is left free so the
+             truncation still resolves against the space actually available. -->
+        <LpAutoSize axis="height" class="flex min-w-0 flex-1 items-center">
+          <slot name="header-title">
+            <h1 class="truncate text-lg font-semibold">{{ pageTitle }}</h1>
+          </slot>
+        </LpAutoSize>
 
-        <div v-if="$slots['header-actions']" class="ml-auto flex items-center gap-2">
+        <!-- Actions ease their WIDTH. This is the bar's worst offender: page
+             actions arrive by teleport, so a button appears or disappears with
+             the route or the section tab, and a translation swaps a short label
+             for a long one — each snapping every control to its left sideways.
+             Kept mounted regardless of the slot, so a page that only teleports
+             into it still gets the easing (an empty box measures zero wide and
+             costs nothing). -->
+        <LpAutoSize axis="width" class="ml-auto flex shrink-0 items-center gap-2">
           <slot name="header-actions" />
-        </div>
+        </LpAutoSize>
       </header>
 
       <!-- full-bleed: page owns the whole region (canvas/map); otherwise the

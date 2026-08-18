@@ -23,6 +23,7 @@ export type {
 } from "./components/address"
 export { default as LpAlert } from "./components/LpAlert.vue"
 export { default as LpAppShell } from "./components/LpAppShell.vue"
+export { default as LpAutoSize } from "./components/LpAutoSize.vue"
 export { default as LpAutocomplete } from "./components/LpAutocomplete.vue"
 export type { AutocompleteOption } from "./components/LpAutocomplete.vue"
 export { default as LpAvatar } from "./components/LpAvatar.vue"
@@ -192,6 +193,12 @@ export { useRovingFocus } from "./composables/useRovingFocus"
 export type { RovingItem, UseRovingFocusOptions } from "./composables/useRovingFocus"
 export { useSettled } from "./composables/useSettled"
 export type { UseSettledOptions } from "./composables/useSettled"
+export { useSizeTransition } from "./composables/useSizeTransition"
+export type {
+  SizeAxis,
+  UseSizeTransition,
+  UseSizeTransitionOptions,
+} from "./composables/useSizeTransition"
 export { useTilt } from "./composables/useTilt"
 export type { UseTilt, UseTiltOptions } from "./composables/useTilt"
 export { useZoomPan } from "./composables/useZoomPan"

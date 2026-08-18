@@ -6,7 +6,7 @@
  * override lets it fill the frame instead of the viewport) to show it in context
  * without taking over the playground chrome.
  */
-import { ref } from "vue"
+import { computed, ref } from "vue"
 import {
   LpAppShell,
   LpAvatar,
@@ -14,6 +14,7 @@ import {
   LpButton,
   LpCard,
   LpIcon,
+  LpSegmented,
   LpStat,
   type SidebarItem,
   type SidebarSection,
@@ -45,6 +46,38 @@ const stats = [
   { label: "Uptime", value: "99.98%", delta: 0.4 },
   { label: "Spend", value: "$248", delta: -12, invert: true },
 ]
+
+/*
+ * The header's moving parts, exercised deliberately.
+ *
+ * Each section carries a different primary action — one carries none — and the
+ * labels differ in length, which is exactly what a translated UI does to a
+ * toolbar. Switching sections therefore changes the width of the actions
+ * cluster and the height of the title block. The shell eases both instead of
+ * re-laying the bar in one frame; flip between sections to watch it.
+ */
+const section = ref("racks")
+const sectionOptions = [
+  { value: "racks", label: "Racks" },
+  { value: "stock", label: "Stock" },
+  { value: "devices", label: "Devices" },
+]
+const sectionAction = computed(
+  () =>
+    ({
+      racks: "New rack",
+      stock: "",
+      devices: "Register a new device",
+    })[section.value],
+)
+const sectionSubtitle = computed(
+  () =>
+    ({
+      racks: "LH-NV-DC1 · Novovolynsk",
+      stock: "",
+      devices: "LH-NV-DC1 · Novovolynsk · 48 units",
+    })[section.value],
+)
 </script>
 
 <template>
@@ -58,7 +91,24 @@ const stats = [
           </div>
         </template>
 
+        <!-- A title that gains and loses a subtitle: the block changes height,
+             and the shell eases it rather than jolting the bar. -->
+        <template #header-title>
+          <div class="min-w-0">
+            <h1 class="truncate text-lg font-semibold leading-tight">Datacentre DC1</h1>
+            <p v-if="sectionSubtitle" class="truncate text-xs text-muted">
+              {{ sectionSubtitle }}
+            </p>
+          </div>
+        </template>
+
         <template #header-actions>
+          <!-- The primary action changes with the section — present or absent,
+               short label or long. That is what moves everything to its left. -->
+          <LpButton v-if="sectionAction" size="sm">
+            <LpIcon name="lucide:plus" :size="16" />
+            {{ sectionAction }}
+          </LpButton>
           <LpButton variant="ghost" size="sm" square aria-label="Search">
             <LpIcon name="lucide:search" :size="18" />
           </LpButton>
@@ -80,6 +130,20 @@ const stats = [
 
         <!-- Page body -->
         <div class="flex flex-col gap-6">
+          <LpCard>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="font-semibold text-ink">Header motion</h2>
+                <p class="mt-1 text-sm text-muted">
+                  Switch sections: the primary action appears, disappears and
+                  changes length, and the subtitle comes and goes. The header
+                  eases between those sizes instead of snapping.
+                </p>
+              </div>
+              <LpSegmented v-model="section" :options="sectionOptions" size="sm" />
+            </div>
+          </LpCard>
+
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <LpStat
               v-for="s in stats"

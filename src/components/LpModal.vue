@@ -9,7 +9,8 @@ import {
   DialogTitle,
 } from "reka-ui"
 import type { ComponentPublicInstance } from "vue"
-import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
+import { computed, ref, useSlots, watch } from "vue"
+import { useSizeTransition } from "../composables/useSizeTransition"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -86,20 +87,14 @@ const bodyPad = computed(() =>
 
 /*
  * Height is content-derived, so a body that arrives late — a placeholder swapped
- * for the loaded thing — resizes the panel in a single frame, right on top of
- * the open animation. CSS alone can't smooth it: `height: auto` isn't
- * interpolable, and the keyword-interpolation escape hatches
- * (`interpolate-size`, `calc-size()`) are Chromium-only, so they would do
- * nothing in the WebKitGTK launcher. Measuring and pinning a pixel height is
- * what works on every engine.
+ * for the loaded thing — would resize the panel in a single frame, right on top
+ * of the open animation. The easing is set up further down.
  *
  * The pin is always the panel's own natural height, so `max-h` still clips and
  * the body keeps `flex-1 min-h-0` — an over-tall panel hands its overflow to the
  * scroll area exactly as before. A panel whose size never moves is pinned once
  * and never transitions.
  */
-// reka renders a real element but exposes it as a component instance, so the
-// panel is reached through $el.
 const panelRef = ref<ComponentPublicInstance | null>(null)
 
 /**
@@ -156,130 +151,27 @@ function onOpenAutoFocus(event: Event) {
     return
   }
 }
-const tweening = ref(false)
-const resizing = ref(false)
+// The panel's height eases between content-derived sizes — see
+// `useSizeTransition`, which owns the measure/pin/tween mechanism and is shared
+// with LpAutoSize. Gated on `open`, because the panel is portalled and remounts
+// on every open: a remount must measure afresh rather than ease in from the
+// size the previous incarnation happened to hold.
+const {
+  el: sizedEl,
+  tweening,
+  resizing,
+} = useSizeTransition({ axis: "height", enabled: () => props.open })
 
-/** Kept in step with the `duration-fast` utility on the panel. */
-const TWEEN_MS = 160
-
-let ro: ResizeObserver | undefined
-let mo: MutationObserver | undefined
-let raf = 0
-let settleTimer: ReturnType<typeof setTimeout> | undefined
-/** Where the panel last settled, so a retune has a height to ease FROM. */
-let lastHeight = 0
-/** True while a tween owns the height, so observers don't cancel it midway. */
-let inFlight = false
-
-// The height is driven imperatively rather than through a style binding. By the
-// time replacement content is in the DOM the panel has already reflowed to its
-// new size, so a bound value would only ever be written once, with no earlier
-// height for the transition to start from. Writing the OLD height, forcing a
-// reflow, then writing the new one gives the transition both ends.
-const retune = (el: HTMLElement) => {
-  // One swap wakes both observers — the mutation as content lands, the resize as
-  // it reflows — and the second call would clear the pin the first just wrote.
-  if (inFlight) return
-  // Remembered, not measured: by the time either observer fires the panel has
-  // already reflowed, so the element can only report where it is going.
-  const from = lastHeight
-  el.style.height = ""
-  // `max-h` comes from a class, so the panel already reports the clipped figure
-  // once the cap bites. Pinning that would leave a short panel sitting over
-  // content it can no longer grow to fit, so the natural height is measured with
-  // the cap lifted and the clamp is left to CSS afterwards.
-  el.style.maxHeight = "none"
-  const to = el.offsetHeight
-  el.style.maxHeight = ""
-  lastHeight = to
-  // Nothing moved, so there is nothing to ease — and leaving the height unset
-  // keeps the panel free to size itself.
-  if (to === 0 || from === 0 || to === from) return
-  el.style.height = `${from}px`
-  void el.offsetHeight
-  el.style.height = `${to}px`
-
-  inFlight = true
-  // While the panel is still catching up, the body is shorter than the content
-  // it already holds, so the scroll area would flash a bar for an overflow that
-  // resolves itself the moment the transition lands.
-  resizing.value = true
-  clearTimeout(settleTimer)
-  settleTimer = setTimeout(() => {
-    inFlight = false
-    resizing.value = false
-    // Released once the panel has arrived. A height left pinned in pixels stops
-    // being a starting point and becomes a cap: content that grows afterwards
-    // is clipped, and `max-h` can no longer size the panel itself.
-    el.style.height = ""
-    // Re-read rather than trusting `to`: `max-h` may have clamped the panel
-    // short of it, and the next tween has to start from where it really sits.
-    lastHeight = el.offsetHeight
-  }, TWEEN_MS)
-}
-
-// Keyed off `open` rather than the ref: the panel is portalled and remounts on
-// every open, and the teardown has to run on close, when the ref is already gone.
+// reka renders a real element but exposes it as a component instance, so the
+// sized element is handed over through $el once the panel has mounted.
 watch(
-  () => props.open,
-  (isOpen) => {
-    ro?.disconnect()
-    mo?.disconnect()
-    ro = undefined
-    mo = undefined
-    cancelAnimationFrame(raf)
-    clearTimeout(settleTimer)
-    tweening.value = false
-    resizing.value = false
-
-    lastHeight = 0
-    inFlight = false
-
-    const el = panelRef.value?.$el
-    if (!isOpen || !(el instanceof HTMLElement)) return
-
-    lastHeight = el.offsetHeight
-    el.style.height = `${el.offsetHeight}px`
-    // The opening panel must not animate its height in from the pre-content box,
-    // so the transition only arms once that first pin has painted. The pin is
-    // dropped in the same frame: it exists to give the first `retune` something
-    // to start from, and holding it would cap the panel at its opening size.
-    raf = requestAnimationFrame(() => {
-      tweening.value = true
-      el.style.height = ""
-    })
-
-    // Two triggers, since either can move the height alone: the resize observer
-    // catches a child growing in place (an image decoding, a list filling in),
-    // the mutation observer catches one subtree swapped for another, where every
-    // observed box may keep its size. Children are observed, never the panel —
-    // that would feed the pin straight back in.
-    const watchChildren = () => {
-      if (!ro) return
-      ro.disconnect()
-      for (const child of Array.from(el.children)) ro.observe(child)
-    }
-    if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => retune(el))
-      watchChildren()
-    }
-    if (typeof MutationObserver !== "undefined") {
-      mo = new MutationObserver(() => {
-        watchChildren()
-        retune(el)
-      })
-      mo.observe(el, { childList: true, subtree: true, characterData: true })
-    }
+  () => (props.open ? panelRef.value : null),
+  (panel) => {
+    const el = panel?.$el
+    sizedEl.value = el instanceof HTMLElement ? el : null
   },
   { flush: "post" },
 )
-
-onBeforeUnmount(() => {
-  ro?.disconnect()
-  mo?.disconnect()
-  cancelAnimationFrame(raf)
-  clearTimeout(settleTimer)
-})
 </script>
 
 <template>
