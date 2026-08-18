@@ -3,7 +3,7 @@
 import LpButton from "./LpButton.vue"
 import LpModal from "./LpModal.vue"
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     open?: boolean
     title?: string
@@ -11,8 +11,15 @@ withDefaults(
     confirmLabel?: string
     cancelLabel?: string
     danger?: boolean
+    /**
+     * The confirm action is in flight: the button disables and swaps to
+     * `loadingLabel`, and confirming no longer closes the dialog — the owner
+     * closes it once the work settles, so a failure can stay on screen.
+     */
+    loading?: boolean
+    loadingLabel?: string
   }>(),
-  { confirmLabel: "Confirm", cancelLabel: "Cancel" },
+  { confirmLabel: "Confirm", cancelLabel: "Cancel", loadingLabel: "Working…" },
 )
 
 const emit = defineEmits<{
@@ -23,7 +30,9 @@ const emit = defineEmits<{
 
 function confirm() {
   emit("confirm")
-  emit("update:open", false)
+  // An async confirm owns its own dismissal; closing here would tear the
+  // dialog down before the caller knows whether the action succeeded.
+  if (!props.loading) emit("update:open", false)
 }
 function cancel() {
   emit("cancel")
@@ -40,9 +49,15 @@ function cancel() {
   >
     <slot />
     <template #footer>
-      <LpButton variant="ghost" @click="cancel">{{ cancelLabel }}</LpButton>
-      <LpButton :variant="danger ? 'danger' : 'solid'" @click="confirm">
-        {{ confirmLabel }}
+      <LpButton variant="ghost" :disabled="loading" @click="cancel">
+        {{ cancelLabel }}
+      </LpButton>
+      <LpButton
+        :variant="danger ? 'danger' : 'solid'"
+        :disabled="loading"
+        @click="confirm"
+      >
+        {{ loading ? loadingLabel : confirmLabel }}
       </LpButton>
     </template>
   </LpModal>

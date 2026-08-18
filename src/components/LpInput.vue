@@ -55,6 +55,12 @@ const props = withDefaults(
     error?: string
     icon?: string
     /**
+     * Marks the label with the required indicator. The attribute still reaches
+     * the underlying <input> for native validation; this only makes the field
+     * read as required.
+     */
+    required?: boolean
+    /**
      * RegExp/string the whole value must match to be valid. Validation only —
      * never blocks typing; a non-matching non-empty value shows the invalid
      * style + aria-invalid. A bare string is anchored, like HTML `pattern`.
@@ -118,6 +124,7 @@ defineExpose({
     :label="hasField ? label : undefined"
     :hint="hasField ? hint : undefined"
     :error="hasField ? error : undefined"
+    :required="hasField ? required : undefined"
     :class="hasField ? rootClass : undefined"
     :style="hasField ? rootStyle : undefined"
   >
@@ -136,6 +143,7 @@ defineExpose({
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        :required="required || undefined"
         :aria-invalid="isInvalidState || undefined"
         :class="[
           'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',

@@ -12,15 +12,23 @@ import { computed, onMounted, ref } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 
 const avatar = tv({
-  base: "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-pill bg-surface-soft font-medium text-muted-strong",
+  base: "inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-surface-soft font-medium text-muted-strong",
   variants: {
     size: {
       sm: "size-7 text-xs",
       md: "size-9 text-sm",
       lg: "size-12 text-base",
     },
+    // People read as circles; things (servers, projects, orgs) read as
+    // rounded squares — the same distinction platform icons make.
+    shape: {
+      circle: "rounded-pill",
+      soft: "rounded-card",
+      square: "rounded-control",
+    },
+    ring: { true: "ring-2 ring-line", false: "" },
   },
-  defaultVariants: { size: "md" },
+  defaultVariants: { size: "md", shape: "circle", ring: false },
 })
 
 type AvatarVariants = VariantProps<typeof avatar>
@@ -31,10 +39,14 @@ const props = withDefaults(
     alt?: string
     fallback?: string
     size?: AvatarVariants["size"]
+    /** Silhouette: circle for people, soft/square for servers and projects. */
+    shape?: AvatarVariants["shape"]
+    /** Draws a hairline ring, for avatars laid over imagery or other avatars. */
+    ring?: boolean
     /** Right-click menu (e.g. account quick actions). Consumer-supplied. */
     menuItems?: ContextMenuItemDef[]
   }>(),
-  { size: "md" },
+  { size: "md", shape: "circle", ring: false },
 )
 
 const initials = computed(
@@ -55,12 +67,12 @@ onMounted(() => {
 
 <template>
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <AvatarRoot :class="avatar({ size })" v-bind="$attrs">
+    <AvatarRoot :class="avatar({ size, shape, ring })" v-bind="$attrs">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
-  <AvatarRoot v-else :class="avatar({ size })" v-bind="$attrs">
+  <AvatarRoot v-else :class="avatar({ size, shape, ring })" v-bind="$attrs">
     <AvatarImage v-if="src" :src="src" :alt="alt" class="size-full object-cover" />
     <AvatarFallback>{{ initials }}</AvatarFallback>
   </AvatarRoot>

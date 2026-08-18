@@ -425,7 +425,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "avatar",
     name: "Avatar",
-    description: "User image with initials fallback, three sizes. Pass `menuItems` for a right-click account menu.",
+    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. Pass `menuItems` for a right-click account menu.",
     components: { LpAvatar },
     state: () =>
       reactive({
@@ -438,6 +438,9 @@ export const registry: ComponentEntry[] = [
     template: `<div class="flex items-center gap-3">
   <LpAvatar size="sm" fallback="SA" />
   <LpAvatar size="md" fallback="LP" />
+  <LpAvatar size="md" fallback="SV" shape="soft" />
+  <LpAvatar size="md" fallback="PR" shape="square" />
+  <LpAvatar size="md" fallback="RG" ring />
   <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" />
   <span class="text-sm text-muted">right-click the last one →</span>
 </div>`,
@@ -742,8 +745,12 @@ export const registry: ComponentEntry[] = [
     components: { LpDivider, LpLink },
     template: `<div class="flex w-80 flex-col gap-3">
   <LpLink href="#">Default link</LpLink>
+  <LpLink href="#" tone="ink">Ink link</LpLink>
+  <LpLink href="#" tone="muted">Muted link</LpLink>
+  <LpLink href="#" tone="soft">Soft link</LpLink>
   <LpDivider label="or" />
   <LpLink href="#" external>External link</LpLink>
+  <LpLink href="#" variant="reveal">Reveal underline</LpLink>
 </div>`,
   },
   {
@@ -953,7 +960,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "confirm",
     name: "ConfirmDialog",
-    description: "Confirm/cancel dialog over Modal.",
+    description: "Confirm/cancel dialog over Modal. Set `loading` while an async confirm is in flight — the dialog stays open so a failure can be shown.",
     components: { LpConfirmDialog, LpButton },
     state: () => reactive({ open: false }),
     template: `<div>

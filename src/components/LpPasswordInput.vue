@@ -9,7 +9,18 @@ import { ref } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 
-defineProps<{ modelValue?: string; placeholder?: string; invalid?: boolean; disabled?: boolean }>()
+defineProps<{
+  modelValue?: string
+  placeholder?: string
+  invalid?: boolean
+  disabled?: boolean
+  // Field wrapping mirrors LpInput: passing any of these wraps the control in
+  // LpFormField, so a password field labels itself like every other field.
+  label?: string
+  hint?: string
+  error?: string
+  required?: boolean
+}>()
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
 const visible = ref(false)
@@ -29,6 +40,10 @@ defineExpose({
     :placeholder="placeholder"
     :invalid="invalid"
     :disabled="disabled"
+    :label="label"
+    :hint="hint"
+    :error="error"
+    :required="required"
     @update:model-value="(v) => $emit('update:modelValue', v)"
   >
     <template v-if="$slots.leading" #leading><slot name="leading" /></template>
