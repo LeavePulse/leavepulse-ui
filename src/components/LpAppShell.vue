@@ -12,7 +12,7 @@
  *    from the nav items, so the header title and the active pill never drift.
  *
  * The header bar's two content-driven regions — the title block and the actions
- * cluster — ease between sizes rather than snapping (LpAutoSize). Those regions
+ * cluster — ease between sizes rather than snapping (LpShift). Those regions
  * change constantly in normal use: actions teleport in per route or per section
  * tab, and every label is translated, so their measurements move under the
  * user. Without the easing each change re-lays the bar in a single frame.
@@ -25,10 +25,10 @@
  * host next to <LpAppShell>.
  */
 import { computed, watch } from "vue"
-import LpAutoSize from "./LpAutoSize.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpShift from "./LpShift.vue"
 import LpSidebar from "./LpSidebar.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
 
@@ -206,11 +206,11 @@ defineExpose({ openDrawer: _openDrawer })
              translation that wraps a long title onto a second line, otherwise
              re-lays the whole bar in one frame. Width is left free so the
              truncation still resolves against the space actually available. -->
-        <LpAutoSize axis="height" class="flex min-w-0 flex-1 items-center">
+        <LpShift axis="height" class="flex min-w-0 flex-1 items-center">
           <slot name="header-title">
             <h1 class="truncate text-lg font-semibold">{{ pageTitle }}</h1>
           </slot>
-        </LpAutoSize>
+        </LpShift>
 
         <!-- Actions ease their WIDTH. This is the bar's worst offender: page
              actions arrive by teleport, so a button appears or disappears with
@@ -219,9 +219,9 @@ defineExpose({ openDrawer: _openDrawer })
              Kept mounted regardless of the slot, so a page that only teleports
              into it still gets the easing (an empty box measures zero wide and
              costs nothing). -->
-        <LpAutoSize axis="width" class="ml-auto flex shrink-0 items-center gap-2">
+        <LpShift axis="width" class="ml-auto flex shrink-0 items-center gap-2">
           <slot name="header-actions" />
-        </LpAutoSize>
+        </LpShift>
       </header>
 
       <!-- full-bleed: page owns the whole region (canvas/map); otherwise the

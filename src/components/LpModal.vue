@@ -10,7 +10,7 @@ import {
 } from "reka-ui"
 import type { ComponentPublicInstance } from "vue"
 import { computed, ref, useSlots, watch } from "vue"
-import { useSizeTransition } from "../composables/useSizeTransition"
+import { useShift } from "../composables/useShift"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -152,15 +152,15 @@ function onOpenAutoFocus(event: Event) {
   }
 }
 // The panel's height eases between content-derived sizes — see
-// `useSizeTransition`, which owns the measure/pin/tween mechanism and is shared
-// with LpAutoSize. Gated on `open`, because the panel is portalled and remounts
+// `useShift`, which owns the measure/pin/tween mechanism and is shared
+// with LpShift. Gated on `open`, because the panel is portalled and remounts
 // on every open: a remount must measure afresh rather than ease in from the
 // size the previous incarnation happened to hold.
 const {
   el: sizedEl,
   tweening,
   resizing,
-} = useSizeTransition({ axis: "height", enabled: () => props.open })
+} = useShift({ axis: "height", enabled: () => props.open })
 
 // reka renders a real element but exposes it as a component instance, so the
 // sized element is handed over through $el once the panel has mounted.

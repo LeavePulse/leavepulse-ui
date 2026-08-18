@@ -1,12 +1,18 @@
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 
 /*
- * "Ease this box between its own content-derived sizes."
+ * "Let this box shift its neighbours smoothly instead of jolting them."
  *
  * A box sized by what's inside it resizes in a single frame: a button appears
  * in a toolbar, a translation swaps a short word for a long one, a placeholder
  * is replaced by the loaded thing — and the layout snaps. Every neighbour it
  * pushes snaps with it.
+ *
+ * The easing is applied to the BOX, but the point of it is the neighbours. A
+ * header of fixed height never resizes, yet the controls inside it jump the
+ * moment one of them changes width; giving that one box its width back
+ * gradually is what turns the jump into a glide. So this is named for what the
+ * user sees — things shifting — not for the measurement that achieves it.
  *
  * CSS alone cannot smooth this. `width`/`height: auto` are not interpolable,
  * and the keyword-interpolation escape hatches (`interpolate-size`,
@@ -16,14 +22,14 @@ import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref }
  *
  * This was first solved inside LpModal, whose panel grows as its body arrives.
  * The mechanism is the same wherever content drives size, so it lives here and
- * LpModal consumes it — see also LpAutoSize, the wrapper form.
+ * LpModal consumes it — see also LpShift, the wrapper form.
  */
 
-export type SizeAxis = "height" | "width" | "both"
+export type ShiftAxis = "height" | "width" | "both"
 
-export interface UseSizeTransitionOptions {
+export interface UseShiftOptions {
   /** Which dimension is content-derived. Default `"height"`. */
-  axis?: MaybeRefOrGetter<SizeAxis | undefined>
+  axis?: MaybeRefOrGetter<ShiftAxis | undefined>
   /** Tween length. Defaults to the kit's `--duration-fast` (160ms). */
   duration?: MaybeRefOrGetter<number | undefined>
   /**
@@ -35,7 +41,7 @@ export interface UseSizeTransitionOptions {
   enabled?: MaybeRefOrGetter<unknown>
 }
 
-export interface UseSizeTransition {
+export interface UseShift {
   /** Attach to the element whose content-derived size should ease. */
   el: Ref<HTMLElement | null>
   /**
@@ -58,9 +64,9 @@ export interface UseSizeTransition {
 /** Kept in step with the `duration-fast` token the transition utilities use. */
 const TWEEN_MS = 160
 
-export function useSizeTransition(
-  options: UseSizeTransitionOptions = {},
-): UseSizeTransition {
+export function useShift(
+  options: UseShiftOptions = {},
+): UseShift {
   const el = ref<HTMLElement | null>(null)
   const tweening = ref(false)
   const resizing = ref(false)
@@ -126,10 +132,16 @@ export function useSizeTransition(
 
     // Nothing moved on either axis, so there is nothing to ease — and leaving
     // the size unset keeps the box free to size itself.
+    //
+    // Only the FROM size has to be non-zero. A target of zero is a real
+    // collapse — the last message cleared, the list emptied — and is exactly
+    // the case worth easing; an earlier guard against `to === 0` silently
+    // dropped it, so content vanishing still snapped. A zero FROM is the
+    // different thing it was meant to catch: the box was not in the layout yet,
+    // so there is no size to ease out of.
     const movesHeight =
-      wantsHeight() && toHeight !== 0 && fromHeight !== 0 && toHeight !== fromHeight
-    const movesWidth =
-      wantsWidth() && toWidth !== 0 && fromWidth !== 0 && toWidth !== fromWidth
+      wantsHeight() && fromHeight !== 0 && toHeight !== fromHeight
+    const movesWidth = wantsWidth() && fromWidth !== 0 && toWidth !== fromWidth
     if (!movesHeight && !movesWidth) return
 
     if (movesHeight) node.style.height = `${fromHeight}px`

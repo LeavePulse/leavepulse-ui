@@ -16,6 +16,7 @@ import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
 import LpPopover from "./LpPopover.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpShift from "./LpShift.vue"
 
 export interface NotificationItem {
   id: string
@@ -225,52 +226,57 @@ function timeAgo(iso?: string): string {
       </button>
     </header>
 
-    <div v-if="loading" class="space-y-1.5 px-2 pb-2">
-      <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-control bg-surface-soft" />
-    </div>
+    <!-- Skeleton → empty → feed are three different heights, so the panel
+         jumped as the list loaded and again whenever it emptied. Easing the
+         swap keeps the popover from snapping under the bell. -->
+    <LpShift axis="height">
+      <div v-if="loading" class="space-y-1.5 px-2 pb-2">
+        <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-control bg-surface-soft" />
+      </div>
 
-    <LpEmptyState
-      v-else-if="!items.length"
-      icon="lucide:bell-off"
-      :title="l.empty"
-      class="px-3 py-10"
-    />
+      <LpEmptyState
+        v-else-if="!items.length"
+        icon="lucide:bell-off"
+        :title="l.empty"
+        class="px-3 py-10"
+      />
 
-    <!-- The feed sits in a thin gutter; rows are self-contained tiles (rounded,
-         hover-lit) instead of full-width strips with hard dividers — lighter and
-         easier to scan. Each row carries its own right-click action menu. -->
-    <LpScrollArea v-else class="max-h-96" content-class="flex flex-col gap-0.5 px-2 pb-2">
-      <LpContextMenu v-for="item in items" :key="item.id" :items="rowMenu(item)">
-        <component
-          :is="item.link ? 'a' : 'button'"
-          :href="item.link || undefined"
-          :type="item.link ? undefined : 'button'"
-          class="group/notif flex w-full items-start gap-2.5 rounded-control px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:bg-white/[0.05]"
-          :class="item.read ? '' : 'bg-brand-soft/35'"
-          @click="onSelect(item)"
-        >
-          <span
-            class="grid size-7 shrink-0 place-items-center rounded-control"
-            :class="item.read ? 'bg-surface-soft text-muted' : 'bg-brand-soft text-brand'"
+      <!-- The feed sits in a thin gutter; rows are self-contained tiles (rounded,
+           hover-lit) instead of full-width strips with hard dividers — lighter and
+           easier to scan. Each row carries its own right-click action menu. -->
+      <LpScrollArea v-else class="max-h-96" content-class="flex flex-col gap-0.5 px-2 pb-2">
+        <LpContextMenu v-for="item in items" :key="item.id" :items="rowMenu(item)">
+          <component
+            :is="item.link ? 'a' : 'button'"
+            :href="item.link || undefined"
+            :type="item.link ? undefined : 'button'"
+            class="group/notif flex w-full items-start gap-2.5 rounded-control px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:bg-white/[0.05]"
+            :class="item.read ? '' : 'bg-brand-soft/35'"
+            @click="onSelect(item)"
           >
-            <LpIcon :name="item.icon || 'lucide:bell'" :size="15" />
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="flex items-center gap-1.5">
-              <span class="truncate text-sm font-medium" :class="item.read ? 'text-muted-strong' : 'text-ink'">
-                {{ item.title }}
+            <span
+              class="grid size-7 shrink-0 place-items-center rounded-control"
+              :class="item.read ? 'bg-surface-soft text-muted' : 'bg-brand-soft text-brand'"
+            >
+              <LpIcon :name="item.icon || 'lucide:bell'" :size="15" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center gap-1.5">
+                <span class="truncate text-sm font-medium" :class="item.read ? 'text-muted-strong' : 'text-ink'">
+                  {{ item.title }}
+                </span>
+                <span v-if="!item.read" class="size-1.5 shrink-0 rounded-full bg-brand" />
               </span>
-              <span v-if="!item.read" class="size-1.5 shrink-0 rounded-full bg-brand" />
+              <span v-if="item.body" class="mt-0.5 line-clamp-2 block text-xs text-muted">
+                {{ item.body }}
+              </span>
+              <span v-if="item.createdAt" class="mt-0.5 block text-[11px] text-muted/70">
+                {{ timeAgo(item.createdAt) }}
+              </span>
             </span>
-            <span v-if="item.body" class="mt-0.5 line-clamp-2 block text-xs text-muted">
-              {{ item.body }}
-            </span>
-            <span v-if="item.createdAt" class="mt-0.5 block text-[11px] text-muted/70">
-              {{ timeAgo(item.createdAt) }}
-            </span>
-          </span>
-        </component>
-      </LpContextMenu>
-    </LpScrollArea>
+          </component>
+        </LpContextMenu>
+      </LpScrollArea>
+    </LpShift>
   </LpPopover>
 </template>

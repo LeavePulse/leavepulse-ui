@@ -1,17 +1,21 @@
 <script setup lang="ts">
 /*
- * Wraps content whose size is derived from what's inside it, and eases the box
- * between sizes instead of letting it snap.
+ * Wraps content whose size is derived from what's inside it, so that everything
+ * around it shifts smoothly instead of jumping.
  *
  * Reach for it wherever a change of content changes a box's measurements: a
  * toolbar that gains or loses a button, a label swapped by a translation, a
- * placeholder replaced by the loaded thing, a panel switching between states.
- * Those all resize in a single frame otherwise, and everything they push moves
- * with them.
+ * placeholder replaced by the loaded thing, a validation message appearing
+ * under a field. Those all resize in a single frame otherwise, and everything
+ * they push jolts with them.
  *
- *   <LpAutoSize axis="width">
+ *   <LpShift axis="width">
  *     <slot name="actions" />
- *   </LpAutoSize>
+ *   </LpShift>
+ *
+ * Note it is the NEIGHBOURS that motivate this, not the box: a fixed-height
+ * header never resizes, yet its controls jump whenever one of them changes
+ * width. Easing that one box is what makes the row glide.
  *
  * Content is measured through a wrapper that is never itself pinned, so the
  * slot keeps whatever layout it brings (flex row, grid, plain text). `axis`
@@ -19,10 +23,10 @@
  * moves, so the other stays free to respond to the surrounding layout.
  *
  * The mechanism — measure the natural size, pin it in pixels, tween — lives in
- * `useSizeTransition`, and LpModal drives its panel with the same composable.
+ * `useShift`, and LpModal drives its panel with the same composable.
  */
 import { computed } from "vue"
-import { useSizeTransition, type SizeAxis } from "../composables/useSizeTransition"
+import { useShift, type ShiftAxis } from "../composables/useShift"
 
 const props = withDefaults(
   defineProps<{
@@ -30,7 +34,7 @@ const props = withDefaults(
      * Which dimension eases. `"width"` for a row that gains/loses controls,
      * `"height"` for a stack whose content grows, `"both"` when either can.
      */
-    axis?: SizeAxis
+    axis?: ShiftAxis
     /** Tween length in ms. Defaults to the kit's `--duration-fast`. */
     duration?: number
     /**
@@ -43,7 +47,7 @@ const props = withDefaults(
   { axis: "height", disabled: false },
 )
 
-const { el, tweening, resizing } = useSizeTransition({
+const { el, tweening, resizing } = useShift({
   axis: () => props.axis,
   duration: () => props.duration,
   enabled: () => !props.disabled,
@@ -56,7 +60,7 @@ const { el, tweening, resizing } = useSizeTransition({
 // Spelled out as whole literals rather than built from `axis`. The consuming
 // app's Tailwind scans this file as TEXT, so a class assembled at runtime is a
 // class it never sees — the utility simply wouldn't be emitted.
-const TRANSITION_CLASS: Record<SizeAxis, string> = {
+const TRANSITION_CLASS: Record<ShiftAxis, string> = {
   height: "transition-[height]",
   width: "transition-[width]",
   both: "transition-[height,width]",
