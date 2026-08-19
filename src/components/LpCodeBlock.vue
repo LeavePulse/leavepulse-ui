@@ -268,7 +268,7 @@ function onInput(e: Event) {
             v-else
           ><button
               type="button"
-              class="lp-fold-toggle flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="lp-fold-toggle flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               :aria-expanded="openState[seg.id]"
               @click="toggleFold(seg.id)"
             ><LpIcon

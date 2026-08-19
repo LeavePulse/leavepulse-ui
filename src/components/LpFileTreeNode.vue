@@ -163,10 +163,13 @@ function onActivate() {
   >
     <!-- Passthrough when the node has no menu, so the row keeps the native one. -->
     <LpContextMenu :items="node.menu ?? []">
+      <!-- The ring is drawn inset, like LpTable's rows: a row spans the full
+           width of the branch, and a branch clips its overflow to animate its
+           height, so an outset ring loses its left and right edge. -->
       <div
         :data-node-id="node.id"
         :tabindex="isFocused ? 0 : -1"
-        class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         :class="[
           node.disabled
             ? 'cursor-not-allowed text-muted/50'

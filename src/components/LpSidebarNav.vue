@@ -78,7 +78,7 @@ const pillTransition = usePillTransition()
           :disabled="item.href ? undefined : item.disabled"
           :aria-current="itemActive(item) ? 'page' : undefined"
           :aria-disabled="item.disabled || undefined"
-          class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+          class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           :class="item.disabled
             ? 'cursor-not-allowed text-muted/50'
             : itemActive(item)
