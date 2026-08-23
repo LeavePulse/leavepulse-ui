@@ -48,6 +48,7 @@ import {
   LpRadioGroup,
   LpScrollArea,
   LpSelect,
+  LpShift,
   LpSkeleton,
   LpSlider,
   LpSparkline,
@@ -66,6 +67,9 @@ import {
   LpUptimeBar,
   useToast,
 } from "../../src"
+// A real image, so the avatar demos show the loaded state rather than only the
+// initials fallback — and so the skeleton demo can show what it stands in for.
+import avatarSample from "../assets/avatar-sample.png"
 
 export interface ComponentEntry {
   id: string
@@ -434,6 +438,7 @@ export const registry: ComponentEntry[] = [
     components: { LpAvatar },
     state: () =>
       reactive({
+        avatarSample,
         accountMenu: [
           { label: "View profile", icon: "lucide:user" },
           { label: "Account settings", icon: "lucide:settings" },
@@ -441,11 +446,13 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div class="flex items-center gap-3">
-  <LpAvatar size="sm" fallback="SA" />
+  <LpAvatar size="sm" :src="avatarSample" alt="THEROER" />
+  <LpAvatar size="md" :src="avatarSample" alt="THEROER" />
+  <LpAvatar size="lg" :src="avatarSample" alt="THEROER" ring />
+  <LpAvatar size="md" :src="avatarSample" alt="THEROER" shape="soft" />
+  <LpAvatar size="md" :src="avatarSample" alt="THEROER" shape="square" />
+  <!-- No src: the initials carry it. -->
   <LpAvatar size="md" fallback="LP" />
-  <LpAvatar size="md" fallback="SV" shape="soft" />
-  <LpAvatar size="md" fallback="PR" shape="square" />
-  <LpAvatar size="md" fallback="RG" ring />
   <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" />
   <span class="text-sm text-muted">right-click the last one →</span>
 </div>`,
@@ -1103,7 +1110,20 @@ export const registry: ComponentEntry[] = [
     name: "Skeleton",
     description:
       "Loading placeholders, in two shapes. Bare, it is one pulsing block sized by your classes. Given content it becomes a WRAPPER and lends its pulse to any `.lp-skeleton-item` inside, at any depth — so a skeleton can be the real markup with its content swapped for divs, keeping the same flex, gaps and responsive classes instead of being rebuilt as a stack of bars.",
-    components: { LpSkeleton },
+    components: { LpSkeleton, LpCard, LpAvatar, LpButton },
+    state: () => {
+      const s = reactive({
+        avatarSample,
+        loading: true,
+        reload() {
+          s.loading = true
+          // Long enough to watch the placeholder, short enough to keep toggling.
+          setTimeout(() => { s.loading = false }, 1600)
+        },
+      })
+      setTimeout(() => { s.loading = false }, 1200)
+      return s
+    },
     template: `<div class="flex w-80 flex-col gap-8">
   <!-- Bare: one block per placeholder. -->
   <div class="flex flex-col gap-2">
@@ -1112,22 +1132,95 @@ export const registry: ComponentEntry[] = [
     <LpSkeleton class="h-4 w-2/3" />
   </div>
 
-  <!-- Wrapper: the layout is the skeleton. Copy the real block, swap its
-       content for .lp-skeleton-item divs, keep the grid. -->
-  <LpSkeleton class="flex flex-col gap-4 rounded-card border border-line p-4">
-    <div class="flex items-center gap-3">
-      <div class="lp-skeleton-item size-10 rounded-pill bg-surface-soft" />
-      <div class="flex flex-1 flex-col gap-1.5">
-        <div class="lp-skeleton-item h-3.5 w-28 rounded-control bg-surface-soft" />
-        <div class="lp-skeleton-item h-3 w-40 rounded-control bg-surface-soft" />
+  <!-- Wrapper: the layout IS the skeleton. Reload and watch — the placeholder
+       and the real content are the same LpCard with the same flex and gaps, so
+       the card keeps its size and nothing below it jumps as the data lands. -->
+  <div class="flex flex-col gap-3">
+    <LpButton size="sm" variant="outline" :disabled="loading" @click="reload">
+      {{ loading ? 'Loading…' : 'Reload' }}
+    </LpButton>
+
+    <LpCard variant="flat" padded>
+      <LpSkeleton v-if="loading" class="flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+          <div class="lp-skeleton-item size-10 shrink-0 rounded-pill bg-surface-soft" />
+          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div class="lp-skeleton-item h-3.5 w-28 rounded-control bg-surface-soft" />
+            <div class="lp-skeleton-item h-3 w-40 rounded-control bg-surface-soft" />
+          </div>
+          <div class="lp-skeleton-item h-8 w-20 shrink-0 rounded-control bg-surface-soft" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="lp-skeleton-item h-3 w-full rounded-control bg-surface-soft" />
+          <div class="lp-skeleton-item h-3 w-5/6 rounded-control bg-surface-soft" />
+        </div>
+      </LpSkeleton>
+
+      <div v-else class="flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+          <LpAvatar size="md" :src="avatarSample" alt="THEROER" />
+          <div class="flex min-w-0 flex-1 flex-col">
+            <span class="truncate text-sm font-medium text-ink">THEROER</span>
+            <span class="truncate text-xs text-muted">theroer · owner</span>
+          </div>
+          <LpButton size="sm" variant="outline">Follow</LpButton>
+        </div>
+        <p class="m-0 text-sm leading-relaxed text-muted">
+          Builds the control plane, the kit, and the launcher.
+        </p>
       </div>
-      <div class="lp-skeleton-item h-8 w-20 rounded-control bg-surface-soft" />
-    </div>
-    <div class="flex flex-col gap-2">
-      <div class="lp-skeleton-item h-3 w-full rounded-control bg-surface-soft" />
-      <div class="lp-skeleton-item h-3 w-5/6 rounded-control bg-surface-soft" />
-    </div>
-  </LpSkeleton>
+    </LpCard>
+  </div>
+</div>`,
+  },
+  {
+    id: "shift",
+    name: "Shift",
+    description:
+      "Eases a box whose size comes from its content, so what sits around it glides instead of jumping. Reach for it wherever a change of content changes measurements: a toolbar gaining a button, a label swapped by a translation, a validation message appearing under a field. `axis` picks the dimension that is content-derived \u2014 pin only the one that actually moves. Note it is the NEIGHBOURS that motivate it: the row below is what jolts when a box above resizes in one frame.",
+    components: { LpShift, LpButton, LpBadge, LpCard },
+    state: () =>
+      reactive({
+        eased: true,
+        extra: false,
+        detail: false,
+      }),
+    template: `<div class="flex w-96 flex-col gap-4">
+  <div class="flex items-center gap-2">
+    <LpButton size="sm" variant="outline" @click="extra = !extra">
+      {{ extra ? 'Remove' : 'Add' }} a control
+    </LpButton>
+    <LpButton size="sm" variant="outline" @click="detail = !detail">
+      {{ detail ? 'Collapse' : 'Expand' }} detail
+    </LpButton>
+    <LpButton size="sm" variant="ghost" @click="eased = !eased">
+      {{ eased ? 'Easing on' : 'Easing off' }}
+    </LpButton>
+  </div>
+
+  <!-- width: the row of controls is content-derived, and the badge after it is
+       what would otherwise jump sideways. -->
+  <div class="flex items-center gap-2">
+    <LpShift axis="width" :disabled="!eased">
+      <div class="flex items-center gap-2">
+        <LpButton size="sm">Deploy</LpButton>
+        <LpButton v-if="extra" size="sm" variant="outline">Roll back</LpButton>
+      </div>
+    </LpShift>
+    <LpBadge tone="neutral">\u2190 this shifts</LpBadge>
+  </div>
+
+  <!-- height: the card grows, and the line under it rides the tween. -->
+  <LpShift axis="height" :disabled="!eased">
+    <LpCard variant="flat" padded>
+      <p class="m-0 text-sm text-ink">app-vps-1 \u00b7 healthy</p>
+      <p v-if="detail" class="m-0 mt-2 text-sm leading-relaxed text-muted">
+        14 services, last reconciled 40 seconds ago. The private address is
+        pinned to the bridge, and the health gate reads the ready endpoint.
+      </p>
+    </LpCard>
+  </LpShift>
+  <span class="text-sm text-muted">\u2191 toggle with easing off to see the jump</span>
 </div>`,
   },
   {
