@@ -8,7 +8,7 @@
  * `select`. Mirrors the kit convention (cf. LpSidebar): data in, events out,
  * no data fetching inside.
  */
-import { computed } from "vue"
+import { computed, getCurrentInstance } from "vue"
 import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
@@ -24,6 +24,15 @@ export interface NotificationItem {
   body?: string
   /** Optional icon name (e.g. "lucide:check-circle"). */
   icon?: string
+  /**
+   * Colours the row's icon by what KIND of notification it is — a billing
+   * notice and a security one should not look alike at a glance.
+   *
+   * A named tone rather than a class, so the categories stay themeable:
+   * consumers were mapping their own types onto raw palette classes, which is
+   * the one place a theme cannot follow them.
+   */
+  tone?: "brand" | "action" | "danger" | "accent" | "muted"
   /** Optional deep link; the row becomes clickable when set. */
   link?: string
   /** ISO-8601 creation time; rendered as a relative label. */
@@ -40,6 +49,7 @@ export interface NotificationItem {
 export interface NotificationLabels {
   title?: string
   markAllRead?: string
+  clear?: string
   markAsRead?: string
   markAsUnread?: string
   open?: string
@@ -76,6 +86,7 @@ const props = withDefaults(
 const l = computed(() => ({
   title: props.title ?? props.labels?.title ?? "Notifications",
   markAllRead: props.labels?.markAllRead ?? "Mark all read",
+  clear: props.labels?.clear ?? "Clear",
   markAsRead: props.labels?.markAsRead ?? "Mark as read",
   markAsUnread: props.labels?.markAsUnread ?? "Mark as unread",
   open: props.labels?.open ?? "Open",
@@ -94,6 +105,8 @@ const emit = defineEmits<{
   (e: "markRead", id: string): void
   (e: "markUnread", id: string): void
   (e: "markAllRead"): void
+  /** Empty the whole feed. The header button only appears when this is bound. */
+  (e: "clear"): void
   (e: "dismiss", id: string): void
   (e: "select", item: NotificationItem): void
 }>()
@@ -106,21 +119,52 @@ const badgeLabel = computed(() =>
 )
 const hasUnread = computed(() => unread.value > 0)
 
+/** Icon tints for an unread row, keyed by the item's category tone. */
+const TONE_CLASS: Record<string, string> = {
+  brand: "bg-brand-soft text-brand",
+  action: "bg-action-soft text-action",
+  danger: "bg-danger-soft text-danger",
+  accent: "bg-accent-soft text-accent",
+  muted: "bg-surface-soft text-muted-strong",
+}
+
+/*
+ * Which optional actions the consumer actually handles. A button for an event
+ * nobody listens to is a button that does nothing when pressed.
+ *
+ * NOT `useAttrs()`: a listener for a DECLARED emit is removed from `$attrs`, so
+ * an `@clear` handler never appears there. The raw vnode props are where it
+ * survives.
+ */
+const instance = getCurrentInstance()
+const handlesClear = computed(() => Boolean(instance?.vnode.props?.onClear))
+
 // Right-click quick actions on the bell. "Open" is intentionally omitted — a
 // left-click already opens the feed, so the menu only carries actions you
 // can't get from the click itself. Because `open` is a defineModel we open on
 // left-click ourselves (the popover is anchor-only), which frees the trigger
 // button to also host LpContextMenu without the two fighting over the trigger.
-const contextMenu = computed<ContextMenuItemDef[]>(() =>
-  props.menuItems ?? [
+const contextMenu = computed<ContextMenuItemDef[]>(() => {
+  if (props.menuItems) return props.menuItems
+  const items: ContextMenuItemDef[] = [
     {
       label: l.value.markAllRead,
       icon: "lucide:check-check",
       disabled: !hasUnread.value,
       onSelect: () => emit("markAllRead"),
     },
-  ],
-)
+  ]
+  // Same rule as the header button: offered only when the caller can act on it.
+  if (handlesClear.value) {
+    items.push({
+      label: l.value.clear,
+      icon: "lucide:trash-2",
+      disabled: !props.items.length,
+      onSelect: () => emit("clear"),
+    })
+  }
+  return items
+})
 
 function onSelect(item: NotificationItem) {
   if (!item.read) emit("markRead", item.id)
@@ -216,14 +260,28 @@ function timeAgo(iso?: string): string {
 
     <header class="flex items-center justify-between gap-2 px-3 py-2.5">
       <span class="text-sm font-semibold">{{ l.title }}</span>
-      <button
-        v-if="hasUnread"
-        type="button"
-        class="rounded-md px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
-        @click="emit('markAllRead')"
-      >
-        {{ l.markAllRead }}
-      </button>
+      <span class="flex items-center gap-0.5">
+        <!-- Emptying the feed is a different act from reading it, and it is
+             destructive, so it is muted and sits away from the primary action.
+             Only offered when a listener is bound: a caller with no way to
+             clear its feed must not be given a button that does nothing. -->
+        <button
+          v-if="items.length && handlesClear"
+          type="button"
+          class="rounded-md px-1.5 py-0.5 text-xs font-medium text-muted outline-none transition-colors hover:bg-surface-soft hover:text-ink focus-visible:bg-surface-soft"
+          @click="emit('clear')"
+        >
+          {{ l.clear }}
+        </button>
+        <button
+          v-if="hasUnread"
+          type="button"
+          class="rounded-md px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
+          @click="emit('markAllRead')"
+        >
+          {{ l.markAllRead }}
+        </button>
+      </span>
     </header>
 
     <!-- Skeleton → empty → feed are three different heights, so the panel
@@ -250,13 +308,16 @@ function timeAgo(iso?: string): string {
             :is="item.link ? 'a' : 'button'"
             :href="item.link || undefined"
             :type="item.link ? undefined : 'button'"
-            class="group/notif flex w-full items-start gap-2.5 rounded-control px-2 py-2 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:bg-white/[0.05]"
+            class="group/notif flex w-full items-start gap-2.5 rounded-control px-2 py-2 text-left outline-none transition-colors hover:bg-surface-soft focus-visible:bg-surface-soft"
             :class="item.read ? '' : 'bg-brand-soft/35'"
             @click="onSelect(item)"
           >
+            <!-- A read notification is always muted: the tone says what kind of
+                 thing it is, and that only needs to compete for attention while
+                 it is still unread. -->
             <span
               class="grid size-7 shrink-0 place-items-center rounded-control"
-              :class="item.read ? 'bg-surface-soft text-muted' : 'bg-brand-soft text-brand'"
+              :class="item.read ? 'bg-surface-soft text-muted' : TONE_CLASS[item.tone ?? 'brand']"
             >
               <LpIcon :name="item.icon || 'lucide:bell'" :size="15" />
             </span>
