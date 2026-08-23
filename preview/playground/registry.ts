@@ -47,6 +47,7 @@ import {
   LpRollingText,
   LpRadioGroup,
   LpScrollArea,
+  LpSection,
   LpSelect,
   LpShift,
   LpSkeleton,
@@ -1171,6 +1172,47 @@ export const registry: ComponentEntry[] = [
       </div>
     </LpCard>
   </div>
+</div>`,
+  },
+  {
+    id: "section",
+    name: "Section",
+    description:
+      "A section heading: a title, an optional line under it, actions on the right. Draws no container of its own \u2014 it sits inside a card, inside a panel, or straight on the page, and owning a border would fight two of those three. `level` is the visual size and is independent of `as`, the heading element: a page\u2019s main heading may need to be an h1 rendered small, a card\u2019s an h3 rendered large. Tying them together is what sends people back to a raw <h2>.",
+    components: { LpSection, LpCard, LpButton, LpBadge, LpInput },
+    template: `<div class="flex w-[32rem] flex-col gap-8">
+  <!-- On the page: the biggest level, with a description and actions. -->
+  <LpSection
+    as="h1"
+    level="xl"
+    title="Billing"
+    description="Invoices, payment methods and your current plan."
+  >
+    <template #actions>
+      <LpButton size="sm" variant="outline">Export</LpButton>
+      <LpButton size="sm">Add card</LpButton>
+    </template>
+  </LpSection>
+
+  <!-- Inside a card: smaller, with a badge beside the title. -->
+  <LpCard>
+    <LpSection as="h3" title="Recent invoices" class="mb-4">
+      <template #meta><LpBadge tone="neutral">12</LpBadge></template>
+      <template #actions>
+        <LpInput size="sm" placeholder="Filter\u2026" class="w-40" />
+      </template>
+    </LpSection>
+    <p class="m-0 text-sm text-muted">Twelve invoices, none overdue.</p>
+  </LpCard>
+
+  <!-- Bare, with an icon, no actions. -->
+  <LpSection
+    icon="lucide:server"
+    level="sm"
+    as="h3"
+    title="Hosts"
+    description="Six hosts, five online."
+  />
 </div>`,
   },
   {

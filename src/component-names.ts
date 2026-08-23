@@ -52,6 +52,7 @@ export const COMPONENT_NAMES = [
   "LpRadioGroup",
   "LpRollingText",
   "LpScrollArea",
+  "LpSection",
   "LpSegmented",
   "LpSelect",
   "LpServiceNode",
