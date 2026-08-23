@@ -44,7 +44,7 @@ const isBlock = computed(() => !slots.default)
     class="lp-skeleton"
     :class="[
       // `rounded` describes the PLACEHOLDER's own shape, so it only applies to
-      // the bare form. A wrapper is invisible — rounding it would clip the
+      // the bare form. A wrapper is invisible, so rounding it would clip the
       // layout inside without anything being drawn to justify the corner.
       isBlock
         ? [

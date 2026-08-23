@@ -69,7 +69,7 @@ import {
   useToast,
 } from "../../src"
 // A real image, so the avatar demos show the loaded state rather than only the
-// initials fallback — and so the skeleton demo can show what it stands in for.
+// initials fallback, and so the skeleton demo can show what it stands in for.
 import avatarSample from "../assets/avatar-sample.png"
 
 export interface ComponentEntry {
@@ -1110,7 +1110,7 @@ export const registry: ComponentEntry[] = [
     id: "skeleton",
     name: "Skeleton",
     description:
-      "Loading placeholders, in two shapes. Bare, it is one pulsing block sized by your classes. Given content it becomes a WRAPPER and lends its pulse to any `.lp-skeleton-item` inside, at any depth — so a skeleton can be the real markup with its content swapped for divs, keeping the same flex, gaps and responsive classes instead of being rebuilt as a stack of bars.",
+      "Loading placeholders, in two shapes. Bare, it is one pulsing block sized by your classes. Given content it becomes a WRAPPER and lends its pulse to any `.lp-skeleton-item` inside, at any depth, so a skeleton can be the real markup with its content swapped for divs, keeping the same flex, gaps and responsive classes instead of being rebuilt as a stack of bars.",
     components: { LpSkeleton, LpCard, LpAvatar, LpButton },
     state: () => {
       const s = reactive({
@@ -1133,7 +1133,7 @@ export const registry: ComponentEntry[] = [
     <LpSkeleton class="h-4 w-2/3" />
   </div>
 
-  <!-- Wrapper: the layout IS the skeleton. Reload and watch — the placeholder
+  <!-- Wrapper: the layout IS the skeleton. Reload and watch: the placeholder
        and the real content are the same LpCard with the same flex and gaps, so
        the card keeps its size and nothing below it jumps as the data lands. -->
   <div class="flex flex-col gap-3">
@@ -1178,7 +1178,7 @@ export const registry: ComponentEntry[] = [
     id: "section",
     name: "Section",
     description:
-      "A section heading: a title, an optional line under it, actions on the right. It draws NO container \u2014 the cards below are LpCard, and the heading is only the top line inside each. That is deliberate: these headings sit inside cards in one app, inside glass panels in another, and straight on the page in a third, so owning a border would fight two of the three. `level` is the visual size and is independent of `as`, the heading element.",
+      "A section heading: a title, an optional line under it, actions on the right. It draws NO container. The cards below are LpCard, and the heading is only the top line inside each. That is deliberate: these headings sit inside cards in one app, inside glass panels in another, and straight on the page in a third, so owning a border would fight two of the three. `level` is the visual size and is independent of `as`, the heading element.",
     components: { LpSection, LpCard, LpButton, LpBadge, LpInput, LpLink },
     template: `<div class="flex w-[32rem] flex-col gap-4">
   <!-- Same container every time (LpCard), so what changes between these is
@@ -1216,7 +1216,7 @@ export const registry: ComponentEntry[] = [
         ger-01-p <span class="font-mono text-xs text-muted">216879598879719424</span>
       </template>
       <template #description>
-        Six hosts, five online — <LpLink href="#">see the fleet</LpLink>.
+        Six hosts, five online. <LpLink href="#">See the fleet</LpLink>.
       </template>
     </LpSection>
   </LpCard>

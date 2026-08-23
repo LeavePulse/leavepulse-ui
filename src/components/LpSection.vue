@@ -9,8 +9,8 @@
  *
  * This is the block every app rebuilt: ~140 hand-written headings across the
  * three of them, each picking its own size, its own gap, its own alignment.
- * LeaveHosting had already extracted its own `PageHeader.vue` — same title,
- * same description, same actions slot — which is the clearest evidence the
+ * LeaveHosting had already extracted its own `PageHeader.vue` with the same
+ * title, description and actions slot, which is the clearest evidence the
  * shape is shared rather than one app's habit.
  *
  * What it deliberately does NOT do:
@@ -19,7 +19,7 @@
  *   the cabinet they sit inside `glass rounded-3xl` blocks and, more often,
  *   directly on the page. Owning a border here would fight two of the three.
  * - It has no icon slot of its own beyond `icon`. The panel coloured each
- *   heading's icon from the raw palette — amber beside rose beside sky — in
+ *   heading's icon from the raw palette (amber beside rose beside sky) in
  *   pages where none of those states were amber, rose or blue. One muted
  *   colour, or none.
  *
@@ -44,7 +44,7 @@ const section = tv({
     // heading is the top line, so the actions belong level with THAT rather
     // than floating to the middle of the pair. With no description there is
     // only one line, and pinning to the top instead misaligns anything taller
-    // than the text — an input, a segmented control — by a couple of pixels.
+    // than the text (an input, a segmented control) by a couple of pixels.
     described: {
       true: { root: "items-start" },
       false: { root: "items-center" },
@@ -68,7 +68,7 @@ const props = withDefaults(
     description?: string
     /** Iconify name shown before the title, e.g. "lucide:server". */
     icon?: string
-    /** Visual size. Independent of `as` — see the note above. */
+    /** Visual size. Independent of `as`, see the note above. */
     level?: SectionVariants["level"]
     /** The heading element to render. Pick it for the document outline. */
     as?: "h1" | "h2" | "h3" | "h4" | "p"
@@ -79,7 +79,7 @@ const props = withDefaults(
 /*
  * `title` and `description` each come in two forms, and they are one opening
  * rather than two: the prop is what the slot renders when nothing fills it.
- * Both are a plain string nine times out of ten — usually a t() call — and
+ * Both are a plain string nine times out of ten (usually a t() call), and
  * making those pass through a <template> would tax the common case for the
  * sake of the rare one. But the rare one is real (a name with an id after it,
  * a description carrying a link), and without the slot it is what sends people
@@ -92,7 +92,7 @@ const slots = defineSlots<{
   description?: () => unknown
   /** Right-aligned controls: buttons, filters, a count. */
   actions?: () => unknown
-  /** Extra content beside the title — a badge, a count, a status dot. */
+  /** Extra content beside the title: a badge, a count, a status dot. */
   meta?: () => unknown
 }>()
 
@@ -112,9 +112,9 @@ const classes = computed(() =>
          line of their own even when they would have fitted beside the title.
          With it the column takes the space that is left and shrinks first.
 
-         `break-words` covers the title AND the description in one place: both
-         routinely carry something with no spaces in it — a hostname, a URL, a
-         container id — and an unbreakable run pushes straight out through the
+         `break-words` covers the title AND the description in one place. Both
+         routinely carry something with no spaces in it (a hostname, a URL, a
+         container id), and an unbreakable run pushes straight out through the
          side of whatever card the section sits in. min-w-0 lets the column
          shrink; only this lets the text inside it give way. -->
     <div class="min-w-0 flex-1 break-words">
