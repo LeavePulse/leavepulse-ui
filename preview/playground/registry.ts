@@ -1101,12 +1101,33 @@ export const registry: ComponentEntry[] = [
   {
     id: "skeleton",
     name: "Skeleton",
-    description: "Loading placeholders.",
+    description:
+      "Loading placeholders, in two shapes. Bare, it is one pulsing block sized by your classes. Given content it becomes a WRAPPER and lends its pulse to any `.lp-skeleton-item` inside, at any depth — so a skeleton can be the real markup with its content swapped for divs, keeping the same flex, gaps and responsive classes instead of being rebuilt as a stack of bars.",
     components: { LpSkeleton },
-    template: `<div class="flex w-72 flex-col gap-2">
-  <LpSkeleton class="h-10 w-10" rounded="pill" />
-  <LpSkeleton class="h-4 w-full" />
-  <LpSkeleton class="h-4 w-2/3" />
+    template: `<div class="flex w-80 flex-col gap-8">
+  <!-- Bare: one block per placeholder. -->
+  <div class="flex flex-col gap-2">
+    <LpSkeleton class="h-10 w-10" rounded="pill" />
+    <LpSkeleton class="h-4 w-full" />
+    <LpSkeleton class="h-4 w-2/3" />
+  </div>
+
+  <!-- Wrapper: the layout is the skeleton. Copy the real block, swap its
+       content for .lp-skeleton-item divs, keep the grid. -->
+  <LpSkeleton class="flex flex-col gap-4 rounded-card border border-line p-4">
+    <div class="flex items-center gap-3">
+      <div class="lp-skeleton-item size-10 rounded-pill bg-surface-soft" />
+      <div class="flex flex-1 flex-col gap-1.5">
+        <div class="lp-skeleton-item h-3.5 w-28 rounded-control bg-surface-soft" />
+        <div class="lp-skeleton-item h-3 w-40 rounded-control bg-surface-soft" />
+      </div>
+      <div class="lp-skeleton-item h-8 w-20 rounded-control bg-surface-soft" />
+    </div>
+    <div class="flex flex-col gap-2">
+      <div class="lp-skeleton-item h-3 w-full rounded-control bg-surface-soft" />
+      <div class="lp-skeleton-item h-3 w-5/6 rounded-control bg-surface-soft" />
+    </div>
+  </LpSkeleton>
 </div>`,
   },
   {
