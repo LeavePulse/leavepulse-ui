@@ -5,6 +5,7 @@
  * serialize/parse with validation.
  */
 import { computed, readonly, shallowRef, type ComputedRef, type DeepReadonly, type Ref } from "vue"
+import { easingToken, prefersReducedMotion } from "../composables/easing"
 import { detectBackdropFilter } from "./backdrop"
 import {
   COLOR_VARS,
@@ -91,13 +92,6 @@ type ViewTransitionDocument = Document & {
   startViewTransition?: (cb: () => void) => { ready: Promise<void>; finished: Promise<void> }
 }
 
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true
-  )
-}
-
 /*
  * Apply a theme with the "circular reveal" transition — a clip-path circle
  * grows from `origin` (usually the toggle button's centre), repainting the page
@@ -139,7 +133,7 @@ export function applyThemeWithTransition(
       },
       {
         duration: durationMs,
-        easing: "cubic-bezier(0.2, 0, 0, 1)",
+        easing: easingToken("ease-emphasized"),
         // Hold the fully-shrunk circle after the keyframes end. Without it the
         // old snapshot snaps back to its default (un-clipped) state for the one
         // frame between animation-end and the browser tearing down the

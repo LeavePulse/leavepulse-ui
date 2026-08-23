@@ -10,6 +10,7 @@
  * Tab enters the tree once, arrows move within it. The parent owns that state.
  */
 import { computed } from "vue"
+import { easingToken, prefersReducedMotion } from "../composables/easing"
 import {
   fileIcon,
   formatModified,
@@ -110,35 +111,30 @@ function rowDelay(index: number): string {
   return `${Math.min(index * 18, 180)}ms`
 }
 
-/** Respect the OS setting — skip the height animation entirely. */
-function reducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false
-}
-
 // Expand/collapse the branch by animating from 0 to its measured height. The
 // Web Animations API is used directly (rather than a CSS class) because the
 // target height isn't known until the rows are in the DOM.
 function onBranchEnter(el: Element, done: () => void) {
-  if (reducedMotion()) return done()
+  if (prefersReducedMotion()) return done()
   const height = (el as HTMLElement).scrollHeight
   el.animate(
     [
       { height: "0px", opacity: 0 },
       { height: `${height}px`, opacity: 1 },
     ],
-    { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    { duration: 220, easing: easingToken("ease-emphasized") },
   ).onfinish = () => done()
 }
 
 function onBranchLeave(el: Element, done: () => void) {
-  if (reducedMotion()) return done()
+  if (prefersReducedMotion()) return done()
   const height = (el as HTMLElement).scrollHeight
   el.animate(
     [
       { height: `${height}px`, opacity: 1 },
       { height: "0px", opacity: 0 },
     ],
-    { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" },
+    { duration: 180, easing: easingToken("ease-emphasized") },
   ).onfinish = () => done()
 }
 

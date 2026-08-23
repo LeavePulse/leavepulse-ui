@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
+import { prefersReducedMotion } from "./easing"
 
 /*
  * "Let this box shift its neighbours smoothly instead of jolting them."
@@ -85,13 +86,6 @@ export function useShift(
   const wantsHeight = () => axisOf() !== "width"
   const wantsWidth = () => axisOf() !== "height"
 
-  function reducedMotion() {
-    return (
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-    )
-  }
-
   /*
    * The size is driven imperatively rather than through a style binding. By the
    * time replacement content is in the DOM the box has already reflowed to its
@@ -153,7 +147,7 @@ export function useShift(
     inFlight = true
     resizing.value = true
     clearTimeout(settleTimer)
-    const wait = reducedMotion() ? 0 : (toValue(options.duration) ?? TWEEN_MS)
+    const wait = prefersReducedMotion() ? 0 : (toValue(options.duration) ?? TWEEN_MS)
     settleTimer = setTimeout(() => {
       inFlight = false
       resizing.value = false

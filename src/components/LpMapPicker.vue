@@ -14,6 +14,7 @@
  * is how the zoom reads as continuous instead of as a hard cut between levels.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
 
@@ -335,7 +336,7 @@ function onPointerUp(e: PointerEvent) {
  * rather than per-frame, which keeps the feel identical at 60 and 144 Hz.
  */
 function glide() {
-  if (reducedMotion() || Math.hypot(velocity.x, velocity.y) < 0.05) {
+  if (prefersReducedMotion() || Math.hypot(velocity.x, velocity.y) < 0.05) {
     velocity = { x: 0, y: 0 }
     return
   }
@@ -353,10 +354,6 @@ function glide() {
     }
   }
   glideFrame = requestAnimationFrame(step)
-}
-
-function reducedMotion() {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
 }
 
 function panBy(dx: number, dy: number) {

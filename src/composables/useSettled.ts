@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, watch, type MaybeRefOrGetter, toValue } from "vue"
+import { prefersReducedMotion } from "./easing"
 
 /*
  * "Has the opening animation had the frame to itself yet?"
@@ -73,10 +74,7 @@ export function useSettled(
       // id stays open while its whole body is replaced, and that second mount
       // is as expensive as the first.
       settled.value = false
-      const reduced =
-        typeof window !== "undefined" &&
-        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-      const wait = reduced ? 0 : (toValue(options.delay) ?? SETTLE_MS)
+      const wait = prefersReducedMotion() ? 0 : (toValue(options.delay) ?? SETTLE_MS)
       timer = setTimeout(() => {
         settled.value = true
         timer = undefined

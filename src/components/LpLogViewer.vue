@@ -8,6 +8,7 @@
  * needs.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, TransitionGroup, watch } from "vue"
+import { prefersReducedMotion } from "../composables/easing"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -466,9 +467,7 @@ function restoreScrollAnchor() {
 function rideToBottom(smooth = true, force = false) {
   const el = viewport()
   if (!el) return
-  const reduce =
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  const reduce = prefersReducedMotion()
   const far = !force && el.scrollHeight - el.scrollTop - el.clientHeight > el.clientHeight
   el.scrollTo({ top: el.scrollHeight, behavior: smooth && !reduce && !far ? "smooth" : "auto" })
 }
