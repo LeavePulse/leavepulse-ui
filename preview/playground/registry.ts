@@ -1278,7 +1278,8 @@ export const registry: ComponentEntry[] = [
   {
     id: "divider",
     name: "Divider · Link",
-    description: "Separator rule and inline links.",
+    description:
+      "Separator rule and inline links. The `reveal` variant sweeps an underline in from the left. `revealOn: group` hands that trigger to an ancestor marked `group`, for a link inside a row or card that is itself the click target: the row lights up and the name sweeps with it, rather than waiting for the pointer to cross the text exactly.",
     components: { LpDivider, LpLink },
     template: `<div class="flex w-80 flex-col gap-3">
   <LpLink href="#">Default link</LpLink>
@@ -1288,6 +1289,19 @@ export const registry: ComponentEntry[] = [
   <LpDivider label="or" />
   <LpLink href="#" external>External link</LpLink>
   <LpLink href="#" variant="reveal">Reveal underline</LpLink>
+
+  <LpDivider label="in a row" />
+  <!-- Hover anywhere on either row: the bar sweeps from the row, not from the
+       few characters of the name. -->
+  <a
+    v-for="r in ['app-vps-1', 'data-vps']"
+    :key="r"
+    href="#"
+    class="group flex items-center justify-between gap-3 rounded-control px-3 py-2 transition-colors hover:bg-surface-soft"
+  >
+    <LpLink :as="'span'" variant="reveal" reveal-on="group" tone="ink">{{ r }}</LpLink>
+    <span class="text-xs text-muted">running</span>
+  </a>
 </div>`,
   },
   {
