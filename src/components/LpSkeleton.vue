@@ -43,12 +43,19 @@ const isBlock = computed(() => !slots.default)
     aria-hidden="true"
     class="lp-skeleton"
     :class="[
-      isBlock ? 'lp-skeleton-item bg-surface-soft' : '',
-      {
-        'rounded-control': isBlock && (rounded === 'control' || !rounded),
-        'rounded-card': rounded === 'card',
-        'rounded-pill': rounded === 'pill',
-      },
+      // `rounded` describes the PLACEHOLDER's own shape, so it only applies to
+      // the bare form. A wrapper is invisible — rounding it would clip the
+      // layout inside without anything being drawn to justify the corner.
+      isBlock
+        ? [
+            'lp-skeleton-item bg-surface-soft',
+            {
+              'rounded-control': rounded === 'control' || !rounded,
+              'rounded-card': rounded === 'card',
+              'rounded-pill': rounded === 'pill',
+            },
+          ]
+        : '',
     ]"
   >
     <slot />
