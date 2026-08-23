@@ -34,14 +34,21 @@ import LpIcon from "./LpIcon.vue"
 
 const section = tv({
   slots: {
-    // items-start, not items-center: once a description is present the actions
-    // must stay level with the TITLE, not drift to the middle of the block.
-    root: "flex flex-wrap items-start justify-between gap-x-4 gap-y-2",
+    root: "flex flex-wrap justify-between gap-x-4 gap-y-2",
     title: "font-semibold text-ink",
     description: "mt-1 text-sm text-muted",
     actions: "flex shrink-0 flex-wrap items-center gap-2",
   },
   variants: {
+    // Where the actions sit against a two-line block. With a description the
+    // heading is the top line, so the actions belong level with THAT rather
+    // than floating to the middle of the pair. With no description there is
+    // only one line, and pinning to the top instead misaligns anything taller
+    // than the text — an input, a segmented control — by a couple of pixels.
+    described: {
+      true: { root: "items-start" },
+      false: { root: "items-center" },
+    },
     level: {
       sm: { title: "text-sm" },
       md: { title: "text-base" },
@@ -49,7 +56,7 @@ const section = tv({
       xl: { title: "text-xl tracking-tight" },
     },
   },
-  defaultVariants: { level: "md" },
+  defaultVariants: { level: "md", described: false },
 })
 
 type SectionVariants = VariantProps<typeof section>
@@ -69,21 +76,48 @@ const props = withDefaults(
   { level: "md", as: "h2" },
 )
 
-defineSlots<{
+/*
+ * `title` and `description` each come in two forms, and they are one opening
+ * rather than two: the prop is what the slot renders when nothing fills it.
+ * Both are a plain string nine times out of ten — usually a t() call — and
+ * making those pass through a <template> would tax the common case for the
+ * sake of the rare one. But the rare one is real (a name with an id after it,
+ * a description carrying a link), and without the slot it is what sends people
+ * back to hand-writing the block the component exists to standardise.
+ */
+const slots = defineSlots<{
   /** Title markup, when a plain string is not enough. */
   title?: () => unknown
+  /** Description markup, when a plain string is not enough. */
+  description?: () => unknown
   /** Right-aligned controls: buttons, filters, a count. */
   actions?: () => unknown
   /** Extra content beside the title — a badge, a count, a status dot. */
   meta?: () => unknown
 }>()
 
-const classes = computed(() => section({ level: props.level }))
+// Either form counts as "described": the actions align against a two-line
+// block whether the second line came from the prop or the slot.
+const hasDescription = computed(() => !!props.description || !!slots.description)
+
+const classes = computed(() =>
+  section({ level: props.level, described: hasDescription.value }),
+)
 </script>
 
 <template>
   <div :class="classes.root()">
-    <div class="min-w-0">
+    <!-- `flex-1` matters as much as `min-w-0`: without it a long description
+         stretches this column across the whole row, and the actions wrap to a
+         line of their own even when they would have fitted beside the title.
+         With it the column takes the space that is left and shrinks first.
+
+         `break-words` covers the title AND the description in one place: both
+         routinely carry something with no spaces in it — a hostname, a URL, a
+         container id — and an unbreakable run pushes straight out through the
+         side of whatever card the section sits in. min-w-0 lets the column
+         shrink; only this lets the text inside it give way. -->
+    <div class="min-w-0 flex-1 break-words">
       <div class="flex flex-wrap items-center gap-2">
         <LpIcon v-if="icon" :name="icon" :size="16" class="shrink-0 text-muted" />
         <component :is="as" :class="classes.title()">
@@ -91,7 +125,9 @@ const classes = computed(() => section({ level: props.level }))
         </component>
         <slot name="meta" />
       </div>
-      <p v-if="description" :class="classes.description()">{{ description }}</p>
+      <p v-if="hasDescription" :class="classes.description()">
+        <slot name="description">{{ description }}</slot>
+      </p>
     </div>
 
     <div v-if="$slots.actions" :class="classes.actions()">

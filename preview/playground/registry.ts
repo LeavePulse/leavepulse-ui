@@ -1178,23 +1178,25 @@ export const registry: ComponentEntry[] = [
     id: "section",
     name: "Section",
     description:
-      "A section heading: a title, an optional line under it, actions on the right. Draws no container of its own \u2014 it sits inside a card, inside a panel, or straight on the page, and owning a border would fight two of those three. `level` is the visual size and is independent of `as`, the heading element: a page\u2019s main heading may need to be an h1 rendered small, a card\u2019s an h3 rendered large. Tying them together is what sends people back to a raw <h2>.",
-    components: { LpSection, LpCard, LpButton, LpBadge, LpInput },
-    template: `<div class="flex w-[32rem] flex-col gap-8">
-  <!-- On the page: the biggest level, with a description and actions. -->
-  <LpSection
-    as="h1"
-    level="xl"
-    title="Billing"
-    description="Invoices, payment methods and your current plan."
-  >
-    <template #actions>
-      <LpButton size="sm" variant="outline">Export</LpButton>
-      <LpButton size="sm">Add card</LpButton>
-    </template>
-  </LpSection>
+      "A section heading: a title, an optional line under it, actions on the right. It draws NO container \u2014 the cards below are LpCard, and the heading is only the top line inside each. That is deliberate: these headings sit inside cards in one app, inside glass panels in another, and straight on the page in a third, so owning a border would fight two of the three. `level` is the visual size and is independent of `as`, the heading element.",
+    components: { LpSection, LpCard, LpButton, LpBadge, LpInput, LpLink },
+    template: `<div class="flex w-[32rem] flex-col gap-4">
+  <!-- Same container every time (LpCard), so what changes between these is
+       the heading alone. -->
+  <LpCard>
+    <LpSection
+      as="h2"
+      level="lg"
+      title="Billing"
+      description="Invoices for app-vps-1.lp.internal.leavepulse.example.com, payment methods and your current plan."
+    >
+      <template #actions>
+        <LpButton size="sm" variant="ghost">Export</LpButton>
+        <LpButton size="sm" variant="outline">Add card</LpButton>
+      </template>
+    </LpSection>
+  </LpCard>
 
-  <!-- Inside a card: smaller, with a badge beside the title. -->
   <LpCard>
     <LpSection as="h3" title="Recent invoices" class="mb-4">
       <template #meta><LpBadge tone="neutral">12</LpBadge></template>
@@ -1205,14 +1207,22 @@ export const registry: ComponentEntry[] = [
     <p class="m-0 text-sm text-muted">Twelve invoices, none overdue.</p>
   </LpCard>
 
-  <!-- Bare, with an icon, no actions. -->
-  <LpSection
-    icon="lucide:server"
-    level="sm"
-    as="h3"
-    title="Hosts"
-    description="Six hosts, five online."
-  />
+  <!-- title and description as SLOTS, for what a plain string cannot carry:
+       a name with its id after it, a description with a link in it. Same
+       place, same typography as the prop form above. -->
+  <LpCard>
+    <LpSection icon="lucide:server" level="sm" as="h3">
+      <template #title>
+        ger-01-p <span class="font-mono text-xs text-muted">216879598879719424</span>
+      </template>
+      <template #description>
+        Six hosts, five online — <LpLink href="#">see the fleet</LpLink>.
+      </template>
+    </LpSection>
+  </LpCard>
+
+  <!-- And with no container at all, which is how a page-level heading is used. -->
+  <LpSection as="h2" level="xl" title="On the page, unwrapped" />
 </div>`,
   },
   {

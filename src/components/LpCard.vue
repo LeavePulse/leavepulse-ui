@@ -11,7 +11,15 @@ import { computed } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 
 const card = tv({
-  base: "rounded-card border bg-surface-raised",
+  // break-words: a card is where text with no spaces in it ends up — a
+  // hostname, a URL, a container id, a stack frame — and an unbreakable run
+  // otherwise pushes straight out through the border, over whatever sits
+  // beside it. Set here rather than on the components that go inside, so that
+  // a paragraph written by hand behaves the same as one a kit component
+  // renders: two lines that look identical must not wrap differently.
+  // Anything that genuinely must not break (a code block, a log line) sets its
+  // own overflow and scrolls instead.
+  base: "rounded-card border bg-surface-raised break-words",
   variants: {
     variant: {
       // raised opts into the skin painter (.lp-skin-panel) so it follows the
