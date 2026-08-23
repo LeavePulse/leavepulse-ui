@@ -97,6 +97,42 @@
 
   /* ── motion ──────────────────────────────────── */
   --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  /* For motion that TRAVELS a distance the eye is meant to follow: a line
+     drawing itself, a wipe crossing a plot, a bar filling — anything where the
+     journey is the content rather than a way of arriving.
+
+     Very nearly LINEAR, and that is the point.
+
+     The usual "ease-out by default" rule is about interaction: the fast start
+     answers a click, so the interface feels responsive. A chart drawing itself
+     answers no click, and ease-out actively hurts it — every ease-out curve,
+     tuned however you like, spends 45–65% of its duration covering the final
+     10% of the path. The stroke flashes past and then visibly creeps, so the
+     part worth watching is the part you miss.
+
+     The same reasoning the field applies to progress bars and other steady,
+     time-representing motion, where an even rate is what makes the progress
+     readable.
+
+     Note the second control point's y is 0.85, NOT 1. A curve ending on y=1
+     arrives with zero velocity and therefore always creeps, however gentle the
+     rest of it looks — that single coordinate is what separates a 22% tail
+     from a 46% one. Holding it below the line lets the stroke still be moving
+     when it lands. */
+  --ease-travel: cubic-bezier(0.2, 0.25, 0.5, 0.85);
+  /* For something that COMES TO REST: an odometer wheel stopping on its digit,
+     a value landing after a count, a knob settling after a flick.
+
+     It overshoots very slightly and drifts back, which is what a real mechanism
+     does — mass carries a wheel a hair past its mark before it settles. Without
+     it a digit arrives by simply ceasing to move, and a row of columns all
+     ceasing together reads as a screen redraw rather than as a thing coming to
+     a stop.
+
+     The overshoot is deliberately small. Anything more bounces, and a figure
+     that bounces past its value looks briefly WRONG — which matters when the
+     number is a real reading somebody is about to act on. */
+  --ease-settle: cubic-bezier(0.22, 1.12, 0.36, 1);
   /* Three-step motion scale, themeable like everything else. fast = state
      feedback (hover/press/focus); medium = transforms & most enter/exit;
      slow = larger reveals (disclosure height, drawer slide).
