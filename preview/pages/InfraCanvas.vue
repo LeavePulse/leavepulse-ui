@@ -13,9 +13,22 @@ import {
   LpTopologyCanvas,
   useToast,
   type EdgeObserved,
+  type InfraNodeData,
   type TopologyEdge,
   type TopologyNode,
 } from "../../src"
+
+/*
+ * `TopologyNode.data` is a union — a host carries InfraNodeData, a service
+ * carries ServiceNodeData — and the node's own `type` is what tells them apart.
+ * The inspector and the connect rule below are host-level concerns (project,
+ * role, overlay, online), so they narrow through here rather than reaching into
+ * fields that only one arm of the union has.
+ */
+type InfraNode = TopologyNode & { data: InfraNodeData }
+
+const isInfraNode = (n: TopologyNode): n is InfraNode =>
+  n.type == null || n.type === "infra" || n.type === "group"
 
 const nodes = ref<TopologyNode[]>([
   { id: "api", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, project: "infra" } },
@@ -56,6 +69,8 @@ function onConnect(conn: { source: string | null; target: string | null }) {
   const src = nodes.value.find((n) => n.id === conn.source)
   const dst = nodes.value.find((n) => n.id === conn.target)
   if (!src || !dst) return
+  // Project isolation is a host-level rule; service nodes don't carry one.
+  if (!isInfraNode(src) || !isInfraNode(dst)) return
   if (src.data.project !== dst.data.project) {
     toast.error(`cross-project edge rejected: ${src.data.project} ✗ ${dst.data.project}`)
     return
@@ -74,7 +89,11 @@ function onConnect(conn: { source: string | null; target: string | null }) {
   toast.success(`wg edge added — reconciling (${src.data.name} ↔ ${dst.data.name})`)
 }
 
-const sel = computed(() => nodes.value.find((n) => n.id === selected.value) ?? null)
+// The inspector describes hosts; selecting a service leaves it empty.
+const sel = computed<InfraNode | null>(() => {
+  const node = nodes.value.find((n) => n.id === selected.value)
+  return node && isInfraNode(node) ? node : null
+})
 const selPeers = computed(() => {
   if (!sel.value) return []
   const id = sel.value.id

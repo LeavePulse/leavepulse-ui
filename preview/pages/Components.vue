@@ -188,14 +188,14 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
           variant="danger"
           @click="error('gRPC timeout', {
             title: 'Failed',
-            actions: [{ label: 'Retry', onClick: () => success('Retried') }],
+            actions: [{ label: 'Retry', onClick: () => { success('Retried') } }],
           })"
         >
           Error + action
         </LpButton>
         <LpButton
           variant="outline"
-          @click="toast('Click me to copy diagnostics', { title: 'Clickable', onClick: () => success('Copied') })"
+          @click="toast('Click me to copy diagnostics', { title: 'Clickable', onClick: () => { success('Copied') } })"
         >
           Clickable
         </LpButton>
