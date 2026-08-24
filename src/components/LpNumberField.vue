@@ -6,6 +6,7 @@ import {
   NumberFieldInput,
   NumberFieldRoot,
 } from "reka-ui"
+import { useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 
 defineProps<{
@@ -16,9 +17,19 @@ defineProps<{
   max?: number
   step?: number
   disabled?: boolean
+  // The unit the number is in ("mm", "W", "mA"). It sits inside the field
+  // rather than in the label, because a grid of bare boxes labelled "Width",
+  // "Depth", "Weight" tells the reader nothing about which one wants grams.
+  // Not part of the value: it is never typed, selected, or submitted.
+  unit?: string
 }>()
 
 defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
+
+// The unit is described to the input rather than merely placed beside it: on
+// screen the two read as one field, and without this a reader announces "380"
+// and leaves out the milliamps that make it mean anything.
+const unitId = useId()
 </script>
 
 <template>
@@ -42,8 +53,13 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
       />
     </NumberFieldDecrement>
     <NumberFieldInput
+      :aria-describedby="unit ? unitId : undefined"
       class="min-w-0 flex-1 bg-transparent text-center text-sm text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
     />
+    <!-- The unit sits between the value and the increment button, so a long one
+         narrows the field rather than covering the digits. Not focusable and
+         not part of the value: it is read, never typed. -->
+    <span v-if="unit" :id="unitId" class="shrink-0 pr-1 text-xs text-muted">{{ unit }}</span>
     <NumberFieldIncrement
       class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >

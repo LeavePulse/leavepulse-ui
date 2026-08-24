@@ -1668,12 +1668,14 @@ export const registry: ComponentEntry[] = [
   {
     id: "numberfield",
     name: "NumberField",
-    description: "Numeric input with stepper buttons, min/max/step.",
+    description: "Numeric input with stepper buttons, min/max/step, optional unit.",
     components: { LpNumberField },
-    state: () => reactive({ value: 30 }),
-    template: `<div class="w-48">
+    state: () => reactive({ value: 30, watts: 10, millis: 380 }),
+    template: `<div class="w-48 space-y-3">
   <LpNumberField v-model="value" :min="0" :max="100" :step="5" />
-  <p class="mt-2 text-xs text-muted">value: {{ value }}</p>
+  <LpNumberField v-model="watts" :min="0" unit="W" />
+  <LpNumberField v-model="millis" :min="0" unit="mA" />
+  <p class="text-xs text-muted">value: {{ value }}</p>
 </div>`,
   },
   {
