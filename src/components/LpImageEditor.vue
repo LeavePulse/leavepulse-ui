@@ -92,32 +92,7 @@ const upright = computed(() => ((rotation.value % 360) + 360) % 360)
 
 /** Touched at all? An untouched picture is uploaded as it arrived — four turns
  *  back to where it started is not an edit, however far the dial travelled. */
-const edited = computed(
-  () => upright.value !== 0 || zoom.scale.value !== 1 || cropped.value,
-)
-
-/*
- * The crop rectangle, in FRACTIONS of the viewport (0..1), not pixels.
- *
- * Two things could express "which part of the picture is kept" — the frame and
- * the zoom — and if both did, they would disagree the moment either changed.
- * So they divide it: zoom and pan say what is under the frame, the frame says
- * how much of that is kept. Fractions rather than pixels because the viewport
- * resizes: a rectangle stored in pixels is wrong the moment the modal is
- * narrower, and a person who framed a rating plate does not expect the frame to
- * slide off it when the window changes.
- */
-const FULL = { left: 0, top: 0, right: 1, bottom: 1 }
-const crop = ref({ ...FULL })
-
-/** Nothing trimmed — the frame is still the whole viewport. */
-const cropped = computed(
-  () =>
-    crop.value.left > 0.001 ||
-    crop.value.top > 0.001 ||
-    crop.value.right < 0.999 ||
-    crop.value.bottom < 0.999,
-)
+const edited = computed(() => upright.value !== 0 || zoom.scale.value !== 1)
 
 watch(
   () => props.file,
@@ -125,7 +100,6 @@ watch(
     revoke()
     rotation.value = 0
     zoom.reset()
-    crop.value = { ...FULL }
     objectUrl.value = URL.createObjectURL(file)
     source.value = await decode(file, objectUrl.value)
   },
@@ -201,100 +175,23 @@ function rotate(by: number) {
 function reset() {
   rotation.value = 0
   zoom.reset()
-  crop.value = { ...FULL }
 }
 
-type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "move"
-
-/** Smallest the frame may get, as a fraction. Below this the handles overlap
- *  and there is nothing left to grab. */
-const MIN_SPAN = 0.08
-
-const dragging = ref<Handle | null>(null)
-let startCrop = { ...FULL }
-let startPoint = { x: 0, y: 0 }
-
-function onHandleDown(handle: Handle, event: PointerEvent) {
-  // Stop the picture's own pan from starting: the pointer is on the frame.
-  event.stopPropagation()
-  ;(event.target as HTMLElement).setPointerCapture(event.pointerId)
-  dragging.value = handle
-  startCrop = { ...crop.value }
-  startPoint = { x: event.clientX, y: event.clientY }
-}
-
-function onHandleMove(event: PointerEvent) {
-  const handle = dragging.value
-  const frame = viewport.value
-  if (!handle || !frame) return
-
-  const dx = (event.clientX - startPoint.x) / frame.clientWidth
-  const dy = (event.clientY - startPoint.y) / frame.clientHeight
-  const next = { ...startCrop }
-
-  if (handle === "move") {
-    // Moved as a whole, clamped by its own size so it stays inside.
-    const w = startCrop.right - startCrop.left
-    const h = startCrop.bottom - startCrop.top
-    next.left = clamp(startCrop.left + dx, 0, 1 - w)
-    next.top = clamp(startCrop.top + dy, 0, 1 - h)
-    next.right = next.left + w
-    next.bottom = next.top + h
-    crop.value = next
-    return
-  }
-
-  if (handle.includes("w")) next.left = clamp(startCrop.left + dx, 0, next.right - MIN_SPAN)
-  if (handle.includes("e")) next.right = clamp(startCrop.right + dx, next.left + MIN_SPAN, 1)
-  if (handle.includes("n")) next.top = clamp(startCrop.top + dy, 0, next.bottom - MIN_SPAN)
-  if (handle.includes("s")) next.bottom = clamp(startCrop.bottom + dy, next.top + MIN_SPAN, 1)
-
-  crop.value = lockedRatio.value ? keepRatio(next, handle) : next
-}
-
-function onHandleUp() {
-  dragging.value = null
-}
-
-/** A fixed aspect means the frame's shape is not the person's to change; only
- *  its size and position are. */
-const lockedRatio = computed(() => props.aspect !== "free")
-
-/**
- * Re-square a rectangle to the locked ratio, growing from the corner opposite
- * whichever handle is being dragged — so the side under the pointer follows it
- * and the other stays put, which is what a resize looks like everywhere else.
+/*
+ * The frame is FIXED and the picture moves under it.
+ *
+ * The other model — a rectangle dragged around a still image by its handles —
+ * was tried here first and it was the wrong one twice over. It gave two ways
+ * to say the same thing (zoom the picture, or resize the frame), which is the
+ * duplication this component is otherwise careful to avoid; and it put eight
+ * bright handles permanently over the photograph being judged. This is the
+ * model every avatar cropper and X itself settled on: aim the picture, and
+ * what is inside the frame is what is kept.
+ *
+ * So there is no crop rectangle to store. What is kept is exactly what the
+ * viewport shows, which the zoom and pan already describe.
  */
-function keepRatio(box: typeof FULL, handle: Handle) {
-  const frame = viewport.value
-  if (!frame) return box
-  const px = frame.clientWidth
-  const py = frame.clientHeight
-  // Work in pixels: a ratio is about real proportions, and the fractions are
-  // stretched by whatever shape the viewport happens to be.
-  const wantPx = boxRatio.value
-  let w = (box.right - box.left) * px
-  let h = (box.bottom - box.top) * py
-
-  if (w / h > wantPx) w = h * wantPx
-  else h = w / wantPx
-
-  const anchorX = handle.includes("w") ? box.right : box.left
-  const anchorY = handle.includes("n") ? box.bottom : box.top
-  const fw = w / px
-  const fh = h / py
-
-  const left = handle.includes("w") ? anchorX - fw : anchorX
-  const top = handle.includes("n") ? anchorY - fh : anchorY
-  return {
-    left: clamp(left, 0, 1 - fw),
-    top: clamp(top, 0, 1 - fh),
-    right: clamp(left, 0, 1 - fw) + fw,
-    bottom: clamp(top, 0, 1 - fh) + fh,
-  }
-}
-
-/** Crop box proportions, after the rotation has been applied. */
+/** Shape of the frame, after the rotation has been applied. */
 const boxRatio = computed(() => {
   if (typeof props.aspect === "number" && props.aspect > 0) return props.aspect
   const ratio = ASPECTS[props.aspect as string]
@@ -316,20 +213,19 @@ const imageStyle = computed(() => ({
   transform: `${zoom.style.value.transform} rotate(${rotation.value}deg)`,
   // A quarter turn travels. Snapping is how you lose track of which way the
   // picture went, and the rest of the kit moves — a control that jumps reads
-  // as a different component. The composable already suppresses its own
-  // transition while a drag is in flight, and that wins here too: `undefined`
-  // from it means "animate", anything else means "follow the pointer exactly".
+  // as a different component. The composable suppresses its own transition
+  // while a drag is in flight, and that wins here too.
   transition:
     zoom.style.value.transition ??
     `transform var(--duration-medium) var(--ease-emphasized)`,
 }))
 
-/**
- * What is inside the crop box, as a Blob. `null` when nothing was changed.
+/*
+ * What the frame holds, as a Blob. `null` when nothing was changed.
  *
- * The geometry is taken from the rendered frame rather than recomputed: what
- * the person lined up on screen is what gets written, which is the one thing a
- * cropper has to be right about.
+ * Taken from the rendered viewport rather than recomputed: what the person
+ * lined up on screen is what gets written, which is the one thing a cropper
+ * has to be right about.
  */
 async function exportImage(): Promise<Blob | null> {
   const picture = source.value
@@ -338,8 +234,8 @@ async function exportImage(): Promise<Blob | null> {
   if (!picture || !size || !frame) return null
   if (!edited.value && props.aspect === "free") return null
 
-  // Work in "upright space": the picture as the person sees it, already turned.
-  // The rotation is then re-applied once, when drawing, which keeps the crop
+  // Work in "upright space": the picture as the person sees it, already
+  // turned. The rotation is re-applied once, when drawing, which keeps the
   // maths free of quarter-turn special cases.
   const turned = upright.value % 180 !== 0
   const uprightW = turned ? size.height : size.width
@@ -349,32 +245,21 @@ async function exportImage(): Promise<Blob | null> {
   // reaches. One frame pixel is this many upright pixels.
   const cover = Math.max(frame.clientWidth / uprightW, frame.clientHeight / uprightH)
   const shown = cover * zoom.scale.value
-
-  // What the whole viewport shows…
-  const viewW = Math.min(uprightW, frame.clientWidth / shown)
-  const viewH = Math.min(uprightH, frame.clientHeight / shown)
+  const cropW = Math.min(uprightW, frame.clientWidth / shown)
+  const cropH = Math.min(uprightH, frame.clientHeight / shown)
 
   // `offset` is in content pixels — the same space the cover scale maps from —
   // so it converts with `cover`, not with the zoomed scale.
-  const viewX = clamp(
+  const centreX = clamp(
     uprightW / 2 - zoom.offset.value.x / cover,
-    viewW / 2,
-    uprightW - viewW / 2,
+    cropW / 2,
+    uprightW - cropW / 2,
   )
-  const viewY = clamp(
+  const centreY = clamp(
     uprightH / 2 - zoom.offset.value.y / cover,
-    viewH / 2,
-    uprightH - viewH / 2,
+    cropH / 2,
+    uprightH - cropH / 2,
   )
-
-  // …and the frame keeps a rectangle of that. The two are separate on purpose:
-  // zoom decides what is under the frame, the frame decides how much of it is
-  // kept, and neither has to know about the other.
-  const box = crop.value
-  const cropW = viewW * (box.right - box.left)
-  const cropH = viewH * (box.bottom - box.top)
-  const centreX = viewX - viewW / 2 + viewW * ((box.left + box.right) / 2)
-  const centreY = viewY - viewH / 2 + viewH * ((box.top + box.bottom) / 2)
 
   const scale = Math.min(1, props.maxEdge / Math.max(cropW, cropH))
   const canvas = document.createElement("canvas")
@@ -383,8 +268,6 @@ async function exportImage(): Promise<Blob | null> {
   const ctx = canvas.getContext("2d")
   if (!ctx) return null
 
-  // Centre, turn, then draw the source about its own middle: the crop window is
-  // expressed in upright space and the rotation puts the pixels back.
   ctx.translate(canvas.width / 2, canvas.height / 2)
   ctx.rotate((upright.value * Math.PI) / 180)
   ctx.scale(scale, scale)
@@ -405,10 +288,6 @@ async function exportImage(): Promise<Blob | null> {
 function clamp(value: number, low: number, high: number) {
   return Math.min(Math.max(value, low), Math.max(low, high))
 }
-
-/** Corners first: they are what people reach for, and the edges are for the
- *  one dimension a corner would change both of. */
-const HANDLES = ["nw", "ne", "se", "sw", "n", "e", "s", "w"] as const
 
 /*
  * The wheel.
@@ -484,32 +363,6 @@ const SHORTCUTS = [
   { keys: ["0"], label: "Reset" },
 ] as const
 
-const frameBoxStyle = computed(() => ({
-  left: `${crop.value.left * 100}%`,
-  top: `${crop.value.top * 100}%`,
-  width: `${(crop.value.right - crop.value.left) * 100}%`,
-  height: `${(crop.value.bottom - crop.value.top) * 100}%`,
-}))
-
-/**
- * The dimming: one element the size of the frame, casting a spread shadow
- * outward. Four positioned panels would seam visibly at the corners as the
- * frame is dragged.
- *
- * The element IS the hole — it is placed over the kept region and the shadow
- * covers everything around it. Clipping the shadow to the frame's own shape
- * was the first attempt and it dims exactly backwards: `clip-path` keeps what
- * is inside the path, so the shade survived only where it was not wanted, and
- * on screen nothing appeared to happen at all.
- */
-const shadeStyle = computed(() => ({
-  left: `${crop.value.left * 100}%`,
-  top: `${crop.value.top * 100}%`,
-  width: `${(crop.value.right - crop.value.left) * 100}%`,
-  height: `${(crop.value.bottom - crop.value.top) * 100}%`,
-  boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
-}))
-
 defineExpose({ export: exportImage, reset, edited, shortcuts: SHORTCUTS })
 </script>
 
@@ -546,87 +399,85 @@ defineExpose({ export: exportImage, reset, edited, shortcuts: SHORTCUTS })
         :style="imageStyle"
       >
 
-      <!-- The crop frame, over the picture. Everything outside it is dimmed
-           rather than hidden: what is being cut away is worth seeing while you
-           decide where to cut, and a black mask turns "is the cable in shot?"
-           into a guess. -->
-      <div class="lp-editor__shade pointer-events-none absolute" :style="shadeStyle" />
-
-      <div
-        class="lp-editor__frame absolute"
-        :style="frameBoxStyle"
-        @pointerdown="onHandleDown('move', $event)"
-        @pointermove="onHandleMove"
-        @pointerup="onHandleUp"
-        @pointercancel="onHandleUp"
+      <!-- Thirds, only while the picture is being moved. A composition guide
+           belongs to the moment of composing; left on, it is one more thing to
+           look past for all the time you are not. -->
+      <Transition
+        enter-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+        leave-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
       >
-        <!-- Thirds, drawn only while the frame is being moved: a composition
-             guide is for the moment of composing, and a permanent grid is
-             something to look past for the rest of the time. -->
         <div
-          v-if="dragging"
+          v-if="zoom.panning.value"
           class="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3"
         >
-          <div v-for="i in 9" :key="i" class="border border-white/10" />
+          <div
+            v-for="i in 9"
+            :key="i"
+            class="border-white/15"
+            :class="[i % 3 !== 0 ? 'border-r' : '', i < 7 ? 'border-b' : '']"
+          />
         </div>
-
-        <span
-          v-for="handle in HANDLES"
-          :key="handle"
-          :class="['lp-editor__handle', `lp-editor__handle--${handle}`]"
-          @pointerdown="onHandleDown(handle, $event)"
-          @pointermove="onHandleMove"
-          @pointerup="onHandleUp"
-          @pointercancel="onHandleUp"
-        />
-      </div>
+      </Transition>
     </div>
 
-    <div class="flex flex-wrap items-center gap-1">
-      <LpButton
-        size="sm"
-        variant="ghost"
-        :title="text.rotateLeft"
-        :aria-label="text.rotateLeft"
-        @click="rotate(-90)"
-      >
-        <LpIcon name="lucide:rotate-ccw" :size="16" />
-      </LpButton>
-      <LpButton
-        size="sm"
-        variant="ghost"
-        :title="text.rotateRight"
-        :aria-label="text.rotateRight"
-        @click="rotate(90)"
-      >
-        <LpIcon name="lucide:rotate-cw" :size="16" />
-      </LpButton>
-      <LpButton
-        size="sm"
-        variant="ghost"
-        :title="text.zoomIn"
-        :aria-label="text.zoomIn"
-        @click="zoom.zoomBy(1.2)"
-      >
-        <LpIcon name="lucide:zoom-in" :size="16" />
-      </LpButton>
-      <LpButton
-        size="sm"
-        variant="ghost"
-        :title="text.zoomOut"
-        :aria-label="text.zoomOut"
-        @click="zoom.zoomBy(1 / 1.2)"
-      >
-        <LpIcon name="lucide:zoom-out" :size="16" />
-      </LpButton>
-      <LpButton
-        size="sm"
-        variant="ghost"
-        class="ml-auto"
-        :disabled="!edited"
-        @click="reset"
-      >
-        <LpIcon name="lucide:undo-2" :size="16" />
+    <!-- Two operations, shown as two. Five loose icons in a row — with two of
+         them opposite pairs — read as five unrelated things; grouped, each
+         pair is one control with a direction, and the zoom reading sits
+         between the buttons that move it. -->
+    <div class="flex items-center gap-1.5 text-muted">
+      <div class="flex items-center rounded-control bg-surface-soft p-0.5">
+        <LpButton
+          size="sm"
+          variant="ghost"
+          :title="text.rotateLeft"
+          :aria-label="text.rotateLeft"
+          @click="rotate(-90)"
+        >
+          <LpIcon name="lucide:rotate-ccw" :size="16" />
+        </LpButton>
+        <LpButton
+          size="sm"
+          variant="ghost"
+          :title="text.rotateRight"
+          :aria-label="text.rotateRight"
+          @click="rotate(90)"
+        >
+          <LpIcon name="lucide:rotate-cw" :size="16" />
+        </LpButton>
+      </div>
+
+      <div class="flex items-center rounded-control bg-surface-soft p-0.5">
+        <LpButton
+          size="sm"
+          variant="ghost"
+          :disabled="zoom.scale.value <= 1"
+          :title="text.zoomOut"
+          :aria-label="text.zoomOut"
+          @click="zoom.zoomBy(1 / 1.2)"
+        >
+          <LpIcon name="lucide:minus" :size="16" />
+        </LpButton>
+        <!-- Tabular, so the digits do not shuffle their own width as it moves. -->
+        <span class="min-w-10 text-center text-xs tabular-nums">
+          {{ Math.round(zoom.scale.value * 100) }}%
+        </span>
+        <LpButton
+          size="sm"
+          variant="ghost"
+          :title="text.zoomIn"
+          :aria-label="text.zoomIn"
+          @click="zoom.zoomBy(1.2)"
+        >
+          <LpIcon name="lucide:plus" :size="16" />
+        </LpButton>
+      </div>
+
+      <!-- Only once there is something to undo: a permanently dimmed control
+           is a question the eye answers on every pass. -->
+      <LpButton v-if="edited" size="sm" variant="ghost" class="ml-auto" @click="reset">
+        <LpIcon name="lucide:undo-2" :size="15" />
         {{ text.reset }}
       </LpButton>
     </div>
@@ -634,66 +485,6 @@ defineExpose({ export: exportImage, reset, edited, shortcuts: SHORTCUTS })
 </template>
 
 <style scoped>
-.lp-editor__frame {
-  cursor: move;
-  outline: 1px solid var(--color-brand);
-  touch-action: none;
-}
-
-/*
- * The grab targets are bigger than what is drawn.
- *
- * A corner handle reads as a 10px square and is a 24px target: fingers are
- * nowhere near 10px, and neither is a hand on a trackpad. The visible square is
- * the ::after, centred inside the larger hit area — the same trick a slider
- * thumb uses, and the reason a crop frame does not feel like a game of darts.
- */
-.lp-editor__handle {
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  touch-action: none;
-}
-
-.lp-editor__handle::after {
-  content: "";
-  position: absolute;
-  inset: 7px;
-  border-radius: 2px;
-  background: var(--color-brand);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-}
-
-/* Edge handles are a bar, not a dot: they change one dimension, and a bar is
-   what says so. */
-.lp-editor__handle--n::after,
-.lp-editor__handle--s::after {
-  inset: 9px 4px;
-}
-
-.lp-editor__handle--e::after,
-.lp-editor__handle--w::after {
-  inset: 4px 9px;
-}
-
-/*
- * Handles sit ON the edge, not outside it.
- *
- * Straddling the border is the tidier drawing and the wrong one here: the
- * viewport clips, so at full frame — which is where every picture starts —
- * every corner handle was cut away and only the four edge bars survived. A
- * cropper whose corners are invisible until you shrink it first is a cropper
- * nobody finds.
- */
-.lp-editor__handle--nw { top: -2px; left: -2px; cursor: nwse-resize; }
-.lp-editor__handle--ne { top: -2px; right: -2px; cursor: nesw-resize; }
-.lp-editor__handle--se { bottom: -2px; right: -2px; cursor: nwse-resize; }
-.lp-editor__handle--sw { bottom: -2px; left: -2px; cursor: nesw-resize; }
-.lp-editor__handle--n { top: -2px; left: 50%; margin-left: -12px; cursor: ns-resize; }
-.lp-editor__handle--s { bottom: -2px; left: 50%; margin-left: -12px; cursor: ns-resize; }
-.lp-editor__handle--e { right: -2px; top: 50%; margin-top: -12px; cursor: ew-resize; }
-.lp-editor__handle--w { left: -2px; top: 50%; margin-top: -12px; cursor: ew-resize; }
-
 /* The picture settles into the frame instead of appearing in it. Scale rather
    than a slide: the frame is the fixed thing here and the image lives inside
    it, so anything that moved would read as a crop that had shifted. */
