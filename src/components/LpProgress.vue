@@ -97,17 +97,29 @@ const props = withDefaults(
  * gap to the other end. Interpolating here and handing both the same number
  * keeps them exactly level, because there is only one number.
  */
-const eased = ref(props.animateOnMount ? 0 : 1)
+/*
+ * `shown` is the position on screen, and it is the thing that is animated —
+ * not a phase that something else multiplies by.
+ *
+ * The earlier shape kept an eased 0..1 and derived the position from it and a
+ * `from` captured in the watcher. That could not work: `from` was read off a
+ * computed over `props.value`, so by the time the watcher ran it already
+ * reported the DESTINATION, and every sweep after the first interpolated from
+ * the answer to the answer. The entrance still animated, which is what made
+ * the bug look like a decision — the bar filled beautifully once and jumped
+ * forever after.
+ *
+ * Animating the position directly removes the question. Wherever the bar is is
+ * where the next sweep starts, including one that interrupts another midway.
+ */
+const shown = ref(props.animateOnMount ? 0 : props.value)
 let raf = 0
 
-/* Where the current sweep began, so one interrupted mid-way continues from the
-   arc's present position rather than snapping back to empty. */
-let from = props.animateOnMount ? 0 : props.value
-
-const runSweep = (ms: number) => {
+const runSweep = (to: number, ms: number) => {
   if (raf) cancelAnimationFrame(raf)
-  if (prefersReducedMotion() || ms <= 0) {
-    eased.value = 1
+  const from = shown.value
+  if (prefersReducedMotion() || ms <= 0 || from === to) {
+    shown.value = to
     return
   }
   const t0 = performance.now()
@@ -115,7 +127,7 @@ const runSweep = (ms: number) => {
     const t = Math.min(1, (now - t0) / ms)
     // The kit's shared curve — the same function LpNumberFlow eases on, so the
     // arc and the counter agree by construction rather than by comment.
-    eased.value = easeOut(t)
+    shown.value = from + (to - from) * easeOut(t)
     raf = t < 1 ? requestAnimationFrame(step) : 0
   }
   raf = requestAnimationFrame(step)
@@ -140,22 +152,19 @@ const bindReveal = (instance: unknown) => {
   revealAnchor.value = (instance as { $el?: Element } | null)?.$el ?? null
 }
 
-watch(revealed, (visible) => {
-  if (visible && props.animateOnMount) runSweep(props.duration)
-}, { immediate: true })
-
-/* A later change re-runs the sweep from where it stands, so the ring eases to
-   its new value instead of jumping. */
 watch(
-  () => [props.value, props.max],
-  () => {
-    from = shown.value
-    runSweep(props.duration)
+  revealed,
+  (visible) => {
+    if (visible && props.animateOnMount) runSweep(props.value, props.duration)
   },
+  { immediate: true },
 )
 
-/** The value both the arc and the counter render: one interpolation, one truth. */
-const shown = computed(() => from + (props.value - from) * eased.value)
+/* A later change eases to the new value from wherever the bar stands. */
+watch(
+  () => [props.value, props.max],
+  () => runSweep(props.value, props.duration),
+)
 
 const pct = computed(() =>
   Math.max(0, Math.min(100, (shown.value / props.max) * 100)),

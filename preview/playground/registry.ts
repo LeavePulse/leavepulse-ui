@@ -465,8 +465,22 @@ export const registry: ComponentEntry[] = [
     name: "Progress",
     description:
       "One value as a bar or a ring — same data, same tones. `variant=\"ring\"` for KPI dials, where a percentage should read at a glance.",
-    components: { LpProgress },
+    components: { LpProgress, LpSlider, LpButton },
+    state: () => reactive({ live: 35 }),
     template: `<div class="flex flex-col gap-8">
+  <!-- Driven, because a static gauge cannot show the thing a gauge is for:
+       what it does when the number CHANGES. -->
+  <div class="flex w-80 flex-col gap-3">
+    <LpSlider v-model="live" :min="0" :max="100" />
+    <div class="flex gap-2">
+      <LpButton size="sm" variant="soft" @click="live = 12">12</LpButton>
+      <LpButton size="sm" variant="soft" @click="live = 64">64</LpButton>
+      <LpButton size="sm" variant="soft" @click="live = 97">97</LpButton>
+    </div>
+    <LpProgress :value="live" tone="auto" title="Live" caption />
+    <LpProgress :value="live" variant="ring" tone="auto" class="self-start" />
+  </div>
+
   <div class="flex w-80 flex-col gap-3">
     <LpProgress :value="35" />
     <LpProgress :value="70" tone="action" />

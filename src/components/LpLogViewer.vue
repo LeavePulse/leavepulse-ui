@@ -7,8 +7,18 @@
  * viewport element and re-emits the native scroll event — exactly what tailing
  * needs.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, TransitionGroup, watch } from "vue"
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  TransitionGroup,
+  watch,
+} from "vue"
 import { prefersReducedMotion } from "../composables/easing"
+import { useHotkeys } from "../composables/useHotkeys"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -52,6 +62,9 @@ const props = withDefaults(
     /** Fixed height. Anything CSS-valid; defaults to a comfortable terminal. */
     height?: string
     emptyLabel?: string
+    /** Shown while the stream is held. Defaulted in English; apps with i18n
+     *  pass their own. */
+    frozenLabel?: string
     /**
      * When true, a "loading older…" row is shown pinned at the top — set it while
      * fetching a previous page in response to `reach-top`, clear it when done.
@@ -90,6 +103,7 @@ const props = withDefaults(
     tail: true,
     height: "20rem",
     emptyLabel: "No logs yet",
+    frozenLabel: "Held — release Ctrl to resume",
     rowMenu: true,
     parse: false,
   },
@@ -200,8 +214,85 @@ function parseLine(line: LogLine): LogLine {
     : { ...line, message: msg, time, level, source }
 }
 
+/*
+ * Hold a key, the stream stops.
+ *
+ * Not a toggle. A stream worth freezing is one that is scrolling past faster
+ * than it can be read, and in that state you are looking at a line you want to
+ * keep in sight — reaching for a button means moving your eyes off it, and a
+ * toggle you must remember to switch back leaves the viewer dead until you do.
+ * The gesture is Task Manager's: press to hold, let go to resume, and nothing
+ * is lost either way because the lines were never the viewer's to begin with.
+ *
+ * The freeze bites at the SOURCE rather than at the scroll position. Pinning
+ * the scroll only stops it moving; the rows underneath still re-render, so
+ * whatever you were reading is replaced in place while it appears to stand
+ * still — which is worse than either state on its own.
+ */
+const root = ref<HTMLElement | null>(null)
+const frozen = ref(false)
+const frozenLines = shallowRef<LogLine[] | null>(null)
+
+const sourceLines = computed<LogLine[]>(() => frozenLines.value ?? props.lines)
+
+function freeze(): boolean {
+  // Declining unless the stream is being looked at: `false` hands Ctrl back
+  // untouched, which matters because Ctrl is half of every shortcut on the
+  // page and swallowing it would break them all.
+  if (!hovered.value && !focusWithin()) return false
+  if (frozen.value) return true
+  // Snapshotted by reference, not copied: the array the consumer hands over is
+  // replaced wholesale on every update, so holding the old one is enough — and
+  // a copy of ten thousand lines on every keypress is not.
+  frozenLines.value = props.lines
+  frozen.value = true
+  return true
+}
+
+function thaw() {
+  frozen.value = false
+  frozenLines.value = null
+}
+
+/*
+ * Held while the pointer is over the stream, or while it holds the focus.
+ *
+ * Not scoped to focus alone: nobody clicks a log before reading it, and a
+ * modifier held over an unfocused viewer would have gone to the page instead.
+ * Not global either — two viewers side by side would both freeze, and Ctrl is
+ * pressed for a hundred other reasons on a page that happens to contain logs.
+ * Pointing at the thing is the intent.
+ */
+const hovered = ref(false)
+
+function focusWithin() {
+  const el = root.value
+  return !!el && el.contains(document.activeElement)
+}
+
+useHotkeys(() => [
+  { key: "control", allowInInput: true, handler: freeze },
+  { key: "meta", allowInInput: true, handler: freeze },
+])
+
+// Released on keyup anywhere, and on blur: a window that loses focus mid-hold
+// never delivers the keyup, and the viewer would stay frozen with no visible
+// reason and no key to press.
+function onKeyup(event: KeyboardEvent) {
+  if (event.key === "Control" || event.key === "Meta") thaw()
+}
+
+onMounted(() => {
+  window.addEventListener("keyup", onKeyup)
+  window.addEventListener("blur", thaw)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener("keyup", onKeyup)
+  window.removeEventListener("blur", thaw)
+})
+
 const parsedLines = computed<LogLine[]>(() =>
-  props.parse ? props.lines.map(parseLine) : props.lines,
+  props.parse ? sourceLines.value.map(parseLine) : sourceLines.value,
 )
 
 // Rows actually rendered, each carrying its ORIGINAL index so line numbers stay
@@ -548,8 +639,29 @@ const transitionProps = {
 
 <template>
   <div
+    ref="root"
+    tabindex="-1"
     class="relative overflow-hidden rounded-card border border-line bg-surface font-mono text-xs leading-relaxed"
+    :class="frozen ? 'ring-1 ring-brand' : ''"
+    @pointerenter="hovered = true"
+    @pointerleave="hovered = false"
   >
+    <!-- Says which state it is in, because a stream that has simply gone quiet
+         looks exactly like a frozen one. -->
+    <Transition
+      enter-active-class="transition duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+      leave-active-class="transition duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+      enter-from-class="-translate-y-1 opacity-0"
+      leave-to-class="-translate-y-1 opacity-0"
+    >
+      <div
+        v-if="frozen"
+        class="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-pill bg-brand px-2.5 py-1 text-[11px] font-medium text-ink-inverse"
+      >
+        {{ frozenLabel }}
+      </div>
+    </Transition>
+
     <!-- `instant`: this viewer decides for itself when a jump animates (see
          rideToBottom) and restores scrollTop directly after prepending older
          lines. A CSS smooth scroll would override both. -->
