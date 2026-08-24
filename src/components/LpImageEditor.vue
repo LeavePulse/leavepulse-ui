@@ -79,7 +79,7 @@ const ASPECTS: Record<string, number | null> = {
   "16:9": 16 / 9,
 }
 
-const bitmap = shallowRef<ImageBitmap | null>(null)
+const source = shallowRef<ImageBitmap | HTMLImageElement | null>(null)
 const objectUrl = ref("")
 const rotation = ref(0)
 const viewport = ref<HTMLElement | null>(null)
@@ -96,23 +96,86 @@ const edited = computed(
   () => upright.value !== 0 || zoom.scale.value !== 1 || cropped.value,
 )
 
+/*
+ * The crop rectangle, in FRACTIONS of the viewport (0..1), not pixels.
+ *
+ * Two things could express "which part of the picture is kept" — the frame and
+ * the zoom — and if both did, they would disagree the moment either changed.
+ * So they divide it: zoom and pan say what is under the frame, the frame says
+ * how much of that is kept. Fractions rather than pixels because the viewport
+ * resizes: a rectangle stored in pixels is wrong the moment the modal is
+ * narrower, and a person who framed a rating plate does not expect the frame to
+ * slide off it when the window changes.
+ */
+const FULL = { left: 0, top: 0, right: 1, bottom: 1 }
+const crop = ref({ ...FULL })
+
+/** Nothing trimmed — the frame is still the whole viewport. */
+const cropped = computed(
+  () =>
+    crop.value.left > 0.001 ||
+    crop.value.top > 0.001 ||
+    crop.value.right < 0.999 ||
+    crop.value.bottom < 0.999,
+)
+
 watch(
   () => props.file,
   async (file) => {
     revoke()
     rotation.value = 0
     zoom.reset()
+    crop.value = { ...FULL }
     objectUrl.value = URL.createObjectURL(file)
-    bitmap.value = await createImageBitmap(file).catch(() => null)
+    source.value = await decode(file, objectUrl.value)
   },
   { immediate: true },
 )
 
+/**
+ * The picture, as something canvas can draw and measure.
+ *
+ * `createImageBitmap` first: it decodes off the main thread and hands back
+ * real dimensions. It refuses SVG outright — "the source image could not be
+ * decoded" — which is not a corner case here, since a screenshot tool or a
+ * diagram export is exactly the sort of thing someone pastes in. So an <img>
+ * is the fallback, and it decodes everything the browser can render.
+ *
+ * Without this the editor still SHOWED the picture — the <img> tag never
+ * needed the bitmap — while silently measuring nothing: the frame fell back to
+ * a square, and export returned null. A failure that looks like a layout
+ * choice is the worst kind.
+ */
+async function decode(
+  file: File | Blob,
+  url: string,
+): Promise<ImageBitmap | HTMLImageElement | null> {
+  try {
+    return await createImageBitmap(file)
+  } catch {
+    return await new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = url
+    })
+  }
+}
+
+/** Natural size, whichever kind of source came back. */
+const sourceSize = computed(() => {
+  const s = source.value
+  if (!s) return null
+  return s instanceof HTMLImageElement
+    ? { width: s.naturalWidth, height: s.naturalHeight }
+    : { width: s.width, height: s.height }
+})
+
 function revoke() {
   if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
   objectUrl.value = ""
-  bitmap.value?.close()
-  bitmap.value = null
+  if (source.value instanceof ImageBitmap) source.value.close()
+  source.value = null
 }
 
 onBeforeUnmount(revoke)
@@ -140,29 +203,6 @@ function reset() {
   zoom.reset()
   crop.value = { ...FULL }
 }
-
-/*
- * The crop rectangle, in FRACTIONS of the viewport (0..1), not pixels.
- *
- * Two things could express "which part of the picture is kept" — the frame and
- * the zoom — and if both did, they would disagree the moment either changed.
- * So they divide it: zoom and pan say what is under the frame, the frame says
- * how much of that is kept. Fractions rather than pixels because the viewport
- * resizes: a rectangle stored in pixels is wrong the moment the modal is
- * narrower, and a person who framed a rating plate does not expect the frame to
- * slide off it when the window changes.
- */
-const FULL = { left: 0, top: 0, right: 1, bottom: 1 }
-const crop = ref({ ...FULL })
-
-/** Nothing trimmed — the frame is still the whole viewport. */
-const cropped = computed(
-  () =>
-    crop.value.left > 0.001 ||
-    crop.value.top > 0.001 ||
-    crop.value.right < 0.999 ||
-    crop.value.bottom < 0.999,
-)
 
 type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "move"
 
@@ -259,11 +299,11 @@ const boxRatio = computed(() => {
   if (typeof props.aspect === "number" && props.aspect > 0) return props.aspect
   const ratio = ASPECTS[props.aspect as string]
   if (ratio) return ratio
-  const source = bitmap.value
-  if (!source) return 1
+  const size = sourceSize.value
+  if (!size) return 1
   const turned = upright.value % 180 !== 0
-  const w = turned ? source.height : source.width
-  const h = turned ? source.width : source.height
+  const w = turned ? size.height : size.width
+  const h = turned ? size.width : size.height
   return w / h
 })
 
@@ -292,17 +332,18 @@ const imageStyle = computed(() => ({
  * cropper has to be right about.
  */
 async function exportImage(): Promise<Blob | null> {
-  const source = bitmap.value
+  const picture = source.value
+  const size = sourceSize.value
   const frame = viewport.value
-  if (!source || !frame) return null
+  if (!picture || !size || !frame) return null
   if (!edited.value && props.aspect === "free") return null
 
   // Work in "upright space": the picture as the person sees it, already turned.
   // The rotation is then re-applied once, when drawing, which keeps the crop
   // maths free of quarter-turn special cases.
   const turned = upright.value % 180 !== 0
-  const uprightW = turned ? source.height : source.width
-  const uprightH = turned ? source.width : source.height
+  const uprightW = turned ? size.height : size.width
+  const uprightH = turned ? size.width : size.height
 
   // object-cover: the picture fills the frame and the overflow is what panning
   // reaches. One frame pixel is this many upright pixels.
@@ -354,7 +395,7 @@ async function exportImage(): Promise<Blob | null> {
   const readX = (turned ? centreY : centreX) - readW / 2
   const readY = (turned ? centreX : centreY) - readH / 2
 
-  ctx.drawImage(source, readX, readY, readW, readH, -readW / 2, -readH / 2, readW, readH)
+  ctx.drawImage(picture, readX, readY, readW, readH, -readW / 2, -readH / 2, readW, readH)
 
   return await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", props.quality),
