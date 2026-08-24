@@ -22,11 +22,13 @@ import {
   LpContextMenu,
   LpDatePicker,
   LpDropdownMenu,
+  LpDropzone,
   LpEmptyState,
   LpFileTree,
   type FileNode,
   LpFormField,
   LpIcon,
+  LpImageEditor,
   LpInput,
   LpLightbox,
   type LightboxItem,
@@ -2050,6 +2052,88 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     :items="shots"
     copyable
   />
+</div>`,
+  },
+  {
+    id: "dropzone",
+    name: "Dropzone",
+    description:
+      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree.",
+    components: { LpDropzone },
+    state: () => reactive({ taken: [] as string[], refused: [] as string[], tone: "sunken" }),
+    template: `<div class="flex w-full max-w-md flex-col gap-3">
+  <LpSelect
+    v-model="tone"
+    :options="[
+      { value: 'sunken', label: 'sunken — darker than the card' },
+      { value: 'flush', label: 'flush — same as the card' },
+      { value: 'soft', label: 'soft — lighter than the card' },
+    ]"
+  />
+  <LpDropzone
+    accept="image/*"
+    multiple
+    paste-target
+    :tone="tone"
+    :max-bytes="8 * 1024 * 1024"
+    title="Drop photographs here"
+    hint="or click to browse · Ctrl+V pastes a screenshot · 8 MB each"
+    @files="(f) => (taken = f.map((x) => x.name + ' — ' + (x.size / 1024).toFixed(0) + ' KB'))"
+    @rejected="(r) => (refused = r.map((x) => x.file.name + ' (' + x.cause + ')'))"
+  />
+  <p v-if="taken.length" class="text-xs text-muted">Taken: {{ taken.join(', ') }}</p>
+  <p v-if="refused.length" class="text-xs text-danger">Refused: {{ refused.join(', ') }}</p>
+</div>`,
+  },
+  {
+    id: "imageeditor",
+    name: "ImageEditor",
+    description:
+      "Straighten and crop on the way to an upload: quarter turns, wheel/pinch zoom, drag to pan. `export()` returns the visible region as a Blob, or null when nothing was changed — an untouched picture uploads byte-for-byte rather than a generation worse.",
+    components: { LpImageEditor, LpButton, LpSelect },
+    state: () => {
+      // A deliberately sideways photograph, the case this exists for.
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#1f2937"/><stop offset="1" stop-color="#0b1220"/></linearGradient></defs>
+<rect width="900" height="1600" fill="url(#g)"/>
+<rect x="120" y="560" width="660" height="440" rx="18" fill="#e5e7eb"/>
+<text x="450" y="760" text-anchor="middle" font-family="Inter,system-ui,sans-serif"
+ font-size="64" font-weight="700" fill="#111827">MLF-A001</text>
+<text x="450" y="840" text-anchor="middle" font-family="Inter,system-ui,sans-serif"
+ font-size="44" fill="#374151">24V ⎓ 0.38A</text>
+<text x="450" y="1520" text-anchor="middle" font-family="Inter,system-ui,sans-serif"
+ font-size="34" fill="rgba(255,255,255,.5)">900 × 1600 — portrait</text>
+</svg>`
+      const file = new File([svg], "plate.svg", { type: "image/svg+xml" })
+      const state = reactive({
+        file,
+        aspect: "free",
+        result: "",
+        editor: null as { export: () => Promise<Blob | null> } | null,
+        async save() {
+          const blob = await state.editor?.export()
+          state.result = blob
+            ? `${(blob.size / 1024).toFixed(1)} KB written`
+            : "unchanged — the original is uploaded as it arrived"
+        },
+      })
+      return state
+    },
+    template: `<div class="flex flex-col gap-3" style="max-width: 22rem">
+  <LpSelect
+    v-model="aspect"
+    :options="[
+      { value: 'free', label: 'free' },
+      { value: 'square', label: 'square' },
+      { value: '4:3', label: '4:3' },
+      { value: '3:4', label: '3:4' },
+      { value: '16:9', label: '16:9' },
+    ]"
+  />
+  <LpImageEditor :ref="(el) => (editor = el)" :file="file" :aspect="aspect" />
+  <LpButton size="sm" @click="save">Export</LpButton>
+  <p v-if="result" class="text-xs text-muted">{{ result }}</p>
 </div>`,
   },
 ]

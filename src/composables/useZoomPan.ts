@@ -25,6 +25,23 @@ export interface UseZoomPanOptions {
 
 export interface UseZoomPan {
   scale: Ref<number>
+  /**
+   * Pan offset in CONTENT pixels — what `style` puts inside `translate()`,
+   * before the scale magnifies it. Exposed because anything that has to know
+   * *which part* is visible needs the number, not the CSS string: an exporter
+   * writing the cropped region, a minimap drawing the viewport rectangle, a
+   * caller restoring a saved position. Parsing it back out of `transform` is
+   * the alternative, and that breaks the moment this composable changes how it
+   * composes the transform.
+   */
+  offset: ComputedRef<{ x: number; y: number }>
+  /**
+   * Put the view somewhere — restoring a saved position, or carrying one
+   * through a change that re-frames the content. Clamped like any other pan,
+   * so a caller cannot place the content off the viewport. Omitting `scale`
+   * keeps the current one.
+   */
+  setView: (view: { x: number; y: number; scale?: number }) => void
   /** True once zoomed past the minimum — the point at which panning matters. */
   zoomed: ComputedRef<boolean>
   /** True while a drag is in flight, so the caller can swap the cursor. */
@@ -194,8 +211,21 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
     transition: panning.value || pinchStartDistance > 0 ? "none" : undefined,
   }))
 
+  const offset = computed(() => ({ x: x.value, y: y.value }))
+
+  function setView(view: { x: number; y: number; scale?: number }) {
+    if (view.scale !== undefined) {
+      scale.value = Math.min(max, Math.max(min, view.scale))
+    }
+    x.value = view.x
+    y.value = view.y
+    clampPan()
+  }
+
   return {
     scale,
+    offset,
+    setView,
     zoomed,
     panning,
     style,
