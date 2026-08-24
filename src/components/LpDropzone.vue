@@ -180,9 +180,10 @@ defineExpose({ browse: () => input.value?.click() })
     ref="revealAnchor"
     type="button"
     :disabled="disabled"
-    class="lp-dropzone flex w-full flex-col items-center gap-2 rounded-card border border-dashed border-line px-6 py-8 text-center transition-colors duration-[var(--duration-fast)] hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55"
+    class="lp-dropzone relative flex w-full flex-col items-center gap-2 rounded-card px-6 py-8 text-center transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55"
     :class="[
-      over ? 'border-brand bg-brand-soft' : TONES[tone],
+      over ? 'bg-brand-soft' : TONES[tone],
+      over ? 'lp-dropzone--over' : '',
       animate && !revealed ? 'lp-dropzone--waiting' : '',
     ]"
     @click="input?.click()"
@@ -192,6 +193,28 @@ defineExpose({ browse: () => input.value?.click() })
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
   >
+    <!-- The border is drawn rather than declared, because `border-style:
+         dashed` cannot be moved: a CSS border has no dash offset to animate.
+         At rest it is a plain dashed outline; while something is being dragged
+         over it the dashes travel, which answers "yes, let go here" to
+         peripheral vision — the pointer is what the person is watching, not
+         this box. -->
+    <svg
+      aria-hidden="true"
+      class="lp-dropzone__frame pointer-events-none absolute inset-0 size-full"
+    >
+      <rect
+        x="0.5"
+        y="0.5"
+        width="calc(100% - 1px)"
+        height="calc(100% - 1px)"
+        rx="var(--radius-card)"
+        fill="none"
+        stroke-width="1"
+        stroke-dasharray="6 5"
+      />
+    </svg>
+
     <slot :over="over">
       <LpIcon
         :name="icon"
@@ -217,10 +240,32 @@ defineExpose({ browse: () => input.value?.click() })
 </template>
 
 <style scoped>
-/* The dashes draw themselves in and the block settles up a few pixels. The
-   border is a real dashed border rather than an SVG, so the entrance is the
-   fade plus the rise — enough to read as arrival without pretending to be a
-   stroke animation the browser cannot give a border. */
+.lp-dropzone__frame rect {
+  stroke: var(--color-line);
+  transition: stroke var(--duration-fast) linear;
+}
+
+.lp-dropzone:hover .lp-dropzone__frame rect {
+  stroke: var(--color-line-strong);
+}
+
+/* Marching ants, and only while a drag is in flight. At rest this would be a
+   loop nobody asked for, running for as long as the page is open and competing
+   with every other thing on it; under a drag it is the answer to "can I let go
+   here". One dash period per cycle, so the travel is continuous rather than
+   jumping back at the seam. */
+.lp-dropzone--over .lp-dropzone__frame rect {
+  stroke: var(--color-brand);
+  animation: lp-dropzone-ants 500ms linear infinite;
+}
+
+@keyframes lp-dropzone-ants {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+
+/* The dashes fade in and the block settles up a few pixels. */
 .lp-dropzone {
   animation: lp-dropzone-in var(--duration-slow) var(--ease-settle) both;
 }
@@ -242,6 +287,12 @@ defineExpose({ browse: () => input.value?.click() })
   .lp-dropzone--waiting {
     opacity: 1;
     transform: none;
+    animation: none;
+  }
+
+  /* The ants stop, the colour stays: the brand stroke is what says "drop
+     here", and it says it standing still. */
+  .lp-dropzone--over .lp-dropzone__frame rect {
     animation: none;
   }
 }
