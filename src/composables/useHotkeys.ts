@@ -111,9 +111,38 @@ function matches(event: KeyboardEvent, binding: HotkeyBinding): boolean {
  * may come and go with the state that owns them — a getter is the point, not a
  * formality.
  */
-export function useHotkeys(bindings: MaybeRefOrGetter<HotkeyBinding[]>) {
+export interface UseHotkeysOptions {
+  /**
+   * Only act while the focus is inside this element.
+   *
+   * The default is the whole window, which is right for a command palette and
+   * wrong for a control: two of the same component on one page would both
+   * answer the same key, and a control beside a form would answer keys aimed
+   * at the form. Scoping it here rather than in each component because every
+   * one of them was about to write the same `document.activeElement` check and
+   * decline by hand.
+   *
+   * Undefined or null means the window, so the palette case stays the default.
+   */
+  scope?: MaybeRefOrGetter<HTMLElement | null | undefined>
+}
+
+export function useHotkeys(
+  bindings: MaybeRefOrGetter<HotkeyBinding[]>,
+  options: UseHotkeysOptions = {},
+) {
+  function inScope(target: EventTarget | null): boolean {
+    const el = toValue(options.scope)
+    if (!el) return true
+    const node = target instanceof Node ? target : null
+    // The element itself counts: a focusable canvas holds the focus without
+    // containing anything that could.
+    return !!node && (el === node || el.contains(node))
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (event.isComposing) return
+    if (!inScope(event.target)) return
     const inTextEntry = isTextEntry(event.target)
     for (const binding of toValue(bindings)) {
       if (inTextEntry && !binding.allowInInput) continue
