@@ -553,6 +553,25 @@ watch(
 )
 
 const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
+
+/*
+ * The gradient id for a series, with the series NAME reduced to id-safe
+ * characters.
+ *
+ * A name is a label — "used %", "in eth0", "read sda" — and putting it verbatim
+ * into an id produced `url(#lp-chart-x-g-used %)`, which is not a valid
+ * reference: the browser fails to resolve it and falls back to painting the
+ * shape black. The gradient was there, correct, and simply never reached, so an
+ * area chart of any series whose name held a space or a percent sign rendered
+ * as a solid black block under its line — while "cpu" and "memory" on the same
+ * page kept their colour, which is what made it look like a data problem rather
+ * than an escaping one.
+ *
+ * Index-suffixed so two names that differ only in punctuation ("in eth0" and
+ * "in-eth0") cannot collapse onto one id and share a colour.
+ */
+const gradientId = (name: string, index: number) =>
+  `${clipId}-g-${index}-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`
 </script>
 
 <template>
@@ -618,8 +637,8 @@ const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
         >
           <defs>
             <linearGradient
-              v-for="s in lines"
-              :id="`${clipId}-g-${s.name}`"
+              v-for="(s, i) in lines"
+              :id="gradientId(s.name, i)"
               :key="s.name"
               x1="0"
               y1="0"
@@ -728,11 +747,11 @@ const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
 
             <!-- area fills -->
             <path
-              v-for="s in lines"
+              v-for="(s, i) in lines"
               v-show="type === 'area'"
               :key="`f-${s.name}`"
               :d="s.fill"
-              :fill="`url(#${clipId}-g-${s.name})`"
+              :fill="`url(#${gradientId(s.name, i)})`"
             />
 
             <!-- lines -->
