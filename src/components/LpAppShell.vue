@@ -39,6 +39,10 @@ const props = withDefaults(
     /** Flat items, or sections for grouped nav. Forwarded to LpSidebar. */
     items?: SidebarItem[]
     sections?: SidebarSection[]
+    /** Folded nav groups (v-model:collapsed). Forwarded to LpSidebar. */
+    collapsed?: string[]
+    /** Fold long navs automatically; 0 disables. Forwarded to LpSidebar. */
+    autoCollapseAfter?: number
     /** Active item id (v-model) when not using a custom `isActive`. */
     modelValue?: string
     /**
@@ -80,6 +84,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "update:modelValue", id: string): void
   (e: "update:open", value: boolean): void
+  (e: "update:collapsed", keys: string[]): void
   (e: "select", item: SidebarItem): void
 }>()
 
@@ -167,9 +172,12 @@ defineExpose({ openDrawer: _openDrawer })
       :mobile-breakpoint="mobileBreakpoint"
       :divider="divider"
       :loading="loading"
+      :collapsed="collapsed"
+      :auto-collapse-after="autoCollapseAfter"
       class="shrink-0"
       @update:model-value="onModel"
       @update:open="(v) => emit('update:open', v)"
+      @update:collapsed="(v) => emit('update:collapsed', v)"
       @select="onSelect"
     >
       <template v-if="$slots.logo" #header>
@@ -188,8 +196,14 @@ defineExpose({ openDrawer: _openDrawer })
 
     <!-- Main column: header + the single scroll region. -->
     <div class="flex min-w-0 flex-1 flex-col">
+      <!-- `relative` so a consumer can centre something — section tabs, a
+           search box — against the WHOLE bar. Centring it inside the title
+           block instead makes its position depend on how wide the actions are,
+           so the tabs slide sideways every time a button appears: measured at
+           59 px off centre with two actions and 77 px with three, which reads
+           as the navigation drifting rather than the page changing. -->
       <header
-        class="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:px-6"
+        class="relative flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:px-6"
       >
         <LpButton
           :class="burgerClass"
@@ -218,8 +232,18 @@ defineExpose({ openDrawer: _openDrawer })
              for a long one — each snapping every control to its left sideways.
              Kept mounted regardless of the slot, so a page that only teleports
              into it still gets the easing (an empty box measures zero wide and
-             costs nothing). -->
-        <LpShift axis="width" class="ml-auto flex shrink-0 items-center gap-2">
+             costs nothing).
+
+             `max-w` + horizontal scroll rather than `shrink-0`: a phone cannot
+             fit a title and three buttons on one line, and an unshrinkable box
+             resolved that by pushing its own contents past the right edge —
+             where there is nothing to scroll to and nothing to press. The
+             actions now cap at two thirds of the bar and scroll within it, so
+             the title keeps a third and every button stays reachable. -->
+        <LpShift
+          axis="width"
+          class="ml-auto flex max-w-[66%] shrink items-center gap-2 overflow-x-auto lp-scrollbar-none md:max-w-none md:shrink-0 md:overflow-visible"
+        >
           <slot name="header-actions" />
         </LpShift>
       </header>

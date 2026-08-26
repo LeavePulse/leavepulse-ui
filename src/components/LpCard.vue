@@ -19,7 +19,13 @@ const card = tv({
   // renders: two lines that look identical must not wrap differently.
   // Anything that genuinely must not break (a code block, a log line) sets its
   // own overflow and scrolls instead.
-  base: "rounded-card border bg-surface-raised break-words",
+  // min-w-0: a card is nearly always laid out by a grid or a flex row, and both
+  // give their children `min-width: auto` — meaning "never narrower than your
+  // contents". A card holding a form then refuses to shrink and pushes its own
+  // column past the viewport: measured at 490px inside a 358px grid, with the
+  // inputs ending up off-screen on a phone. The card is a container; it takes
+  // the width it is given and wraps what is inside it.
+  base: "min-w-0 rounded-card border bg-surface-raised break-words",
   variants: {
     variant: {
       // raised opts into the skin painter (.lp-skin-panel) so it follows the

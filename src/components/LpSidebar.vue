@@ -13,7 +13,7 @@
  * auto-closes the drawer. With `responsive` off the component renders exactly
  * the static <nav> it always has — existing call sites are unaffected.
  */
-import { computed, useId } from "vue"
+import { computed, ref, useId } from "vue"
 import LpDrawer from "./LpDrawer.vue"
 import LpSidebarNav from "./LpSidebarNav.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
@@ -56,6 +56,25 @@ const props = withDefaults(
      * flush, header-less look.
      */
     divider?: boolean
+    /**
+     * Which collapsible groups are folded away (v-model:collapsed). Leave it
+     * unbound to let the sidebar fold long navs on its own — see
+     * `autoCollapseAfter`.
+     */
+    collapsed?: string[]
+    /**
+     * Fold collapsible groups automatically once the nav has more than this
+     * many rows, counting headings and items alike.
+     *
+     * The reason is the reader, not the pixels: a short nav is taken in at a
+     * glance, a long one has to be searched, and searching a list you did not
+     * choose to have is the part that grates. Past the threshold the groups
+     * that are not today's work fold themselves, and the one holding the
+     * current page always stays open.
+     *
+     * 0 turns it off — the app then owns the state through `collapsed`.
+     */
+    autoCollapseAfter?: number
   }>(),
   {
     skeletonRows: 6,
@@ -63,12 +82,14 @@ const props = withDefaults(
     responsive: false,
     mobileBreakpoint: "md",
     divider: true,
+    autoCollapseAfter: 14,
   },
 )
 
 const emit = defineEmits<{
   (e: "update:modelValue", id: string): void
   (e: "update:open", value: boolean): void
+  (e: "update:collapsed", keys: string[]): void
   (e: "select", item: SidebarItem): void
 }>()
 
@@ -79,6 +100,47 @@ const groups = computed<SidebarSection[]>(() =>
 
 function itemActive(item: SidebarItem): boolean {
   return props.isActive ? props.isActive(item) : item.id === props.modelValue
+}
+
+function keyOf(section: SidebarSection): string {
+  return section.key ?? section.title ?? ""
+}
+
+/*
+ * Folded state. The app may own it (v-model:collapsed) — that is how a stored
+ * setting survives a reload; otherwise the sidebar keeps it for the session.
+ */
+const ownCollapsed = ref<string[] | null>(null)
+
+/** Headings + items: what the eye actually has to walk past. */
+const navLength = computed(
+  () => groups.value.reduce((n, g) => n + g.items.length + (g.title ? 1 : 0), 0),
+)
+
+/*
+ * Nothing chosen yet and the nav is long: fold the collapsible groups, except
+ * the one the reader is standing in. Once anything is toggled the choice is a
+ * decision and this stops second-guessing it.
+ */
+const autoCollapsed = computed<string[]>(() => {
+  const limit = props.autoCollapseAfter
+  if (!limit || navLength.value <= limit) return []
+  return groups.value
+    .filter((g) => g.collapsible && !g.items.some(itemActive))
+    .map(keyOf)
+    .filter(Boolean)
+})
+
+const collapsedKeys = computed<string[]>(
+  () => props.collapsed ?? ownCollapsed.value ?? autoCollapsed.value,
+)
+
+function toggleSection(key: string, collapsed: boolean) {
+  const next = collapsed
+    ? [...new Set([...collapsedKeys.value, key])]
+    : collapsedKeys.value.filter((k) => k !== key)
+  ownCollapsed.value = next
+  emit("update:collapsed", next)
 }
 
 function activate(item: SidebarItem) {
@@ -139,7 +201,9 @@ defineOptions({ inheritAttrs: false })
       :loading="loading"
       :skeleton-rows="skeletonRows"
       :skeleton-header="skeletonHeader"
+      :collapsed-keys="collapsedKeys"
       @activate="activate"
+      @toggle-section="toggleSection"
     >
       <template v-if="$slots.item" #item="slotProps">
         <slot name="item" v-bind="slotProps" />
@@ -184,7 +248,9 @@ defineOptions({ inheritAttrs: false })
         :loading="loading"
         :skeleton-rows="skeletonRows"
         :skeleton-header="skeletonHeader"
+        :collapsed-keys="collapsedKeys"
         @activate="activate"
+        @toggle-section="toggleSection"
       >
         <template v-if="$slots.item" #item="slotProps">
           <slot name="item" v-bind="slotProps" />

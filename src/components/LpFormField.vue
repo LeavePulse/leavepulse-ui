@@ -23,8 +23,12 @@ const id = useId()
 </script>
 
 <template>
-  <!-- `gap` covers label→control only; the message carries its own spacing. -->
-  <div class="flex flex-col gap-1.5">
+  <!-- `gap` covers label→control only; the message carries its own spacing.
+       min-w-0 because a field is laid out by a form grid, whose children default
+       to `min-width: auto` and so refuse to go narrower than the widest label or
+       placeholder inside them — which is how a two-column form ended up wider
+       than the phone holding it. -->
+  <div class="flex min-w-0 flex-col gap-1.5">
     <Label v-if="label" :for="id" class="text-sm font-medium text-ink">
       {{ label }}
       <span v-if="required" class="text-danger">*</span>
