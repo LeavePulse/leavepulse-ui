@@ -46,7 +46,13 @@ const id = useId()
          a step the easing could not cover, since it exists even at height 0. -->
     <LpShift axis="height">
       <p v-if="error" class="pt-1.5 text-xs text-danger">{{ error }}</p>
-      <p v-else-if="hint" class="pt-1.5 text-xs text-muted">{{ hint }}</p>
+      <!-- The hint is a slot as well as a prop: most are a sentence, but some
+           carry a link or a unit in <code>, and a prop can only be text. Callers
+           had been reaching for `#hint` on the assumption it existed — it
+           rendered nothing, so the explanation silently went missing. -->
+      <p v-else-if="hint || $slots.hint" class="pt-1.5 text-xs text-muted">
+        <slot name="hint">{{ hint }}</slot>
+      </p>
     </LpShift>
   </div>
 </template>
