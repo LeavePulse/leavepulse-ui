@@ -13,7 +13,13 @@ import { computed } from "vue"
 
 export interface InfraNodeData {
   name: string
+  /** Role key: selects the colour/glyph, and shown as-is unless `roleLabel`. */
   role: string
+  /**
+   * What to print for the role. The key itself ("host", "proxy") is an API
+   * value, not a word for an operator to read in their own language.
+   */
+  roleLabel?: string
   overlay?: string
   online?: boolean
   kind?: string
@@ -31,6 +37,31 @@ export interface InfraNodeData {
   staleFor?: string
   /** Fade the node back (search miss / not part of the focused node's graph). */
   dimmed?: boolean
+  /**
+   * Wording for this node's badges. Carried in `data` because that is what
+   * LpTopologyCanvas forwards to the node renderer; a component prop would
+   * never reach it.
+   */
+  labels?: InfraNodeLabels
+}
+
+/**
+ * Wording for the badges, so the node speaks the app's language.
+ *
+ * The kit ships English defaults; a localised app passes its own. `{n}` is the
+ * count, `{age}` the value of `staleFor`.
+ */
+export interface InfraNodeLabels {
+  /** Tooltip on the firewall badge. Default: "{n} firewall rule(s)". */
+  firewallRules?: string
+  /** Tooltip on the service badge. Default: "{n} service(s)". */
+  services?: string
+  /** Tooltip on the service badge when readings are stale. */
+  servicesStale?: string
+  /** Tooltip on the staleness badge. */
+  noContact?: string
+  /** Suffix after the age, e.g. "old" in "4m old". */
+  old?: string
 }
 
 const props = defineProps<{
@@ -39,6 +70,21 @@ const props = defineProps<{
   /** Extra/overriding role styles, merged over the defaults below. */
   roles?: Record<string, InfraRoleStyle>
 }>()
+
+/** Fill `{n}` / `{age}` in a label template. */
+function fill(tpl: string, vars: Record<string, string | number>): string {
+  return tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""))
+}
+
+const text = computed(() => ({
+  firewallRules: props.data.labels?.firewallRules ?? "{n} firewall rule(s)",
+  services: props.data.labels?.services ?? "{n} service(s)",
+  servicesStale:
+    props.data.labels?.servicesStale ?? "{n} service(s) as of {age} ago - not current",
+  noContact:
+    props.data.labels?.noContact ?? "No contact for {age} - everything shown here is that old",
+  old: props.data.labels?.old ?? "old",
+}))
 
 /*
  * Role → look. Colours are token references, never literals, so a theme (or a
@@ -80,13 +126,28 @@ const accentLine = computed(
 </script>
 
 <template>
+  <!--
+    An offline host is drawn offline, not merely faded.
+
+    Opacity alone was the only signal the frame carried, and at 0.5 on a dark
+    canvas it is nearly invisible: a machine that had not reported for minutes
+    sat in a role-coloured frame that read as healthy, contradicted only by a
+    7px dot. Offline now takes the frame and the role bar as well, so the three
+    signals on a node agree instead of arguing.
+  -->
   <div
     class="w-[168px] overflow-hidden rounded-card border bg-surface-raised shadow-panel transition-[border-color,box-shadow]"
-    :class="selected ? 'border-[var(--accent)]' : 'border-[var(--accent-line)]'"
+    :class="[
+      selected
+        ? 'border-[var(--accent)]'
+        : data.online === false
+          ? 'border-dashed border-danger/50'
+          : 'border-[var(--accent-line)]',
+    ]"
     :style="{
       '--accent': accent,
       '--accent-line': accentLine,
-      opacity: data.dimmed ? 0.3 : data.online === false ? 0.5 : 1,
+      opacity: data.dimmed ? 0.3 : data.online === false ? 0.75 : 1,
       ...(selected
         ? { boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel)' }
         : {}),
@@ -103,7 +164,12 @@ const accentLine = computed(
       class="!size-2 !border-2 !border-[var(--accent)] !bg-surface"
     />
 
-    <div class="h-[3px] bg-[var(--accent)]" />
+    <!-- The role bar reads as "this node is alive and is a proxy"; on an
+         offline host it must not keep asserting the first half. -->
+    <div
+      class="h-[3px]"
+      :class="data.online === false ? 'bg-danger/50' : 'bg-[var(--accent)]'"
+    />
     <div class="px-[11px] pb-2.5 pt-[9px]">
       <div class="flex items-center gap-[7px]">
         <span class="text-[13px] text-[var(--accent)]">{{ icon }}</span>
@@ -116,7 +182,7 @@ const accentLine = computed(
       </div>
       <div class="mt-1.5 flex items-center justify-between">
         <span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">
-          {{ data.role }}
+          {{ data.roleLabel ?? data.role }}
         </span>
         <span v-if="data.overlay" class="font-mono text-[10px] text-muted">{{ data.overlay }}</span>
       </div>
@@ -127,7 +193,7 @@ const accentLine = computed(
         <span
           v-if="data.firewallCount"
           class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
-          :title="`${data.firewallCount} firewall rule(s)`"
+          :title="fill(text.firewallRules, { n: data.firewallCount! })"
         >
           <span>⛨</span>{{ data.firewallCount }}
         </span>
@@ -137,8 +203,8 @@ const accentLine = computed(
           :class="data.staleFor ? 'line-through decoration-danger/70' : ''"
           :title="
             data.staleFor
-              ? `${data.serviceCount} service(s) as of ${data.staleFor} ago — not current`
-              : `${data.serviceCount} service(s)`
+              ? fill(text.servicesStale, { n: data.serviceCount!, age: data.staleFor })
+              : fill(text.services, { n: data.serviceCount! })
           "
         >
           <span>◇</span>{{ data.serviceCount }}
@@ -146,9 +212,9 @@ const accentLine = computed(
         <span
           v-if="data.staleFor"
           class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
-          :title="`No contact for ${data.staleFor} — everything shown here is that old`"
+          :title="fill(text.noContact, { age: data.staleFor })"
         >
-          <span>⚠</span>{{ data.staleFor }} old
+          <span>⚠</span>{{ data.staleFor }} {{ text.old }}
         </span>
       </div>
     </div>

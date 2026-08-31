@@ -439,6 +439,10 @@ defineExpose({ fitView, setViewport: applyViewport })
           </svg>
           {{ l.label }}
         </div>
+        <!-- Edges are only half of what a graph encodes; a node also carries
+             state (offline, stale readings) that the legend cannot know the
+             meaning of. The host explains its own node encoding here. -->
+        <slot name="legend-extra" />
       </div>
     </Panel>
   </VueFlow>

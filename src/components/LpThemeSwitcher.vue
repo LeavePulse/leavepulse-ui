@@ -11,7 +11,7 @@
  * and the choice survives a reload (anti-flash bootstrap). The component never
  * fetches; it just drives the theme engine.
  */
-import { computed, onMounted } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { presets } from "../theme/presets"
 import type { TokenSet } from "../theme/tokens"
 import { useTheme } from "../theme/useTheme"
@@ -153,8 +153,30 @@ const menu = computed<ContextMenuItemDef[]>(() =>
   })),
 )
 
+/*
+ * The theme the SERVER rendered is not necessarily the one the client restores:
+ * SSR paints from the `lp-theme` cookie (or the default), while on the client
+ * `bootstrapTheme()` deliberately wins from localStorage, which holds the full
+ * token set including custom themes the server cannot name. The colours cope —
+ * they are CSS variables, reapplied on boot — but a label that spells the theme
+ * OUT is text, and Vue compares text: every SSR consumer logged a hydration
+ * mismatch on this attribute alone.
+ *
+ * So the label says what the server said until the component is mounted, then
+ * names the theme actually in effect. Nobody reads a tooltip in the frame
+ * before hydration, and the a11y name settles on the truth.
+ */
+const hydrated = ref(false)
+onMounted(() => {
+  hydrated.value = true
+})
+
+const labelName = computed(() =>
+  hydrated.value ? activeName.value : (list.value[0]?.name ?? ""),
+)
+
 const triggerLabel = computed(
-  () => props["aria-label"] ?? `Theme: ${activeName.value}. Click to switch, right-click to choose.`,
+  () => props["aria-label"] ?? `Theme: ${labelName.value}. Click to switch, right-click to choose.`,
 )
 </script>
 
@@ -195,7 +217,7 @@ const triggerLabel = computed(
         />
       </span>
 
-      <span v-if="wantsLabel" class="text-sm font-medium">{{ activeName }}</span>
+      <span v-if="wantsLabel" class="text-sm font-medium">{{ labelName }}</span>
     </button>
   </LpContextMenu>
 </template>
