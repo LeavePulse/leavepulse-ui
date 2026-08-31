@@ -375,10 +375,13 @@ const barInsetTop = computed(() =>
   transform: translateX(-0.5rem);
 }
 
-.lp-row-leave-active {
-  position: absolute;
-  width: 100%;
-}
+/*
+ * The leaving row stays in the flow. Taking it out with `position: absolute` is
+ * the usual trick for a list, but a `<tr>` positioned that way loses the table's
+ * column grid and collapses to its content width — the row visibly breaks apart
+ * on its way out. The rows below close the gap through `lp-row-move` instead,
+ * which is a moment slower and stays a table the whole time.
+ */
 
 /* A filter that redraws the list is information, not decoration: with motion
    turned down the rows change without animating rather than not changing. */
@@ -387,10 +390,6 @@ const barInsetTop = computed(() =>
   .lp-row-leave-active,
   .lp-row-move {
     transition: none;
-  }
-
-  .lp-row-leave-active {
-    position: static;
   }
 }
 </style>
