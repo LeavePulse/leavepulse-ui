@@ -13,6 +13,21 @@ export interface TableColumn<Row> {
   width?: string
   /** Allow clicking the header to sort by this column. */
   sortable?: boolean
+  /**
+   * Offer "show only these values" in the header's menu, built from the values
+   * actually present in the rows. For a column that holds a small vocabulary —
+   * a type, a state, a site — where the question is "just the mains leads,
+   * please". Pointless on a column of unique values, so it is opt-in.
+   */
+  filterable?: boolean
+  /**
+   * How a raw cell value reads in that filter list. `power_ac` is the stored
+   * vocabulary; the menu should say what the column itself says.
+   */
+  valueLabel?: (value: unknown) => string
+  /** Keep this column out of the show/hide list — an actions column has no
+   *  name to offer and nothing to gain from being hidden. */
+  alwaysVisible?: boolean
 }
 
 export interface SortState {
@@ -47,6 +62,10 @@ const props = withDefaults(
     sortAscLabel?: string
     sortDescLabel?: string
     sortClearLabel?: string
+    /** Wording for the value filter and the column chooser. */
+    filterLabel?: string
+    showAllLabel?: string
+    columnsLabel?: string
   }>(),
   {
     emptyLabel: "Nothing here yet",
@@ -57,6 +76,9 @@ const props = withDefaults(
     sortAscLabel: "Sort ascending",
     sortDescLabel: "Sort descending",
     sortClearLabel: "Clear sorting",
+    filterLabel: "Show only",
+    showAllLabel: "Show all",
+    columnsLabel: "Columns",
   },
 )
 
@@ -94,14 +116,75 @@ function menuFor(row: T): ContextMenuItemDef[] {
 const ownSort = ref<SortState | null>(null)
 const activeSort = computed(() => props.sort ?? ownSort.value)
 
+/*
+ * ── hiding values, and hiding columns ────────────────────────────────────────
+ *
+ * Both live here rather than in each page for the same reason the sort does: a
+ * table that can be sorted but not narrowed sends every caller off to build its
+ * own filter bar, and six of those are six different ideas of what filtering
+ * looks like.
+ *
+ * State is the *hidden* set, not the shown one. A column that gains a new value
+ * — a cable type nobody had recorded yet — then appears by default instead of
+ * being invisible until someone notices the list has an unticked entry they
+ * never saw.
+ */
+const hiddenValues = ref<Record<string, Set<unknown>>>({})
+const hiddenColumns = ref<Set<string>>(new Set())
+
+const visibleColumns = computed(() =>
+  props.columns.filter((c) => !hiddenColumns.value.has(c.key)),
+)
+
+/** The distinct values a filterable column holds, in first-seen order. */
+function valuesOf(col: TableColumn<T>): unknown[] {
+  const seen: unknown[] = []
+  for (const row of props.rows) {
+    const v = row[col.key]
+    if (!seen.includes(v)) seen.push(v)
+  }
+  return seen
+}
+
+function isValueHidden(key: string, value: unknown): boolean {
+  return hiddenValues.value[key]?.has(value) ?? false
+}
+
+function toggleValue(key: string, value: unknown) {
+  const next = new Set(hiddenValues.value[key] ?? [])
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  hiddenValues.value = { ...hiddenValues.value, [key]: next }
+}
+
+function showAllValues(key: string) {
+  hiddenValues.value = { ...hiddenValues.value, [key]: new Set() }
+}
+
+function toggleColumn(key: string) {
+  const next = new Set(hiddenColumns.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  hiddenColumns.value = next
+}
+
+/** Rows left once the per-column value filters have been applied. */
+const filteredRows = computed<T[]>(() => {
+  const active = Object.entries(hiddenValues.value).filter(([, set]) => set.size)
+  if (!active.length) return props.rows
+  return props.rows.filter((row) =>
+    active.every(([key, hidden]) => !hidden.has(row[key])),
+  )
+})
+
 // We compare by raw cell value with a stable-ish coerce.
 const displayRows = computed<T[]>(() => {
   const s = activeSort.value
-  if (!s) return props.rows
+  if (!s) return filteredRows.value
   const col = props.columns.find((c) => c.key === s.key)
-  if (!col?.sortable) return props.rows
+  if (!col?.sortable) return filteredRows.value
   const factor = s.dir === "asc" ? 1 : -1
-  return [...props.rows].sort((a, b) => compare(a[s.key], b[s.key]) * factor)
+  return [...filteredRows.value].sort((a, b) => compare(a[s.key], b[s.key]) * factor)
 })
 
 function compare(a: unknown, b: unknown): number {
@@ -143,31 +226,86 @@ function sortIcon(col: TableColumn<T>): string {
  * list straight through to the browser's own menu.
  */
 function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
-  if (!col.sortable) return []
   const s = activeSort.value
   const set = (next: SortState | null) => () => {
     ownSort.value = next
     emit("update:sort", next)
   }
+
+  const items: ContextMenuItemDef[] = []
+
+  if (col.sortable) {
+    items.push(
+      {
+        label: props.sortAscLabel,
+        icon: "lucide:arrow-up",
+        disabled: s?.key === col.key && s.dir === "asc",
+        onSelect: set({ key: col.key, dir: "asc" }),
+      },
+      {
+        label: props.sortDescLabel,
+        icon: "lucide:arrow-down",
+        disabled: s?.key === col.key && s.dir === "desc",
+        onSelect: set({ key: col.key, dir: "desc" }),
+      },
+      {
+        label: props.sortClearLabel,
+        icon: "lucide:x",
+        disabled: !s,
+        onSelect: set(null),
+      },
+    )
+  }
+
+  // "Show only the mains leads" asked of the column that says which is which,
+  // rather than of a filter bar somewhere else on the page.
+  if (col.filterable) {
+    const hidden = hiddenValues.value[col.key]
+    items.push({
+      label: props.filterLabel,
+      icon: "lucide:filter",
+      separatorBefore: items.length > 0,
+      children: [
+        ...valuesOf(col).map((value) => ({
+          label: col.valueLabel?.(value) ?? String(value ?? "—"),
+          checked: !isValueHidden(col.key, value),
+          onSelect: () => toggleValue(col.key, value),
+        })),
+        {
+          label: props.showAllLabel,
+          icon: "lucide:list",
+          separatorBefore: true,
+          disabled: !hidden?.size,
+          onSelect: () => showAllValues(col.key),
+        },
+      ],
+    })
+  }
+
+  return items
+}
+
+/**
+ * The menu for the header itself, away from any one column: which columns to
+ * show. Asked here because it is a question about the table rather than about
+ * a column — right-clicking `Type` to hide `Where` would be the wrong place.
+ */
+function tableMenu(): ContextMenuItemDef[] {
+  const offered = props.columns.filter((c) => !c.alwaysVisible && c.label)
+  if (!offered.length) return []
   return [
     {
-      label: props.sortAscLabel,
-      icon: "lucide:arrow-up",
-      disabled: s?.key === col.key && s.dir === "asc",
-      onSelect: set({ key: col.key, dir: "asc" }),
-    },
-    {
-      label: props.sortDescLabel,
-      icon: "lucide:arrow-down",
-      disabled: s?.key === col.key && s.dir === "desc",
-      onSelect: set({ key: col.key, dir: "desc" }),
-    },
-    {
-      label: props.sortClearLabel,
-      icon: "lucide:x",
-      separatorBefore: true,
-      disabled: !s,
-      onSelect: set(null),
+      label: props.columnsLabel,
+      icon: "lucide:columns-3",
+      children: offered.map((col) => ({
+        label: col.label,
+        checked: !hiddenColumns.value.has(col.key),
+        // The last visible column cannot be hidden: a table with no columns is
+        // a blank card the operator has no way back from.
+        disabled:
+          !hiddenColumns.value.has(col.key) && visibleColumns.value.length <= 1,
+        onSelect: () => toggleColumn(col.key),
+      })),
     },
   ]
 }
@@ -280,6 +418,10 @@ const barInsetTop = computed(() =>
     class="rounded-card border border-line"
     :bar-inset-top="barInsetTop"
   >
+    <!-- The table-wide menu, which is what a right-click on empty header space
+         reaches: rows and headers carry their own and take the event first, so
+         this is the fallback rather than a competitor. -->
+    <LpContextMenu :items="tableMenu()">
     <table class="w-full border-collapse text-sm">
       <thead ref="headEl" :class="stickyHeader ? 'sticky top-0 z-10' : ''">
         <tr class="border-b border-line bg-surface-soft">
@@ -291,7 +433,7 @@ const barInsetTop = computed(() =>
             />
           </th>
           <th
-            v-for="col in columns"
+            v-for="col in visibleColumns"
             :key="col.key"
             :style="col.width ? { width: col.width } : undefined"
             class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
@@ -385,7 +527,7 @@ const barInsetTop = computed(() =>
               />
             </td>
             <td
-              v-for="col in columns"
+              v-for="col in visibleColumns"
               :key="col.key"
               class="px-4 py-3 text-ink"
               :class="alignClass(col.align)"
@@ -398,6 +540,7 @@ const barInsetTop = computed(() =>
         </LpContextMenu>
       </TransitionGroup>
     </table>
+    </LpContextMenu>
   </LpScrollArea>
 </template>
 

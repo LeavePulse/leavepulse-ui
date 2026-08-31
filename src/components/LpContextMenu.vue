@@ -32,6 +32,13 @@ export interface ContextMenuItemDef {
   onSelect?: () => void
   /** Nested submenu. When present, onSelect is ignored. */
   children?: ContextMenuItemDef[]
+  /**
+   * Renders as a tick-box rather than a plain item, and the menu stays open on
+   * select. For the lists where the point is to set several at once — which
+   * columns to show, which values to filter by — and closing after each one
+   * would mean reopening the menu for every tick.
+   */
+  checked?: boolean
 }
 
 const props = defineProps<{
@@ -85,7 +92,28 @@ const ICON =
               <ContextMenuSubContent :class="PANEL" :side-offset="2" :align-offset="-4">
                 <template v-for="(sub, j) in item.children" :key="j">
                   <ContextMenuSeparator v-if="sub.separatorBefore" class="my-1 h-px bg-line" />
+                  <!-- The tick-box case, as in the top-level menu: this is
+                       where most of them live, since a submenu is what a list
+                       of choices opens into. -->
                   <ContextMenuItem
+                    v-if="sub.checked !== undefined"
+                    :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand']"
+                    :disabled="sub.disabled"
+                    @select.prevent="sub.onSelect?.()"
+                  >
+                    <span class="flex items-center gap-2">
+                      <LpIcon
+                        :name="sub.checked ? 'lucide:check' : 'lucide:minus'"
+                        :size="15"
+                        :class="[ICON, sub.checked ? '' : 'opacity-25']"
+                      />
+                      {{ sub.label }}
+                    </span>
+                    <kbd v-if="sub.shortcut" class="text-xs text-muted">{{ sub.shortcut }}</kbd>
+                  </ContextMenuItem>
+
+                  <ContextMenuItem
+                    v-else
                     :class="[ITEM, 'justify-between', sub.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand']"
                     :disabled="sub.disabled"
                     @select="sub.onSelect?.()"
@@ -100,6 +128,27 @@ const ICON =
               </ContextMenuSubContent>
             </ContextMenuPortal>
           </ContextMenuSub>
+
+          <!-- Tick-box item. `@select.prevent` keeps the menu open: these come
+               in lists where several are set in one visit, and closing after
+               each tick would mean reopening for the next. The tick occupies a
+               fixed slot so unticked rows stay aligned with ticked ones. -->
+          <ContextMenuItem
+            v-else-if="item.checked !== undefined"
+            :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand']"
+            :disabled="item.disabled"
+            @select.prevent="item.onSelect?.()"
+          >
+            <span class="flex items-center gap-2">
+              <LpIcon
+                :name="item.checked ? 'lucide:check' : 'lucide:minus'"
+                :size="15"
+                :class="[ICON, item.checked ? '' : 'opacity-25']"
+              />
+              {{ item.label }}
+            </span>
+            <kbd v-if="item.shortcut" class="text-xs text-muted">{{ item.shortcut }}</kbd>
+          </ContextMenuItem>
 
           <!-- Leaf item -->
           <ContextMenuItem
