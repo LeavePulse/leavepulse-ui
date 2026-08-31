@@ -77,10 +77,18 @@ function menuFor(row: T): ContextMenuItemDef[] {
 }
 
 // ── sorting ──────────────────────────────────────────────────
-// Client-side sort is applied only when the parent doesn't drive `sort` via
-// v-model (server-side). We compare by raw cell value with a stable-ish coerce.
+//
+// The parent may drive `sort` through v-model, which is how a server-side sort
+// is expressed. When it does not, the table keeps the state itself and sorts
+// its own rows — otherwise `sortable` rendered a header that could be clicked,
+// emitted an event nobody was listening for, and left the rows exactly as they
+// were: a control that answers a click by doing nothing.
+const ownSort = ref<SortState | null>(null)
+const activeSort = computed(() => props.sort ?? ownSort.value)
+
+// We compare by raw cell value with a stable-ish coerce.
 const displayRows = computed<T[]>(() => {
-  const s = props.sort
+  const s = activeSort.value
   if (!s) return props.rows
   const col = props.columns.find((c) => c.key === s.key)
   if (!col?.sortable) return props.rows
@@ -98,18 +106,22 @@ function compare(a: unknown, b: unknown): number {
 
 function toggleSort(col: TableColumn<T>) {
   if (!col.sortable) return
-  const s = props.sort
+  const s = activeSort.value
   // Cycle: none → asc → desc → none, scoped to the clicked column.
   let next: SortState | null
   if (!s || s.key !== col.key) next = { key: col.key, dir: "asc" }
   else if (s.dir === "asc") next = { key: col.key, dir: "desc" }
   else next = null
+  // Kept locally as well as emitted: a parent that binds v-model overwrites
+  // this on the way back, and one that does not still gets a table that sorts.
+  ownSort.value = next
   emit("update:sort", next)
 }
 
 function sortIcon(col: TableColumn<T>): string {
-  if (props.sort?.key !== col.key) return "lucide:chevrons-up-down"
-  return props.sort.dir === "asc" ? "lucide:arrow-up" : "lucide:arrow-down"
+  const s = activeSort.value
+  if (s?.key !== col.key) return "lucide:chevrons-up-down"
+  return s.dir === "asc" ? "lucide:arrow-up" : "lucide:arrow-down"
 }
 
 // ── selection ────────────────────────────────────────────────
@@ -237,7 +249,11 @@ const barInsetTop = computed(() =>
             class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
             :class="alignClass(col.align)"
             :aria-sort="
-              sort?.key === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined
+              activeSort?.key === col.key
+                ? activeSort.dir === 'asc'
+                  ? 'ascending'
+                  : 'descending'
+                : undefined
             "
           >
             <button
@@ -246,7 +262,7 @@ const barInsetTop = computed(() =>
               class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
-                sort?.key === col.key ? 'text-ink' : '',
+                activeSort?.key === col.key ? 'text-ink' : '',
               ]"
               @click="toggleSort(col)"
             >
@@ -255,7 +271,11 @@ const barInsetTop = computed(() =>
                 :name="sortIcon(col)"
                 :size="13"
                 class="shrink-0 transition-[transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]"
-                :class="sort?.key === col.key ? 'opacity-100' : 'opacity-40 group-hover/sort:opacity-70'"
+                :class="
+                  activeSort?.key === col.key
+                    ? 'opacity-100'
+                    : 'opacity-40 group-hover/sort:opacity-70'
+                "
               />
             </button>
             <template v-else>{{ col.label }}</template>
@@ -266,8 +286,17 @@ const barInsetTop = computed(() =>
            steer, and a stray key from a control inside a cell must not move the
            cursor. The container is bound only so the composable can find rows
            to focus. -->
-      <tbody :ref="(el) => roving.setContainer(el as HTMLElement | null)">
-        <tr v-if="displayRows.length === 0">
+      <!-- Rows fade and settle rather than snapping in and out. Filtering a
+           list is a change the eye has to follow: rows vanishing between two
+           frames read as the table being redrawn, and the one that stayed is
+           impossible to keep track of. `move` is what carries the survivors to
+           their new position instead of teleporting them. -->
+      <TransitionGroup
+        tag="tbody"
+        name="lp-row"
+        :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
+      >
+        <tr v-if="displayRows.length === 0" key="lp-table-empty">
           <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
             <LpIcon :name="emptyIcon" :size="22" class="mx-auto mb-2 opacity-60" />
             <div>{{ emptyLabel }}</div>
@@ -282,8 +311,12 @@ const barInsetTop = computed(() =>
           :key="keyFor(row, index)"
           :items="menuFor(row)"
         >
+          <!-- `group` so a cell's own content can answer the row's hover: a
+               link inside a row wants its underline to sweep in when the row
+               lights up, not when the pointer crosses the text exactly. The
+               class paints nothing by itself. -->
           <tr
-            class="border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
+            class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
             :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
             v-bind="roving.itemProps(String(keyFor(row, index)))"
             @click="emit('rowClick', row)"
@@ -307,7 +340,57 @@ const barInsetTop = computed(() =>
             </td>
           </tr>
         </LpContextMenu>
-      </tbody>
+      </TransitionGroup>
     </table>
   </LpScrollArea>
 </template>
+
+<style scoped>
+/*
+ * Rows arriving, leaving and moving as the filter changes.
+ *
+ * A row cannot be translated on its Y axis without the table reflowing around
+ * it, so the entrance is opacity plus a small horizontal offset — enough to
+ * read as movement, not enough to fight the column grid. `--ease-emphasized`
+ * because this is interface responding to a click, not data being drawn.
+ *
+ * The leaving row is taken out of the flow, or the rows below it wait for the
+ * fade before closing the gap and the whole list lurches at the end instead of
+ * gliding.
+ */
+.lp-row-enter-active,
+.lp-row-leave-active {
+  transition:
+    opacity var(--duration-fast) var(--ease-emphasized),
+    transform var(--duration-fast) var(--ease-emphasized);
+}
+
+.lp-row-move {
+  transition: transform var(--duration-medium) var(--ease-emphasized);
+}
+
+.lp-row-enter-from,
+.lp-row-leave-to {
+  opacity: 0;
+  transform: translateX(-0.5rem);
+}
+
+.lp-row-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+/* A filter that redraws the list is information, not decoration: with motion
+   turned down the rows change without animating rather than not changing. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-row-enter-active,
+  .lp-row-leave-active,
+  .lp-row-move {
+    transition: none;
+  }
+
+  .lp-row-leave-active {
+    position: static;
+  }
+}
+</style>
