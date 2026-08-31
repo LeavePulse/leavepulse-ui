@@ -42,6 +42,11 @@ const props = withDefaults(
     /** Per-row right-click menu. Return [] (or omit the prop) to disable it for
      *  a row; the row then keeps the browser's native context menu. */
     rowMenu?: (row: T) => ContextMenuItemDef[]
+    /** Wording for the header's right-click menu. Passed in because the kit
+     *  carries no translations: an app that leaves these alone gets English. */
+    sortAscLabel?: string
+    sortDescLabel?: string
+    sortClearLabel?: string
   }>(),
   {
     emptyLabel: "Nothing here yet",
@@ -49,6 +54,9 @@ const props = withDefaults(
     selectable: false,
     selected: () => [],
     sort: null,
+    sortAscLabel: "Sort ascending",
+    sortDescLabel: "Sort descending",
+    sortClearLabel: "Clear sorting",
   },
 )
 
@@ -122,6 +130,46 @@ function sortIcon(col: TableColumn<T>): string {
   const s = activeSort.value
   if (s?.key !== col.key) return "lucide:chevrons-up-down"
   return s.dir === "asc" ? "lucide:arrow-up" : "lucide:arrow-down"
+}
+
+/**
+ * What right-clicking a header offers: the directions by name.
+ *
+ * The click cycles none → asc → desc → none, which is right for the common
+ * case and clumsy for the rest — going back to unsorted from ascending is two
+ * more clicks. Naming the three states makes each one reachable at once.
+ *
+ * Empty for a column that does not sort, and LpContextMenu passes an empty
+ * list straight through to the browser's own menu.
+ */
+function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
+  if (!col.sortable) return []
+  const s = activeSort.value
+  const set = (next: SortState | null) => () => {
+    ownSort.value = next
+    emit("update:sort", next)
+  }
+  return [
+    {
+      label: props.sortAscLabel,
+      icon: "lucide:arrow-up",
+      disabled: s?.key === col.key && s.dir === "asc",
+      onSelect: set({ key: col.key, dir: "asc" }),
+    },
+    {
+      label: props.sortDescLabel,
+      icon: "lucide:arrow-down",
+      disabled: s?.key === col.key && s.dir === "desc",
+      onSelect: set({ key: col.key, dir: "desc" }),
+    },
+    {
+      label: props.sortClearLabel,
+      icon: "lucide:x",
+      separatorBefore: true,
+      disabled: !s,
+      onSelect: set(null),
+    },
+  ]
 }
 
 // ── selection ────────────────────────────────────────────────
@@ -256,8 +304,15 @@ const barInsetTop = computed(() =>
                 : undefined
             "
           >
+            <!-- The menu wraps the button rather than the cell: a component
+                 cannot sit between `<tr>` and `<th>` — the template compiler
+                 drops it there, silently — so the trigger goes on the one
+                 element inside the header that is already interactive.
+                 Right-clicking names the directions instead of making you cycle
+                 through them: getting back to unsorted from ascending is two
+                 more clicks otherwise. -->
+            <LpContextMenu v-if="col.sortable" :items="headerMenu(col)">
             <button
-              v-if="col.sortable"
               type="button"
               class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
@@ -278,6 +333,7 @@ const barInsetTop = computed(() =>
                 "
               />
             </button>
+            </LpContextMenu>
             <template v-else>{{ col.label }}</template>
           </th>
         </tr>
