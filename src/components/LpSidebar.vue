@@ -57,6 +57,26 @@ const props = withDefaults(
      */
     divider?: boolean
     /**
+     * Where this nav lives.
+     *
+     * `rail` is the app shell's edge: one hairline on the inner side, square
+     * corners, the raised shell background.
+     *
+     * `panel` is a nav that sits inside a page next to the content it drives —
+     * a settings index, a table picker. It is a card: boxed on all four sides
+     * and rounded. Without it the rail's single border reads as a stray line
+     * down the middle of the page, and a consumer cannot cancel it with a class
+     * of their own.
+     */
+    variant?: "rail" | "panel"
+    /**
+     * Rail width. A plain `class` cannot set it — the component's own `w-60`
+     * wins, and the kit does not merge conflicting Tailwind classes — so the
+     * width is a prop. Any CSS length; a page-embedded nav usually wants to
+     * match the column it lives in.
+     */
+    width?: string
+    /**
      * Which collapsible groups are folded away (v-model:collapsed). Leave it
      * unbound to let the sidebar fold long navs on its own — see
      * `autoCollapseAfter`.
@@ -82,6 +102,7 @@ const props = withDefaults(
     responsive: false,
     mobileBreakpoint: "md",
     divider: true,
+    variant: "rail",
     autoCollapseAfter: 14,
   },
 )
@@ -170,6 +191,15 @@ const railClass = computed(() =>
   props.responsive ? RAIL_VISIBILITY[props.mobileBreakpoint] : "flex",
 )
 
+// Chrome is per variant, not per consumer: a `class` cannot cancel a border the
+// component already put on (the kit does not merge conflicting Tailwind classes),
+// so the two looks are spelled out here instead.
+const chromeClass = computed(() =>
+  props.variant === "panel"
+    ? "rounded-card border border-line bg-surface-raised"
+    : "border-r border-line bg-surface-raised",
+)
+
 // This component has a fragment root (the desktop <nav> + the mobile drawer), so
 // Vue can't auto-inherit a consumer-passed `class`. Take attrs over manually and
 // land them on the desktop rail (where a layout class like `shrink-0` belongs).
@@ -179,17 +209,23 @@ defineOptions({ inheritAttrs: false })
 <template>
   <!-- Desktop / always-on rail -->
   <nav
-    class="h-full w-60 flex-col gap-1 border-r border-line bg-surface-raised p-3"
-    :class="railClass"
+    class="h-full flex-col gap-1 p-3"
+    :class="[railClass, chromeClass, width ? '' : 'w-60']"
+    :style="width ? { width } : undefined"
     aria-label="Sidebar"
     v-bind="$attrs"
   >
-    <!-- Edge-to-edge (negative margins cancel the rail p-3) and h-16 to match the
-         app header, so its bottom hairline continues the header's border-b. -->
+    <!-- Rail: edge-to-edge (negative margins cancel the p-3) and h-16 to match
+         the app header, so its bottom hairline continues the header's border-b.
+         Panel: kept inside the padding — bleeding to the edge would cut across
+         the rounded corners. -->
     <div
       v-if="$slots.header"
-      class="-mx-3 -mt-3 mb-3 flex h-16 shrink-0 items-center px-3"
-      :class="divider ? 'border-b border-line' : ''"
+      class="mb-3 flex shrink-0 items-center"
+      :class="[
+        variant === 'panel' ? 'pb-3' : '-mx-3 -mt-3 h-16 px-3',
+        divider ? 'border-b border-line' : '',
+      ]"
     >
       <slot name="header" />
     </div>

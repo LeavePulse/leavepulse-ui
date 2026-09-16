@@ -303,13 +303,23 @@ export const registry: ComponentEntry[] = [
     id: "sidebar",
     name: "Sidebar",
     description:
-      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). Mirrors the cabinet/profile sidebars in the apps.",
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. Mirrors the cabinet/profile sidebars in the apps.",
     components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () =>
       reactive({
         active: "overview",
+        section: "server",
         loading: false,
         open: false,
+        pageSections: [
+          {
+            items: [
+              { id: "server", label: "Server", icon: "lucide:server", badge: 2 },
+              { id: "logs", label: "Logs", icon: "lucide:scroll-text" },
+              { id: "economy", label: "Economy", icon: "lucide:coins", badge: 5 },
+            ],
+          },
+        ],
         sections: [
           {
             items: [
@@ -381,6 +391,15 @@ export const registry: ComponentEntry[] = [
         </LpButton>
       </template>
     </LpSidebar>
+  </div>
+
+  <!-- variant="panel": the same nav inside a page, boxed on all four sides and
+       rounded, sitting next to the content it drives. -->
+  <div class="flex h-64 gap-4">
+    <LpSidebar v-model="section" variant="panel" width="14rem" :sections="pageSections" class="shrink-0" />
+    <div class="flex-1 rounded-card border border-line bg-surface-soft p-4 text-sm text-muted">
+      Settings for <span class="text-ink">{{ section }}</span>
+    </div>
   </div>
 </div>`,
   },
