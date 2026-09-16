@@ -177,9 +177,17 @@ watch(
        blur). Declaring it next to the form it belongs to should not decide
        where on screen it lands. -->
   <Teleport to="body">
+    <!-- `forwards` on the way out, because the leave animation finishing is not
+         the same moment as the element leaving. `rise-out` is a bare `to {}`, so
+         once it ends the element snaps back to opacity 1 at its resting
+         position, and Vue then takes a frame to unmount it — a bar that had
+         faded to nothing flashed back at full strength and vanished. Holding the
+         final frame means the last thing painted is the last frame of the fade.
+         Reduced motion skips it entirely rather than holding a frame it never
+         animated to. -->
     <Transition
       enter-active-class="animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)]"
-      leave-active-class="animate-[rise-out_var(--duration-fast)_ease]"
+      leave-active-class="animate-[rise-out_var(--duration-fast)_ease_forwards] motion-reduce:animate-none"
     >
       <div
         v-if="open"
