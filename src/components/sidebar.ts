@@ -17,6 +17,12 @@ export interface SidebarItem {
   disabled?: boolean
   /** Right-click menu for this item (e.g. "Open in new tab", "Pin"). */
   menu?: ContextMenuItemDef[]
+  /**
+   * Extra terms the sidebar's filter should match, beyond the label. For the
+   * item people look for under a name it does not carry — "Billing" found by
+   * "invoice", a page found by the feature it used to be called.
+   */
+  keywords?: string[]
 }
 
 export interface SidebarSection {

@@ -305,7 +305,7 @@ export const registry: ComponentEntry[] = [
     id: "sidebar",
     name: "Sidebar",
     description:
-      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. Mirrors the cabinet/profile sidebars in the apps.",
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. `searchable` puts a filter above the items — matching label and any `keywords`, dropping sections that match nothing, and opening folded groups while a query is on (try `invoice`). Mirrors the cabinet/profile sidebars in the apps.",
     components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () =>
       reactive({
@@ -343,7 +343,7 @@ export const registry: ComponentEntry[] = [
             title: "Workspace",
             items: [
               { id: "logs", label: "Logs", icon: "lucide:scroll-text", badge: "3" },
-              { id: "billing", label: "Billing", icon: "lucide:credit-card" },
+              { id: "billing", label: "Billing", icon: "lucide:credit-card", keywords: ["invoice", "payment"] },
               { id: "settings", label: "Settings", icon: "lucide:settings" },
             ],
           },
@@ -362,6 +362,7 @@ export const registry: ComponentEntry[] = [
     <LpSidebar
       v-model="active"
       v-model:open="open"
+      searchable
       responsive
       mobile-breakpoint="sm"
       :sections="sections"

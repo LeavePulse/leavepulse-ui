@@ -15,6 +15,7 @@
  */
 import { computed, ref, useId } from "vue"
 import LpDrawer from "./LpDrawer.vue"
+import LpInput from "./LpInput.vue"
 import LpSidebarNav from "./LpSidebarNav.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
 
@@ -33,6 +34,21 @@ const props = withDefaults(
      * given it overrides the modelValue check. The consumer owns the routing.
      */
     isActive?: (item: SidebarItem) => boolean
+    /**
+     * Put a filter field above the nav. A hundred-item sidebar is not read, it
+     * is searched: past a screenful, scanning costs more than typing, and every
+     * app that has one had built the same LpInput into the #header slot.
+     *
+     * Filtering is on `label` (and any `keywords` on the item), case- and
+     * accent-insensitive. Sections whose items all fail drop out rather than
+     * leaving a run of empty headings, and a collapsed section opens while a
+     * query is active — a hidden match is the same as no match.
+     */
+    searchable?: boolean
+    /** Placeholder for that field. */
+    searchPlaceholder?: string
+    /** The query, when the app wants to own it (v-model:search). */
+    search?: string
     /** Show a skeleton placeholder instead of the items. */
     loading?: boolean
     /** Skeleton row count while loading. */
@@ -97,6 +113,7 @@ const props = withDefaults(
     autoCollapseAfter?: number
   }>(),
   {
+    searchPlaceholder: "Search",
     skeletonRows: 6,
     skeletonHeader: true,
     responsive: false,
@@ -112,12 +129,51 @@ const emit = defineEmits<{
   (e: "update:open", value: boolean): void
   (e: "update:collapsed", keys: string[]): void
   (e: "select", item: SidebarItem): void
+  (e: "update:search", value: string): void
 }>()
 
 // Normalise both inputs to a single section list.
-const groups = computed<SidebarSection[]>(() =>
+const allGroups = computed<SidebarSection[]>(() =>
   props.sections ?? (props.items ? [{ items: props.items }] : []),
 )
+
+/*
+ * The filter query. Controlled through v-model:search when the app wants it —
+ * a nav whose query is part of the URL, say — and kept here otherwise, so
+ * `searchable` alone is enough to get a working field.
+ */
+const ownSearch = ref("")
+const query = computed({
+  get: () => props.search ?? ownSearch.value,
+  set: (v) => {
+    ownSearch.value = v
+    emit("update:search", v)
+  },
+})
+
+/** Case- and accent-insensitive, so "reglas" finds "Reglas" and "Règles". */
+function normalise(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
+}
+
+function matches(item: SidebarItem, needle: string): boolean {
+  if (normalise(item.label).includes(needle)) return true
+  return (item.keywords ?? []).some((k) => normalise(k).includes(needle))
+}
+
+const groups = computed<SidebarSection[]>(() => {
+  const needle = normalise(query.value.trim())
+  if (!needle) return allGroups.value
+  // A section with no surviving items is dropped whole: a heading with nothing
+  // under it reads as a section that failed to load rather than one that
+  // matched nothing.
+  return allGroups.value
+    .map((section) => ({ ...section, items: section.items.filter((i) => matches(i, needle)) }))
+    .filter((section) => section.items.length > 0)
+})
+
+/** True while a query is narrowing the list — used to force groups open. */
+const filtering = computed(() => query.value.trim().length > 0)
 
 function itemActive(item: SidebarItem): boolean {
   return props.isActive ? props.isActive(item) : item.id === props.modelValue
@@ -152,8 +208,11 @@ const autoCollapsed = computed<string[]>(() => {
     .filter(Boolean)
 })
 
-const collapsedKeys = computed<string[]>(
-  () => props.collapsed ?? ownCollapsed.value ?? autoCollapsed.value,
+const collapsedKeys = computed<string[]>(() =>
+  // Nothing stays folded while a query is on: a section that matched but is
+  // closed looks exactly like a section that did not match, and the person is
+  // typing precisely because they cannot find the thing by eye.
+  filtering.value ? [] : (props.collapsed ?? ownCollapsed.value ?? autoCollapsed.value),
 )
 
 function toggleSection(key: string, collapsed: boolean) {
@@ -230,6 +289,18 @@ defineOptions({ inheritAttrs: false })
       <slot name="header" />
     </div>
 
+    <!-- The filter sits between the brand and the nav: it belongs to the list,
+         not to the header, and a person reaching for it is already looking at
+         the items. -->
+    <LpInput
+      v-if="searchable"
+      v-model="query"
+      size="sm"
+      icon="lucide:search"
+      class="mb-2 shrink-0"
+      :placeholder="searchPlaceholder"
+      :aria-label="searchPlaceholder"
+    />
     <LpSidebarNav
       :groups="groups"
       :pill-id="railPillId"
@@ -277,6 +348,18 @@ defineOptions({ inheritAttrs: false })
         <slot name="header" />
       </div>
 
+      <!-- The filter sits between the brand and the nav: it belongs to the list,
+           not to the header, and a person reaching for it is already looking at
+           the items. -->
+      <LpInput
+        v-if="searchable"
+        v-model="query"
+        size="sm"
+        icon="lucide:search"
+        class="mb-2 shrink-0"
+        :placeholder="searchPlaceholder"
+        :aria-label="searchPlaceholder"
+      />
       <LpSidebarNav
         :groups="groups"
         :pill-id="drawerPillId"

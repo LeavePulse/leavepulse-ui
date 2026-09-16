@@ -96,9 +96,15 @@ function onToggle(value: boolean) {
         The height animation lives on the wrapper; the inner panel fades + drifts
         up so the content eases in rather than snapping at full opacity. The slide
         is short (4px) and runs slightly behind the expand for a settled feel.
+
+        The bottom padding matches the sides rather than exceeding them: a taller
+        gap under the content reads as the block having been cut off short, and
+        with a control in there (a field, a row of buttons) the extra space below
+        it looked like a mistake next to the 12px at either side. The top stays
+        smaller because the trigger's own padding already separates the two.
       -->
       <div
-        class="grid gap-2.5 px-3 pt-1 pb-3.5 group-data-[state=open]/content:animate-[disclosure-body-in_300ms_var(--ease-emphasized)] motion-reduce:animate-none"
+        class="grid gap-2.5 px-3 pt-1 pb-3 group-data-[state=open]/content:animate-[disclosure-body-in_300ms_var(--ease-emphasized)] motion-reduce:animate-none"
       >
         <slot />
       </div>
