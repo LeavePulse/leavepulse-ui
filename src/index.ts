@@ -21,6 +21,8 @@ export type {
   NominatimOptions,
   TileSource,
 } from "./components/address"
+export { default as LpActionBar } from "./components/LpActionBar.vue"
+export type { ActionBarAction } from "./components/LpActionBar.vue"
 export { default as LpAlert } from "./components/LpAlert.vue"
 export { default as LpAppShell } from "./components/LpAppShell.vue"
 export { default as LpAutocomplete } from "./components/LpAutocomplete.vue"
@@ -44,6 +46,23 @@ export type { ChartAxis, ChartPoint, ChartSeries } from "./components/chart"
 export { default as LpCheckbox } from "./components/LpCheckbox.vue"
 export { default as LpCodeBlock } from "./components/LpCodeBlock.vue"
 export type { CodeLang } from "./components/codeHighlight"
+export { default as LpColorPicker } from "./components/LpColorPicker.vue"
+export type { ColorPickerLabels } from "./components/LpColorPicker.vue"
+export {
+  clampHsv,
+  DEFAULT_SWATCHES,
+  formatColor,
+  hsvToHsl,
+  hsvToRgb,
+  isLight,
+  normalizeHue,
+  opaqueCss,
+  parseColor,
+  parseHex,
+  rgbToHex,
+  rgbToHsv,
+} from "./components/color"
+export type { ColorFormat, Hsv, Rgb } from "./components/color"
 export { default as LpCommandPalette } from "./components/LpCommandPalette.vue"
 export type { Command } from "./components/LpCommandPalette.vue"
 export { default as LpConfirmDialog } from "./components/LpConfirmDialog.vue"
@@ -204,6 +223,8 @@ export type { PresetName } from "./theme/presets"
 export { parseConfig, serializeConfig, UI_CONFIG_VERSION } from "./theme/config"
 export type { UiConfig } from "./theme/config"
 
+export { useClipboard } from "./composables/useClipboard"
+export type { CopyOptions, UseClipboard } from "./composables/useClipboard"
 export { useHotkeys, isAppleKeyboard, appleModifierLabel } from "./composables/useHotkeys"
 export type { HotkeyBinding } from "./composables/useHotkeys"
 export { useInputFilter } from "./composables/useInputFilter"

@@ -1,5 +1,6 @@
 import { reactive, type Component } from "vue"
 import {
+  LpActionBar,
   LpAddressInput,
   LpAlert,
   LpAutocomplete,
@@ -18,6 +19,7 @@ import {
   LpDrawer,
   LpCalendar,
   LpCodeBlock,
+  LpColorPicker,
   LpCommandPalette,
   LpContextMenu,
   LpDatePicker,
@@ -972,6 +974,29 @@ export const registry: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "colorpicker",
+    name: "ColorPicker",
+    description:
+      "Colour field + popover: a saturation/brightness area over a hue rail, an optional alpha rail, a hex/CSS text field and preset swatches. v-model is a CSS colour STRING — `format` picks hex/rgb/hsl on the way out, and all three are parsed on the way in. @change fires on release (commit-vs-preview), and the area and rails are arrow-key operable. Right-click either the field or the panel to copy as hex/rgb/hsl, switch which format it shows via `Show as`, or paste a colour in — pasting takes hex, rgb() and hsl() in any CSS form, plus loose shapes like `255 0 0` or `rgb 17 34 51`; `recent` remembers what you settle on and offers it back above the presets. Every string it renders — menu items, the Recent heading, the accessible names on the area and rails — goes through `labels` for i18n.",
+    components: { LpColorPicker },
+    state: () => reactive({ brand: "#3b82f6", tint: "rgba(236, 72, 153, 0.6)" }),
+    template: `<div class="flex flex-col gap-4">
+  <div class="w-56">
+    <LpColorPicker v-model="brand" recent />
+    <p class="mt-2 text-xs text-muted">value: {{ brand }} — right-click to copy</p>
+  </div>
+  <div class="w-56">
+    <LpColorPicker v-model="tint" alpha format="rgb" />
+    <p class="mt-2 text-xs text-muted">with alpha: {{ tint }}</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <span class="size-10 rounded-card border border-line" :style="{ backgroundColor: brand }" />
+    <span class="size-10 rounded-card border border-line" :style="{ backgroundColor: tint }" />
+    <span class="text-xs text-muted">live preview</span>
+  </div>
+</div>`,
+  },
+  {
     id: "dropdown",
     name: "DropdownMenu",
     description: "Action menu with icons and danger items.",
@@ -1722,6 +1747,58 @@ export const registry: ComponentEntry[] = [
     template: `<div class="w-72">
   <LpSlider v-model="value" :min="0" :max="100" />
   <p class="mt-2 text-xs text-muted">value: {{ value }}</p>
+</div>`,
+  },
+  {
+    id: "actionbar",
+    name: "ActionBar",
+    description:
+      "A bar that rises from the bottom of the viewport to ask for ONE decision and stays until something resolves it — unsaved changes, a cookie notice, a bulk action on a selection. Not a dialog (the page stays usable behind it, no focus trap) and not a toast (it does not leave on a timer). Teleported to the body, so it pins to the viewport wherever it is declared. The last action is the primary one automatically, and several open at once stack instead of covering each other.",
+    components: { LpActionBar, LpButton },
+    state: () => reactive({ dirty: false, cookies: false, selection: false, saving: false }),
+    template: `<div class="flex flex-wrap gap-2">
+  <LpButton variant="outline" size="sm" @click="dirty = true">Unsaved changes</LpButton>
+  <LpButton variant="outline" size="sm" @click="cookies = true">Cookie notice (full width)</LpButton>
+  <LpButton variant="outline" size="sm" @click="selection = true">Bulk action (danger)</LpButton>
+
+  <LpActionBar
+    v-model:open="dirty"
+    icon="lucide:pencil-line"
+    title="You have unsaved changes"
+    description="Leaving this page will discard them."
+    :actions="[
+      { label: 'Discard', onClick: () => { dirty = false } },
+      { label: 'Save changes', icon: 'lucide:check', loading: saving, onClick: async () => {
+          saving = true
+          await new Promise(r => setTimeout(r, 900))
+          saving = false; dirty = false
+        } },
+    ]"
+  />
+
+  <LpActionBar
+    v-model:open="cookies"
+    width="full"
+    icon="lucide:cookie"
+    title="We use cookies"
+    description="Only what the site needs to work, plus analytics if you allow them."
+    dismissible
+    :actions="[
+      { label: 'Essential only', onClick: () => { cookies = false } },
+      { label: 'Allow all', onClick: () => { cookies = false } },
+    ]"
+  />
+
+  <LpActionBar
+    v-model:open="selection"
+    variant="danger"
+    icon="lucide:trash-2"
+    title="3 rows selected"
+    :actions="[
+      { label: 'Cancel', onClick: () => { selection = false } },
+      { label: 'Delete rows', icon: 'lucide:trash-2', onClick: () => { selection = false } },
+    ]"
+  />
 </div>`,
   },
   {
