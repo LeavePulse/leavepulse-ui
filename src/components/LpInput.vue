@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
 import { useInputFilter } from "../composables/useInputFilter"
+import { mergeClass } from "../composables/useMergedClass"
 import LpFormField from "./LpFormField.vue"
 import LpIcon from "./LpIcon.vue"
 
@@ -130,7 +131,7 @@ defineExpose({
   >
     <div
       data-lp-ring-owner
-      :class="[shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : rootClass]"
+      :class="mergeClass(shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : (rootClass as string))"
       :style="hasField ? undefined : rootStyle"
     >
       <span v-if="hasLeading" class="flex shrink-0 items-center text-muted">
