@@ -100,11 +100,39 @@ function alignClass(align?: "left" | "right" | "center"): string {
   return "text-left"
 }
 
-// Resolved right-click menu for a row, or [] when none — keeps the template
-// branch simple and avoids calling rowMenu twice per row.
-function menuFor(row: T): ContextMenuItemDef[] {
-  return props.rowMenu?.(row) ?? []
+/*
+ * The row a right-click landed on, and the menu the table shows because of it.
+ *
+ * Rows used to be wrapped one LpContextMenu each. Two things were wrong with
+ * that. LpContextMenu's root is a v-if/v-else pair and reka's ContextMenuRoot
+ * is a context provider with no element of its own, so every row handed
+ * <TransitionGroup> a fragment where it needs an element: Vue warned once per
+ * row ("renders non-element root node that cannot be animated") and the row
+ * enter/leave/move animations silently did nothing. It also stood up a full
+ * reka menu instance per row — fifty rows, fifty poppers, all closed.
+ *
+ * So the <tr> is now a plain child of the TransitionGroup, and the ONE menu
+ * already wrapping the whole table serves the rows too: the right-click is
+ * caught on the way up, the row it came from is remembered, and the menu is
+ * built for that row. `always` keeps that menu mounted even while it would
+ * otherwise be empty, so the first right-click is not swallowed while it
+ * populates.
+ */
+const menuRow = ref<T | null>(null)
+
+function onRowContextMenu(row: T) {
+  menuRow.value = row
 }
+
+// Row items first — they are what the pointer is actually on — then the
+// table-wide ones under a rule, when the row has any of its own.
+const contextMenu = computed<ContextMenuItemDef[]>(() => {
+  const table = tableMenu()
+  const row = menuRow.value ? (props.rowMenu?.(menuRow.value) ?? []) : []
+  if (!row.length) return table
+  if (!table.length) return row
+  return [...row, { ...table[0], separatorBefore: true }, ...table.slice(1)]
+})
 
 // ── sorting ──────────────────────────────────────────────────
 //
@@ -421,7 +449,7 @@ const barInsetTop = computed(() =>
     <!-- The table-wide menu, which is what a right-click on empty header space
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
-    <LpContextMenu :items="tableMenu()">
+    <LpContextMenu :items="contextMenu" always>
     <table class="w-full border-collapse text-sm">
       <thead ref="headEl" :class="stickyHeader ? 'sticky top-0 z-10' : ''">
         <tr class="border-b border-line bg-surface-soft">
@@ -500,44 +528,36 @@ const barInsetTop = computed(() =>
             <div>{{ emptyLabel }}</div>
           </td>
         </tr>
-        <!-- Each row is wrapped in a right-click menu; with no rowMenu (or an
-             empty result) LpContextMenu is a passthrough and the row keeps the
-             browser's native menu. It renders via as-child, so the DOM stays a
-             bare <tr> either way. -->
-        <LpContextMenu
+        <!-- A plain <tr>, because TransitionGroup animates element children and
+             nothing else. The right-click menu is the table's one menu, told
+             which row the event came from — see `contextMenu`. -->
+        <tr
           v-for="(row, index) in displayRows"
           :key="keyFor(row, index)"
-          :items="menuFor(row)"
+          @contextmenu="onRowContextMenu(row)"
+          class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
+          :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
+          v-bind="roving.itemProps(String(keyFor(row, index)))"
+          @click="emit('rowClick', row)"
+          @keydown="onRowKeydown"
         >
-          <!-- `group` so a cell's own content can answer the row's hover: a
-               link inside a row wants its underline to sweep in when the row
-               lights up, not when the pointer crosses the text exactly. The
-               class paints nothing by itself. -->
-          <tr
-            class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
-            :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
-            v-bind="roving.itemProps(String(keyFor(row, index)))"
-            @click="emit('rowClick', row)"
-            @keydown="onRowKeydown"
+          <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
+            <LpCheckbox
+              :model-value="selectedSet.has(keyFor(row, index))"
+              @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
+            />
+          </td>
+          <td
+            v-for="col in visibleColumns"
+            :key="col.key"
+            class="px-4 py-3 text-ink"
+            :class="alignClass(col.align)"
           >
-            <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
-              <LpCheckbox
-                :model-value="selectedSet.has(keyFor(row, index))"
-                @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
-              />
-            </td>
-            <td
-              v-for="col in visibleColumns"
-              :key="col.key"
-              class="px-4 py-3 text-ink"
-              :class="alignClass(col.align)"
-            >
-              <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
-                {{ row[col.key] }}
-              </slot>
-            </td>
-          </tr>
-        </LpContextMenu>
+            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
+              {{ row[col.key] }}
+            </slot>
+          </td>
+        </tr>
       </TransitionGroup>
     </table>
     </LpContextMenu>
