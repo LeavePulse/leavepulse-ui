@@ -9,7 +9,7 @@
  * shown content isn't left below the fold.
  */
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "reka-ui"
-import { type ComponentPublicInstance, nextTick, ref } from "vue"
+import { type ComponentPublicInstance, computed, getCurrentInstance, nextTick, ref } from "vue"
 import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
@@ -33,6 +33,21 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
 
+/*
+ * Vue casts an absent Boolean prop to `false`, so `open` alone cannot say whether
+ * the caller controls this block. Passing that `false` straight to reka pins the
+ * block shut: it reads a controlled-closed collapsible, and the trigger stops
+ * doing anything at all — `defaultOpen` never gets a say. So control is decided
+ * by whether the attribute was actually handed to us, and the uncontrolled case
+ * passes `undefined`, which is what reka checks for.
+ */
+const instance = getCurrentInstance()
+const controlled = computed(() => {
+  const raw = instance?.vnode.props
+  return Boolean(raw && ("open" in raw || "onUpdate:open" in raw))
+})
+const rootOpen = computed(() => (controlled.value ? props.open : undefined))
+
 // reka's CollapsibleRoot renders a real element but exposes it as a component
 // instance, so reach through $el for the DOM node we scroll into view.
 const root = ref<ComponentPublicInstance | null>(null)
@@ -55,7 +70,7 @@ function onToggle(value: boolean) {
 <template>
   <CollapsibleRoot
     ref="root"
-    :open="open"
+    :open="rootOpen"
     :default-open="defaultOpen"
     class="overflow-hidden rounded-control border border-line bg-surface-soft"
     @update:open="onToggle"
