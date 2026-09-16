@@ -11,6 +11,7 @@
  */
 import { Motion } from "motion-v"
 import { computed, ref, shallowRef, watch, onMounted, onBeforeUnmount } from "vue"
+import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
 import {
@@ -147,6 +148,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   ro?.disconnect()
   ro = null
+  if (presenceFrame) cancelAnimationFrame(presenceFrame)
+  if (scaleFrame) cancelAnimationFrame(scaleFrame)
+  if (rightFrame) cancelAnimationFrame(rightFrame)
+  if (gutterFrame) cancelAnimationFrame(gutterFrame)
 })
 
 // ── data ───────────────────────────────────────
@@ -162,6 +167,74 @@ const toggleSeries = (name: string) => {
 
 const allSeries = computed(() => normalise(props.series))
 const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.name)))
+
+/*
+ * How present each series is, 1 to 0, driven per frame rather than by CSS.
+ *
+ * A curve leaves by collapsing onto the baseline: every point travels to zero
+ * together and the shape flattens into the axis before it fades. Moving the
+ * whole layer down instead slides it past the axis as a picture of a chart —
+ * the marks keep their shape on the way out, which reads as the plot being
+ * dragged away rather than the readings going to nothing.
+ *
+ * It has to be JS: the collapse is a new `d` on every frame, and no browser
+ * interpolates a path's `d` between two arbitrary shapes.
+ */
+/* One duration for the series leaving and the axis it was measured against, so
+   the two read as a single change rather than two. 260ms sits in the 250-400ms
+   band a legend toggle wants: long enough to follow, short enough to feel like
+   a control responding. */
+const SETTLE_MS = 260
+
+const presence = ref(new Map<string, number>())
+let presenceFrame: number | undefined
+
+/*
+ * A series with no entry yet is fully present, NOT "0 because it is hidden".
+ *
+ * Falling back to the hidden flag raced the animation it was meant to start:
+ * the computed that draws the curve and the watcher that animates it both run
+ * on the same tick, and whichever order they land in, the fallback had already
+ * reported the end state — so a series being hidden jumped to the floor while
+ * one being shown eased up from it.
+ */
+const presenceOf = (name: string) => presence.value.get(name) ?? 1
+
+watch(
+  // A string, not the Set: `hidden` is replaced wholesale on every toggle, and a
+  // watcher handed the object itself compares the new reference to the old one
+  // and sees a change it cannot describe — or, with a stale copy in the array,
+  // no change at all. The names that are currently off say it exactly.
+  () =>
+    allSeries.value.map((s) => `${s.name}:${hidden.value.has(s.name) ? 0 : 1}`).join(","),
+  () => {
+    const targets = new Map(allSeries.value.map((s) => [s.name, hidden.value.has(s.name) ? 0 : 1]))
+    if (!props.animate || prefersReducedMotion()) {
+      presence.value = targets
+      return
+    }
+
+    const from = new Map(allSeries.value.map((s) => [s.name, presenceOf(s.name)]))
+    if ([...targets].every(([name, to]) => from.get(name) === to)) return
+
+    const start = performance.now()
+    if (presenceFrame) cancelAnimationFrame(presenceFrame)
+
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / SETTLE_MS)
+      // Same curve as the axis: the curve and its scale travel together.
+      const eased = easeTravel(t)
+      const next = new Map<string, number>()
+      for (const [name, to] of targets) {
+        const a = from.get(name) ?? to
+        next.set(name, a + (to - a) * eased)
+      }
+      presence.value = next
+      presenceFrame = t < 1 ? requestAnimationFrame(step) : undefined
+    }
+    presenceFrame = requestAnimationFrame(step)
+  },
+)
 
 const count = computed(() => pointCount(allSeries.value))
 const labels = computed(() => resolveLabels(props.series, props.labels, count.value))
@@ -194,14 +267,29 @@ const stackTotals = computed(() => {
   return { pos, neg }
 })
 
+/*
+ * Which axes EXIST is decided by the series as declared; only their ranges
+ * follow what is visible.
+ *
+ * Hiding the one series on the right axis used to remove that axis outright:
+ * its labels went, the gutter they reserved collapsed, the plot widened into
+ * the space, and any remaining right-axis series jumped across to the left
+ * scale — a toggle of one curve rearranging the whole frame. Keeping the axis
+ * while it has a series assigned to it means hiding a curve changes the curve.
+ */
+const declaredRight = computed(() => allSeries.value.filter((s) => s.axis === "right"))
+const declaredLeft = computed(() => allSeries.value.filter((s) => s.axis === "left"))
+
 const onRight = computed(() => visible.value.filter((s) => s.axis === "right"))
 const onLeft = computed(() => {
   // A chart whose every series asked for the right axis still needs the left
   // one to carry the grid, so treat that as "no split at all".
   const left = visible.value.filter((s) => s.axis === "left")
-  return left.length || !onRight.value.length ? left : visible.value
+  return left.length || !declaredRight.value.length ? left : visible.value
 })
-const hasRightAxis = computed(() => onRight.value.length > 0 && onLeft.value !== visible.value)
+const hasRightAxis = computed(
+  () => declaredRight.value.length > 0 && declaredLeft.value.length > 0,
+)
 
 const scaleFor = (members: typeof visible.value) => {
   const totals = stackTotals.value
@@ -211,20 +299,108 @@ const scaleFor = (members: typeof visible.value) => {
   return niceScale(raw.min, raw.max, props.yTicks)
 }
 
-const scale = computed(() => scaleFor(onLeft.value))
+const targetScale = computed(() =>
+  scaleFor(onLeft.value.length ? onLeft.value : declaredLeft.value),
+)
+
+/*
+ * The axis animates by interpolating its own BOUNDS, not by transitioning the
+ * elements drawn from them.
+ *
+ * Everything on the plot is positioned from min/max — the curves, the gridlines
+ * and the tick labels — so moving the range moves all three as one gesture, and
+ * the numbers arrive with the shape that made them change. Transitioning the
+ * marks instead would need the axis to animate separately, and it cannot: `y1`
+ * and `y2` on an SVG <line> never became CSS properties, so a gridline jumps
+ * while the curve eases, which is the two-beat effect this avoids.
+ */
+const scale = ref(targetScale.value)
+let scaleFrame: number | undefined
+
+watch(targetScale, (to, from) => {
+  if (!props.animate || prefersReducedMotion() || !from) {
+    scale.value = to
+    return
+  }
+  if (from.min === to.min && from.max === to.max && from.step === to.step) return
+
+  const start = performance.now()
+  if (scaleFrame) cancelAnimationFrame(scaleFrame)
+
+  const tick = (now: number) => {
+    const t = Math.min(1, (now - start) / SETTLE_MS)
+    /* easeTravel, not easeOut: an ease-out covers most of the range in the first
+       frames, which on a big rescale (800 down to 40) looks like a snap with a
+       slow tail rather than a scale moving. */
+    const eased = easeTravel(t)
+    scale.value =
+      t < 1
+        ? {
+            min: from.min + (to.min - from.min) * eased,
+            max: from.max + (to.max - from.max) * eased,
+            /* The step stays the target's: it decides how many ticks there are,
+               and a travelling one would add and drop labels mid-move. */
+            step: to.step,
+          }
+        : to
+    scaleFrame = t < 1 ? requestAnimationFrame(tick) : undefined
+  }
+  scaleFrame = requestAnimationFrame(tick)
+})
 
 /*
  * The right axis reuses the LEFT axis's tick COUNT so both sets of labels land
  * on the same gridlines. Two independent tick runs would draw two interleaved
  * grids across one plot, which reads as noise rather than as two scales.
  */
-const rightScale = computed(() => {
+const targetRightScale = computed(() => {
   if (!hasRightAxis.value) return null
-  const raw = extent(onRight.value, zeroBased.value)
-  const steps = Math.max(1, axisTicks(scale.value.min, scale.value.max, scale.value.step).length - 1)
+  /* With every right-hand series hidden there is nothing to measure, so the
+     axis holds the range it had — an axis that keeps its place while its curve
+     leaves, rather than collapsing to a degenerate 0..1 behind it. */
+  const members = onRight.value.length ? onRight.value : declaredRight.value
+  const raw = extent(members, zeroBased.value)
+  /* Steps come from the TARGET left scale. Reading the animated one rebuilt this
+     axis from a fractional range every frame, so a right-hand series jittered
+     against a scale being redrawn underneath it. */
+  const steps = Math.max(
+    1,
+    axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step).length - 1,
+  )
   const nice = niceScale(raw.min, raw.max, steps)
   // Stretch the top so the run divides into exactly `steps` intervals.
   return { min: nice.min, max: nice.min + nice.step * steps, step: nice.step }
+})
+
+// The right axis travels on the same clock as the left, or a series measured
+// against it arrives before the one beside it.
+const rightScale = ref(targetRightScale.value)
+let rightFrame: number | undefined
+
+watch(targetRightScale, (to, from) => {
+  if (!to || !from || !props.animate || prefersReducedMotion()) {
+    rightScale.value = to
+    return
+  }
+  if (from.min === to.min && from.max === to.max && from.step === to.step) return
+
+  const start = performance.now()
+  if (rightFrame) cancelAnimationFrame(rightFrame)
+
+  const tick = (now: number) => {
+    const t = Math.min(1, (now - start) / SETTLE_MS)
+    const eased = easeTravel(t)
+    rightScale.value =
+      t < 1
+        ? {
+            min: from.min + (to.min - from.min) * eased,
+            max: from.max + (to.max - from.max) * eased,
+            step: to.step,
+          }
+        : to
+    rightFrame = t < 1 ? requestAnimationFrame(tick) : undefined
+  }
+  rightFrame = requestAnimationFrame(tick)
 })
 
 const fmtWith = (v: number, unit?: string, f?: (n: number) => string): string =>
@@ -243,23 +419,76 @@ const scaleOf = (s: { axis: "left" | "right" }) =>
 
 // ── layout ─────────────────────────────────────
 // Side padding tracks the widest tick label so long numbers never clip.
+/*
+ * Labels come from the TARGET scale, never the one mid-flight.
+ *
+ * The animated bounds are fractional for most of their travel, so formatting
+ * them printed "173.4" where "200" belongs — and since the gutter is measured
+ * from the widest label, the whole plot breathed in and out for the length of
+ * every transition. The numbers a tick can read are the ones it will settle on;
+ * only where each sits is in motion.
+ */
 const yLabels = computed(() =>
-  axisTicks(scale.value.min, scale.value.max, scale.value.step).map(fmt),
+  axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step).map(fmt),
 )
 
 const rightLabels = computed(() =>
-  rightScale.value
-    ? axisTicks(rightScale.value.min, rightScale.value.max, rightScale.value.step).map(fmtRight)
+  targetRightScale.value
+    ? axisTicks(
+        targetRightScale.value.min,
+        targetRightScale.value.max,
+        targetRightScale.value.step,
+      ).map(fmtRight)
     : [],
 )
 
 const gutter = (labels: string[]) => 12 + Math.max(...labels.map((l) => l.length), 1) * 7
 
+/*
+ * The gutters ease to their new width instead of resizing on the frame the
+ * labels change. Going from "800" to "30" narrows the left margin by a third of
+ * an inch in one step, and because the plot is measured from it, every mark
+ * shifted sideways while it was still travelling vertically — a diagonal slide
+ * nothing in the data asked for.
+ */
+const targetGutters = computed(() => ({
+  left: props.showYAxis ? gutter(yLabels.value) : 8,
+  right: props.showYAxis && rightLabels.value.length ? gutter(rightLabels.value) : 12,
+}))
+
+const gutters = ref(targetGutters.value)
+let gutterFrame: number | undefined
+
+watch(targetGutters, (to, from) => {
+  if (!props.animate || prefersReducedMotion() || !from) {
+    gutters.value = to
+    return
+  }
+  if (from.left === to.left && from.right === to.right) return
+
+  const start = performance.now()
+  if (gutterFrame) cancelAnimationFrame(gutterFrame)
+
+  const tick = (now: number) => {
+    const t = Math.min(1, (now - start) / SETTLE_MS)
+    const eased = easeTravel(t)
+    gutters.value =
+      t < 1
+        ? {
+            left: from.left + (to.left - from.left) * eased,
+            right: from.right + (to.right - from.right) * eased,
+          }
+        : to
+    gutterFrame = t < 1 ? requestAnimationFrame(tick) : undefined
+  }
+  gutterFrame = requestAnimationFrame(tick)
+})
+
 const box = computed<Box>(() => ({
   width: width.value,
   height: props.height,
-  left: props.showYAxis ? gutter(yLabels.value) : 8,
-  right: props.showYAxis && rightLabels.value.length ? gutter(rightLabels.value) : 12,
+  left: gutters.value.left,
+  right: gutters.value.right,
   top: 10,
   bottom: props.showXAxis ? 26 : 8,
 }))
@@ -276,16 +505,44 @@ const geo = computed(() => ({
 const geoOf = (s: { axis: "left" | "right" }) => ({ ...geo.value, ...scaleOf(s) })
 
 const gridLines = computed(() => {
-  const left = axisTicks(scale.value.min, scale.value.max, scale.value.step)
-  const right = rightScale.value
-    ? axisTicks(rightScale.value.min, rightScale.value.max, rightScale.value.step)
+  // Ticks are the target's — they are the figures the axis will read — while
+  // the position each one takes comes from the scale as it currently stands.
+  const left = axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step)
+  const right = targetRightScale.value
+    ? axisTicks(
+        targetRightScale.value.min,
+        targetRightScale.value.max,
+        targetRightScale.value.step,
+      )
     : []
-  return left.map((v, i) => ({
-    v,
-    y: yAt(v, scale.value.min, scale.value.max, box.value),
-    label: fmt(v),
-    rightLabel: right[i] != null ? fmtRight(right[i]) : "",
-  }))
+  /*
+   * A tick sits at its FRACTION of the axis, not at its value on the scale
+   * currently in flight.
+   *
+   * Projecting the value instead put "800" where 800 falls on a range still
+   * reading 0..30 — roughly seventeen hundred pixels above a plot 240 tall.
+   * The labels shot off the top, came back as the range caught up, and the
+   * chart looked like it had thrown them. As a fraction, the top tick is the
+   * top of the axis throughout, whatever number it happens to carry.
+   */
+  const span = targetScale.value.max - targetScale.value.min || 1
+  const plot = plotHeight(box.value)
+  return left.map((v, i) => {
+    const fraction = (v - targetScale.value.min) / span
+    return {
+      v,
+      /*
+       * Keyed by POSITION, not by value. A tick keyed by its value is a
+       * different element every time the range moves, so hiding a series
+       * replaced the whole axis at once — the numbers jumped to their new
+       * places instead of moving there.
+       */
+      key: i,
+      y: box.value.top + plot - fraction * plot,
+      label: fmt(v),
+      rightLabel: right[i] != null ? fmtRight(right[i]) : "",
+    }
+  })
 })
 
 /** Thin out x labels so they never collide at narrow widths. */
@@ -312,17 +569,33 @@ const baseY = computed(() =>
   ),
 )
 
+/*
+ * Hidden series are still drawn — off the bottom of the plot and transparent.
+ * Dropping them from the list instead makes the legend feel like a switch that
+ * deletes a reading: the curve is simply not there on the next frame, while the
+ * axis it was scaled against slides to a new range behind it. Kept in the list,
+ * it falls out of the plot while the remaining series keep their place, which is
+ * what "stop showing this one" should look like.
+ */
 const lines = computed(() =>
-  visible.value.map((s) => {
+  allSeries.value.map((s) => {
     const g = geoOf(s)
+    const p = presenceOf(s.name)
+    // Values pulled toward the axis floor, so the curve flattens into it.
+    const base = Math.min(Math.max(0, g.min), g.max)
+    const values = p === 1 ? s.values : s.values.map((v) => (v == null ? null : base + (v - base) * p))
     return {
       ...s,
-      d: linePath(s.values, g, props.smooth),
-      fill: props.type === "area" ? areaPath(s.values, g, props.smooth) : "",
+      values,
+      d: linePath(values, g, props.smooth),
+      fill: props.type === "area" ? areaPath(values, g, props.smooth) : "",
       /* A dashed series is a reference level (a budget, a target), not a
          measurement — dotting it implies readings that aren't there. */
       points: props.showPoints && !s.dashed,
       scale: scaleOf(s),
+      /* Fades only at the end of the collapse: going transparent while it is
+         still visibly moving loses the travel that explains what happened. */
+      alpha: Math.min(1, p * 3),
     }
   }),
 )
@@ -679,7 +952,7 @@ const gradientId = (name: string, index: number) =>
 
           <!-- grid + y ticks -->
           <g v-if="showGrid || showYAxis">
-            <template v-for="g in gridLines" :key="g.v">
+            <template v-for="g in gridLines" :key="g.key">
               <line
                 v-if="showGrid"
                 :x1="box.left"
@@ -688,7 +961,7 @@ const gradientId = (name: string, index: number) =>
                 :y2="g.y"
                 stroke="var(--color-line)"
                 stroke-width="1"
-              />
+                />
               <text
                 v-if="showYAxis"
                 :x="box.left - 8"
@@ -745,45 +1018,35 @@ const gradientId = (name: string, index: number) =>
               :opacity="active < 0 || active === b.index ? 1 : 0.45"
             />
 
-            <!-- area fills -->
-            <path
-              v-for="(s, i) in lines"
-              v-show="type === 'area'"
-              :key="`f-${s.name}`"
-              :d="s.fill"
-              :fill="`url(#${gradientId(s.name, i)})`"
-            />
-
-            <!-- lines -->
-            <path
-              v-for="s in lines"
-              v-show="type !== 'bar'"
-              :key="`l-${s.name}`"
-              :d="s.d"
-              fill="none"
-              :stroke="s.color"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              :stroke-dasharray="s.dashed ? '5 4' : undefined"
-            />
-
-            <!-- every-point dots -->
-            <template v-if="type !== 'bar'">
-              <template v-for="s in lines" :key="`p-${s.name}`">
-                <template v-if="s.points">
-                  <circle
-                    v-for="(v, i) in s.values"
-                    v-show="v != null"
-                    :key="i"
-                    :cx="xAt(i, count, box, banded)"
-                    :cy="v == null ? 0 : yAt(v, s.scale.min, s.scale.max, box)"
-                    r="2.5"
-                    :fill="s.color"
-                  />
-                </template>
+            <!-- one group per series, so hiding one drops only that curve -->
+            <g v-for="(s, i) in lines" :key="`s-${s.name}`" :style="{ opacity: s.alpha }">
+              <path
+                v-show="type === 'area'"
+                :d="s.fill"
+                :fill="`url(#${gradientId(s.name, i)})`"
+              />
+              <path
+                v-show="type !== 'bar'"
+                :d="s.d"
+                fill="none"
+                :stroke="s.color"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                :stroke-dasharray="s.dashed ? '5 4' : undefined"
+              />
+              <template v-if="type !== 'bar' && s.points">
+                <circle
+                  v-for="(v, j) in s.values"
+                  v-show="v != null"
+                  :key="j"
+                  :cx="xAt(j, count, box, banded)"
+                  :cy="v == null ? 0 : yAt(v, s.scale.min, s.scale.max, box)"
+                  r="2.5"
+                  :fill="s.color"
+                />
               </template>
-            </template>
+            </g>
           </g>
 
           <!-- crosshair -->
@@ -863,3 +1126,14 @@ const gradientId = (name: string, index: number) =>
     </LpContextMenu>
   </div>
 </template>
+
+
+<style scoped>
+/*
+ * A series leaving, and the axis it was measured against following it.
+ *
+ * Both run on the same duration so the curve and its numbers settle together:
+ * the axis arriving first would read as the scale having changed for its own
+ * reasons, rather than because a series left.
+ */
+</style>
