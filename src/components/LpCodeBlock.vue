@@ -16,6 +16,7 @@
  * set `region:open` (e.g. `// #region label open`) to start expanded.
  */
 import { computed, reactive, ref, watch } from "vue"
+import { useClipboard } from "../composables/useClipboard"
 import { type CodeLang, tokenizeLine } from "./codeHighlight"
 import LpIcon from "./LpIcon.vue"
 
@@ -168,16 +169,10 @@ const showHeader = computed(
 )
 
 // ── copy ─────────────────────────────────────────────────────
-const copied = ref(false)
-async function copy() {
-  try {
-    await navigator.clipboard.writeText(copyText.value)
-    copied.value = true
-    window.setTimeout(() => (copied.value = false), 1400)
-  } catch {
-    /* clipboard blocked — no-op */
-  }
-}
+// The tick on the button is the whole confirmation here, so no toast: the
+// header is right next to the pointer that just clicked it.
+const { copied, copy: writeClipboard } = useClipboard()
+const copy = () => writeClipboard(copyText.value)
 
 function toggleLock() {
   emit("update:locked", !props.locked)

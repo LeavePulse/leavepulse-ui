@@ -18,6 +18,7 @@ import {
   watch,
 } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
+import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
@@ -344,14 +345,10 @@ function fmtTime(time?: number | string): string {
 }
 
 // ── row context menu ─────────────────────────────────────────────────
-async function copy(text: string) {
-  try {
-    await navigator.clipboard?.writeText(text)
-  } catch {
-    // Clipboard can reject (insecure context / denied permission); swallow —
-    // the menu action is best-effort and shouldn't throw into the UI.
-  }
-}
+// A menu item closes the menu as it runs, leaving nothing on screen to say the
+// copy happened — so unlike LpCodeBlock's button, this one announces itself.
+const { copy: writeClipboard } = useClipboard()
+const copy = (text: string) => writeClipboard(text, { toast: "Copied to clipboard" })
 
 // The whole line as one copyable string: "time LEVEL [source] message".
 function lineText(line: LogLine): string {
