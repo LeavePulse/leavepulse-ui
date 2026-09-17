@@ -555,6 +555,35 @@
     var(--lp-glow-spread-bottom);
 }
 
+/*
+ * Accent stripe down a card's leading edge (LpCard's `accent`).
+ *
+ * Drawn as an inset box-shadow rather than a border or a positioned child,
+ * because those two cannot do the job here:
+ *
+ * - A `border-left` occupies layout. It pushes the content 3px inward, so an
+ *   accented card and a plain one in the same list no longer agree on where
+ *   their text starts — measured 23px against 21px. Compensating in the
+ *   padding leaves the card fighting `--surface-border-width`, which the skin
+ *   axis changes per theme.
+ * - An absolutely positioned child collapses: `.lp-skin-panel > *` gives every
+ *   direct child `position: relative`, which takes `inset-y-0` away from the
+ *   stripe and paints it at zero width. `::before` is not free either — the
+ *   skin painter already uses it for the overlay gradient.
+ *
+ * An inset shadow takes no space, follows `border-radius` round the corners on
+ * its own, and needs nothing of the content. It composes rather than replaces:
+ * the skin painter's own inset + drop shadows follow the stripe in the same
+ * list, so an accented `raised` card keeps its elevation, and `interactive`
+ * still swaps `--surface-panel-shadow` underneath on hover.
+ */
+.lp-card-accent {
+  box-shadow:
+    inset var(--lp-card-accent-width, 3px) 0 0 0 var(--lp-card-accent, transparent),
+    var(--surface-panel-inset),
+    var(--surface-panel-shadow);
+}
+
 /* ── circular theme reveal (View Transitions) ────
    applyThemeWithTransition() snapshots the page, swaps the theme tokens, then
    shrinks a clip-path circle in the OLD snapshot from the toggle's position,
