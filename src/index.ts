@@ -103,6 +103,7 @@ export { fileNameOf } from "./components/lightbox"
 export { default as LpLink } from "./components/LpLink.vue"
 export { default as LpLogViewer } from "./components/LpLogViewer.vue"
 export type { LogLevel, LogLine } from "./components/LpLogViewer.vue"
+export { default as LpMediaGallery } from "./components/LpMediaGallery.vue"
 export { default as LpModal } from "./components/LpModal.vue"
 export { default as LpNotificationBell } from "./components/LpNotificationBell.vue"
 export type {

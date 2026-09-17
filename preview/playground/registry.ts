@@ -5,6 +5,7 @@ import {
   LpAlert,
   LpAutocomplete,
   LpMapPicker,
+  LpMediaGallery,
   LpAvatar,
   LpBadge,
   LpBreadcrumbs,
@@ -272,7 +273,8 @@ export const registry: ComponentEntry[] = [
   {
     id: "card",
     name: "Card",
-    description: "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu.",
+    description:
+      "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu. `accent` draws a stripe down the leading edge in ANY CSS colour — for a value that arrives from data (a Discord role colour, a per-project hex) rather than from the palette; it costs no layout, so accented and plain cards line their content up.",
     components: { LpCard },
     state: () =>
       reactive({
@@ -282,10 +284,17 @@ export const registry: ComponentEntry[] = [
           { label: "Delete", icon: "lucide:trash-2", danger: true, separatorBefore: true },
         ],
       }),
-    template: `<div class="grid w-full grid-cols-3 gap-3">
-  <LpCard>Raised</LpCard>
-  <LpCard variant="flat">Flat</LpCard>
-  <LpCard variant="flat" interactive :menu-items="cardMenu">Right-click me</LpCard>
+    template: `<div class="flex flex-col gap-3">
+  <div class="grid w-full grid-cols-3 gap-3">
+    <LpCard>Raised</LpCard>
+    <LpCard variant="flat">Flat</LpCard>
+    <LpCard variant="flat" interactive :menu-items="cardMenu">Right-click me</LpCard>
+  </div>
+  <div class="grid w-full grid-cols-3 gap-3">
+    <LpCard accent="#5865F2">accent="#5865F2"</LpCard>
+    <LpCard accent="var(--color-action)">accent="var(--color-action)"</LpCard>
+    <LpCard accent="#eb459e" accent-width="6px" interactive>accent-width="6px"</LpCard>
+  </div>
 </div>`,
   },
   {
@@ -2105,10 +2114,64 @@ export const registry: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "media-gallery",
+    name: "MediaGallery",
+    description:
+      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. Items are LightboxItem, so a set passes straight through.",
+    components: { LpMediaGallery },
+    state: () => {
+      const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>
+        "data:image/svg+xml;utf8," +
+        encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
+<rect width="${w}" height="${h}" fill="url(#g)"/>
+<text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"
+ font-family="Inter,system-ui,sans-serif" font-size="${Math.round(h / 6)}" font-weight="700"
+ fill="rgba(255,255,255,.92)">${label}</text></svg>`,
+        )
+
+      return reactive({
+        shots: [
+          { src: plate("1", "#5865F2", "#8b5cf6"), title: "spawn.png", description: "1200 × 800" },
+          { src: plate("2", "#eb459e", "#f0b35a"), title: "nether.png", description: "1200 × 800" },
+          { src: plate("3", "#39e58c", "#00bcff"), title: "base.png", description: "1200 × 800" },
+          { src: plate("4", "#f0b35a", "#eb459e"), title: "end.png", description: "1200 × 800" },
+          { src: plate("5", "#00bcff", "#5865F2"), title: "farm.png", description: "1200 × 800" },
+          { src: plate("6", "#8b5cf6", "#39e58c"), title: "portal.png", description: "1200 × 800" },
+          { src: plate("7", "#ff6b6b", "#feca57"), title: "mesa.png", description: "1200 × 800" },
+        ] as LightboxItem[],
+      })
+    },
+    template: `<div class="flex flex-col gap-6">
+  <div>
+    <p class="mb-2 text-xs text-muted">columns=3 — click any tile</p>
+    <div class="w-[420px] max-w-full">
+      <LpMediaGallery :items="shots" :columns="3" />
+    </div>
+  </div>
+
+  <div>
+    <p class="mb-2 text-xs text-muted">max=4 — the last tile counts the rest and opens at image 5</p>
+    <div class="w-[420px] max-w-full">
+      <LpMediaGallery :items="shots" :columns="4" :max="4" />
+    </div>
+  </div>
+
+  <div>
+    <p class="mb-2 text-xs text-muted">aspect="video", gap=1, responsive columns</p>
+    <div class="w-[420px] max-w-full">
+      <LpMediaGallery :items="shots.slice(0, 4)" :columns="{ base: 1, sm: 2 }" aspect="video" :gap="1" />
+    </div>
+  </div>
+</div>`,
+  },
+  {
     id: "lightbox",
     name: "Lightbox",
     description:
-      "Full-screen image viewer: arrows or swipe to page, wheel zooms toward the cursor, drag pans, double-click toggles fit/2x, pinch on touch, rotate, download, copy. Esc or a backdrop click closes; a filmstrip tracks the set. Keyboard: ←/→, Home/End, +/−, 0, R.",
+      "Full-screen image viewer: arrows or swipe to page, wheel zooms toward the cursor over the picture and pages through the set off it, drag pans, double-click toggles fit/2x, pinch on touch, rotate, download, copy. Esc or a backdrop click closes; a filmstrip tracks the set. Keyboard: ←/→, Home/End, +/−, 0, R.",
     components: { LpLightbox, LpButton },
     state: () => {
       // Inline SVGs so the demo needs no network (and works in a Tauri shell).

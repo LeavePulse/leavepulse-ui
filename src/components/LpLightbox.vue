@@ -2,7 +2,8 @@
 /*
  * Full-screen image viewer — the Discord-style lightbox: click a thumbnail, the
  * image fills the screen, arrows step through the set, the wheel zooms toward
- * the cursor, dragging pans, and the backdrop or Esc closes it.
+ * the cursor over the picture and pages through the set off it, dragging pans,
+ * and the backdrop or Esc closes it.
  *
  * Built on reka's Dialog so focus trapping, Esc and scroll locking come from the
  * same primitive the rest of the kit's overlays use. The zoom/pan maths lives in
@@ -113,6 +114,57 @@ function go(next: number) {
 
 const canPrev = computed(() => total.value > 1 && (props.loop || current.value > 0))
 const canNext = computed(() => total.value > 1 && (props.loop || current.value < total.value - 1))
+
+/*
+ * Wheel over the PICTURE zooms; wheel anywhere else in the stage pages.
+ *
+ * The stage is mostly empty space — an image is letterboxed inside it, so the
+ * bands above and below a wide photo are a large part of what the pointer is
+ * actually over. Zooming there is a gesture aimed at nothing, while paging is
+ * what a set of images invites. Over the image itself the old behaviour stands:
+ * that is where "look closer" is unambiguous.
+ *
+ * A zoomed-in image is the exception. Once it is scaled up, the wheel is the
+ * only way back out, and the picture no longer fits its own box — so while
+ * zoomed, the whole stage zooms rather than stranding the viewer at 4x if they
+ * drift off the edge.
+ */
+const wheelAccum = ref(0)
+let wheelTimer: ReturnType<typeof setTimeout> | undefined
+
+/* A mouse notch arrives as one large delta; a trackpad sends a stream of small
+ * ones. Stepping per event would fling a flick through the whole set, so the
+ * deltas accumulate and a step is taken per threshold's worth of travel. */
+const WHEEL_STEP = 60
+
+function onStageWheel(e: WheelEvent) {
+  const overImage = (e.target as HTMLElement | null)?.closest("[data-lightbox-image]")
+  if (overImage || isZoomed.value) {
+    zoom.onWheel(e)
+    return
+  }
+  if (total.value < 2) return
+
+  // The stage does not scroll, so this only stops the PAGE behind the dialog
+  // from taking the gesture.
+  e.preventDefault()
+
+  wheelAccum.value += e.deltaY
+  // Idle between gestures clears the remainder: a half-step left over from one
+  // flick must not add itself to the next one minutes later.
+  clearTimeout(wheelTimer)
+  wheelTimer = setTimeout(() => (wheelAccum.value = 0), 200)
+
+  while (Math.abs(wheelAccum.value) >= WHEEL_STEP) {
+    const dir = wheelAccum.value > 0 ? 1 : -1
+    wheelAccum.value -= dir * WHEEL_STEP
+    if (dir > 0 ? !canNext.value : !canPrev.value) {
+      wheelAccum.value = 0
+      break
+    }
+    go(current.value + dir)
+  }
+}
 
 // Reset the view whenever the image changes — carrying a 4x zoom onto the next
 // picture means landing on a random crop of it.
@@ -336,7 +388,7 @@ const ARROW =
           ref="viewport"
           class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
           :class="isPanning ? 'cursor-grabbing' : isZoomed ? 'cursor-grab' : ''"
-          @wheel="zoom.onWheel"
+          @wheel="onStageWheel"
           @pointerdown="onPointerDown"
           @pointermove="zoom.onPointerMove"
           @pointerup="onPointerUp"

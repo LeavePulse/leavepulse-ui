@@ -41,6 +41,7 @@ export const COMPONENT_NAMES = [
   "LpLink",
   "LpLogViewer",
   "LpMapPicker",
+  "LpMediaGallery",
   "LpModal",
   "LpNotificationBell",
   "LpNumberField",
