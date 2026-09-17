@@ -9,11 +9,31 @@ import {
   DialogTitle,
 } from "reka-ui"
 import type { ComponentPublicInstance } from "vue"
-import { computed, ref, useSlots, watch } from "vue"
+import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { useShift } from "../composables/useShift"
+import { useModalLayer } from "./modalDepth"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+
+/*
+ * Stacking depth, so a dialog opened FROM a dialog sits above the one that
+ * opened it — scrim included.
+ *
+ * The fixed rungs cannot express this on their own. Every modal took
+ * --z-overlay for its scrim and --z-modal for its panel, so a nested pair
+ * landed at exactly the heights of the outer pair: the second scrim, at 100,
+ * sat UNDER the first panel at 110. It still darkened the page, which is why
+ * this reads as "the blur is missing" rather than as a stacking bug — a
+ * backdrop-filter only blurs what is painted beneath it, and the panel it was
+ * supposed to blur was above.
+ *
+ * Each level adds a step, keeping the scrim one below its own panel and both
+ * above everything the level beneath put on screen. The same problem, and the
+ * same fix, as the lightbox's own rungs in tokens.css — only the depth here is
+ * not known until a dialog finds itself inside another.
+ */
+const { claim, release, layer } = useModalLayer()
 
 const props = withDefaults(
   defineProps<{
@@ -75,6 +95,17 @@ const widthClass = computed(() => {
 const slots = useSlots()
 // The body clips overflow and focus rings are drawn outside their control, so a
 // field flush against the top edge lost its ring; pt-1 clears the ring's width.
+/*
+ * Claim a level as this dialog opens, give it back as it closes. `immediate`
+ * matters: a dialog that starts out open has to have its rung before the first
+ * paint, or its scrim lands on the default one for a frame.
+ */
+watch(() => props.open, (open) => (open ? claim() : release()), { immediate: true })
+
+// A dialog torn down while still open would otherwise stay on the stack, holding
+// every dialog under it a step lower than it should be.
+onBeforeUnmount(release)
+
 const bodyPad = computed(() =>
   [
     "px-5",
@@ -178,7 +209,8 @@ watch(
   <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        :style="{ zIndex: layer.scrim }"
       />
       <!-- Centred by a full-screen flex wrapper rather than by translating the
            panel off its own centre. With `top:50% / -translate-y-1/2` the panel
@@ -193,7 +225,10 @@ watch(
            this wrapper: `max-h-full` on a centred flex child resolves against a
            box it is free to overflow, so a tall body stopped handing its
            overflow to the scroll area below and simply ran off-screen. -->
-      <div class="fixed inset-0 z-(--z-modal) flex items-center justify-center pointer-events-none">
+      <div
+        class="fixed inset-0 flex items-center justify-center pointer-events-none"
+        :style="{ zIndex: layer.panel }"
+      >
       <!-- Without a description reka-ui warns on every open, and the opt-out it
            checks for is an ABSENT `aria-describedby` — despite the message
            naming the string "undefined" (a leftover from Radix, where
