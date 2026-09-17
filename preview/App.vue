@@ -3,6 +3,8 @@ import { computed, ref, watchEffect } from "vue"
 import {
   type ContextMenuItemDef,
   LpButton,
+  type Command,
+  LpCommandPalette,
   LpContextMenu,
   LpEmptyState,
   LpIcon,
@@ -125,6 +127,42 @@ const themeItems = computed<ContextMenuItemDef[]>(() =>
   })),
 )
 
+// ⌘K / Ctrl-K opens the palette. The kit component binds the hotkey itself
+// (`hotkey` defaults on), so this only has to supply the commands and the open
+// state. Every route the preview has is reachable from here, which is the
+// point: the component list is long enough that scanning it is the slow way.
+const paletteOpen = ref(false)
+
+const commands = computed<Command[]>(() => [
+  ...registry.map((entry) => ({
+    id: `component/${entry.id}`,
+    label: entry.name,
+    description: entry.description,
+    icon: "lucide:box",
+    group: "Components",
+    // The description is prose, so searching it alone misses the id a consumer
+    // actually types ("otp", "toc"). Match that too.
+    keywords: [entry.id],
+    onSelect: () => navigate({ kind: "component", id: entry.id }),
+  })),
+  ...Object.entries(PAGE_TITLES).map(([id, title]) => ({
+    id: `page/${id}`,
+    label: title,
+    icon: "lucide:layout-dashboard",
+    group: "Pages",
+    keywords: [id],
+    onSelect: () => navigate({ kind: "page", id }),
+  })),
+  ...THEMES.map((name) => ({
+    id: `theme/${name}`,
+    label: presets[name].name,
+    icon: THEME_ICON[name],
+    group: "Theme",
+    keywords: ["theme", name],
+    onSelect: () => setTheme(name),
+  })),
+])
+
 const chip = "rounded-control px-3 py-1.5 text-sm transition-colors"
 const on = "bg-surface-soft text-ink"
 </script>
@@ -179,6 +217,12 @@ const on = "bg-surface-soft text-ink"
         <Home v-else class="w-full" />
       </LpScrollArea>
     </main>
+
+    <LpCommandPalette
+      v-model:open="paletteOpen"
+      :commands="commands"
+      placeholder="Jump to a component, page or theme…"
+    />
 
     <LpToaster />
   </div>
