@@ -75,8 +75,23 @@ function onToggle(value: boolean) {
 }
 
 // The disclosure carries a bordered control frame; stacking several into one list means removing the per-item border from the outside.
+/*
+ * shrink-0 is load-bearing inside a flex column.
+ *
+ * A disclosure is nearly always in one — the body of a dialog, a settings
+ * column, a form. A flex item defaults to `flex-shrink: 1`, so when that column
+ * runs out of room every child is squeezed, and this one hides the evidence
+ * with its own `overflow-hidden`: measured in a dialog whose content overflows,
+ * the root sat at 22px while the trigger inside it was 40px — a header cut in
+ * half, spilling past the panel, and snapping back and forth by 20px as the
+ * surrounding layout settled.
+ *
+ * A collapsible owns its height: closed it is exactly its header, open it is
+ * the header plus the animating body. Nothing outside gets to shorten that —
+ * the column it sits in is the thing that should scroll instead.
+ */
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "overflow-hidden rounded-control border border-line bg-surface-soft",
+  "shrink-0 overflow-hidden rounded-control border border-line bg-surface-soft",
 )
 </script>
 
