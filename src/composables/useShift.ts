@@ -65,6 +65,14 @@ export interface UseShift {
 /** Kept in step with the `duration-fast` token the transition utilities use. */
 const TWEEN_MS = 160
 
+/*
+ * How long after a tween starts a second observer call still counts as the same
+ * move rather than a new one. Both observers report one swap within a frame or
+ * two; anything later is content that is still changing size and has to be
+ * followed. Two frames at 60Hz, with room to spare for a slow one.
+ */
+const RETARGET_AFTER_MS = 40
+
 export function useShift(
   options: UseShiftOptions = {},
 ): UseShift {
@@ -81,6 +89,8 @@ export function useShift(
   let lastWidth = 0
   /** True while a tween owns the size, so observers don't cancel it midway. */
   let inFlight = false
+  /** When the in-flight tween started, to tell a duplicate from a follow-up. */
+  let tweenStart = 0
 
   const axisOf = () => toValue(options.axis) ?? "height"
   const wantsHeight = () => axisOf() !== "width"
@@ -96,9 +106,29 @@ export function useShift(
   function retune() {
     const node = el.value
     if (!node) return
-    // One swap wakes both observers — the mutation as content lands, the resize
-    // as it reflows — and the second call would clear the pin the first wrote.
-    if (inFlight) return
+
+    /*
+     * A tween already owns the size. Where it came from decides what to do:
+     *
+     * - One swap wakes both observers — the mutation as content lands, the
+     *   resize as it reflows — and the second call arrives within a frame or
+     *   two of the first, describing the same move. Re-running it would clear
+     *   the pin the first one wrote, so it is dropped.
+     * - Content that animates its OWN height keeps reporting new sizes for as
+     *   long as it runs. A collapsible body opening inside a dialog fires the
+     *   observer every frame for 260ms, and dropping all of those pinned the
+     *   panel at the size the body happened to have one frame in — measured,
+     *   212px held for 170ms and then 135px arriving in a single frame, which
+     *   is the "modal snaps open" report. Those retunes must RETARGET the
+     *   tween instead: start from where the box is painted right now and ease
+     *   on to the new figure.
+     */
+    if (inFlight) {
+      if (performance.now() - tweenStart < RETARGET_AFTER_MS) return
+      const live = node.getBoundingClientRect()
+      lastHeight = Math.round(live.height)
+      lastWidth = Math.round(live.width)
+    }
 
     // Remembered, not measured: by the time either observer fires the box has
     // already reflowed, so the element can only report where it is going.
@@ -145,6 +175,7 @@ export function useShift(
     if (movesWidth) node.style.width = `${toWidth}px`
 
     inFlight = true
+    tweenStart = performance.now()
     resizing.value = true
     clearTimeout(settleTimer)
     const wait = prefersReducedMotion() ? 0 : (toValue(options.duration) ?? TWEEN_MS)
