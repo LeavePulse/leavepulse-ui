@@ -19,6 +19,10 @@
  * straight from here into the lightbox with nothing in between. `thumb` is the
  * small source when one exists; without it the grid shows `src`, which is
  * correct but heavier, and that is the caller's call to make.
+ *
+ * An item marked `spoiler` arrives covered and takes a click to uncover. The
+ * cover is per image and the reveal is remembered per image, because a set is
+ * usually mixed — one marked screenshot among plain ones.
  */
 import { computed, ref } from "vue"
 import type { LightboxItem } from "./lightbox"
@@ -69,6 +73,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** A thumbnail was activated, before the lightbox opens. */
   (e: "select", item: LightboxItem, index: number): void
+  /** A spoiler was uncovered. */
+  (e: "reveal", item: LightboxItem): void
   (e: "update:open", value: boolean): void
 }>()
 
@@ -173,9 +179,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 function activate(i: number) {
   const item = props.items[i]
   if (!item) return
+  // `select` reports the position in the caller's own array, which is the one
+  // they can do anything with — the lightbox's filtered index is internal.
   emit("select", item, i)
   if (!props.openable) return
-  index.value = i
+  // Covered images are not in the lightbox's list, so the index has to be
+  // translated into it.
+  const at = openIndexOf(i)
+  if (at === -1) return
+  index.value = at
   open.value = true
   emit("update:open", true)
 }
@@ -185,9 +197,57 @@ function openOverflow() {
   activate(visible.value.length)
 }
 
+/*
+ * Which spoilers have been opened.
+ *
+ * Keyed by `src` rather than by index, because the index is not a name: a set
+ * that gains an image at the front, or is filtered, shifts every position under
+ * the cursor, and a grid keyed by index would then show the wrong picture as
+ * already-revealed — which for a spoiler is the one failure that matters.
+ */
+const revealed = ref(new Set<string>())
+
+function isHidden(item: LightboxItem): boolean {
+  return Boolean(item.spoiler) && !revealed.value.has(item.src)
+}
+
+/*
+ * A covered tile takes its click to uncover itself and STOPS there — it does
+ * not also open the lightbox. Revealing and viewing are two separate requests,
+ * and running them together puts a picture nobody has agreed to see yet
+ * full-screen on the first click. The second click opens it like any other.
+ */
+function reveal(item: LightboxItem) {
+  // A new Set, not .add(): a Set mutated in place is the same object, so a
+  // computed reading it never sees a change.
+  revealed.value = new Set(revealed.value).add(item.src)
+  emit("reveal", item)
+}
+
+/*
+ * The lightbox never receives a covered image. Paging through the set with the
+ * arrow keys would otherwise walk straight into one full-screen, having asked
+ * nobody — the grid's cover would have been for nothing. Items already revealed
+ * pass through untouched, so opening the one you just uncovered still lands on
+ * it.
+ */
+const openItems = computed(() => props.items.filter((item) => !isHidden(item)))
+
+/** Index within `openItems` of the grid item at `i`, or -1 when it is covered. */
+function openIndexOf(i: number): number {
+  const item = props.items[i]
+  return item ? openItems.value.indexOf(item) : -1
+}
+
 defineExpose({
   /** Open the lightbox at an index — for a "view all" button outside the grid. */
   openAt: (i: number) => activate(i),
+  /** Uncover every spoiler in the set. */
+  revealAll: () => {
+    const next = new Set(revealed.value)
+    for (const item of props.items) if (item.spoiler) next.add(item.src)
+    revealed.value = next
+  },
 })
 </script>
 
@@ -208,11 +268,19 @@ defineExpose({
         'focus-visible:ring-2 focus-visible:ring-ring',
       ]"
       :aria-label="
-        hiddenCount && i === visible.length - 1
-          ? `Show ${hiddenCount} more`
-          : item.title || `Image ${i + 1} of ${items.length}`
+        isHidden(item)
+          ? 'Spoiler — show image'
+          : hiddenCount && i === visible.length - 1
+            ? `Show ${hiddenCount} more`
+            : item.title || `Image ${i + 1} of ${items.length}`
       "
-      @click="hiddenCount && i === visible.length - 1 ? openOverflow() : activate(i)"
+      @click="
+        isHidden(item)
+          ? reveal(item)
+          : hiddenCount && i === visible.length - 1
+            ? openOverflow()
+            : activate(i)
+      "
     >
       <slot name="item" :item="item" :index="i">
         <!-- decoding=async + loading=lazy: a gallery is often far down a page,
@@ -227,15 +295,18 @@ defineExpose({
              little pushes that feathered edge outside the clip. -->
         <img
           :src="item.thumb || item.src"
-          :alt="item.title || ''"
+          :alt="isHidden(item) ? '' : item.title || ''"
           loading="lazy"
           decoding="async"
           class="size-full object-cover transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-          :class="
-            hiddenCount && i === visible.length - 1
+          :class="[
+            isHidden(item)
+              ? 'scale-[1.12] blur-[18px] brightness-[0.6] saturate-[1.1] group-hover:scale-[1.12]'
+              : '',
+            !isHidden(item) && hiddenCount && i === visible.length - 1
               ? 'scale-[1.06] blur-[2px] brightness-[0.45] group-hover:scale-[1.06]'
-              : ''
-          "
+              : '',
+          ]"
         >
       </slot>
 
@@ -252,8 +323,22 @@ defineExpose({
            and obvious zoomed. Dimming the image itself means the corner clips a
            finished pixel, which fades toward transparent instead of toward
            something that should never be on show. -->
+      <!-- A covered tile says so in words. The blur alone is ambiguous — a
+           heavily blurred photograph reads as one that failed to load, and the
+           label is the difference between "broken" and "click to see". -->
       <span
-        v-if="hiddenCount && i === visible.length - 1"
+        v-if="isHidden(item)"
+        class="pointer-events-none absolute inset-0 flex items-center justify-center"
+      >
+        <span
+          class="rounded-pill bg-black/55 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white"
+        >
+          Spoiler
+        </span>
+      </span>
+
+      <span
+        v-else-if="hiddenCount && i === visible.length - 1"
         class="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-medium text-white"
       >
         +{{ hiddenCount }}
@@ -272,7 +357,7 @@ defineExpose({
       v-if="openable"
       v-model:open="open"
       v-model:index="index"
-      :items="items"
+      :items="openItems"
       :downloadable="downloadable"
       :rotatable="rotatable"
     />

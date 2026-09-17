@@ -2117,7 +2117,7 @@ export const registry: ComponentEntry[] = [
     id: "media-gallery",
     name: "MediaGallery",
     description:
-      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. Items are LightboxItem, so a set passes straight through.",
+      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through.",
     components: { LpMediaGallery },
     state: () => {
       const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>
@@ -2142,6 +2142,12 @@ export const registry: ComponentEntry[] = [
           { src: plate("6", "#8b5cf6", "#39e58c"), title: "portal.png", description: "1200 × 800" },
           { src: plate("7", "#ff6b6b", "#feca57"), title: "mesa.png", description: "1200 × 800" },
         ] as LightboxItem[],
+        mixed: [
+          { src: plate("1", "#5865F2", "#8b5cf6"), title: "spawn.png" },
+          { src: plate("2", "#eb459e", "#f0b35a"), title: "ending.png", spoiler: true },
+          { src: plate("3", "#39e58c", "#00bcff"), title: "base.png" },
+          { src: plate("4", "#f0b35a", "#eb459e"), title: "boss.png", spoiler: true },
+        ] as LightboxItem[],
       })
     },
     template: `<div class="flex flex-col gap-6">
@@ -2156,6 +2162,16 @@ export const registry: ComponentEntry[] = [
     <p class="mb-2 text-xs text-muted">max=4 — the last tile counts the rest and opens at image 5</p>
     <div class="w-[420px] max-w-full">
       <LpMediaGallery :items="shots" :columns="4" :max="4" />
+    </div>
+  </div>
+
+  <div>
+    <p class="mb-2 text-xs text-muted">
+      spoiler — a covered tile takes one click to uncover and a second to open; a
+      covered image is kept out of the lightbox entirely, so paging cannot walk into one
+    </p>
+    <div class="w-[420px] max-w-full">
+      <LpMediaGallery :items="mixed" :columns="4" />
     </div>
   </div>
 

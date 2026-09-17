@@ -315,8 +315,21 @@ const imageStyle = computed(() => ({
 
 const BTN =
   "flex size-9 items-center justify-center rounded-control text-white/80 outline-none transition-colors duration-[var(--duration-fast)] hover:bg-white/15 hover:text-white focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+/*
+ * The arrows sit on a photograph, which is the hard surface to answer on: the
+ * resting chrome is a dark translucent disc, and a hover that only deepens that
+ * dark is a change from "nearly black" to "slightly more nearly black" over an
+ * image that may itself be dark. Measured, the old step moved the fill from
+ * 0.45 to 0.65 alpha and the disc by 5% of 44px — two pixels. It was doing
+ * something, and it read as doing nothing.
+ *
+ * So the hover changes the QUALITY of the surface, not just its depth: the fill
+ * goes lighter rather than darker, a hairline ring appears, the icon reaches
+ * full white and the disc grows by a tenth. Pressing it dips back below resting
+ * size, which is the part that makes a button feel connected to the click.
+ */
 const ARROW =
-  "absolute top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-pill bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-0"
+  "absolute top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-pill bg-black/45 text-white/75 ring-1 ring-white/0 outline-none backdrop-blur-sm transition-[background-color,scale,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-white/20 hover:text-white hover:ring-white/30 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-0 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
 </script>
 
 <template>

@@ -14,6 +14,16 @@ export interface LightboxItem {
   description?: string
   /** Filename used when downloading; derived from `src` when absent. */
   filename?: string
+  /**
+   * Hide this image behind a cover until someone asks for it — a spoiler, a
+   * screenshot of something not everyone in the channel has reached yet, a
+   * picture that should not appear in a scroll past.
+   *
+   * A property of the ITEM rather than of the grid showing it: which images are
+   * spoilers is a fact about the images, and the usual set is a mixed one, with
+   * a marked picture sitting beside plain ones.
+   */
+  spoiler?: boolean
 }
 
 /** Last path segment of a URL, or a fallback — used to name a download. */
