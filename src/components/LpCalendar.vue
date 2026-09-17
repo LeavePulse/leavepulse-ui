@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Inline month calendar (reka Calendar). The kit-facing model is an ISO date
@@ -23,6 +30,7 @@ import {
 } from "reka-ui"
 import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -68,6 +76,11 @@ function disabledFor(date: DateValue): boolean {
 
 const navBtn =
   "flex size-8 items-center justify-center rounded-control text-muted outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft hover:text-ink active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
+
+// The calendar draws its own card frame, which has to give way when it is placed inside a popover that already has one.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "inline-block rounded-card border border-line bg-surface-raised p-3",
+)
 </script>
 
 <template>
@@ -80,7 +93,8 @@ const navBtn =
     :weekday-format="weekdayFormat"
     :is-date-disabled="disabledFor"
     fixed-weeks
-    class="inline-block rounded-card border border-line bg-surface-raised p-3"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="onUpdate"
   >
     <CalendarHeader class="mb-2 flex items-center justify-between gap-2">

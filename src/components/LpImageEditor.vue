@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Straighten-and-crop for a picture on its way to being uploaded.
@@ -23,6 +30,7 @@ import { useZoomPan } from "../composables/useZoomPan"
 import LpButton from "./LpButton.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -364,10 +372,17 @@ const SHORTCUTS = [
 ] as const
 
 defineExpose({ export: exportImage, reset, edited, shortcuts: SHORTCUTS })
+
+// The editor lays out canvas and controls on a fixed gap, which a narrow panel has to tighten.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-3",
+)
 </script>
 
 <template>
-  <div ref="revealAnchor" class="flex flex-col gap-3">
+  <div ref="revealAnchor"
+    :class="rootClass"
+    v-bind="rest">
     <!-- The frame is the crop. The picture moves under it, which is the
          interaction every avatar cropper already taught people. -->
     <!-- Focusable, because everything here is otherwise a mouse gesture: a

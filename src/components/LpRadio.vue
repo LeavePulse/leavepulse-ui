@@ -1,16 +1,33 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { RadioGroupIndicator, RadioGroupItem } from "reka-ui"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 // A single radio item with a slot for rich content (icon, badges, multi-line).
 // Must be placed inside an <LpRadioGroup> (or a reka-ui RadioGroupRoot), which
 // owns the selected value. The default slot replaces the plain label.
-defineProps<{ value: string; label?: string; disabled?: boolean }>()
+const props = defineProps<{ value: string; label?: string; disabled?: boolean }>()
+
+// The label sits a fixed distance from the control, which a dense list of
+// options needs to close up — `class="gap-1"` should win over the default.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "group inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
+    props.disabled ? "cursor-not-allowed opacity-55" : "",
+  ].join(" "),
+)
 </script>
 
 <template>
   <label
-    class="group inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-    :class="disabled && 'cursor-not-allowed opacity-55'"
+    :class="rootClass"
+    v-bind="rest"
   >
     <RadioGroupItem
       :value="value"

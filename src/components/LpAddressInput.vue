@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Postal address form — street, optional second line, city, postcode and
@@ -33,6 +40,7 @@ import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 import LpModal from "./LpModal.vue"
 import LpSelect from "./LpSelect.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const LpMapPicker = defineAsyncComponent(() => import("./LpMapPicker.vue"))
 
@@ -252,10 +260,17 @@ function confirmPoint() {
   emit("pick", point.value)
   mapOpen.value = false
 }
+
+// The group stacks its fields on a fixed gap that a tighter form has to close.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-3",
+)
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <LpFormField :label="text.line">
       <!-- Typing is the fast path and stands on its own; the map is one button
            away for when an address is easier pointed at than spelled. -->

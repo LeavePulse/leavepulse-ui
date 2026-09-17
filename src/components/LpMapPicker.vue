@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Point picker on a raster tile map — drag to pan, wheel or the buttons to
@@ -17,6 +24,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -536,11 +544,17 @@ defineExpose({ zoomIn: () => zoomBy(1), zoomOut: () => zoomBy(-1), recentre, loc
 
 const CONTROL =
   "flex size-8 items-center justify-center rounded-control bg-black/45 text-white/90 outline-none backdrop-blur-sm transition-[background-color,scale] duration-[var(--duration-fast)] hover:bg-black/65 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+
+// The picker is a bordered box with a fixed frame; a consumer fitting it into a panel of their own needs the border and radius to be overridable.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "relative overflow-hidden rounded-control border border-line bg-surface-soft",
+)
 </script>
 
 <template>
   <div
-    class="relative overflow-hidden rounded-control border border-line bg-surface-soft"
+    :class="rootClass"
+    v-bind="rest"
     :style="{ height }"
   >
     <div

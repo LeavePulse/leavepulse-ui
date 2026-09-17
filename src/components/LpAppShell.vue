@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Full application shell: a fixed-height (h-dvh) flex frame holding the side
@@ -31,6 +38,7 @@ import LpScrollArea from "./LpScrollArea.vue"
 import LpShift from "./LpShift.vue"
 import LpSidebar from "./LpSidebar.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export type { SidebarItem, SidebarSection } from "./sidebar"
 
@@ -157,10 +165,17 @@ const burgerClass = computed(() => burgerHidden[props.mobileBreakpoint])
 // Expose the burger trigger so a host can omit its own header entirely.
 const _openDrawer = () => emit("update:open", true)
 defineExpose({ openDrawer: _openDrawer })
+
+// The shell claims the full viewport height, which is wrong when it is embedded in a page that already has a header of its own.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex h-dvh overflow-hidden bg-surface text-ink",
+)
 </script>
 
 <template>
-  <div class="flex h-dvh overflow-hidden bg-surface text-ink">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <LpSidebar
       :model-value="modelValue"
       :items="items"

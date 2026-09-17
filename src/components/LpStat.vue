@@ -1,9 +1,17 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 // Stat tile: dot + caps label, big mono value, optional delta/trend badge and a
 // subtitle. A product pattern, fully token-driven — re-skins with the theme.
 import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -86,10 +94,17 @@ const deltaDecimals = computed(() => {
   const [, fraction] = String(props.delta).split(".")
   return Math.min(fraction?.length ?? 0, 4)
 })
+
+// A stat tile spaces its label and value on a fixed gap; a dense KPI row needs that tighter.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-2",
+)
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <div class="flex items-center gap-2">
       <span v-if="online" class="size-1.5 rounded-full bg-action" />
       <LpIcon v-if="icon" :name="icon" :size="14" class="text-muted" />

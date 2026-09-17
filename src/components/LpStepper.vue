@@ -1,6 +1,14 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface Step {
   label: string
@@ -38,10 +46,17 @@ function isCompleted(step: Step, i: number): boolean {
 function isCurrent(i: number): boolean {
   return i === currentIndex.value
 }
+
+// The stepper spaces its steps evenly; a compact wizard header needs that spacing under the consumer's control.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex items-center gap-2",
+)
 </script>
 
 <template>
-  <ol class="flex items-center gap-2">
+  <ol
+    :class="rootClass"
+    v-bind="rest">
     <li
       v-for="(step, i) in steps"
       :key="step.key ?? i"

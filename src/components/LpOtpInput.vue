@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * One-time-code input (TOTP / 2FA). A row of single-character cells with the
@@ -10,6 +17,7 @@
  */
 import { PinInputInput, PinInputRoot } from "reka-ui"
 import { computed } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -51,6 +59,11 @@ const cellSize = {
   md: "size-11 text-lg",
   lg: "size-13 text-xl",
 }
+
+// The boxes sit on a fixed gap that a narrow form has to tighten.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex items-center gap-2",
+)
 </script>
 
 <template>
@@ -60,7 +73,8 @@ const cellSize = {
     :mask="mask"
     :disabled="disabled"
     otp
-    class="flex items-center gap-2"
+    :class="rootClass"
+    v-bind="rest"
     @complete="onComplete"
   >
     <PinInputInput

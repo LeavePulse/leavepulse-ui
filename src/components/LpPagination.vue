@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Page navigator. Pairs with LpTable but stands alone.
@@ -14,6 +21,7 @@ import { Motion } from "motion-v"
 import { computed, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -104,10 +112,17 @@ const navArrow =
 // The sliding brand pill (shared layoutId) glides under the current page.
 const pillId = `lp-page-indicator-${useId()}`
 const pillTransition = usePillTransition()
+
+// Pagination is a nav row with its own spacing, which a compact table footer has to tighten.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex items-center gap-1.5",
+)
 </script>
 
 <template>
-  <nav class="flex items-center gap-1.5" aria-label="Pagination">
+  <nav
+    :class="rootClass"
+    v-bind="rest" aria-label="Pagination">
     <button
       type="button"
       :class="[navBase, navArrow]"

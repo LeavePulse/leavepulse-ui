@@ -1,6 +1,14 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import type { Component } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface Crumb {
   label: string
@@ -23,10 +31,17 @@ withDefaults(
   { as: "a" },
 )
 defineEmits<{ (e: "navigate", item: Crumb, index: number): void }>()
+
+// The trail sets its own gap, which a dense header bar needs to reduce.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex items-center gap-1.5 text-sm",
+)
 </script>
 
 <template>
-  <nav class="flex items-center gap-1.5 text-sm" aria-label="Breadcrumb">
+  <nav
+    :class="rootClass"
+    v-bind="rest" aria-label="Breadcrumb">
     <template v-for="(item, i) in items" :key="i">
       <LpIcon
         v-if="i > 0"

@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Form-control wrapper: label + the control (default slot) + hint/error.
@@ -11,6 +18,7 @@
 import { Label } from "reka-ui"
 import { useId } from "vue"
 import LpShift from "./LpShift.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 defineProps<{
   label?: string
@@ -20,6 +28,11 @@ defineProps<{
 }>()
 
 const id = useId()
+
+// The field stacks label and control with a fixed gap; a denser form needs that gap smaller.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex min-w-0 flex-col gap-1.5",
+)
 </script>
 
 <template>
@@ -28,7 +41,9 @@ const id = useId()
        to `min-width: auto` and so refuse to go narrower than the widest label or
        placeholder inside them — which is how a two-column form ended up wider
        than the phone holding it. -->
-  <div class="flex min-w-0 flex-col gap-1.5">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <Label v-if="label" :for="id" class="text-sm font-medium text-ink">
       {{ label }}
       <span v-if="required" class="text-danger">*</span>

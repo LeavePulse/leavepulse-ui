@@ -1,8 +1,16 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { computed, ref } from "vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpTooltip from "./LpTooltip.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export type UptimeStatus = "operational" | "degraded" | "down" | "maintenance" | "empty"
 
@@ -115,10 +123,17 @@ const uptimeDecimals = computed(() => {
   const trimmed = Number(v.toFixed(2))
   return Number.isInteger(trimmed) ? 0 : String(trimmed).split(".")[1].length
 })
+
+// The bar sets its own gap between the strip and its caption, which a compact status row has to close.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-1.5",
+)
 </script>
 
 <template>
-  <div class="flex flex-col gap-1.5">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <div v-if="title" class="text-xs">
       <span class="font-medium text-ink">{{ title }}</span>
     </div>

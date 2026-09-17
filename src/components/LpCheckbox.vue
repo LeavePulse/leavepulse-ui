@@ -1,6 +1,14 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 defineProps<{
   modelValue?: boolean
@@ -21,10 +29,17 @@ function onUpdate(v: boolean | "indeterminate") {
   emit("update:modelValue", checked)
   emit("change", checked)
 }
+
+// The label sits a fixed distance from the box; a dense list of options needs that closer.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "group inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
+)
 </script>
 
 <template>
-  <label class="group inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+  <label
+    :class="rootClass"
+    v-bind="rest">
     <CheckboxRoot
       :id="id"
       :name="name"

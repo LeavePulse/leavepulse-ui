@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 // Numeric input with stepper buttons (reka NumberField). Themed via tokens.
 import {
@@ -8,6 +15,7 @@ import {
 } from "reka-ui"
 import { useId } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 defineProps<{
   // null = empty field (reka's native state); consumers that need a number
@@ -30,6 +38,11 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
 // screen the two read as one field, and without this a reader announces "380"
 // and leaves out the milliamps that make it mean anything.
 const unitId = useId()
+
+// The field is full-width with its own control frame — the two things a consumer laying out a compact numeric column needs to change.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+)
 </script>
 
 <template>
@@ -40,7 +53,8 @@ const unitId = useId()
     :step="step"
     :disabled="disabled"
     data-lp-ring-owner
-    class="flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
   >
     <NumberFieldDecrement

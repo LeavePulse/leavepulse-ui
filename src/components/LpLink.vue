@@ -1,5 +1,13 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { computed, type Component } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -94,6 +102,21 @@ const REVEAL_TRIGGER = {
 const revealClass = computed(
   () => `${REVEAL_BASE} ${REVEAL_TRIGGER[props.revealOn]}`,
 )
+
+// A link is inline text: the gap to its icon and the underline treatment are
+// the parts a consumer restyles, and `class="gap-0"` or `class="no-underline"`
+// must beat the default rather than depend on stylesheet order.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "inline-flex items-center gap-1 underline-offset-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+    colorClass.value,
+    props.variant === "reveal"
+      ? revealClass.value
+      : props.variant === "underline"
+        ? "underline decoration-current/40 hover:decoration-current"
+        : "hover:underline",
+  ].join(" "),
+)
 </script>
 
 <template>
@@ -102,15 +125,8 @@ const revealClass = computed(
     :href="isAnchor ? href : undefined"
     :target="target"
     :rel="rel"
-    class="inline-flex items-center gap-1 underline-offset-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-    :class="[
-      colorClass,
-      variant === 'reveal'
-        ? revealClass
-        : variant === 'underline'
-          ? 'underline decoration-current/40 hover:decoration-current'
-          : 'hover:underline',
-    ]"
+    :class="rootClass"
+    v-bind="rest"
   >
     <slot />
   </component>

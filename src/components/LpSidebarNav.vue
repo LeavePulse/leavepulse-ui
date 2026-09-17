@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Inner body of LpSidebar: the section/item list plus the loading skeleton and
@@ -14,6 +21,7 @@ import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -66,11 +74,18 @@ function isOpen(section: SidebarSection): boolean {
 }
 
 const pillTransition = usePillTransition()
+
+// The nav fills the remaining height with a fixed gap between groups; a short sidebar needs both under the consumer's control.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex min-h-0 flex-1 flex-col gap-4",
+)
 </script>
 
 <template>
   <!-- Loading skeleton: an optional identity row + a run of item rows. -->
-  <div v-if="loading" class="flex min-h-0 flex-1 flex-col gap-4">
+  <div v-if="loading"
+    :class="rootClass"
+    v-bind="rest">
     <div v-if="skeletonHeader" class="flex items-center gap-3 px-1">
       <div class="size-10 shrink-0 animate-pulse rounded-pill bg-surface-soft" />
       <div class="flex-1 space-y-2">

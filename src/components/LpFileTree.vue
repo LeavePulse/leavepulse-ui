@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * File/folder tree — the kit convention for browsing a hierarchy of files so
@@ -30,6 +37,7 @@ import {
 import LpEmptyState from "./LpEmptyState.vue"
 import LpFileTreeNode from "./LpFileTreeNode.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export type { FileNode } from "./fileTree"
 
@@ -476,10 +484,17 @@ function collapseAll() {
 }
 
 defineExpose({ reveal, expandAll, collapseAll, checkAll, clearChecked, summary })
+
+// The tree fills its container; a consumer giving it a fixed height or width in a split pane must be able to say so.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex h-full w-full min-w-0 flex-col gap-1 overflow-hidden",
+)
 </script>
 
 <template>
-  <div v-if="loading" class="flex h-full w-full min-w-0 flex-col gap-1 overflow-hidden">
+  <div v-if="loading"
+    :class="rootClass"
+    v-bind="rest">
     <div
       v-for="n in skeletonRows"
       :key="n"

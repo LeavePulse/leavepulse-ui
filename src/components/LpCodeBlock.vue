@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Code block with lightweight, theme-aware syntax highlighting (codeHighlight.ts
@@ -19,6 +26,7 @@ import { computed, reactive, ref, watch } from "vue"
 import { useClipboard } from "../composables/useClipboard"
 import { type CodeLang, tokenizeLine } from "./codeHighlight"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -181,10 +189,17 @@ function toggleLock() {
 function onInput(e: Event) {
   emit("update:modelValue", (e.target as HTMLTextAreaElement).value)
 }
+
+// A code block is a framed panel; embedding one inside another panel means dropping its border or its radius, which a consumer can only do from the outside.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "overflow-hidden rounded-card border border-line bg-surface font-mono text-xs",
+)
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-card border border-line bg-surface font-mono text-xs">
+  <div
+    :class="rootClass"
+    v-bind="rest">
     <!-- Header -->
     <div
       v-if="showHeader"

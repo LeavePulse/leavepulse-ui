@@ -1,13 +1,13 @@
 <script lang="ts">
 // Opt out of auto attr inheritance: the template has two root branches (menu /
 // no-menu), so fallthrough class/attrs/events are bound explicitly onto the
-// inner <div> via v-bind="$attrs" in both — keeping them on the card surface.
+// inner <div> in both — keeping them on the card surface.
 export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 
 const card = tv({
@@ -72,7 +72,11 @@ const props = withDefaults(
   { variant: "raised", padded: true, interactive: false, as: "div" },
 )
 
-const classes = computed(() =>
+// Merged rather than concatenated: binding the raw `$attrs` would otherwise put the
+// consumer's `class` next to ours and leave the winner to stylesheet order —
+// `class="p-1"` lost to the `p-5` of `padded`. useMergedAttrs merges it in and
+// hands back the remaining attrs, so the class never arrives a second time.
+const { class: classes, attrs: rest } = useMergedAttrs(() =>
   card({ variant: props.variant, padded: props.padded, interactive: props.interactive }),
 )
 </script>
@@ -82,11 +86,11 @@ const classes = computed(() =>
        (inheritAttrs:false above), so the card surface looks identical whether or
        not it's wrapped in a context menu. -->
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <component :is="as" :class="classes" v-bind="$attrs">
+    <component :is="as" :class="classes" v-bind="rest">
       <slot />
     </component>
   </LpContextMenu>
-  <component :is="as" v-else :class="classes" v-bind="$attrs">
+  <component :is="as" v-else :class="classes" v-bind="rest">
     <slot />
   </component>
 </template>

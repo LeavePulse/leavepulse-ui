@@ -47,6 +47,36 @@ export function useMergedClass(
 }
 
 /**
+ * `useMergedClass` plus the rest of `$attrs`, for the common `inheritAttrs:
+ * false` shape: bind `class` and `attrs` and the consumer's `class` lands once,
+ * merged, while ids, handlers and aria-* still reach the element.
+ *
+ * ```ts
+ * const { class: rootClass, attrs: rest } = useMergedAttrs(() => card({ padded }))
+ * ```
+ * ```vue
+ * <div :class="rootClass" v-bind="rest">
+ * ```
+ *
+ * Binding the raw `$attrs` alongside a merged class is the bug this avoids:
+ * Vue appends that second `class` to the merged one, and stylesheet order —
+ * not the caller — decides which wins.
+ */
+export function useMergedAttrs(own: MaybeRefOrGetter<string | undefined>): {
+  class: ComputedRef<string>
+  attrs: ComputedRef<Record<string, unknown>>
+} {
+  const attrs = useAttrs()
+  return {
+    class: useMergedClass(own),
+    attrs: computed(() => {
+      const { class: _omitted, ...rest } = attrs
+      return rest
+    }),
+  }
+}
+
+/**
  * The same merge as a plain function, for the places that already have both
  * strings in hand and do not need the attrs lookup — a render helper, or a
  * component merging a class onto a child rather than its own root.

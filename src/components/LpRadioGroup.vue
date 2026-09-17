@@ -1,5 +1,13 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { RadioGroupIndicator, RadioGroupItem, RadioGroupRoot } from "reka-ui"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface RadioOption {
   value: string
@@ -11,13 +19,19 @@ export interface RadioOption {
 // the same RadioGroupRoot, so selection still flows through v-model.
 defineProps<{ modelValue?: string; options?: RadioOption[]; disabled?: boolean }>()
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
+
+// A radio group stacks with a fixed gap; a dense settings list needs it smaller, and a horizontal layout needs it gone.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-2",
+)
 </script>
 
 <template>
   <RadioGroupRoot
     :model-value="modelValue"
     :disabled="disabled"
-    class="flex flex-col gap-2"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="(v) => $emit('update:modelValue', v as string)"
   >
     <slot>

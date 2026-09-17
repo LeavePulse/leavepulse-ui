@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Segmented control — a compact bar of mutually-exclusive options with a sliding
@@ -9,6 +16,7 @@
 import { Motion } from "motion-v"
 import { ToggleGroupItem, ToggleGroupRoot } from "reka-ui"
 import { useId } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 
@@ -47,6 +55,17 @@ const sizeCls = {
   md: "h-(--size-control-md) text-sm",
 }
 
+// The bar sizes itself from `size` and `block`, which is right until a consumer
+// needs it flush against something — `class="p-0"` and `class="rounded-none"`
+// have to reach the root rather than losing a coin toss with stylesheet order.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "inline-flex items-center gap-1 rounded-control border border-line bg-surface-soft p-1",
+    sizeCls[props.size],
+    props.block ? "flex w-full" : "",
+  ].join(" "),
+)
+
 const pillId = `lp-segmented-${useId()}`
 const pillTransition = usePillTransition()
 </script>
@@ -57,8 +76,8 @@ const pillTransition = usePillTransition()
     type="single"
     :disabled="disabled"
     :rovingFocus="true"
-    class="inline-flex items-center gap-1 rounded-control border border-line bg-surface-soft p-1"
-    :class="[sizeCls[size], block ? 'flex w-full' : '']"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="onChange"
   >
     <ToggleGroupItem

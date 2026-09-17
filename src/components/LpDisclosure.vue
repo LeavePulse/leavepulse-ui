@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Collapsible "show more" section built on reka Collapsible. The trigger is a
@@ -11,6 +18,7 @@
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "reka-ui"
 import { type ComponentPublicInstance, computed, getCurrentInstance, nextTick, ref } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -65,6 +73,11 @@ function onToggle(value: boolean) {
     })
   }
 }
+
+// The disclosure carries a bordered control frame; stacking several into one list means removing the per-item border from the outside.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "overflow-hidden rounded-control border border-line bg-surface-soft",
+)
 </script>
 
 <template>
@@ -72,7 +85,8 @@ function onToggle(value: boolean) {
     ref="root"
     :open="rootOpen"
     :default-open="defaultOpen"
-    class="overflow-hidden rounded-control border border-line bg-surface-soft"
+    :class="rootClass"
+    v-bind="rest"
     @update:open="onToggle"
   >
     <CollapsibleTrigger

@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Token-driven SVG chart: line, area and bar off one data shape. No charting
@@ -36,6 +43,7 @@ import {
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpShift from "./LpShift.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 /** What was under the pointer when a point was clicked or right-clicked. */
 export interface ChartPointEvent {
@@ -845,10 +853,17 @@ const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
  */
 const gradientId = (name: string, index: number) =>
   `${clipId}-g-${index}-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`
+
+// The chart fills its container's width and sets its own gap between plot and legend — both are layout decisions the page makes, not the chart.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex w-full flex-col gap-3",
+)
 </script>
 
 <template>
-  <div ref="root" class="flex w-full flex-col gap-3">
+  <div ref="root"
+    :class="rootClass"
+    v-bind="rest">
     <div v-if="title || subtitle || $slots.actions" class="flex items-start justify-between gap-3">
       <div class="flex flex-col gap-0.5">
         <span v-if="title" class="text-sm font-medium text-ink">{{ title }}</span>

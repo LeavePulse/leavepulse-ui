@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Phone number field — a country picker (flag + dial code) fused with a free-text
@@ -25,6 +32,7 @@ import { useInputFilter } from "../composables/useInputFilter"
 import { type Country, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
 import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface PhoneDetail {
   /** Matched country, or undefined when the prefix matches none. */
@@ -146,19 +154,26 @@ const sizeClass = {
   md: "h-(--size-control-md) text-sm",
   lg: "h-(--size-control-lg) text-sm",
 }
+
+// The control is full-width with its own frame — the two things a consumer
+// placing it in a narrow column has to change, so `class="w-48"` must win.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring",
+    sizeClass[props.size],
+    props.invalid
+      ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
+      : "border-line focus-within:border-brand",
+    props.disabled ? "cursor-not-allowed opacity-55" : "",
+  ].join(" "),
+)
 </script>
 
 <template>
   <div
     data-lp-ring-owner
-    class="flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring"
-    :class="[
-      sizeClass[size],
-      invalid
-        ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft'
-        : 'border-line focus-within:border-brand',
-      disabled ? 'cursor-not-allowed opacity-55' : '',
-    ]"
+    :class="rootClass"
+    v-bind="rest"
   >
     <!-- reset-search-term-on-{select,blur}: as in LpSelect, the trigger shows
          the selection and the box only filters, so reka seeding the chosen value

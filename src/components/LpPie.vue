@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Shares of a whole, as a pie or a donut. Same SVG-and-tokens approach as
@@ -23,6 +30,7 @@ import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpTooltip from "./LpTooltip.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 /** A slice, as reported by every interaction event. */
 export interface SliceEvent {
@@ -545,10 +553,17 @@ const centreLabel = computed(() => {
   if (selected.value.size > 1) return `${selected.value.size} selected`
   return "total"
 })
+
+// The pie sets its own gap between chart and legend, which a narrow card has to close up.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "flex flex-col gap-3",
+)
 </script>
 
 <template>
-  <div ref="revealAnchor" class="flex flex-col gap-3">
+  <div ref="revealAnchor"
+    :class="rootClass"
+    v-bind="rest">
     <div v-if="title || subtitle" class="flex flex-col gap-0.5">
       <span v-if="title" class="text-sm font-medium text-ink">{{ title }}</span>
       <span v-if="subtitle" class="text-xs text-muted">{{ subtitle }}</span>

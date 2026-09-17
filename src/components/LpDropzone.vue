@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * A place to put files: drop them, click to browse, or paste from the
@@ -17,6 +24,7 @@
  * the file dialog unreachable without a mouse.
  */
 import { onBeforeUnmount, onMounted, ref } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import LpIcon from "./LpIcon.vue"
 
@@ -173,6 +181,17 @@ onMounted(() => {
 onBeforeUnmount(() => window.removeEventListener("paste", windowPaste))
 
 defineExpose({ browse: () => input.value?.click() })
+
+// The zone is a full-width block with generous padding by default, which is
+// the right shape on a page and the wrong one in a sidebar — `class="w-40"`
+// and `class="py-2"` have to be able to say so. The drag/reveal state classes
+// go through the same merge so there is a single class source on the root.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
+  "lp-dropzone relative flex w-full flex-col items-center gap-2 rounded-card px-6 py-8 text-center transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55",
+  over.value ? "bg-brand-soft" : TONES[props.tone],
+  over.value ? "lp-dropzone--over" : "",
+  props.animate && !revealed.value ? "lp-dropzone--waiting" : "",
+].join(" "))
 </script>
 
 <template>
@@ -180,12 +199,8 @@ defineExpose({ browse: () => input.value?.click() })
     ref="revealAnchor"
     type="button"
     :disabled="disabled"
-    class="lp-dropzone relative flex w-full flex-col items-center gap-2 rounded-card px-6 py-8 text-center transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55"
-    :class="[
-      over ? 'bg-brand-soft' : TONES[tone],
-      over ? 'lp-dropzone--over' : '',
-      animate && !revealed ? 'lp-dropzone--waiting' : '',
-    ]"
+    :class="rootClass"
+    v-bind="rest"
     @click="input?.click()"
     @paste="onPaste"
     @dragenter.prevent="onDragOver"

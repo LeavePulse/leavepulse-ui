@@ -1,7 +1,15 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
-defineProps<{
+const props = defineProps<{
   icon?: string
   title: string
   description?: string
@@ -11,12 +19,22 @@ defineProps<{
    */
   compact?: boolean
 }>()
+
+// The empty state pads itself generously, which is right on a page and wrong
+// inside a small card — `class="py-2"` has to reach the root rather than lose
+// a coin toss with stylesheet order.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "flex flex-col items-center px-6 text-center",
+    props.compact ? "gap-2 py-6" : "gap-3 py-12",
+  ].join(" "),
+)
 </script>
 
 <template>
   <div
-    class="flex flex-col items-center px-6 text-center"
-    :class="compact ? 'gap-2 py-6' : 'gap-3 py-12'"
+    :class="rootClass"
+    v-bind="rest"
   >
     <div
       v-if="icon"

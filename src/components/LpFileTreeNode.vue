@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * One row of LpFileTree plus its recursively rendered children. Split out so the
@@ -22,6 +29,7 @@ import {
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = defineProps<{
   node: FileNode
@@ -146,12 +154,18 @@ function onActivate() {
   emit("select", props.node)
   if (isDir.value) emit("toggle", props.node)
 }
+
+// A node is a list row whose min-width the consumer may need to release when the tree scrolls horizontally.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "min-w-0",
+)
 </script>
 
 <template>
   <li
     role="treeitem"
-    class="min-w-0"
+    :class="rootClass"
+    v-bind="rest"
     :aria-level="depth + 1"
     :aria-selected="isSelected"
     :aria-expanded="canExpand ? isOpen : undefined"

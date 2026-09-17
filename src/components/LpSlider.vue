@@ -1,7 +1,15 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 // Single-value slider (reka Slider). reka models value as an array; we expose
 // a plain number for the common single-thumb case. Themed via tokens.
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
@@ -29,6 +37,11 @@ function onUpdate(v: number[] | undefined) {
 function onCommit(v: number[] | undefined) {
   if (v && v.length) emit("change", v[0])
 }
+
+// A slider is full-width by default; putting one in a toolbar means constraining it, and a fixed h-5 has to yield to a denser row.
+const { class: rootClass, attrs: rest } = useMergedAttrs(
+  "relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55",
+)
 </script>
 
 <template>
@@ -38,7 +51,8 @@ function onCommit(v: number[] | undefined) {
     :max="max"
     :step="step"
     :disabled="disabled"
-    class="relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="onUpdate"
     @value-commit="onCommit"
   >

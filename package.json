@@ -61,7 +61,6 @@
     "@vueuse/core": "^12.0.0 || ^13.0.0 || ^14.0.0",
     "motion-v": "^2.2.0",
     "reka-ui": "^2.9.0",
-    "tailwind-merge": "^3.0.0",
     "tailwind-variants": "^3.0.0",
     "tailwindcss": "^4.0.0",
     "vue": "^3.5.0"
@@ -80,7 +79,6 @@
     "motion-v": "^2.2.1",
     "reka-ui": "^2.9.10",
     "shiki": "^4.2.0",
-    "tailwind-merge": "^3.6.0",
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.6.3",

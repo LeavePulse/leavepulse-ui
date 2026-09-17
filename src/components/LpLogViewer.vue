@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended to
+// it, so opt out of the automatic pass-through that would add it a second
+// time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Terminal-flavoured log stream. Monospace rows, a tonal level gutter, optional
@@ -23,6 +30,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "success"
 
@@ -632,14 +640,24 @@ const transitionProps = {
   "leave-to-class": "max-h-0 -translate-y-1 opacity-0",
   "move-class": "transition-transform duration-200 ease-[var(--ease-emphasized)]",
 }
+
+// The viewer draws its own card frame and hides its overflow; a consumer
+// fitting it into a panel that already has a border, or giving it a fixed
+// height, needs those to give way rather than lose to stylesheet order.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "relative overflow-hidden rounded-card border border-line bg-surface font-mono text-xs leading-relaxed",
+    frozen.value ? "ring-1 ring-brand" : "",
+  ].join(" "),
+)
 </script>
 
 <template>
   <div
     ref="root"
     tabindex="-1"
-    class="relative overflow-hidden rounded-card border border-line bg-surface font-mono text-xs leading-relaxed"
-    :class="frozen ? 'ring-1 ring-brand' : ''"
+    :class="rootClass"
+    v-bind="rest"
     @pointerenter="hovered = true"
     @pointerleave="hovered = false"
   >
