@@ -1060,22 +1060,57 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones; `recent` floats what this person actually runs to the top.",
     components: { LpCommandPalette, LpButton },
-    state: () =>
-      reactive({
+    state: () => {
+      const s: any = reactive({
         open: false,
+        recent: ["metrics"],
         commands: [
           { id: "new", label: "New server", description: "Provision a fresh node", icon: "lucide:plus", shortcut: "⌘N", group: "Actions", keywords: ["create", "add"] },
           { id: "deploy", label: "Deploy current branch", description: "Roll out to production", icon: "lucide:rocket", group: "Actions", keywords: ["ship", "release"] },
+          {
+            id: "restart",
+            label: "Restart service…",
+            description: "Pick one of the running services",
+            icon: "lucide:refresh-cw",
+            group: "Actions",
+            childPlaceholder: "Which service?",
+            children: [
+              { id: "restart:api", label: "api", icon: "lucide:server" },
+              { id: "restart:worker", label: "worker", icon: "lucide:server" },
+              { id: "restart:web", label: "web", icon: "lucide:server" },
+            ],
+          },
           { id: "logs", label: "View logs", description: "Tail the live log stream", icon: "lucide:scroll-text", shortcut: "⌘L", group: "Navigate" },
           { id: "metrics", label: "Open metrics", icon: "lucide:activity", group: "Navigate" },
-          { id: "theme", label: "Toggle theme", icon: "lucide:palette", group: "Preferences", keywords: ["dark", "light", "appearance"] },
+          { id: "theme", label: "Toggle theme", icon: "lucide:palette", group: "Preferences", keywords: ["dark", "light", "appearance"], keepOpen: true },
         ],
-      }),
+        // Stands in for an API: everything remote behaves like this from the
+        // palette's side — a query in, commands out, late answers discarded.
+        people: async (q: string) => {
+          await new Promise((r) => setTimeout(r, 250))
+          return ["Ada Lovelace", "Grace Hopper", "Alan Turing"]
+            .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
+            .map((n) => ({ id: `user:${n}`, label: n, description: "Open profile", icon: "lucide:user", group: "People" }))
+        },
+        // Recency is the app's to keep — here in memory, in a real app in
+        // storage. The palette only reads it back.
+        onRun: (id: string) => {
+          s.recent = [id, ...s.recent.filter((r: string) => r !== id)].slice(0, 5)
+        },
+      })
+      return s
+    },
     template: `<div>
   <LpButton variant="outline" @click="open = true">Open palette ( ⌘K )</LpButton>
-  <LpCommandPalette v-model:open="open" :commands="commands" />
+  <LpCommandPalette
+    v-model:open="open"
+    :commands="commands"
+    :search="people"
+    :recent="recent"
+    @run="onRun"
+  />
 </div>`,
   },
   {

@@ -64,7 +64,7 @@ export {
 } from "./components/color"
 export type { ColorFormat, Hsv, Rgb } from "./components/color"
 export { default as LpCommandPalette } from "./components/LpCommandPalette.vue"
-export type { Command } from "./components/LpCommandPalette.vue"
+export type { Command, PaletteLabels } from "./components/LpCommandPalette.vue"
 export { default as LpConfirmDialog } from "./components/LpConfirmDialog.vue"
 export { default as LpContextMenu } from "./components/LpContextMenu.vue"
 export type { ContextMenuItemDef } from "./components/LpContextMenu.vue"
