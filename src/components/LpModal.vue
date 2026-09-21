@@ -275,12 +275,17 @@ watch(
         class="flex items-start"
         :style="hasAside ? { maxHeight: 'min(90vh, calc(100dvh - 2rem))' } : undefined"
       >
-      <!-- `pointer-events-auto` because the wrapper lets clicks through to the
+      <!-- Bound to `open`, not to the slot alone: DialogContent unmounts itself
+           with the dialog, but an aside is an ordinary node in the portal and
+           stayed on screen after the dialog closed — a section list floating
+           over the page with nothing behind it.
+
+           `pointer-events-auto` because the wrapper lets clicks through to the
            overlay, and the aside is not the overlay. `data-lp-modal-aside` is
            what tells `interact-outside` a click here is not a click on the
            scrim — without it the dialog closes under the pointer. -->
       <aside
-        v-if="$slots.aside"
+        v-if="open && $slots.aside"
         data-lp-modal-aside
         class="pointer-events-auto flex min-h-0 flex-col"
       >
@@ -355,7 +360,7 @@ watch(
       </DialogContent>
 
       <aside
-        v-if="$slots.asideEnd"
+        v-if="open && $slots.asideEnd"
         data-lp-modal-aside
         class="pointer-events-auto flex min-h-0 flex-col"
       >
