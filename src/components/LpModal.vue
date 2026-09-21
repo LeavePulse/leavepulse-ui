@@ -72,6 +72,20 @@ defineEmits<{ (e: "update:open", value: boolean): void }>()
 // Spread rather than a plain `:aria-describedby` binding: with a description
 // the key must be absent entirely so reka-ui's own generated id survives, and
 // only the description-less case overrides it away.
+/*
+ * A click on the aside lands outside DialogContent, and reka reads anything
+ * outside it as a click on the scrim — the dialog closed under the pointer the
+ * moment you picked a section. The aside marks itself, and a click that starts
+ * inside one keeps the dialog open. Without an aside nothing carries the
+ * attribute and every click behaves exactly as before.
+ */
+const onInteractOutside = (event: Event) => {
+  const target = event.target
+  if (target instanceof Element && target.closest("[data-lp-modal-aside]")) {
+    event.preventDefault()
+  }
+}
+
 const describedByAttrs = computed(() =>
   props.description ? {} : { "aria-describedby": undefined },
 )
@@ -93,6 +107,9 @@ const widthClass = computed(() => {
 // inset horizontally; top only when there's no header, bottom only when there's
 // no footer (header/footer own those edges).
 const slots = useSlots()
+
+// Dialog and aside only form a pair when something fills the slot.
+const hasAside = computed(() => Boolean(slots.aside || slots.asideEnd))
 // The body clips overflow and focus rings are drawn outside their control, so a
 // field flush against the top edge lost its ring; pt-1 clears the ring's width.
 /*
@@ -225,10 +242,50 @@ watch(
            this wrapper: `max-h-full` on a centred flex child resolves against a
            box it is free to overflow, so a tall body stopped handing its
            overflow to the scroll area below and simply ran off-screen. -->
+      <!-- A companion panel standing OUTSIDE the dialog, in the same centring
+           row: a section list, a preview, a picker. Inside, it would take the
+           width the body already wants; measured against the viewport it would
+           have to be re-measured on every resize.
+
+           The row keeps `items-center` until something fills the slot, so a
+           dialog without one centres exactly as it always has. With an aside
+           the two align to the top of the row instead, and because the row
+           collapses to its content the taller of the pair sets that top edge —
+           so the aside may be shorter than the dialog, and the dialog is never
+           shorter than the aside. Neither is stretched: `stretch` here would
+           pull every dialog to the full height of its own ceiling.
+
+           Height, width, the gap to the dialog and whether it appears at all
+           are the caller's, and deliberately so: a utility class written in
+           this file is not in the consuming app's Tailwind scan and would never
+           be generated. The gap in particular has to go with the aside — kept
+           here, it survives an aside hidden at a breakpoint this file knows
+           nothing about, and pushes the dialog off centre by its own width. -->
       <div
         class="fixed inset-0 flex items-center justify-center pointer-events-none"
         :style="{ zIndex: layer.panel }"
       >
+      <!-- The dialog and its aside stand in a row of their own, and that row is
+           what the wrapper centres. Aligning them on the full-screen wrapper
+           instead would pin them to the top of the WINDOW, and the dialog would
+           be free to end up shorter than the aside beside it.
+           `items-start` inside the row: the row collapses to the taller of the
+           two, both hang from its top edge, and neither is stretched. -->
+      <div
+        class="flex items-start"
+        :style="hasAside ? { maxHeight: 'min(90vh, calc(100dvh - 2rem))' } : undefined"
+      >
+      <!-- `pointer-events-auto` because the wrapper lets clicks through to the
+           overlay, and the aside is not the overlay. `data-lp-modal-aside` is
+           what tells `interact-outside` a click here is not a click on the
+           scrim — without it the dialog closes under the pointer. -->
+      <aside
+        v-if="$slots.aside"
+        data-lp-modal-aside
+        class="pointer-events-auto flex min-h-0 flex-col"
+      >
+        <slot name="aside" />
+      </aside>
       <!-- Without a description reka-ui warns on every open, and the opt-out it
            checks for is an ABSENT `aria-describedby` — despite the message
            naming the string "undefined" (a leftover from Radix, where
@@ -240,9 +297,11 @@ watch(
         ref="panelRef"
         class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
         :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
-        :style="width ? { width } : undefined"
+        :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
         v-bind="describedByAttrs"
         @open-auto-focus="onOpenAutoFocus"
+        @interact-outside="onInteractOutside"
+        @pointer-down-outside="onInteractOutside"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
           <div class="flex flex-col gap-1">
@@ -294,6 +353,15 @@ watch(
           <slot name="footer" />
         </footer>
       </DialogContent>
+
+      <aside
+        v-if="$slots.asideEnd"
+        data-lp-modal-aside
+        class="pointer-events-auto flex min-h-0 flex-col"
+      >
+        <slot name="asideEnd" />
+      </aside>
+      </div>
       </div>
     </DialogPortal>
   </DialogRoot>
