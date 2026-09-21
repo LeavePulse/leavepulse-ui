@@ -529,7 +529,7 @@ const barInsetTop = computed(() =>
         name="lp-row"
         :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
       >
-        <tr v-if="displayRows.length === 0" key="lp-table-empty">
+        <tr v-if="displayRows.length === 0" key="lp-table-empty" class="lp-row-empty">
           <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
             <LpIcon :name="emptyIcon" :size="22" class="mx-auto mb-2 opacity-60" />
             <div>{{ emptyLabel }}</div>
@@ -599,6 +599,19 @@ const barInsetTop = computed(() =>
 .lp-row-leave-to {
   opacity: 0;
   transform: translateX(-0.5rem);
+}
+
+/*
+ * The empty-state row leaves at once, without the fade. It and the first real
+ * rows would otherwise share the table for the length of the animation, and a
+ * row of blank height sits above them — the table jumps once on every load.
+ *
+ * `position: absolute` is what a list would use here, but a positioned `<tr>`
+ * drops out of the table layout entirely. Nothing sits below this row to be
+ * dragged around, so simply not animating its exit costs nothing.
+ */
+.lp-row-empty.lp-row-leave-active {
+  display: none;
 }
 
 /*
