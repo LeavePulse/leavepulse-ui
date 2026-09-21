@@ -451,7 +451,14 @@ const barInsetTop = computed(() =>
          this is the fallback rather than a competitor. -->
     <LpContextMenu :items="contextMenu" always>
     <table class="w-full border-collapse text-sm">
-      <thead ref="headEl" :class="stickyHeader ? 'sticky top-0 z-10' : ''">
+      <!-- The background belongs on `thead` itself, not only on its row:
+           `border-collapse` collapses the borders, and with a sticky header the
+           rows show through that seam — a band of body text rides across the
+           header on every scroll. -->
+      <thead
+        ref="headEl"
+        :class="stickyHeader ? 'sticky top-0 z-10 bg-surface-soft' : ''"
+      >
         <tr class="border-b border-line bg-surface-soft">
           <th v-if="selectable" class="w-px px-4 py-3">
             <LpCheckbox
