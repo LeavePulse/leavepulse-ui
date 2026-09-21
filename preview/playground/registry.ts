@@ -38,6 +38,7 @@ import {
   LpLink,
   LpLogViewer,
   LpModal,
+  LpModalNav,
   LpNotificationBell,
   LpNumberField,
   LpNumberFlow,
@@ -1611,6 +1612,57 @@ export const registry: ComponentEntry[] = [
       <LpButton variant="ghost" @click="lazy = false">Close</LpButton>
     </template>
   </LpModal>
+</div>`,
+  },
+  {
+    id: "modal-nav",
+    name: "ModalNav",
+    description: "A dialog that keeps its sections in view: settings, a profile, a wizard you can skip around in. Takes LpSidebar's `items` or grouped `sections`. The rail becomes a drawer below `mobileBreakpoint` (default lg) and the header grows the button that opens it.",
+    components: { LpModalNav, LpButton },
+    state: () => {
+      const s = reactive({
+        open: false,
+        section: "activity",
+        sections: [
+          {
+            title: "Work",
+            icon: "lucide:briefcase",
+            collapsible: true,
+            items: [
+              { id: "activity", label: "Activity", icon: "lucide:activity", badge: 103 },
+              { id: "voice", label: "Voice", icon: "lucide:mic", badge: 4 },
+              { id: "reviews", label: "Reviews", icon: "lucide:star", badge: 16 },
+            ],
+          },
+          {
+            title: "Person",
+            icon: "lucide:user",
+            collapsible: true,
+            items: [
+              { id: "economy", label: "Economy", icon: "lucide:coins" },
+              { id: "social", label: "Social", icon: "lucide:heart" },
+            ],
+          },
+        ],
+      })
+      return s
+    },
+    template: `<div>
+  <LpButton variant="solid" @click="open = true">Open</LpButton>
+
+  <LpModalNav
+    v-model:open="open"
+    v-model="section"
+    :sections="sections"
+    title="Staff member"
+    description="Sections stay in view while you read one."
+  >
+    <p>Section: <strong>{{ section }}</strong>.</p>
+    <p class="text-muted">The rail keeps its width while the body takes the rest. Narrow the window past lg and it folds into a drawer.</p>
+    <template #footer>
+      <LpButton variant="ghost" @click="open = false">Close</LpButton>
+    </template>
+  </LpModalNav>
 </div>`,
   },
   {

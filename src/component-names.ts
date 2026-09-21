@@ -43,6 +43,7 @@ export const COMPONENT_NAMES = [
   "LpMapPicker",
   "LpMediaGallery",
   "LpModal",
+  "LpModalNav",
   "LpNotificationBell",
   "LpNumberField",
   "LpNumberFlow",
