@@ -1,24 +1,17 @@
 <script setup lang="ts">
 /*
- * A dialog whose sections stay visible while you read one — settings, a profile
- * with tabs' worth of detail, a wizard that lets you skip a step. The shape
- * these all reach for is a nav column that persists next to the body, and
- * without it they fall back to a row of tabs that runs out of width, or to a
- * back-and-forth between a list screen and a detail screen.
+ * A dialog whose sections stand BESIDE it rather than inside it — settings, a
+ * profile with tabs' worth of detail, a wizard you can skip around in. Put the
+ * list inside the panel and it takes the width the content already wants; a row
+ * of tabs across the top runs out of room at about five.
  *
- * The nav lives INSIDE the dialog. Standing it outside, as a sibling floating
- * beside the panel, is the arrangement this component deliberately does not
- * use: it then sits outside the focus trap, `interact-outside` reads a click on
- * it as a click on the scrim and closes the dialog under the pointer, and its
- * height has to be reconciled with a dialog height that changes as content
- * arrives. Inside, all three come out right for free, and `LpModal` keeps the
- * centring every other modal in the kit relies on.
- *
- * Width is the one cost: the rail comes out of the body's width, which is why
- * the default `size` is wider than a plain modal's. Below `mobileBreakpoint`
- * there is no width to spare at all, so the rail becomes a drawer — and since
- * LpSidebar leaves opening it to the app, the header grows the button for it
- * rather than leaving the sections unreachable on a phone.
+ * This is LpModal's `aside` slot plus LpSidebar, wired together: the pair
+ * shares one centring row, so the list lines up with the dialog at any window
+ * width and neither has to measure the other. What is added on top is the part
+ * that only matters here — below `mobileBreakpoint` there is no room beside the
+ * dialog at all, so the rail folds into a drawer and the header grows the
+ * button that opens it. LpSidebar leaves that button to the app, and without
+ * one the sections are simply unreachable on a phone.
  */
 import { computed, ref } from "vue"
 import LpButton from "./LpButton.vue"
@@ -41,10 +34,6 @@ const props = withDefaults(
     sections?: SidebarSection[]
     title?: string
     description?: string
-    /**
-     * Defaults wider than `LpModal`'s `md`: the rail comes out of the content's
-     * width, and at `md` what is left is too narrow to be worth splitting.
-     */
     size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "full"
     width?: string
     /** Width of the nav rail (any CSS length). */
@@ -58,10 +47,12 @@ const props = withDefaults(
     mobileBreakpoint?: Breakpoint
     /** Label for the button that opens that drawer. */
     navLabel?: string
+    /** Stand the rail to the right of the dialog instead of the left. */
+    navSide?: "start" | "end"
     /**
-     * Let the body fill the height instead of scrolling itself. On by default,
-     * unlike a plain modal: the rail is only a full-height column if the two
-     * of them agree on a height to fill.
+     * Let the body fill the height instead of scrolling itself. Off by default,
+     * as in a plain modal: it existed here to make the rail a full-height
+     * column inside the body, and the rail is no longer in the body.
      */
     fillBody?: boolean
   }>(),
@@ -70,7 +61,7 @@ const props = withDefaults(
     navWidth: "13rem",
     mobileBreakpoint: "lg",
     navLabel: "Sections",
-    fillBody: true,
+    navSide: "start",
   },
 )
 
@@ -86,23 +77,50 @@ const active = computed({
   set: (v: string) => emit("update:modelValue", v),
 })
 
-const hasNav = computed(
-  () => Boolean(props.items?.length || props.sections?.length),
-)
+const hasNav = computed(() => Boolean(props.items?.length || props.sections?.length))
 
 /*
- * Spelled out rather than built from the prop: a class assembled at runtime is
- * not in anyone's Tailwind scan and would never be generated. Mirrors the
- * rail's own visibility in LpSidebar — the button appears exactly where the
- * rail disappears.
+ * Both halves of the responsive switch are spelled out rather than built from
+ * the prop: a class assembled at runtime is in nobody's Tailwind scan and would
+ * never be generated. The rail hides exactly where the button appears.
+ *
+ * `responsive` on LpSidebar hides its own rail below the breakpoint and draws
+ * the drawer as a SIBLING of it, so wrapping the whole thing in a `hidden`
+ * element takes the drawer with it — and the sections are then unreachable at
+ * exactly the width where the drawer is the only way to them. What is left here
+ * is the gap, which has to disappear along with the rail: an aside that is
+ * empty but still spaced pushes the dialog off centre.
  */
+const RAIL_GAP: Record<Breakpoint, string> = {
+  sm: "sm:mr-3",
+  md: "md:mr-3",
+  lg: "lg:mr-3",
+  xl: "xl:mr-3",
+}
+const RAIL_GAP_END: Record<Breakpoint, string> = {
+  sm: "sm:ml-3",
+  md: "md:ml-3",
+  lg: "lg:ml-3",
+  xl: "xl:ml-3",
+}
 const TRIGGER_VISIBILITY: Record<Breakpoint, string> = {
   sm: "sm:hidden",
   md: "md:hidden",
   lg: "lg:hidden",
   xl: "xl:hidden",
 }
+const railClass = computed(() =>
+  (props.navSide === "end" ? RAIL_GAP_END : RAIL_GAP)[props.mobileBreakpoint],
+)
 const triggerClass = computed(() => TRIGGER_VISIBILITY[props.mobileBreakpoint])
+
+/*
+ * The rail carries the dialog's own ceiling, so a long list scrolls with the
+ * dialog instead of running past the bottom of the window. Inline because it
+ * mirrors LpModal's max-height, which is not a class this file can put in the
+ * consuming app's scan.
+ */
+const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
 </script>
 
 <template>
@@ -115,6 +133,49 @@ const triggerClass = computed(() => TRIGGER_VISIBILITY[props.mobileBreakpoint])
     :fill-body="fillBody"
     @update:open="emit('update:open', $event)"
   >
+    <!-- The gap sits on a wrapper rather than on LpSidebar itself: LpSidebar
+         splits its `class` between its root and the inner `nav`, so a margin
+         given to it lands on both. -->
+    <template v-if="hasNav && navSide === 'start'" #aside>
+      <div :class="railClass">
+        <LpSidebar
+          v-model="active"
+          v-model:open="navOpen"
+          variant="panel"
+          :items="items"
+          :sections="sections"
+          :width="navWidth"
+          :searchable="searchable"
+          :search-placeholder="searchPlaceholder"
+          :loading="loading"
+          responsive
+          :mobile-breakpoint="mobileBreakpoint"
+          :style="railStyle"
+          class="rounded-card border border-line bg-surface-raised p-2 shadow-panel"
+        />
+      </div>
+    </template>
+
+    <template v-if="hasNav && navSide === 'end'" #asideEnd>
+      <div :class="railClass">
+        <LpSidebar
+          v-model="active"
+          v-model:open="navOpen"
+          variant="panel"
+          :items="items"
+          :sections="sections"
+          :width="navWidth"
+          :searchable="searchable"
+          :search-placeholder="searchPlaceholder"
+          :loading="loading"
+          responsive
+          :mobile-breakpoint="mobileBreakpoint"
+          :style="railStyle"
+          class="rounded-card border border-line bg-surface-raised p-2 shadow-panel"
+        />
+      </div>
+    </template>
+
     <template #title>
       <div class="flex items-center gap-2">
         <LpButton
@@ -132,43 +193,7 @@ const triggerClass = computed(() => TRIGGER_VISIBILITY[props.mobileBreakpoint])
       </div>
     </template>
 
-    <div class="flex min-h-0 flex-1 gap-4">
-      <!-- `shrink-0`: a flex item's default is to give up width to a greedy
-           sibling, so a wide table in the body would squeeze the rail down to
-           its longest unbreakable word. -->
-      <LpSidebar
-        v-if="hasNav"
-        v-model="active"
-        v-model:open="navOpen"
-        variant="panel"
-        :items="items"
-        :sections="sections"
-        :width="navWidth"
-        :searchable="searchable"
-        :search-placeholder="searchPlaceholder"
-        :loading="loading"
-        responsive
-        :mobile-breakpoint="mobileBreakpoint"
-        class="shrink-0"
-      >
-        <template v-if="$slots.navHeader" #header>
-          <slot name="navHeader" />
-        </template>
-        <template v-if="$slots.navItem" #item="slotProps">
-          <slot name="navItem" v-bind="slotProps" />
-        </template>
-        <template v-if="$slots.navFooter" #footer>
-          <slot name="navFooter" />
-        </template>
-      </LpSidebar>
-
-      <!-- `min-w-0` is the same guard in the other direction: without it a wide
-           child sets this column's minimum to its own width, and the dialog
-           grows past its size instead of the content scrolling. -->
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <slot />
-      </div>
-    </div>
+    <slot />
 
     <template v-if="$slots.footer" #footer>
       <slot name="footer" />

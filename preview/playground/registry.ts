@@ -1617,7 +1617,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal-nav",
     name: "ModalNav",
-    description: "A dialog that keeps its sections in view: settings, a profile, a wizard you can skip around in. Takes LpSidebar's `items` or grouped `sections`. The rail becomes a drawer below `mobileBreakpoint` (default lg) and the header grows the button that opens it.",
+    description: "A dialog whose sections stand beside it: settings, a profile, a wizard you can skip around in. Takes LpSidebar's `items` or grouped `sections`; `navSide` moves the rail to the other side. Below `mobileBreakpoint` (default lg) it folds into a drawer the header's button opens.",
     components: { LpModalNav, LpButton },
     state: () => {
       const s = reactive({
@@ -1658,7 +1658,7 @@ export const registry: ComponentEntry[] = [
     description="Sections stay in view while you read one."
   >
     <p>Section: <strong>{{ section }}</strong>.</p>
-    <p class="text-muted">The rail keeps its width while the body takes the rest. Narrow the window past lg and it folds into a drawer.</p>
+    <p class="text-muted">The list stands outside the dialog, in the same centring row — it takes none of the body's width. Narrow the window past lg and it folds into a drawer.</p>
     <template #footer>
       <LpButton variant="ghost" @click="open = false">Close</LpButton>
     </template>
