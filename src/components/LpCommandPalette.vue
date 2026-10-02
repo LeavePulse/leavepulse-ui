@@ -34,9 +34,10 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue"
+import { computed, nextTick, ref, shallowRef, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useAsyncTask } from "../composables/useAsyncTask"
 import { useHotkeys } from "../composables/useHotkeys"
 
 export interface Command {
@@ -218,19 +219,13 @@ function back(): boolean {
 // ── async results ────────────────────────────────────────────
 /*
  * One in-flight request, shared by `search` at the root and by a fetching
- * `children` inside a mode — they differ only in which function to call.
- *
- * Two races to lose here, and both are lost silently: a stale response
- * overwriting a fresher one, and a response arriving after the palette moved
- * on (closed, or into another mode). The token guards both — the abort signal
- * only asks the consumer to stop, it cannot promise they did.
+ * `children` inside a mode — they differ only in which function to call. The
+ * debounce, the abort and the stale-response guard live in `useAsyncTask`,
+ * which the table's `load` uses too.
  */
 const found = shallowRef<Command[]>([])
-const searching = ref(false)
-
-let timer: ReturnType<typeof setTimeout> | undefined
-let controller: AbortController | undefined
-let token = 0
+const task = useAsyncTask<Command[]>()
+const searching = task.pending
 
 function fetcher(): ((q: string, signal: AbortSignal) => Command[] | Promise<Command[]>) | null {
   const current = mode.value
@@ -243,12 +238,7 @@ function fetcher(): ((q: string, signal: AbortSignal) => Command[] | Promise<Com
 }
 
 function cancel() {
-  if (timer) clearTimeout(timer)
-  timer = undefined
-  controller?.abort()
-  controller = undefined
-  token += 1
-  searching.value = false
+  task.cancel()
 }
 
 function refresh() {
@@ -262,24 +252,13 @@ function refresh() {
   // not — ⌘K would fire a request at every open.
   const inMode = mode.value !== null
   if (!inMode && q.length < Math.max(1, props.minChars)) return
-  searching.value = true
-  const mine = ++token
-  timer = setTimeout(async () => {
-    controller = new AbortController()
-    try {
-      const hits = await run(q, controller.signal)
-      if (mine !== token) return
-      found.value = hits
-    } catch {
-      // Abort or a failing provider: the static commands still stand.
-      if (mine === token) found.value = []
-    } finally {
-      if (mine === token) searching.value = false
-    }
-  }, props.debounce)
+  // Abort or a failing provider: the static commands still stand.
+  task.run((signal) => run(q, signal), {
+    delay: props.debounce,
+    apply: (hits) => (found.value = hits),
+    fail: () => (found.value = []),
+  })
 }
-
-onBeforeUnmount(cancel)
 
 // ── filtering + scoring ──────────────────────────────────────
 /*
