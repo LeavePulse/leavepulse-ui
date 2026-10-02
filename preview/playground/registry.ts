@@ -1915,7 +1915,7 @@ export const registry: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, and stickyHeader.",
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable).",
     components: { LpTable, LpBadge },
     state: () => {
       const s = reactive({
@@ -1938,6 +1938,30 @@ export const registry: ComponentEntry[] = [
           amount: ((i * 37) % 90) + 5,
           status: (["paid", "pending", "failed"] as const)[i % 3],
         })),
+        asyncColumns: [
+          { key: "id", label: "Order", width: "30%", sortable: true },
+          { key: "amount", label: "Amount", align: "right", sortable: true },
+          { key: "status", label: "Status", align: "center", filterable: true },
+        ],
+        // A stand-in server: filters, sorts and pages 40 orders after a delay.
+        async loadOrders(query: { page: number; pageSize: number; sort: { key: string; dir: string } | null; hidden: Record<string, unknown[]> }, signal: AbortSignal) {
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, 350)
+            signal.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("aborted", "AbortError")) })
+          })
+          const all = s.manyRows as { id: string; amount: number; status: string }[]
+          let rows = all.filter((r) => !(query.hidden.status ?? []).includes(r.status))
+          if (query.sort) {
+            const { key, dir } = query.sort
+            rows = [...rows].sort((a, b) => (a[key as "amount"] > b[key as "amount"] ? 1 : -1) * (dir === "asc" ? 1 : -1))
+          }
+          const start = (query.page - 1) * query.pageSize
+          return {
+            rows: rows.slice(start, start + query.pageSize),
+            total: rows.length,
+            facets: { status: [...new Set(all.map((r) => r.status))] },
+          }
+        },
         // Per-row menu: returns items for the right-clicked row.
         rowMenu(row: { id: string; status: string }) {
           return [
@@ -1988,6 +2012,16 @@ export const registry: ComponentEntry[] = [
     sticky-header
     class="h-64"
   >
+    <template #cell-amount="{ value }">€{{ value.toFixed(2) }}</template>
+    <template #cell-status="{ value }">
+      <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">
+        {{ value }}
+      </LpBadge>
+    </template>
+  </LpTable>
+
+  <p class="mt-2 text-xs font-medium text-muted">load — the server pages, sorts and filters (right-click Status to filter):</p>
+  <LpTable :columns="asyncColumns" :load="loadOrders" :page-size="8" row-key="id">
     <template #cell-amount="{ value }">€{{ value.toFixed(2) }}</template>
     <template #cell-status="{ value }">
       <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">

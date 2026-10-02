@@ -1,9 +1,17 @@
+<script lang="ts">
+// Attributes go to the scroll area, not the wrapper: a height or max-height set
+// by the page has always landed there, and the sticky header depends on it.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpPagination from "./LpPagination.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useAsyncTask } from "../composables/useAsyncTask"
 import { useRovingFocus } from "../composables/useRovingFocus"
 
 export interface TableColumn<Row> {
@@ -35,12 +43,49 @@ export interface SortState {
   dir: "asc" | "desc"
 }
 
+/**
+ * What a server-backed table asks for. `hidden` mirrors the header filter: the
+ * values unticked per column, so a value the server has never sent before shows
+ * up instead of being silently excluded.
+ */
+export interface TableQuery {
+  page: number
+  pageSize: number
+  sort: SortState | null
+  hidden: Record<string, unknown[]>
+}
+
+/**
+ * One page of a server-backed table. `facets` are the distinct values of the
+ * filterable columns across the whole result — one page cannot know them, and a
+ * filter built from twenty-five rows would offer whatever happened to be on it.
+ */
+export interface TablePage<Row> {
+  rows: Row[]
+  total: number
+  facets?: Record<string, unknown[]>
+}
+
 type RowKey = string | number
 
 const props = withDefaults(
   defineProps<{
     columns: TableColumn<T>[]
-    rows: T[]
+    /** The rows, for a table that holds its data. Ignored when `load` is set. */
+    rows?: T[]
+    /**
+     * Fetch the rows instead of being handed them: paging, sorting and the
+     * header filters then happen on the server. Debounced and abortable, the
+     * same way as the command palette's `search` — a stale page never lands
+     * over a fresher one.
+     */
+    load?: (query: TableQuery, signal: AbortSignal) => TablePage<T> | Promise<TablePage<T>>
+    /** Rows per page with `load`. */
+    pageSize?: number
+    /** Wait after a sort or filter change before `load` runs. */
+    debounce?: number
+    loadingLabel?: string
+    errorLabel?: string
     /** Stable id per row — required for selection; falls back to index otherwise. */
     rowKey?: keyof T | ((row: T) => RowKey)
     emptyLabel?: string
@@ -68,6 +113,11 @@ const props = withDefaults(
     columnsLabel?: string
   }>(),
   {
+    rows: () => [],
+    pageSize: 25,
+    debounce: 150,
+    loadingLabel: "Loading…",
+    errorLabel: "Could not load",
     emptyLabel: "Nothing here yet",
     emptyIcon: "lucide:inbox",
     selectable: false,
@@ -144,6 +194,27 @@ const contextMenu = computed<ContextMenuItemDef[]>(() => {
 const ownSort = ref<SortState | null>(null)
 const activeSort = computed(() => props.sort ?? ownSort.value)
 
+// ── server-backed rows ───────────────────────────────────────
+const loaded = shallowRef<T[]>([])
+const total = ref(0)
+const facets = ref<Record<string, unknown[]>>({})
+const failed = ref(false)
+const page = ref(1)
+const task = useAsyncTask<TablePage<T>>()
+const loading = task.pending
+
+const sourceRows = computed<T[]>(() => (props.load ? loaded.value : props.rows))
+
+// The tallest page shown so far, held as a floor: the last page is usually
+// short, and without it the pager below jumps up the moment you reach it.
+const tableEl = ref<HTMLElement | null>(null)
+const floor = ref(0)
+async function holdHeight() {
+  await nextTick()
+  const height = tableEl.value?.offsetHeight ?? 0
+  if (height > floor.value) floor.value = height
+}
+
 /*
  * ── hiding values, and hiding columns ────────────────────────────────────────
  *
@@ -158,6 +229,23 @@ const activeSort = computed(() => props.sort ?? ownSort.value)
  * never saw.
  */
 const hiddenValues = ref<Record<string, Set<unknown>>>({})
+
+/*
+ * Rows animate only when the table itself reshuffles them — a header filter or
+ * a sort, a change the eye should follow. A parent replacing `rows` wholesale
+ * (the next page, a reload) swaps instantly: animated, the old page would fade
+ * out beside the new one, and the table would show both lists for a moment.
+ */
+const animating = ref(false)
+let motionTimer: ReturnType<typeof setTimeout> | undefined
+function withMotion(change: () => void) {
+  if (!props.load) {
+    animating.value = true
+    if (motionTimer) clearTimeout(motionTimer)
+    motionTimer = setTimeout(() => (animating.value = false), 600)
+  }
+  change()
+}
 const hiddenColumns = ref<Set<string>>(new Set())
 
 const visibleColumns = computed(() =>
@@ -166,8 +254,9 @@ const visibleColumns = computed(() =>
 
 /** The distinct values a filterable column holds, in first-seen order. */
 function valuesOf(col: TableColumn<T>): unknown[] {
+  if (props.load && facets.value[col.key]) return facets.value[col.key]
   const seen: unknown[] = []
-  for (const row of props.rows) {
+  for (const row of sourceRows.value) {
     const v = row[col.key]
     if (!seen.includes(v)) seen.push(v)
   }
@@ -179,6 +268,10 @@ function isValueHidden(key: string, value: unknown): boolean {
 }
 
 function toggleValue(key: string, value: unknown) {
+  withMotion(() => applyToggle(key, value))
+}
+
+function applyToggle(key: string, value: unknown) {
   const next = new Set(hiddenValues.value[key] ?? [])
   if (next.has(value)) next.delete(value)
   else next.add(value)
@@ -186,7 +279,7 @@ function toggleValue(key: string, value: unknown) {
 }
 
 function showAllValues(key: string) {
-  hiddenValues.value = { ...hiddenValues.value, [key]: new Set() }
+  withMotion(() => (hiddenValues.value = { ...hiddenValues.value, [key]: new Set() }))
 }
 
 function toggleColumn(key: string) {
@@ -198,6 +291,7 @@ function toggleColumn(key: string) {
 
 /** Rows left once the per-column value filters have been applied. */
 const filteredRows = computed<T[]>(() => {
+  if (props.load) return sourceRows.value
   const active = Object.entries(hiddenValues.value).filter(([, set]) => set.size)
   if (!active.length) return props.rows
   return props.rows.filter((row) =>
@@ -208,7 +302,7 @@ const filteredRows = computed<T[]>(() => {
 // We compare by raw cell value with a stable-ish coerce.
 const displayRows = computed<T[]>(() => {
   const s = activeSort.value
-  if (!s) return filteredRows.value
+  if (!s || props.load) return filteredRows.value
   const col = props.columns.find((c) => c.key === s.key)
   if (!col?.sortable) return filteredRows.value
   const factor = s.dir === "asc" ? 1 : -1
@@ -233,8 +327,10 @@ function toggleSort(col: TableColumn<T>) {
   else next = null
   // Kept locally as well as emitted: a parent that binds v-model overwrites
   // this on the way back, and one that does not still gets a table that sorts.
-  ownSort.value = next
-  emit("update:sort", next)
+  withMotion(() => {
+    ownSort.value = next
+    emit("update:sort", next)
+  })
 }
 
 function sortIcon(col: TableColumn<T>): string {
@@ -255,10 +351,11 @@ function sortIcon(col: TableColumn<T>): string {
  */
 function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
   const s = activeSort.value
-  const set = (next: SortState | null) => () => {
-    ownSort.value = next
-    emit("update:sort", next)
-  }
+  const set = (next: SortState | null) => () =>
+    withMotion(() => {
+      ownSort.value = next
+      emit("update:sort", next)
+    })
 
   const items: ContextMenuItemDef[] = []
 
@@ -338,9 +435,45 @@ function tableMenu(): ContextMenuItemDef[] {
   ]
 }
 
+function fetchPage(delay = 0) {
+  const load = props.load
+  if (!load) return
+  const hidden = Object.fromEntries(
+    Object.entries(hiddenValues.value)
+      .filter(([, set]) => set.size)
+      .map(([key, set]) => [key, [...set]]),
+  )
+  const query: TableQuery = { page: page.value, pageSize: props.pageSize, sort: activeSort.value, hidden }
+  task.run((signal) => load(query, signal), {
+    delay,
+    apply: (result) => {
+      loaded.value = result.rows
+      total.value = result.total
+      facets.value = result.facets ?? {}
+      failed.value = false
+      holdHeight()
+    },
+    fail: () => {
+      failed.value = true
+    },
+  })
+}
+
+// A new sort or filter starts from the first page: page 4 of a different
+// question is a page of nothing in particular.
+watch([activeSort, hiddenValues], () => {
+  if (!props.load) return
+  if (page.value !== 1) page.value = 1
+  else fetchPage(props.debounce)
+})
+watch(page, () => fetchPage())
+watch(() => props.load, () => fetchPage(), { immediate: true })
+
+defineExpose({ reload: () => fetchPage() })
+
 // ── selection ────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selected))
-const allKeys = computed(() => props.rows.map((r, i) => keyFor(r, i)))
+const allKeys = computed(() => sourceRows.value.map((r, i) => keyFor(r, i)))
 const allChecked = computed(
   () => allKeys.value.length > 0 && allKeys.value.every((k) => selectedSet.value.has(k)),
 )
@@ -431,7 +564,10 @@ watch(
   },
   { immediate: true, flush: "post" },
 )
-onBeforeUnmount(() => ro?.disconnect())
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  if (motionTimer) clearTimeout(motionTimer)
+})
 
 const barInsetTop = computed(() =>
   props.stickyHeader && headHeight.value ? `${headHeight.value}px` : undefined,
@@ -441,16 +577,19 @@ const barInsetTop = computed(() =>
 <template>
   <!-- No top fade: a sticky header sits in the masked band and would be dimmed
        by it. The bottom edge is left crisp with it for symmetry. -->
+  <div class="flex flex-col gap-3">
   <LpScrollArea
+    v-bind="$attrs"
     :fade="false"
     class="rounded-card border border-line"
+    :style="load && floor ? { minHeight: `${floor + 2}px` } : undefined"
     :bar-inset-top="barInsetTop"
   >
     <!-- The table-wide menu, which is what a right-click on empty header space
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
     <LpContextMenu :items="contextMenu" always>
-    <table class="w-full border-collapse text-sm">
+    <table ref="tableEl" class="w-full border-collapse text-sm">
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
            rows show through that seam — a band of body text rides across the
@@ -488,7 +627,7 @@ const barInsetTop = computed(() =>
                  Right-clicking names the directions instead of making you cycle
                  through them: getting back to unsorted from ascending is two
                  more clicks otherwise. -->
-            <LpContextMenu v-if="col.sortable" :items="headerMenu(col)">
+            <LpContextMenu v-if="col.sortable || col.filterable" :items="headerMenu(col)">
             <button
               type="button"
               class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
@@ -500,6 +639,14 @@ const barInsetTop = computed(() =>
             >
               {{ col.label }}
               <LpIcon
+                v-if="!col.sortable"
+                name="lucide:filter"
+                :size="12"
+                class="shrink-0"
+                :class="hiddenValues[col.key]?.size ? 'text-brand opacity-100' : 'opacity-40 group-hover/sort:opacity-70'"
+              />
+              <LpIcon
+                v-else
                 :name="sortIcon(col)"
                 :size="13"
                 class="shrink-0 transition-[transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]"
@@ -524,15 +671,24 @@ const barInsetTop = computed(() =>
            frames read as the table being redrawn, and the one that stayed is
            impossible to keep track of. `move` is what carries the survivors to
            their new position instead of teleporting them. -->
+      <!-- Animated only while the table reshuffles its own rows — see
+           `withMotion`. -->
       <TransitionGroup
         tag="tbody"
         name="lp-row"
+        :css="animating"
+        :class="loading && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
         :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
       >
         <tr v-if="displayRows.length === 0" key="lp-table-empty" class="lp-row-empty">
           <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
-            <LpIcon :name="emptyIcon" :size="22" class="mx-auto mb-2 opacity-60" />
-            <div>{{ emptyLabel }}</div>
+            <LpIcon
+              :name="loading ? 'lucide:loader-circle' : failed ? 'lucide:circle-alert' : emptyIcon"
+              :size="22"
+              class="mx-auto mb-2 opacity-60"
+              :class="loading ? 'animate-spin' : ''"
+            />
+            <div>{{ loading ? loadingLabel : failed ? errorLabel : emptyLabel }}</div>
           </td>
         </tr>
         <!-- A plain <tr>, because TransitionGroup animates element children and
@@ -569,6 +725,14 @@ const barInsetTop = computed(() =>
     </table>
     </LpContextMenu>
   </LpScrollArea>
+  <LpPagination
+    v-if="load && total > pageSize"
+    v-model:page="page"
+    :total="total"
+    :page-size="pageSize"
+    :disabled="loading"
+  />
+  </div>
 </template>
 
 <style scoped>
