@@ -91,6 +91,25 @@ export function useShift(
   let inFlight = false
   /** When the in-flight tween started, to tell a duplicate from a follow-up. */
   let tweenStart = 0
+  /**
+   * Scroll positions inside the box, kept from the scroll events themselves.
+   * Measuring lifts the height cap, and for that one reflow a scrolling list
+   * inside (a picker, a span tree) is as tall as its content: it no longer
+   * overflows, the browser clamps its scrollTop to 0, and putting the cap back
+   * does not bring the position back. Every click that changed the content —
+   * ticking an item, picking a span — threw the list back to the top.
+   */
+  const scrolled = new Map<Element, number>()
+  const rememberScroll = (event: Event) => {
+    const target = event.target
+    if (target instanceof Element) scrolled.set(target, target.scrollTop)
+  }
+  function restoreScroll() {
+    for (const [node, top] of scrolled) {
+      if (!node.isConnected) scrolled.delete(node)
+      else if (node.scrollTop !== top) node.scrollTop = top
+    }
+  }
 
   const axisOf = () => toValue(options.axis) ?? "height"
   const wantsHeight = () => axisOf() !== "width"
@@ -151,6 +170,7 @@ export function useShift(
     const toWidth = wantsWidth() ? node.offsetWidth : 0
     if (wantsHeight()) node.style.maxHeight = ""
     if (wantsWidth()) node.style.maxWidth = ""
+    restoreScroll()
     lastHeight = toHeight
     lastWidth = toWidth
 
@@ -173,6 +193,7 @@ export function useShift(
     void node.offsetHeight
     if (movesHeight) node.style.height = `${toHeight}px`
     if (movesWidth) node.style.width = `${toWidth}px`
+    restoreScroll()
 
     inFlight = true
     tweenStart = performance.now()
@@ -194,7 +215,12 @@ export function useShift(
     }, wait)
   }
 
+  let scrollHost: HTMLElement | null = null
+
   function teardown() {
+    scrollHost?.removeEventListener("scroll", rememberScroll, true)
+    scrollHost = null
+    scrolled.clear()
     ro?.disconnect()
     mo?.disconnect()
     ro = undefined
@@ -218,6 +244,8 @@ export function useShift(
 
       lastHeight = node.offsetHeight
       lastWidth = node.offsetWidth
+      scrollHost = node
+      node.addEventListener("scroll", rememberScroll, { capture: true, passive: true })
       if (wantsHeight()) node.style.height = `${lastHeight}px`
       if (wantsWidth()) node.style.width = `${lastWidth}px`
       // A box must not animate in from its pre-content size, so the transition
