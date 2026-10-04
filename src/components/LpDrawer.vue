@@ -23,10 +23,11 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from "vaul-vue"
-import { computed, ref, useSlots } from "vue"
+import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useModalLayer } from "./modalDepth"
 
 type Direction = "top" | "bottom" | "left" | "right"
 
@@ -125,6 +126,16 @@ const SIZES = { sm: 22, md: 28, lg: 36, xl: 48 } // rem along the main axis
 // Geometry per edge. The cross-axis is pinned to the viewport; the main axis
 // takes the size preset. vaul drives the open/close transform itself, so we
 // don't add slide keyframes — only the resting box + rounding toward the centre.
+/*
+ * The drawer joins the same stack as LpModal. It painted at the fixed
+ * --z-overlay/--z-modal rungs, so a dialog opened from it (a picker inside a
+ * settings drawer) claimed those same rungs and the tie went to DOM order —
+ * the drawer, portalled later on reopen, covered the dialog it had opened.
+ */
+const { claim, release, layer } = useModalLayer()
+watch(() => props.open, (open) => (open ? claim() : release()), { immediate: true })
+onBeforeUnmount(release)
+
 const contentClass = computed(() => {
   const base = "fixed z-(--z-modal) flex flex-col border-line bg-surface-raised shadow-panel outline-none"
   const map: Record<Direction, string> = {
@@ -345,11 +356,12 @@ const edgeStripClass = computed(() =>
   >
     <DrawerPortal>
       <DrawerOverlay
+        :style="{ zIndex: layer.scrim }"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DrawerContent
         :class="contentClass"
-        :style="sizeStyle"
+        :style="[sizeStyle, { zIndex: layer.panel }]"
         :data-vaul-animate="handingOff ? 'false' : undefined"
       >
         <!-- Resize grip on the inner edge (horizontal drawers). data-vaul-no-drag
