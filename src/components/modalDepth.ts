@@ -26,8 +26,15 @@ import { computed, ref, type ComputedRef } from "vue"
  * is 100 and --z-modal 110, so a gap of 2 left the upper scrim under the lower
  * PANEL — it darkened that panel and could not blur it, a backdrop-filter
  * having nothing of it underneath to work on.
+ *
+ * Clearing it means strictly more than the 10 between the two rungs. A step of
+ * exactly 10 put the lower panel at 100, level with the upper scrim, and a tie
+ * in z-index is settled by DOM order. Siblings in one component happened to
+ * come out right, but a dialog mounted once at the app root — opened from a
+ * page dialog that teleported in later — lost the tie, and its scrim darkened
+ * the page behind the first dialog instead of the first dialog itself.
  */
-const STEP = 10
+const STEP = 20
 
 /** Levels currently claimed, oldest first. */
 const stack = ref<number[]>([])
