@@ -5,7 +5,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useAttrs, watch } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
@@ -131,6 +131,21 @@ const props = withDefaults(
     columnsLabel: "Columns",
   },
 )
+
+/*
+ * Layout classes belong on the root, not on the scroll area. Since the pager
+ * wrapper became the root, a caller's `min-h-0 flex-1` landed on the inner
+ * scroll area while the wrapper kept sizing to its content — in a flex column
+ * the table grew past its container and its bottom edge was clipped away.
+ * Everything else (style, aria, listeners) still goes to the scroll area, so a
+ * `max-height` keeps capping the scrolling part.
+ */
+const attrs = useAttrs()
+const rootClass = computed(() => attrs.class)
+const scrollAttrs = computed(() => {
+  const { class: _class, ...rest } = attrs
+  return rest
+})
 
 const emit = defineEmits<{
   (e: "update:selected", value: RowKey[]): void
@@ -577,11 +592,11 @@ const barInsetTop = computed(() =>
 <template>
   <!-- No top fade: a sticky header sits in the masked band and would be dimmed
        by it. The bottom edge is left crisp with it for symmetry. -->
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-3" :class="rootClass">
   <LpScrollArea
-    v-bind="$attrs"
+    v-bind="scrollAttrs"
     :fade="false"
-    class="rounded-card border border-line"
+    class="min-h-0 flex-1 rounded-card border border-line"
     :style="load && floor ? { minHeight: `${floor + 2}px` } : undefined"
     :bar-inset-top="barInsetTop"
   >
