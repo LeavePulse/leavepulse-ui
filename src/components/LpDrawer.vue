@@ -1,3 +1,10 @@
+<script lang="ts">
+import { ref as sharedRef } from "vue"
+
+// One pull at a time across every edge-open drawer on the page.
+const edgeOwner = sharedRef<symbol | null>(null)
+</script>
+
 <script setup lang="ts">
 /*
  * Side / bottom panel built on vaul-vue (drag-driven drawer over reka's Dialog
@@ -12,7 +19,6 @@
  * solid background) for vaul to find and transform. Without it the drawer still
  * works — the background just doesn't scale.
  */
-import { usePointerSwipe } from "@vueuse/core"
 import {
   DrawerClose,
   DrawerContent,
@@ -27,7 +33,7 @@ import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
-import { useModalLayer } from "./modalDepth"
+import { anyModalOpen, useModalLayer } from "./modalDepth"
 
 type Direction = "top" | "bottom" | "left" | "right"
 
@@ -68,21 +74,20 @@ const props = withDefaults(
      */
     noDragContent?: boolean
     /**
-     * Open by dragging in from the screen edge (Discord-style). Renders an
-     * invisible edge strip; a pull from it drags a preview panel that follows
-     * the finger, and a release past `edgeOpenThreshold` opens the drawer. Only
-     * meaningful for left/right drawers.
+     * Open by dragging in from the screen edge (Discord-style). A touch that
+     * starts within `edgeSize` of the edge and travels inward drags a preview of
+     * the panel (with its content) under the finger; a release past
+     * `edgeOpenThreshold`, or a quick flick, opens the drawer. Nothing is laid
+     * over the edge, so taps there still reach the page. Left/right drawers only.
      */
     edgeOpen?: boolean
     /**
-     * Tailwind breakpoint above which the edge strip is disabled. Edge
-     * swipe-to-open only makes sense on mobile: the strip listens for
-     * touch/pen pointers only, so on a desktop it can never open the drawer
-     * but still overlays the screen edge and swallows clicks. Pass the same
-     * breakpoint at which the host switches to the drawer (LpSidebar does).
+     * Tailwind breakpoint at and above which the edge pull is ignored. Pass the
+     * same breakpoint at which the host switches to the drawer (LpSidebar
+     * does), so a wide touch screen with the rail visible doesn't pull it too.
      */
     edgeBreakpoint?: "sm" | "md" | "lg" | "xl"
-    /** Width (px) of the edge grab strip. */
+    /** Distance (px) from the edge within which a touch can start a pull. */
     edgeSize?: number
     /** Fraction (0–1) of the panel width the pull must reach to open on release. */
     edgeOpenThreshold?: number
@@ -226,19 +231,40 @@ const vNoDragControls = {
 }
 
 // ── Edge-drag-to-open (Discord-style) ──────────────────────────────────────
-// vaul opens/closes programmatically and only drags an *already-open* drawer,
-// so the pull-from-edge gesture is ours: an invisible edge strip captures the
-// pointer, we translate a preview panel that follows the finger, and a release
-// past the threshold flips `open` (vaul then animates the rest). Horizontal
-// drawers only.
-const edgeStrip = ref<HTMLElement | null>(null)
-// 0 (closed) … 1 (fully pulled in). Drives the preview transform + overlay.
+// vaul only drags an *already-open* drawer, so the pull-from-edge gesture is
+// ours. It is detected on the document rather than on an overlay strip: a strip
+// covering the screen edge swallowed every tap there, and the app burger lives
+// exactly in that corner. A touch near the edge is only a candidate; it becomes
+// a pull once the finger travels inward past EDGE_SLOP and mostly sideways, so a
+// tap still reaches the control under it and a vertical scroll stays a scroll.
+// While pulling, a preview of the real panel content follows the finger; on
+// release we open if the pull passed the threshold or was a quick flick, then
+// hand off to the real drawer without a second slide.
+const EDGE_SLOP = 10
+const FLICK_SPEED = 0.45
+const BREAKPOINT_PX = { sm: 640, md: 768, lg: 1024, xl: 1280 } as const
+// Controls whose own drag must win over the pull, plus explicit opt-outs.
+const EDGE_IGNORE =
+  "input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-vaul-no-drag], [data-lp-no-edge-pull]"
+
+// 0 (closed) … 1 (fully pulled in). Drives the preview transform + scrim.
 const peek = ref(0)
 const peeking = ref(false)
 // True while we hand off from the finger-preview to the real drawer, so vaul's
 // own open animation is suppressed — the preview has already slid it in, a
 // second slide would look like a double-open.
 const handingOff = ref(false)
+// vaul plays slideFromLeft whenever data-vaul-animate is absent, so lifting it
+// right after the hand-off restarted the open slide from off-screen — the panel
+// visibly opened twice. It stays on for as long as the drawer is open and goes
+// with the close, which keeps vaul's close animation.
+const skipOpenSlide = ref(false)
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) skipOpenSlide.value = false
+  },
+)
 
 // Resolve the panel's main-axis size in px to map drag distance → progress.
 function panelPx(): number {
@@ -248,43 +274,139 @@ function panelPx(): number {
   return Math.min(vw * 0.94, Number.isFinite(cap) ? cap : SIZES[props.size] * 16)
 }
 
-usePointerSwipe(edgeStrip, {
-  threshold: 0,
-  pointerTypes: ["touch", "pen"],
-  onSwipeStart() {
-    if (!props.edgeOpen || props.open) return
+function edgeEnabled(): boolean {
+  if (!props.edgeOpen || !isHorizontal.value || props.open || handingOff.value) return false
+  const bp = props.edgeBreakpoint ? BREAKPOINT_PX[props.edgeBreakpoint] : null
+  return bp === null || window.innerWidth < bp
+}
+
+let track: { id: number; x: number; y: number; t: number; lastX: number; lastT: number; speed: number } | null = null
+const owner = Symbol("edge-pull")
+
+function reducedMotion(): boolean {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+}
+
+// A horizontally scrollable ancestor that can still move the way the finger
+// pulls (a carousel, a wide table) keeps the gesture: the pull only claims
+// what nothing under the finger wants.
+function scrollsWithPull(target: EventTarget | null): boolean {
+  let el = target instanceof Element ? target : null
+  const pullsRight = dir.value === "left"
+  while (el && el !== document.body) {
+    if (el.closest(EDGE_IGNORE) === el) return true
+    if (el.scrollWidth > el.clientWidth) {
+      const overflow = getComputedStyle(el).overflowX
+      if (overflow === "auto" || overflow === "scroll") {
+        if (pullsRight ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth) return true
+      }
+    }
+    el = el.parentElement
+  }
+  return false
+}
+
+function inward(x: number): number {
+  return dir.value === "right" ? window.innerWidth - x : x
+}
+
+function onTouchStart(e: TouchEvent) {
+  if (track) dropTrack()
+  if (e.touches.length !== 1 || !edgeEnabled() || anyModalOpen() || edgeOwner.value) return
+  const t = e.touches[0]
+  if (inward(t.clientX) > props.edgeSize || scrollsWithPull(e.target)) return
+  track = { id: t.identifier, x: t.clientX, y: t.clientY, t: e.timeStamp, lastX: t.clientX, lastT: e.timeStamp, speed: 0 }
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (!track) return
+  const t = Array.from(e.changedTouches).find((x) => x.identifier === track!.id)
+  if (!t) return
+  const sign = dir.value === "right" ? -1 : 1
+  const dx = (t.clientX - track.x) * sign
+  const dy = t.clientY - track.y
+  if (!peeking.value) {
+    if (Math.abs(dy) > EDGE_SLOP && Math.abs(dy) > Math.abs(dx)) {
+      track = null
+      return
+    }
+    if (dx < EDGE_SLOP || Math.abs(dx) < Math.abs(dy)) return
+    if (edgeOwner.value && edgeOwner.value !== owner) {
+      track = null
+      return
+    }
+    edgeOwner.value = owner
     peeking.value = true
-  },
-  onSwipe(e) {
-    if (!peeking.value) return
-    // Inward pull distance: from the right edge we move left (−x), from the
-    // left edge we move right (+x). Normalise to 0…1 of the panel width.
-    const fromRight = dir.value === "right"
-    const dx = fromRight ? window.innerWidth - e.clientX : e.clientX
-    peek.value = Math.max(0, Math.min(1, dx / panelPx()))
-  },
-  onSwipeEnd() {
-    if (!peeking.value) return
-    peeking.value = false
-    if (peek.value >= props.edgeOpenThreshold) {
-      // Open: let the preview finish sliding to fully-in, then swap in the real
-      // drawer *without* a vaul slide (handingOff) so there's no second anim.
-      peek.value = 1
-      handingOff.value = true
+  }
+  if (e.cancelable) e.preventDefault()
+  const dt = e.timeStamp - track.lastT
+  if (dt > 0) track.speed = (((t.clientX - track.lastX) * sign) / dt) * 0.6 + track.speed * 0.4
+  track.lastX = t.clientX
+  track.lastT = e.timeStamp
+  peek.value = Math.max(0, Math.min(1, inward(t.clientX) / panelPx()))
+}
+
+function dropTrack() {
+  track = null
+  if (edgeOwner.value === owner) edgeOwner.value = null
+}
+
+function settle() {
+  const flick = track !== null && track.speed > FLICK_SPEED && peek.value > 0.05
+  dropTrack()
+  if (!peeking.value) return
+  peeking.value = false
+  if (peek.value >= props.edgeOpenThreshold || flick) {
+    peek.value = 1
+    handingOff.value = true
+    skipOpenSlide.value = true
+    timers.push(
       window.setTimeout(() => {
         emit("update:open", true)
-        // Clear after the real drawer has mounted in place.
-        window.setTimeout(() => {
-          handingOff.value = false
-          peek.value = 0
-        }, 60)
-      }, 160)
-    } else {
-      // Below threshold: snap the preview back out.
-      peek.value = 0
-    }
-  },
+        timers.push(
+          window.setTimeout(() => {
+            handingOff.value = false
+            peek.value = 0
+          }, 60),
+        )
+      }, reducedMotion() ? 0 : 180),
+    )
+  } else {
+    peek.value = 0
+  }
+}
+
+const timers: number[] = []
+onBeforeUnmount(() => {
+  for (const id of timers) window.clearTimeout(id)
+  if (edgeOwner.value === owner) edgeOwner.value = null
 })
+
+function onTouchEnd(e: TouchEvent) {
+  if (track && !Array.from(e.changedTouches).some((x) => x.identifier === track!.id)) return
+  settle()
+}
+
+if (typeof document !== "undefined") {
+  watch(
+    () => props.edgeOpen && isHorizontal.value,
+    (on, _, onCleanup) => {
+      if (!on) return
+      const passive = { passive: true }
+      document.addEventListener("touchstart", onTouchStart, passive)
+      document.addEventListener("touchmove", onTouchMove, { passive: false })
+      document.addEventListener("touchend", onTouchEnd, passive)
+      document.addEventListener("touchcancel", onTouchEnd, passive)
+      onCleanup(() => {
+        document.removeEventListener("touchstart", onTouchStart)
+        document.removeEventListener("touchmove", onTouchMove)
+        document.removeEventListener("touchend", onTouchEnd)
+        document.removeEventListener("touchcancel", onTouchEnd)
+      })
+    },
+    { immediate: true },
+  )
+}
 
 // The preview panel slides with the finger: translate from fully-off (100%)
 // toward 0 as peek → 1. Kept visible through the hand-off so the real drawer
@@ -295,51 +417,34 @@ const previewStyle = computed(() => {
   const axis = dir.value === "right" ? off : -off
   return {
     transform: `translateX(${axis}%)`,
-    transition: peeking.value ? "none" : "transform 0.16s ease-out",
+    transition: peeking.value || reducedMotion() ? "none" : "transform 0.18s cubic-bezier(0.32, 0.72, 0, 1)",
     pointerEvents: "none" as const,
   }
 })
-
-const edgeStripStyle = computed(() => {
-  const w = `${props.edgeSize}px`
-  return dir.value === "right"
-    ? { right: "0", width: w }
-    : { left: "0", width: w }
-})
-
-// The strip must only exist below the host's mobile breakpoint. It is hidden
-// with the same Tailwind breakpoint classes the rest of the mobile logic
-// (LpSidebar rail, burger) uses — no JS media query needed.
-const EDGE_STRIP_HIDDEN: Record<NonNullable<typeof props.edgeBreakpoint>, string> = {
-  sm: "sm:hidden",
-  md: "md:hidden",
-  lg: "lg:hidden",
-  xl: "xl:hidden",
-}
-const edgeStripClass = computed(() =>
-  props.edgeBreakpoint ? EDGE_STRIP_HIDDEN[props.edgeBreakpoint] : "",
-)
 </script>
 
 <template>
-  <!-- Edge-drag-to-open: an invisible grab strip + a finger-following preview
-       of the panel, shown only while closed. Horizontal drawers only. -->
+  <!-- Edge-drag-to-open: a finger-following preview of the panel (with its
+       real content, inert) and a scrim that darkens with the pull. Nothing
+       overlays the screen edge, so taps there reach the page. -->
   <template v-if="edgeOpen && isHorizontal">
     <div
-      ref="edgeStrip"
-      class="fixed inset-y-0 z-(--z-overlay) touch-none"
-      :class="edgeStripClass"
-      :style="edgeStripStyle"
-      aria-hidden="true"
+      v-show="peeking || peek > 0"
+      class="lp-scrim pointer-events-none fixed inset-0"
+      :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || reducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
     />
     <div
       v-show="peeking || peek > 0"
-      class="pointer-events-none fixed inset-0 z-(--z-overlay) bg-black/50"
-      :style="{ opacity: peek }"
-    />
-    <div :class="contentClass" :style="[sizeStyle, previewStyle]" aria-hidden="true">
-      <div v-if="hasHeader" class="flex items-start justify-between gap-4" :class="headerClass">
+      :class="contentClass"
+      :style="[sizeStyle, previewStyle, { zIndex: layer.panel }]"
+      aria-hidden="true"
+      inert
+    >
+      <header v-if="hasHeader" class="flex items-start justify-between gap-4" :class="headerClass">
         <span class="text-base font-semibold text-ink">{{ title }}</span>
+      </header>
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" :class="padClass">
+        <slot v-if="peeking || peek > 0" />
       </div>
     </div>
   </template>
@@ -362,7 +467,7 @@ const edgeStripClass = computed(() =>
       <DrawerContent
         :class="contentClass"
         :style="[sizeStyle, { zIndex: layer.panel }]"
-        :data-vaul-animate="handingOff ? 'false' : undefined"
+        :data-vaul-animate="handingOff || skipOpenSlide ? 'false' : undefined"
       >
         <!-- Resize grip on the inner edge (horizontal drawers). data-vaul-no-drag
              so grabbing it resizes the panel instead of starting a vaul drag. -->

@@ -77,3 +77,8 @@ export function useModalLayer(): {
     }),
   }
 }
+
+/** True while any dialog or drawer holds a level — e.g. to keep a gesture from opening another one over it. */
+export function anyModalOpen(): boolean {
+  return stack.value.length > 0
+}
