@@ -112,6 +112,7 @@ export type {
   NotificationLabels,
 } from "./components/LpNotificationBell.vue"
 export { default as LpNumberField } from "./components/LpNumberField.vue"
+export { default as LpTimeField } from "./components/LpTimeField.vue"
 export { default as LpNumberFlow } from "./components/LpNumberFlow.vue"
 export { default as LpOtpInput } from "./components/LpOtpInput.vue"
 export { default as LpPagination } from "./components/LpPagination.vue"

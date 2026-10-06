@@ -6,10 +6,10 @@
  * min/max + isDisabled forwarded to the calendar. Themed like the other inputs.
  *
  * With `time`, the model carries a minute too ("YYYY-MM-DDTHH:mm") and the
- * popover grows a time row under the calendar. Anything that needs a moment
- * rather than a day — an expiry, a scheduled start — would otherwise fall back
- * to a native `datetime-local`, which the browser paints in its own locale and
- * chrome, breaking the form it sits in. Picking a day keeps the time already
+ * popover grows a time row (LpTimeField) under the calendar. Anything that
+ * needs a moment rather than a day — an expiry, a scheduled start — would
+ * otherwise fall back to a native `datetime-local`, which the browser paints in
+ * its own locale and chrome, breaking the form it sits in. Picking a day keeps the time already
  * chosen (default `defaultTime`), so the popover closes on the first click for
  * the common case.
  */
@@ -18,6 +18,7 @@ import { computed, ref } from "vue"
 import { POPOVER_PANEL } from "./dropdown"
 import LpCalendar from "./LpCalendar.vue"
 import LpIcon from "./LpIcon.vue"
+import LpTimeField from "./LpTimeField.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -152,12 +153,13 @@ function clear() {
         />
         <div v-if="time" class="flex items-center gap-2 border-t border-line px-3 py-2">
           <LpIcon name="lucide:clock" :size="15" class="shrink-0 text-muted" />
-          <input
-            type="time"
-            :value="minute"
+          <LpTimeField
+            :model-value="minute || undefined"
             :disabled="!day"
-            class="h-(--size-control-sm) flex-1 rounded-control border border-line bg-surface-soft px-2 text-sm text-ink outline-none transition-colors focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55"
-            @input="onTime(($event.target as HTMLInputElement).value)"
+            :icon="false"
+            size="sm"
+            class="flex-1"
+            @update:model-value="(at) => onTime(at || '')"
           />
           <button
             type="button"

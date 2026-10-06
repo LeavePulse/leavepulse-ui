@@ -41,6 +41,7 @@ import {
   LpModalNav,
   LpNotificationBell,
   LpNumberField,
+  LpTimeField,
   LpNumberFlow,
   LpOtpInput,
   LpPagination,
@@ -1048,12 +1049,14 @@ export const registry: ComponentEntry[] = [
     description:
       "Inline month calendar and a field+popover date picker (reka Calendar + @internationalized/date). Model is an ISO \"YYYY-MM-DD\" string; min/max bounds and an isDisabled predicate. Today is tinted, the selection is a brand pill.",
     components: { LpCalendar, LpDatePicker },
-    state: () => reactive({ date: "2026-06-18", picked: "" }),
+    state: () => reactive({ date: "2026-06-18", picked: "", moment: "" }),
     template: `<div class="flex flex-wrap items-start gap-6">
   <LpCalendar v-model="date" min="2026-06-01" />
   <div class="flex w-64 flex-col gap-2">
     <LpDatePicker v-model="picked" clearable placeholder="Select a date" />
     <p class="text-xs text-muted">ISO value: {{ picked || "—" }}</p>
+    <LpDatePicker v-model="moment" time clearable placeholder="Date and time" />
+    <p class="text-xs text-muted">with time: {{ moment || "—" }}</p>
   </div>
 </div>`,
   },
@@ -1833,6 +1836,18 @@ export const registry: ComponentEntry[] = [
   <LpNumberField v-model="watts" :min="0" unit="W" />
   <LpNumberField v-model="millis" :min="0" unit="mA" />
   <p class="text-xs text-muted">value: {{ value }}</p>
+</div>`,
+  },
+  {
+    id: "timefield",
+    name: "TimeField",
+    description: "Time of day as hour and minute segments (reka TimeField): type or step with the arrow keys. Model is \"HH:mm\", like a native time input, but the clock is fixed by `hourCycle` (24 by default) instead of the browser locale, and it is themed like the other fields.",
+    components: { LpTimeField },
+    state: () => reactive({ at: "18:30", twelve: "" }),
+    template: `<div class="flex w-56 flex-col gap-3">
+  <LpTimeField v-model="at" />
+  <LpTimeField v-model="twelve" :hour-cycle="12" locale="en-US" />
+  <p class="text-xs text-muted">value: {{ at || "—" }} · {{ twelve || "—" }}</p>
 </div>`,
   },
   {

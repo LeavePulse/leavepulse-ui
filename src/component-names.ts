@@ -78,6 +78,7 @@ export const COMPONENT_NAMES = [
   "LpTextarea",
   "LpThemeSwitcher",
   "LpTilt",
+  "LpTimeField",
   "LpToaster",
   "LpTooltip",
   "LpTopologyCanvas",
