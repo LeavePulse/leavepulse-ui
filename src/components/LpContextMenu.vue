@@ -63,17 +63,43 @@ const ITEM =
   "group/item flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
 const ICON =
   "transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[highlighted]/item:translate-x-0.5"
+
+// A menu opened over a text field takes focus, and on close reka hands it to the
+// trigger, so the caret and the selection the user right-clicked are gone — the
+// next keystroke goes nowhere. Hand focus back to the field instead, with its
+// selection if the menu action left the text as it was.
+type TextField = HTMLInputElement | HTMLTextAreaElement
+const SELECTABLE = new Set(["text", "search", "url", "tel", "password"])
+let field: { el: TextField; value: string; start: number; end: number } | null = null
+
+function rememberField() {
+  const el = document.activeElement
+  const text =
+    el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && SELECTABLE.has(el.type))
+  field = text
+    ? { el: el as TextField, value: (el as TextField).value, start: (el as TextField).selectionStart ?? 0, end: (el as TextField).selectionEnd ?? 0 }
+    : null
+}
+
+function returnFocus(event: Event) {
+  const saved = field
+  field = null
+  if (!saved || !saved.el.isConnected) return
+  event.preventDefault()
+  saved.el.focus()
+  if (saved.el.value === saved.value) saved.el.setSelectionRange(saved.start, saved.end)
+}
 </script>
 
 <template>
   <slot v-if="!enabled" />
 
   <ContextMenuRoot v-else>
-    <ContextMenuTrigger as-child>
+    <ContextMenuTrigger as-child @contextmenu.capture="rememberField">
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal v-if="items.length">
-      <ContextMenuContent :class="PANEL">
+      <ContextMenuContent :class="PANEL" @close-auto-focus="returnFocus">
         <template v-for="(item, i) in items" :key="i">
           <ContextMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />
 
