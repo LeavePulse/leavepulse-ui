@@ -8,7 +8,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import type { ComponentPublicInstance } from "vue"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { useShift } from "../composables/useShift"
 import { useModalLayer } from "./modalDepth"
@@ -143,7 +142,7 @@ const bodyPad = computed(() =>
  * scroll area exactly as before. A panel whose size never moves is pinned once
  * and never transitions.
  */
-const panelRef = ref<ComponentPublicInstance | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
 
 /**
  * Controls that are worth landing on when the dialog opens, in order of
@@ -171,8 +170,8 @@ const AUTO_FOCUS_ORDER = [
  */
 function onOpenAutoFocus(event: Event) {
   if (props.autoFocus === "none") return
-  const panel = panelRef.value?.$el
-  if (!(panel instanceof HTMLElement)) return
+  const panel = panelRef.value
+  if (!panel) return
 
   const selectors =
     props.autoFocus === "auto" ? AUTO_FOCUS_ORDER : [props.autoFocus]
@@ -210,13 +209,10 @@ const {
   resizing,
 } = useShift({ axis: "height", enabled: () => props.open })
 
-// reka renders a real element but exposes it as a component instance, so the
-// sized element is handed over through $el once the panel has mounted.
 watch(
   () => (props.open ? panelRef.value : null),
   (panel) => {
-    const el = panel?.$el
-    sizedEl.value = el instanceof HTMLElement ? el : null
+    sizedEl.value = panel
   },
   { flush: "post" },
 )
@@ -265,48 +261,38 @@ watch(
         class="fixed inset-0 flex items-center justify-center pointer-events-none"
         :style="{ zIndex: layer.panel }"
       >
-      <!-- The dialog and its aside stand in a row of their own, and that row is
-           what the wrapper centres. Aligning them on the full-screen wrapper
-           instead would pin them to the top of the WINDOW, and the dialog would
-           be free to end up shorter than the aside beside it.
-           `items-start` inside the row: the row collapses to the taller of the
-           two, both hang from its top edge, and neither is stretched. -->
-      <div
-        class="flex items-start"
-        :style="hasAside ? { maxHeight: 'min(90vh, calc(100dvh - 2rem))' } : undefined"
-      >
-      <!-- Bound to `open`, not to the slot alone: DialogContent unmounts itself
-           with the dialog, but an aside is an ordinary node in the portal and
-           stayed on screen after the dialog closed — a section list floating
-           over the page with nothing behind it.
-
-           `pointer-events-auto` because the wrapper lets clicks through to the
-           overlay, and the aside is not the overlay. `data-lp-modal-aside` is
-           what tells `interact-outside` a click here is not a click on the
-           scrim — without it the dialog closes under the pointer. -->
-      <aside
-        v-if="open && $slots.aside"
-        data-lp-modal-aside
-        class="pointer-events-auto flex min-h-0 flex-col"
-      >
-        <slot name="aside" />
-      </aside>
-      <!-- Without a description reka-ui warns on every open, and the opt-out it
-           checks for is an ABSENT `aria-describedby` — despite the message
-           naming the string "undefined" (a leftover from Radix, where
-           `aria-describedby={undefined}` is how you drop the attribute).
-           Dropping it here is what silences the warning; a caller that does
-           pass a description keeps the generated id and the link to
-           DialogDescription. -->
+      <!-- The dialog and its asides stand in one row, and that row IS the
+           DialogContent. An aside rendered as a sibling of DialogContent sat
+           outside the modal: reka marks everything outside aria-hidden and traps
+           focus inside, so a section list beside the dialog could be neither
+           tabbed to nor read by a screen reader. Inside DialogContent it belongs
+           to the dialog, while the visible card is the inner panel, so nothing
+           moves on screen.
+           `items-start`: the row collapses to the taller of the two, both hang
+           from its top edge, and neither is stretched. Without a description
+           reka-ui warns on every open, and the opt-out it checks for is an
+           ABSENT `aria-describedby`; a caller that passes a description keeps
+           the link to DialogDescription. -->
       <DialogContent
-        ref="panelRef"
-        class="pointer-events-auto flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
-        :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
-        :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
+        class="pointer-events-auto flex min-h-0 items-start outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
+        :style="{ maxHeight: 'min(90vh, calc(100dvh - 2rem))' }"
         v-bind="describedByAttrs"
         @open-auto-focus="onOpenAutoFocus"
         @interact-outside="onInteractOutside"
         @pointer-down-outside="onInteractOutside"
+      >
+      <aside
+        v-if="$slots.aside"
+        data-lp-modal-aside
+        class="flex min-h-0 flex-col"
+      >
+        <slot name="aside" />
+      </aside>
+      <div
+        ref="panelRef"
+        class="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel"
+        :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
+        :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
           <div class="flex flex-col gap-1">
@@ -357,16 +343,15 @@ watch(
         <footer v-if="$slots.footer" class="flex shrink-0 justify-end gap-2 p-5 pt-4">
           <slot name="footer" />
         </footer>
-      </DialogContent>
-
+      </div>
       <aside
-        v-if="open && $slots.asideEnd"
+        v-if="$slots.asideEnd"
         data-lp-modal-aside
-        class="pointer-events-auto flex min-h-0 flex-col"
+        class="flex min-h-0 flex-col"
       >
         <slot name="asideEnd" />
       </aside>
-      </div>
+      </DialogContent>
       </div>
     </DialogPortal>
   </DialogRoot>
