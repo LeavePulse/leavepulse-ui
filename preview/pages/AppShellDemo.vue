@@ -78,12 +78,13 @@ const sectionSubtitle = computed(
       devices: "LH-NV-DC1 · Novovolynsk · 48 units",
     })[section.value],
 )
+const drawer = ref(false)
 </script>
 
 <template>
   <div class="p-6">
     <div class="h-[640px] overflow-hidden rounded-card border border-line [&>div]:h-full">
-      <LpAppShell v-model="active" :sections="sections">
+      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections">
         <template #logo>
           <div class="flex items-center gap-2 font-semibold text-ink">
             <LpIcon name="lucide:activity" :size="20" class="text-brand" />
