@@ -48,7 +48,19 @@ const props = withDefaults(
     aspect?: "free" | "square" | "4:3" | "3:4" | "16:9" | number
     /** Longest edge of the exported image. Larger sources are scaled down. */
     maxEdge?: number
-    /** JPEG quality of the export. */
+    /**
+     * Encoding of the export; read the result's `blob.type` for the one used.
+     *
+     * JPEG, the default, is the smallest for photographs, the case this was
+     * built for. It has no alpha channel, though: a transparent PNG comes back
+     * with its background filled black, and a logo or an icon is ruined by the
+     * crop. "source" keeps the picture's own format where a canvas can write it
+     * (PNG, JPEG, WebP) and falls back to PNG for the ones it cannot (GIF, BMP,
+     * SVG), so transparency survives either way. An animated GIF still comes
+     * back as its first frame: a canvas holds one picture.
+     */
+    type?: "image/jpeg" | "image/png" | "image/webp" | "source"
+    /** Quality of a lossy export (JPEG, WebP); PNG ignores it. */
     quality?: number
     /**
      * Labels for the toolbar. Defaulted in English rather than left blank: an
@@ -62,7 +74,7 @@ const props = withDefaults(
     /** Fade the picture in when the editor first comes into view. */
     animate?: boolean
   }>(),
-  { aspect: "free", maxEdge: 2400, quality: 0.9, labels: () => ({}), animate: true },
+  { aspect: "free", maxEdge: 2400, type: "image/jpeg", quality: 0.9, labels: () => ({}), animate: true },
 )
 
 // Same rule as the rest of the kit: the entrance belongs to arrival, not to
@@ -289,9 +301,16 @@ async function exportImage(): Promise<Blob | null> {
   ctx.drawImage(picture, readX, readY, readW, readH, -readW / 2, -readH / 2, readW, readH)
 
   return await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", props.quality),
+    canvas.toBlob(resolve, outputType.value, props.quality),
   )
 }
+
+const ENCODABLE = new Set(["image/png", "image/jpeg", "image/webp"])
+
+const outputType = computed(() => {
+  if (props.type !== "source") return props.type
+  return ENCODABLE.has(props.file.type) ? props.file.type : "image/png"
+})
 
 function clamp(value: number, low: number, high: number) {
   return Math.min(Math.max(value, low), Math.max(low, high))

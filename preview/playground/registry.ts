@@ -2435,12 +2435,13 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
       const state = reactive({
         file,
         aspect: "free",
+        type: "image/jpeg",
         result: "",
         editor: null as { export: () => Promise<Blob | null> } | null,
         async save() {
           const blob = await state.editor?.export()
           state.result = blob
-            ? `${(blob.size / 1024).toFixed(1)} KB written`
+            ? `${blob.type}, ${(blob.size / 1024).toFixed(1)} KB written`
             : "unchanged — the original is uploaded as it arrived"
         },
       })
@@ -2457,7 +2458,16 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
       { value: '16:9', label: '16:9' },
     ]"
   />
-  <LpImageEditor :ref="(el) => (editor = el)" :file="file" :aspect="aspect" />
+  <LpSelect
+    v-model="type"
+    :options="[
+      { value: 'image/jpeg', label: 'JPEG' },
+      { value: 'image/png', label: 'PNG' },
+      { value: 'image/webp', label: 'WebP' },
+      { value: 'source', label: 'source (SVG → PNG)' },
+    ]"
+  />
+  <LpImageEditor :ref="(el) => (editor = el)" :file="file" :aspect="aspect" :type="type" />
   <LpButton size="sm" @click="save">Export</LpButton>
   <p v-if="result" class="text-xs text-muted">{{ result }}</p>
 </div>`,
