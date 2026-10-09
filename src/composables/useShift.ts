@@ -92,22 +92,40 @@ export function useShift(
   /** When the in-flight tween started, to tell a duplicate from a follow-up. */
   let tweenStart = 0
   /**
-   * Scroll positions inside the box, kept from the scroll events themselves.
+   * Scrolling lists inside the box, found through their scroll events.
    * Measuring lifts the height cap, and for that one reflow a scrolling list
    * inside (a picker, a span tree) is as tall as its content: it no longer
    * overflows, the browser clamps its scrollTop to 0, and putting the cap back
    * does not bring the position back. Every click that changed the content —
    * ticking an item, picking a span — threw the list back to the top.
+   *
+   * The position to put back is read live just before measuring, and only a
+   * list the measurement actually moved is touched, with an instant write. An
+   * earlier version replayed the last scroll event's figure through
+   * `scrollTop` on every retune. Inside a `scroll-smooth` area that write is
+   * itself animated, its in-between frames were recorded as new positions,
+   * and any mutation while the user scrolled — a row re-rendering on hover —
+   * replayed a stale one: a long dialog crept back to the top and could not
+   * be scrolled at all.
    */
-  const scrolled = new Map<Element, number>()
+  const scrolled = new Set<Element>()
   const rememberScroll = (event: Event) => {
     const target = event.target
-    if (target instanceof Element) scrolled.set(target, target.scrollTop)
+    if (target instanceof Element) scrolled.add(target)
   }
-  function restoreScroll() {
-    for (const [node, top] of scrolled) {
+  function readScroll(): Map<Element, number> {
+    const tops = new Map<Element, number>()
+    for (const node of scrolled) {
       if (!node.isConnected) scrolled.delete(node)
-      else if (node.scrollTop !== top) node.scrollTop = top
+      else tops.set(node, node.scrollTop)
+    }
+    return tops
+  }
+  function restoreScroll(tops: Map<Element, number>) {
+    for (const [node, top] of tops) {
+      if (node.isConnected && node.scrollTop !== top) {
+        node.scrollTo({ top, behavior: "instant" })
+      }
     }
   }
 
@@ -153,6 +171,7 @@ export function useShift(
     // already reflowed, so the element can only report where it is going.
     const fromHeight = lastHeight
     const fromWidth = lastWidth
+    const tops = readScroll()
 
     // Measured with any cap lifted, then the clamp is left to CSS. A `max-*`
     // from a class makes the element report the clipped figure once the cap
@@ -170,7 +189,7 @@ export function useShift(
     const toWidth = wantsWidth() ? node.offsetWidth : 0
     if (wantsHeight()) node.style.maxHeight = ""
     if (wantsWidth()) node.style.maxWidth = ""
-    restoreScroll()
+    restoreScroll(tops)
     lastHeight = toHeight
     lastWidth = toWidth
 
@@ -193,7 +212,7 @@ export function useShift(
     void node.offsetHeight
     if (movesHeight) node.style.height = `${toHeight}px`
     if (movesWidth) node.style.width = `${toWidth}px`
-    restoreScroll()
+    restoreScroll(tops)
 
     inFlight = true
     tweenStart = performance.now()
