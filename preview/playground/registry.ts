@@ -235,15 +235,25 @@ export const registry: ComponentEntry[] = [
     id: "switch",
     name: "Switch · Checkbox · Radio",
     description:
-      "Boolean and choice controls. LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
+      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` (LpSwitch also a `description`, and `label-position=\"start\"` for a settings row with the switch at the right edge). LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
-    state: () => reactive({ on: true, checked: true, plan: "pro", tier: "pro", radioOpts }),
+    state: () => reactive({ on: true, checked: true, notify: false, plan: "pro", tier: "pro", radioOpts }),
     template: `<div class="flex flex-col gap-6">
   <div class="flex items-start gap-8">
     <LpSwitch v-model="on" />
+    <LpSwitch v-model="on" label="Dark mode" />
     <LpCheckbox v-model="checked" label="Remember me" />
     <LpRadioGroup v-model="plan" :options="radioOpts" />
   </div>
+
+  <!-- Settings row: text on the left, switch at the right edge. -->
+  <LpSwitch
+    v-model="notify"
+    label-position="start"
+    label="Email notifications"
+    description="A digest of new comments, once a day."
+    class="max-w-sm"
+  />
 
   <!-- LpRadio children: custom row content instead of the options shorthand. -->
   <LpRadioGroup v-model="tier">
