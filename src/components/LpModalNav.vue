@@ -55,6 +55,8 @@ const props = withDefaults(
      * column inside the body, and the rail is no longer in the body.
      */
     fillBody?: boolean
+    /** Frosted glass panel, passed to LpModal. Off by default. */
+    glass?: boolean
   }>(),
   {
     size: "2xl",
@@ -125,6 +127,7 @@ const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
 
 <template>
   <LpModal
+    :glass="glass"
     :open="open"
     :title="title"
     :description="description"

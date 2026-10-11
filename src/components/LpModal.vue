@@ -62,8 +62,14 @@ const props = withDefaults(
      * the element yourself.
      */
     autoFocus?: "auto" | "none" | string
+    /**
+     * Frosted glass instead of a solid panel: the page shows through,
+     * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
+     * A look, not a behaviour, so it is the app's call and off by default.
+     */
+    glass?: boolean
   }>(),
-  { size: "md", autoFocus: "auto" },
+  { size: "md", autoFocus: "auto", glass: false },
 )
 
 defineEmits<{ (e: "update:open", value: boolean): void }>()
@@ -222,6 +228,7 @@ watch(
   <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
+        :class="{ 'lp-scrim--light': glass }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />
@@ -290,8 +297,8 @@ watch(
       </aside>
       <div
         ref="panelRef"
-        class="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel"
-        :class="[widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
+        class="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
+        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">

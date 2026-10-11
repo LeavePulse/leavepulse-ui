@@ -36,6 +36,8 @@ const props = withDefaults(
      */
     loading?: boolean
     loadingLabel?: string
+    /** Frosted glass panel, passed to LpModal. Off by default. */
+    glass?: boolean
   }>(),
   { confirmLabel: "Confirm", cancelLabel: "Cancel", loadingLabel: "Working…" },
 )
@@ -76,6 +78,7 @@ function cancel() {
 
 <template>
   <LpModal
+    :glass="glass"
     :open="open"
     :title="title"
     :description="description"

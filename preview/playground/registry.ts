@@ -1174,6 +1174,7 @@ export const registry: ComponentEntry[] = [
     :recent="recent"
     :group-limit="3"
     preview-pane
+    glass
     @run="onRun"
   />
 </div>`,
@@ -1634,11 +1635,12 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example.",
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third.",
     components: { LpModal, LpButton },
     state: () => {
       const s = reactive({
         open: false,
+        frosted: false,
         lazy: false,
         loading: true,
         openLazy() {
@@ -1654,12 +1656,20 @@ export const registry: ComponentEntry[] = [
     template: `<div class="flex flex-wrap gap-2">
   <LpButton variant="solid" @click="open = true">Open modal</LpButton>
   <LpButton variant="outline" @click="openLazy()">Open with late content</LpButton>
+  <LpButton variant="outline" @click="frosted = true">Open glass</LpButton>
 
   <LpModal v-model:open="open" size="lg" title="Confirm action" description="A token-driven modal on reka Dialog.">
     <p>Body content. Escape or overlay-click closes it.</p>
     <template #footer>
       <LpButton variant="ghost" @click="open = false">Cancel</LpButton>
       <LpButton variant="solid" @click="open = false">Confirm</LpButton>
+    </template>
+  </LpModal>
+
+  <LpModal v-model:open="frosted" size="lg" title="Glass" description="The page shows through, blurred." glass>
+    <p>Same modal, frosted. A look rather than a behaviour, so it stays opt-in.</p>
+    <template #footer>
+      <LpButton variant="solid" @click="frosted = false">Close</LpButton>
     </template>
   </LpModal>
 

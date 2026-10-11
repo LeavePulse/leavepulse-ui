@@ -30,6 +30,8 @@ const props = withDefaults(
     groups: ShortcutGroup[]
     title?: string
     description?: string
+    /** Frosted glass panel, passed to LpModal. Off by default. */
+    glass?: boolean
   }>(),
   { open: false, title: "Keyboard shortcuts" },
 )
@@ -39,6 +41,7 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
 
 <template>
   <LpModal
+    :glass="props.glass"
     :open="props.open"
     size="lg"
     :title="props.title"

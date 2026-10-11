@@ -199,6 +199,12 @@ const props = withDefaults(
      * Hidden below the md breakpoint, where there is no room beside the list.
      */
     previewPane?: boolean
+    /**
+     * Frosted glass instead of a solid panel: the page shows through,
+     * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
+     * A look, not a behaviour, so it is the app's call and off by default.
+     */
+    glass?: boolean
   }>(),
   {
     placeholder: "Type a command or search…",
@@ -213,6 +219,7 @@ const props = withDefaults(
     groupLimit: 0,
     layoutFallback: true,
     previewPane: false,
+    glass: false,
   },
 )
 
@@ -825,11 +832,15 @@ useHotkeys(() =>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
+        :class="{ 'lp-scrim--light': glass }"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
-        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line lp-glass-overlay shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="previewPane && 'md:h-[min(76vh,36rem)] md:w-[min(92vw,64rem)]'"
+        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        :class="[
+          glass ? 'lp-glass-overlay' : 'bg-surface-raised',
+          previewPane && 'md:h-[min(76vh,36rem)] md:w-[min(92vw,64rem)]',
+        ]"
         @open-auto-focus.prevent
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>
