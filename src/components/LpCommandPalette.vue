@@ -197,6 +197,11 @@ const props = withDefaults(
      * pane lets it be read without leaving the page. Opt-in and fixed while
      * open, so the dialog does not change width as results come and go.
      * Hidden below the md breakpoint, where there is no room beside the list.
+     *
+     * The dialog takes one width class or the other, never a base width plus
+     * an `md:` override: a consumer's Tailwind build can emit the two in an
+     * order where the base wins, and the pane opened squeezed into 40rem.
+     * Both widths are 92vw on a narrow screen, so no breakpoint is needed.
      */
     previewPane?: boolean
     /**
@@ -836,10 +841,10 @@ useHotkeys(() =>
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
-        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[
           glass ? 'lp-glass-overlay' : 'bg-surface-raised',
-          previewPane && 'md:h-[min(76vh,36rem)] md:w-[min(92vw,64rem)]',
+          previewPane ? 'w-[min(92vw,64rem)] md:h-[min(76vh,36rem)]' : 'w-[min(92vw,40rem)]',
         ]"
         @open-auto-focus.prevent
       >
