@@ -632,7 +632,7 @@ useHotkeys(() =>
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
-        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line lp-glass-overlay shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         @open-auto-focus.prevent
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>

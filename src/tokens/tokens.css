@@ -522,6 +522,27 @@
   --scrim-opacity: 0.78;
 }
 
+/*
+ * Frosted overlay: a floating panel that lets the page show through, softened.
+ * For surfaces that float over everything and are read briefly (the command
+ * palette), where a hint of what lies beneath says "this is on top, the page
+ * is still there" better than a solid slab. The fill keeps enough opacity for
+ * text to read without the blur; where the blur does not composite
+ * (WebKitGTK, see above) the fill turns solid instead of leaving the page
+ * readable through it.
+ */
+.lp-glass-overlay {
+  background-color: color-mix(in srgb, var(--color-surface-raised) var(--glass-overlay-fill, 82%), transparent);
+  -webkit-backdrop-filter: blur(var(--glass-overlay-blur, 24px)) saturate(140%);
+  backdrop-filter: blur(var(--glass-overlay-blur, 24px)) saturate(140%);
+}
+
+:root[data-lp-no-backdrop] .lp-glass-overlay {
+  background-color: var(--color-surface-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* The overlay gradient rides above the base fill but under the content. */
 .lp-skin-panel::before {
   content: "";
