@@ -868,12 +868,9 @@ useHotkeys(() =>
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
-        class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-resizing']"
-        :style="{
-          width: paneOpen ? 'min(92vw, 64rem)' : 'min(92vw, 40rem)',
-          minHeight: paneOpen ? 'min(76vh, 36rem)' : '0px',
-        }"
+        class="lp-cmd-dialog fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
+        :data-pane="paneOpen ? 'open' : undefined"
         @open-auto-focus.prevent
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>
@@ -927,7 +924,7 @@ useHotkeys(() =>
 
         <!-- Results -->
         <div class="flex min-h-0 flex-1">
-          <LpScrollArea ref="scrollRef" class="min-h-0 min-w-0 flex-1" content-class="p-2">
+          <LpScrollArea ref="scrollRef" class="lp-cmd-list min-h-0 min-w-0 flex-1" content-class="p-2">
             <!-- While a request is out there is nothing to say yet: "no results"
                  under a spinner reads as an answer, and it is not one. -->
             <p v-if="flat.length === 0 && !failed" class="px-2 py-10 text-center text-sm text-muted">
@@ -1040,7 +1037,7 @@ useHotkeys(() =>
           <Transition name="lp-cmd-pane">
             <aside
               v-if="paneOpen"
-              class="hidden min-h-0 w-[56%] shrink-0 flex-col border-l border-line md:flex"
+              class="lp-cmd-pane hidden min-h-0 shrink-0 flex-col border-l border-line md:flex"
             >
               <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
                 <!-- Keyed by the row, so moving the highlight replays the
@@ -1107,28 +1104,49 @@ useHotkeys(() =>
 
 <style scoped>
 /*
- * The dialog changes width and height when the preview pane comes and goes;
- * eased, so the list does not jump sideways under the pointer.
+ * Sizes for the split layout. Only the dialog's width animates: the list and
+ * the pane keep fixed widths, and the dialog — overflow hidden — uncovers the
+ * pane from its right edge as it grows. Animating the columns themselves made
+ * every line of the list and the pane re-wrap on every frame.
  */
-.lp-cmd-resizing {
-  transition:
-    width 260ms var(--ease-emphasized, ease),
-    min-height 260ms var(--ease-emphasized, ease);
+.lp-cmd-dialog {
+  --lp-cmd-list: min(92vw, 40rem);
+  --lp-cmd-pane: max(0px, min(26rem, 96vw - var(--lp-cmd-list)));
+  width: var(--lp-cmd-list);
 }
-.lp-cmd-pane-enter-active {
+.lp-cmd-split {
   transition:
-    opacity 220ms ease 60ms,
-    transform 260ms var(--ease-emphasized, ease);
+    width 300ms var(--ease-emphasized, ease),
+    min-height 300ms var(--ease-emphasized, ease);
 }
+@media (min-width: 768px) {
+  .lp-cmd-split .lp-cmd-list {
+    flex: 0 0 auto;
+    /* the dialog's 1px border on each side */
+    width: calc(var(--lp-cmd-list) - 2px);
+  }
+  .lp-cmd-dialog[data-pane="open"] {
+    width: calc(var(--lp-cmd-list) + var(--lp-cmd-pane));
+    min-height: min(76vh, 36rem);
+  }
+}
+.lp-cmd-pane {
+  width: var(--lp-cmd-pane);
+}
+/*
+ * The pane rides in from the right edge while the dialog opens up to it, and
+ * leaves the same way, for as long as the dialog takes to close over it.
+ */
+.lp-cmd-pane-enter-active,
 .lp-cmd-pane-leave-active {
-  transition: opacity 120ms ease;
+  transition:
+    transform 300ms var(--ease-emphasized, ease),
+    opacity 300ms ease;
 }
-.lp-cmd-pane-enter-from {
-  opacity: 0;
-  transform: translateX(16px);
-}
+.lp-cmd-pane-enter-from,
 .lp-cmd-pane-leave-to {
   opacity: 0;
+  transform: translateX(40%);
 }
 .lp-cmd-para {
   animation: lp-cmd-para-in 260ms ease-out both;
@@ -1140,7 +1158,7 @@ useHotkeys(() =>
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-cmd-resizing,
+  .lp-cmd-split,
   .lp-cmd-pane-enter-active,
   .lp-cmd-pane-leave-active {
     transition: none;
