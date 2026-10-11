@@ -34,7 +34,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, ref, shallowRef, watch } from "vue"
+import { computed, nextTick, ref, shallowRef, useId, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
@@ -177,6 +177,16 @@ const emit = defineEmits<{
 }>()
 
 const query = ref("")
+/*
+ * The input is a combobox over a listbox: focus never leaves the box, so the
+ * highlighted row has to be announced through aria-activedescendant — without
+ * it a screen reader hears the query and nothing as the arrows move.
+ */
+const listId = `lp-cmd-${useId()}`
+function optionId(index: number): string {
+  return `${listId}-${index}`
+}
+const activeId = computed(() => (flat.value.length ? optionId(selectedIndex.value) : undefined))
 const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
@@ -561,6 +571,11 @@ useHotkeys(() =>
             ref="inputRef"
             v-model="query"
             type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            :aria-controls="listId"
+            :aria-activedescendant="activeId"
             :placeholder="mode?.childPlaceholder ?? placeholder"
             class="h-12 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
             @keydown.down.prevent="moveDown"
@@ -580,67 +595,82 @@ useHotkeys(() =>
             {{ searching ? text.searching : emptyText }}
           </p>
 
-          <template v-for="group in grouped" :key="group.name">
+          <div :id="listId" role="listbox">
             <div
-              v-if="group.name"
-              class="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+              v-for="(group, gi) in grouped"
+              :key="group.name"
+              role="group"
+              :aria-labelledby="group.name ? `${listId}-g${gi}` : undefined"
             >
-              {{ group.name }}
+              <div
+                v-if="group.name"
+                :id="`${listId}-g${gi}`"
+                class="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+              >
+                {{ group.name }}
+              </div>
+              <!-- tabindex -1: the rows are reached with the arrows from the box,
+                   so Tab should not walk through every one of them. -->
+              <button
+                v-for="c in group.items"
+                :id="optionId(flatIndexOf(c))"
+                :key="c.id"
+                type="button"
+                role="option"
+                tabindex="-1"
+                :aria-selected="flatIndexOf(c) === selectedIndex"
+                :aria-disabled="c.disabled || undefined"
+                :data-cmd-index="flatIndexOf(c)"
+                :disabled="c.disabled"
+                class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
+                :class="[
+                  c.excerpt ? 'items-start' : 'items-center',
+                  flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60',
+                ]"
+                @click="run(c)"
+                @pointerenter="selectedIndex = flatIndexOf(c)"
+              >
+                <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-medium">
+                    <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
+                      <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
+                      <template v-else>{{ p.text }}</template>
+                    </template>
+                  </span>
+                  <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
+                    <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
+                      <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
+                      <template v-else>{{ p.text }}</template>
+                    </template>
+                  </span>
+                  <!-- Wraps rather than truncates: a passage cut to one line
+                       stops before the part that explains the match. Ink, not
+                       brand, on the active row: a paragraph in accent colour is
+                       hard to read. -->
+                  <span
+                    v-if="c.excerpt"
+                    class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
+                    :style="{ '-webkit-line-clamp': excerptLines }"
+                  >
+                    <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
+                      <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
+                      <template v-else>{{ p.text }}</template>
+                    </template>
+                  </span>
+                </span>
+                <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
+                <!-- Drills in rather than runs: worth saying before the click,
+                     since the two look identical otherwise. -->
+                <LpIcon
+                  v-else-if="c.children"
+                  name="lucide:chevron-right"
+                  :size="14"
+                  class="shrink-0 text-muted"
+                />
+              </button>
             </div>
-            <button
-              v-for="c in group.items"
-              :key="c.id"
-              type="button"
-              :data-cmd-index="flatIndexOf(c)"
-              :disabled="c.disabled"
-              class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
-              :class="[
-                c.excerpt ? 'items-start' : 'items-center',
-                flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60',
-              ]"
-              @click="run(c)"
-              @pointerenter="selectedIndex = flatIndexOf(c)"
-            >
-              <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
-              <span class="min-w-0 flex-1">
-                <span class="block truncate font-medium">
-                  <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
-                    <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
-                    <template v-else>{{ p.text }}</template>
-                  </template>
-                </span>
-                <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
-                  <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
-                    <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                    <template v-else>{{ p.text }}</template>
-                  </template>
-                </span>
-                <!-- Wraps rather than truncates: a passage cut to one line
-                     stops before the part that explains the match. Ink, not
-                     brand, on the active row: a paragraph in accent colour is
-                     hard to read. -->
-                <span
-                  v-if="c.excerpt"
-                  class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
-                  :style="{ '-webkit-line-clamp': excerptLines }"
-                >
-                  <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
-                    <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                    <template v-else>{{ p.text }}</template>
-                  </template>
-                </span>
-              </span>
-              <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
-              <!-- Drills in rather than runs: worth saying before the click,
-                   since the two look identical otherwise. -->
-              <LpIcon
-                v-else-if="c.children"
-                name="lucide:chevron-right"
-                :size="14"
-                class="shrink-0 text-muted"
-              />
-            </button>
-          </template>
+          </div>
         </LpScrollArea>
 
         <!-- Footer hints -->
