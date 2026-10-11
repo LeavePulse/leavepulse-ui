@@ -40,6 +40,7 @@ import { computed, nextTick, ref, shallowRef, useId, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
+import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 
 export interface Command {
@@ -100,6 +101,13 @@ export interface Command {
    * link.
    */
   href?: string
+  /**
+   * Further things to do with this result besides opening it — copy its id,
+   * open it elsewhere, share it. Tab on the highlighted row lists them as a
+   * mode named after the row. A command with `href` gets "open in new tab"
+   * and "copy link" after its own.
+   */
+  actions?: Command[]
   onSelect?: () => void
 }
 
@@ -116,6 +124,12 @@ export interface PaletteLabels {
   retry: string
   /** The row that unfolds a group cut by `groupLimit`; `{count}` is how many are hidden. */
   showMore: string
+  /** Footer hint for Tab while the highlighted row has actions. */
+  actions: string
+  openInNewTab: string
+  copyLink: string
+  /** Toast after "copy link"; empty for none. */
+  linkCopied: string
 }
 
 const props = withDefaults(
@@ -193,6 +207,10 @@ const DEFAULT_LABELS: PaletteLabels = {
   searchFailed: "Search is unavailable right now.",
   retry: "Retry",
   showMore: "Show {count} more",
+  actions: "actions",
+  openInNewTab: "Open in new tab",
+  copyLink: "Copy link",
+  linkCopied: "Link copied",
 }
 
 const text = computed<PaletteLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
@@ -242,6 +260,50 @@ const mode = computed<Command | null>(() => trail.value[trail.value.length - 1] 
  * which is what lets the second step be a lookup rather than a list.
  */
 const modeItems = shallowRef<Command[]>([])
+
+const { copy } = useClipboard()
+
+function actionsOf(c: Command | undefined): Command[] {
+  if (!c || c.disabled || moreOf.has(c)) return []
+  const own = c.actions ?? []
+  const href = c.href
+  if (!href) return own
+  const link = new URL(href, window.location.href).href
+  return [
+    ...own,
+    {
+      id: `${c.id}:open-in-new-tab`,
+      label: text.value.openInNewTab,
+      icon: "lucide:external-link",
+      onSelect: () => window.open(href, "_blank", "noopener"),
+    },
+    {
+      id: `${c.id}:copy-link`,
+      label: text.value.copyLink,
+      icon: "lucide:link",
+      onSelect: () => void copy(link, { toast: text.value.linkCopied || false }),
+    },
+  ]
+}
+
+const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]))
+
+/*
+ * Tab is free for this: the rows are out of the tab order and the box is the
+ * only field, so Tab otherwise just walks off to the dialog's edge. Without
+ * actions it keeps that default.
+ */
+function onTab(event: KeyboardEvent) {
+  if (event.shiftKey) return
+  const c = flat.value[selectedIndex.value]
+  const actions = selectedActions.value
+  if (!c || !actions.length) return
+  // The dialog's focus trap handles Tab too, and would hand focus to the
+  // mode chip this is about to render.
+  event.preventDefault()
+  event.stopPropagation()
+  enter({ id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions })
+}
 
 function enter(c: Command) {
   trail.value = [...trail.value, c]
@@ -759,6 +821,7 @@ useHotkeys(() =>
             @keydown.enter.prevent="runSelected"
             @keydown.backspace="onBackspace"
             @keydown.esc="onEscape"
+            @keydown.tab="onTab"
           />
           <kbd class="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">esc</kbd>
         </div>
@@ -888,6 +951,10 @@ useHotkeys(() =>
           </span>
           <!-- Only inside a mode: at the root Backspace just edits the query,
                and advertising it there would be a lie. -->
+          <span v-if="selectedActions.length" class="flex items-center gap-1">
+            <kbd class="rounded border border-line px-1 text-[10px]">tab</kbd>
+            {{ text.actions }}
+          </span>
           <span v-if="trail.length" class="flex items-center gap-1">
             <kbd class="rounded border border-line px-1 text-[10px]">⌫</kbd>
             {{ text.back }}

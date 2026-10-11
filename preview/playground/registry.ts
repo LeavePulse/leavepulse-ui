@@ -1106,7 +1106,18 @@ export const registry: ComponentEntry[] = [
           await new Promise((r) => setTimeout(r, 250))
           return ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra", "Barbara Liskov", "Donald Knuth"]
             .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
-            .map((n) => ({ id: `user:${n}`, label: n, description: "Open profile", icon: "lucide:user", group: "People" }))
+            .map((n) => ({
+              id: `user:${n}`,
+              label: n,
+              description: "Open profile",
+              icon: "lucide:user",
+              group: "People",
+              // Tab on a person lists these instead of opening the profile.
+              actions: [
+                { id: `user:${n}:message`, label: "Send a message", icon: "lucide:message-circle" },
+                { id: `user:${n}:mention`, label: "Copy @mention", icon: "lucide:at-sign" },
+              ],
+            }))
         },
         // A docs search answers with the passage it matched, not just a title:
         // `excerpt` wraps over a few lines, `highlight` marks the word forms the
