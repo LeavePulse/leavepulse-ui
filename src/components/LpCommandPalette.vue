@@ -136,8 +136,11 @@ export interface PaletteLabels {
   copyLink: string
   /** Toast after "copy link"; empty for none. */
   linkCopied: string
-  /** The preview pane when the highlighted row has nothing to show. */
-  noPreview: string
+  /**
+   * @deprecated The pane now closes for a row with nothing to show, so this
+   * text is never displayed. Kept so existing `labels` objects still type-check.
+   */
+  noPreview?: string
 }
 
 const props = withDefaults(
@@ -194,14 +197,14 @@ const props = withDefaults(
      * A pane beside the list showing the highlighted result in full — its
      * `preview` text, or the `preview` slot. For palettes that search
      * content rather than commands: the excerpt says why a row matched, the
-     * pane lets it be read without leaving the page. Opt-in and fixed while
-     * open, so the dialog does not change width as results come and go.
+     * pane lets it be read without leaving the page. It opens only for a row
+     * with `preview` or `excerpt` (any row, with the slot): the dialog eases
+     * wider, the pane slides in, and the text arrives paragraph by paragraph.
      * Hidden below the md breakpoint, where there is no room beside the list.
      *
-     * The dialog takes one width class or the other, never a base width plus
-     * an `md:` override: a consumer's Tailwind build can emit the two in an
-     * order where the base wins, and the pane opened squeezed into 40rem.
-     * Both widths are 92vw on a narrow screen, so no breakpoint is needed.
+     * The width is an inline style rather than a pair of classes: a base
+     * width plus an `md:` override could be emitted by a consumer's Tailwind
+     * build in an order where the base won, and the pane opened squeezed.
      */
     previewPane?: boolean
     /**
@@ -605,7 +608,7 @@ function folded(name: string, items: Command[]): Command[] {
 // Flat list in render order — what arrow keys walk through.
 const flat = computed(() => grouped.value.flatMap((g) => g.items))
 
-defineSlots<{
+const slots = defineSlots<{
   /** Body of the preview pane for the highlighted command. */
   preview?: (props: { command: Command }) => unknown
 }>()
@@ -617,6 +620,30 @@ const active = computed<Command | undefined>(() => {
 const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 
 /*
+ * The pane opens only for a row that has something to show: an empty pane
+ * beside a list of commands is a column of dead space. With the slot the app
+ * decides what to show, so any highlighted row opens it.
+ */
+const paneOpen = computed(
+  () => props.previewPane && !!active.value && (!!slots.preview || !!(active.value.preview || active.value.excerpt)),
+)
+
+/*
+ * The text in paragraphs, so they can arrive one after another. A blank line
+ * separates them, as in the `preview` the consumer wrote.
+ */
+const paragraphs = computed(() =>
+  (active.value?.preview ?? active.value?.excerpt ?? "")
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean),
+)
+
+/** Stagger between paragraphs, capped so a long section does not trickle in. */
+const STAGGER_MS = 45
+const STAGGER_MAX = 10
+
+/*
  * A preview is opened for the match, so the pane lands on it: the first
  * highlighted word is brought into view, and a result without one starts
  * from the top rather than wherever the previous result was scrolled to.
@@ -624,7 +651,7 @@ const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 watch(
   () => active.value?.id,
   async () => {
-    if (!props.previewPane) return
+    if (!paneOpen.value) return
     await nextTick()
     const viewport = previewRef.value?.viewportEl
     if (!viewport) return
@@ -842,10 +869,11 @@ useHotkeys(() =>
       />
       <DialogContent
         class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="[
-          glass ? 'lp-glass-overlay' : 'bg-surface-raised',
-          previewPane ? 'w-[min(92vw,64rem)] md:h-[min(76vh,36rem)]' : 'w-[min(92vw,40rem)]',
-        ]"
+        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-resizing']"
+        :style="{
+          width: paneOpen ? 'min(92vw, 64rem)' : 'min(92vw, 40rem)',
+          minHeight: paneOpen ? 'min(76vh, 36rem)' : '0px',
+        }"
         @open-auto-focus.prevent
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>
@@ -1007,35 +1035,41 @@ useHotkeys(() =>
               </button>
             </div>
           </LpScrollArea>
-          <aside
-            v-if="previewPane"
-            class="hidden min-h-0 w-[56%] shrink-0 flex-col border-l border-line md:flex"
-          >
-            <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
-              <template v-if="active">
-                <slot name="preview" :command="active">
-                  <div class="flex items-center gap-2 text-ink">
-                    <LpIcon v-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
-                    <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
-                  </div>
-                  <p v-if="active.description" class="mt-0.5 text-xs text-muted">{{ active.description }}</p>
-                  <p
-                    v-if="active.preview || active.excerpt"
-                    class="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
-                  >
-                    <template
-                      v-for="(p, pi) in highlight(active.preview ?? active.excerpt ?? '', active.highlight)"
-                      :key="`p${pi}`"
+          <!-- Slides in beside the list while the dialog widens to make room,
+               and out again for a row with nothing to show. -->
+          <Transition name="lp-cmd-pane">
+            <aside
+              v-if="paneOpen"
+              class="hidden min-h-0 w-[56%] shrink-0 flex-col border-l border-line md:flex"
+            >
+              <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
+                <!-- Keyed by the row, so moving the highlight replays the
+                     entrance rather than swapping text in place. -->
+                <div v-if="active" :key="active.id">
+                  <slot name="preview" :command="active">
+                    <div class="lp-cmd-para flex items-center gap-2 text-ink">
+                      <LpIcon v-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
+                      <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
+                    </div>
+                    <p v-if="active.description" class="lp-cmd-para mt-0.5 text-xs text-muted">
+                      {{ active.description }}
+                    </p>
+                    <p
+                      v-for="(para, i) in paragraphs"
+                      :key="i"
+                      class="lp-cmd-para mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
+                      :style="{ animationDelay: `${Math.min(i + 1, STAGGER_MAX) * STAGGER_MS}ms` }"
                     >
-                      <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
-                      <template v-else>{{ p.text }}</template>
-                    </template>
-                  </p>
-                  <p v-else class="mt-3 text-sm text-muted">{{ text.noPreview }}</p>
-                </slot>
-              </template>
-            </LpScrollArea>
-          </aside>
+                      <template v-for="(p, pi) in highlight(para, active.highlight)" :key="`p${pi}`">
+                        <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
+                        <template v-else>{{ p.text }}</template>
+                      </template>
+                    </p>
+                  </slot>
+                </div>
+              </LpScrollArea>
+            </aside>
+          </Transition>
         </div>
 
         <!-- Footer hints -->
@@ -1072,6 +1106,49 @@ useHotkeys(() =>
 </template>
 
 <style scoped>
+/*
+ * The dialog changes width and height when the preview pane comes and goes;
+ * eased, so the list does not jump sideways under the pointer.
+ */
+.lp-cmd-resizing {
+  transition:
+    width 260ms var(--ease-emphasized, ease),
+    min-height 260ms var(--ease-emphasized, ease);
+}
+.lp-cmd-pane-enter-active {
+  transition:
+    opacity 220ms ease 60ms,
+    transform 260ms var(--ease-emphasized, ease);
+}
+.lp-cmd-pane-leave-active {
+  transition: opacity 120ms ease;
+}
+.lp-cmd-pane-enter-from {
+  opacity: 0;
+  transform: translateX(16px);
+}
+.lp-cmd-pane-leave-to {
+  opacity: 0;
+}
+.lp-cmd-para {
+  animation: lp-cmd-para-in 260ms ease-out both;
+}
+@keyframes lp-cmd-para-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-cmd-resizing,
+  .lp-cmd-pane-enter-active,
+  .lp-cmd-pane-leave-active {
+    transition: none;
+  }
+  .lp-cmd-para {
+    animation: none;
+  }
+}
 .lp-cmd-excerpt {
   display: -webkit-box;
   -webkit-box-orient: vertical;
