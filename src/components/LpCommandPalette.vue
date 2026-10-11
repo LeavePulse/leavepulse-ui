@@ -90,6 +90,14 @@ export interface Command {
    * reopening and retyping.
    */
   keepOpen?: boolean
+  /**
+   * Where the command leads. The row renders as a real link, so Ctrl/⌘-click,
+   * Shift-click and middle-click open it the way the browser opens any link,
+   * and Ctrl/⌘+Enter opens it in a new tab from the keyboard. A plain pick
+   * still runs `onSelect` (a router push, say); without one it follows the
+   * link.
+   */
+  href?: string
   onSelect?: () => void
 }
 
@@ -442,14 +450,38 @@ function moveUp() {
   const len = flat.value.length
   if (len) selectedIndex.value = (selectedIndex.value - 1 + len) % len
 }
-function runSelected() {
-  run(flat.value[selectedIndex.value])
+function runSelected(event?: KeyboardEvent) {
+  const c = flat.value[selectedIndex.value]
+  if (c?.href && !c.disabled && (event?.ctrlKey || event?.metaKey)) {
+    openInNewTab(c)
+    return
+  }
+  run(c)
+}
+
+function openInNewTab(c: Command) {
+  if (!c.href) return
+  window.open(c.href, "_blank", "noopener")
+  emit("run", c.id, c)
+  emit("update:open", false)
+}
+
+/*
+ * A modified click on a link is the browser's to handle: it opens a tab or a
+ * window and this page stays where it is, so the palette neither runs the
+ * command nor closes. Only the plain click is taken over.
+ */
+function onRowClick(event: MouseEvent, c: Command) {
+  if (c.href && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)) return
+  event.preventDefault()
+  run(c)
 }
 
 function run(c: Command | undefined) {
   if (!c || c.disabled) return
   emit("select", c)
   c.onSelect?.()
+  if (!c.onSelect && c.href && !c.children) window.location.assign(c.href)
   // A command with children drills in instead of closing, and is navigation
   // rather than a pick — so it stays out of the recency history.
   if (c.children) {
@@ -611,23 +643,25 @@ useHotkeys(() =>
               </div>
               <!-- tabindex -1: the rows are reached with the arrows from the box,
                    so Tab should not walk through every one of them. -->
-              <button
+              <component
+                :is="c.href ? 'a' : 'button'"
                 v-for="c in group.items"
                 :id="optionId(flatIndexOf(c))"
                 :key="c.id"
-                type="button"
+                :href="c.disabled ? undefined : c.href"
+                :type="c.href ? undefined : 'button'"
                 role="option"
                 tabindex="-1"
                 :aria-selected="flatIndexOf(c) === selectedIndex"
                 :aria-disabled="c.disabled || undefined"
                 :data-cmd-index="flatIndexOf(c)"
-                :disabled="c.disabled"
-                class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
+                :disabled="c.href ? undefined : c.disabled"
+                class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
                 :class="[
                   c.excerpt ? 'items-start' : 'items-center',
                   flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60',
                 ]"
-                @click="run(c)"
+                @click="onRowClick($event, c)"
                 @pointerenter="selectedIndex = flatIndexOf(c)"
               >
                 <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
@@ -668,7 +702,7 @@ useHotkeys(() =>
                   :size="14"
                   class="shrink-0 text-muted"
                 />
-              </button>
+              </component>
             </div>
           </div>
         </LpScrollArea>

@@ -1110,12 +1110,14 @@ export const registry: ComponentEntry[] = [
         },
         // A docs search answers with the passage it matched, not just a title:
         // `excerpt` wraps over a few lines, `highlight` marks the word forms the
-        // server matched ("deploys", "deployed") next to the typed query.
+        // server matched ("deploys", "deployed") next to the typed query. Each
+        // hit is a link (`href`), so Ctrl-click or Ctrl+Enter opens a new tab.
         docs: async (q: string) => {
           const found = await s.people(q)
           const pages = [
             {
               id: "docs:rollback",
+              href: "#rollback",
               label: "Rolling back a deploy",
               description: "Guides › Deploys",
               excerpt:
@@ -1124,6 +1126,7 @@ export const registry: ComponentEntry[] = [
             },
             {
               id: "docs:secrets",
+              href: "#secrets",
               label: "Secrets",
               description: "Reference › Configuration",
               excerpt:
