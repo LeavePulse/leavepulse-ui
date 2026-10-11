@@ -132,6 +132,10 @@ const themeItems = computed<ContextMenuItemDef[]>(() =>
 // state. Every route the preview has is reachable from here, which is the
 // point: the component list is long enough that scanning it is the slow way.
 const paletteOpen = ref(false)
+// The CommandPalette page mounts its own example, which binds ⌘K too: both
+// would toggle on one press and stack two dialogs. The example is what that
+// page is about, so the site palette steps aside there.
+const siteHotkey = computed(() => !(route.value.kind === "component" && route.value.id === "commandpalette"))
 
 const commands = computed<Command[]>(() => [
   ...registry.map((entry) => ({
@@ -220,6 +224,7 @@ const on = "bg-surface-soft text-ink"
 
     <LpCommandPalette
       v-model:open="paletteOpen"
+      :hotkey="siteHotkey"
       :commands="commands"
       placeholder="Jump to a component, page or theme…"
     />

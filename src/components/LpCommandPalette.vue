@@ -45,6 +45,19 @@ export interface Command {
   label: string
   /** Second line under the label. */
   description?: string
+  /**
+   * A passage of the matched text, wrapped over several lines (clamped by
+   * `excerptLines`) instead of truncated to one. For results a server found
+   * inside long text — a docs section, a ticket, a message — where the reason
+   * the row matched is the part worth reading before opening it.
+   */
+  excerpt?: string
+  /**
+   * Extra words to highlight besides the typed query. A server that matches
+   * word forms or typos knows which words actually matched; the query alone
+   * would leave those unmarked.
+   */
+  highlight?: string[]
   icon?: string
   /** Right-aligned hint, e.g. "⌘P". */
   shortcut?: string
@@ -126,6 +139,8 @@ const props = withDefaults(
     resultsLabel?: string
     /** Footer hints and the mode chip, spelled out for translation. */
     labels?: Partial<PaletteLabels>
+    /** Lines an `excerpt` may wrap to before it is clamped. */
+    excerptLines?: number
   }>(),
   {
     placeholder: "Type a command or search…",
@@ -136,6 +151,7 @@ const props = withDefaults(
     recentLimit: 5,
     recentLabel: "Recent",
     resultsLabel: "Results",
+    excerptLines: 4,
   },
 )
 
@@ -355,8 +371,9 @@ interface Part {
   text: string
   hit: boolean
 }
-function highlight(value: string): Part[] {
-  const terms = [...new Set(query.value.toLowerCase().trim().split(/\s+/).filter((t) => t.length >= 2))].sort(
+function highlight(value: string, extra: string[] = []): Part[] {
+  const typed = query.value.toLowerCase().trim().split(/\s+/)
+  const terms = [...new Set([...typed, ...extra.map((t) => t.toLowerCase())].filter((t) => t.length >= 2))].sort(
     (a, b) => b.length - a.length,
   )
   if (!value || terms.length === 0) return value ? [{ text: value, hit: false }] : []
@@ -576,21 +593,38 @@ useHotkeys(() =>
               type="button"
               :data-cmd-index="flatIndexOf(c)"
               :disabled="c.disabled"
-              class="lp-cmd-item flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
-              :class="flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60'"
+              class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45"
+              :class="[
+                c.excerpt ? 'items-start' : 'items-center',
+                flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60',
+              ]"
               @click="run(c)"
               @pointerenter="selectedIndex = flatIndexOf(c)"
             >
-              <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" />
+              <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate font-medium">
-                  <template v-for="(p, pi) in highlight(c.label)" :key="`l${pi}`">
+                  <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
                     <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
                     <template v-else>{{ p.text }}</template>
                   </template>
                 </span>
                 <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
-                  <template v-for="(p, pi) in highlight(c.description)" :key="`d${pi}`">
+                  <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
+                    <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
+                    <template v-else>{{ p.text }}</template>
+                  </template>
+                </span>
+                <!-- Wraps rather than truncates: a passage cut to one line
+                     stops before the part that explains the match. Ink, not
+                     brand, on the active row: a paragraph in accent colour is
+                     hard to read. -->
+                <span
+                  v-if="c.excerpt"
+                  class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
+                  :style="{ '-webkit-line-clamp': excerptLines }"
+                >
+                  <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
                     <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
                     <template v-else>{{ p.text }}</template>
                   </template>
@@ -639,6 +673,11 @@ useHotkeys(() =>
 </template>
 
 <style scoped>
+.lp-cmd-excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 /* Each result eases in; honours reduced motion. */
 .lp-cmd-item {
   animation: lp-cmd-in 140ms ease-out both;

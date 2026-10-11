@@ -1074,7 +1074,7 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones; `recent` floats what this person actually runs to the top.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `recent` floats what this person actually runs to the top.",
     components: { LpCommandPalette, LpButton },
     state: () => {
       const s: any = reactive({
@@ -1108,6 +1108,35 @@ export const registry: ComponentEntry[] = [
             .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
             .map((n) => ({ id: `user:${n}`, label: n, description: "Open profile", icon: "lucide:user", group: "People" }))
         },
+        // A docs search answers with the passage it matched, not just a title:
+        // `excerpt` wraps over a few lines, `highlight` marks the word forms the
+        // server matched ("deploys", "deployed") next to the typed query.
+        docs: async (q: string) => {
+          const found = await s.people(q)
+          const pages = [
+            {
+              id: "docs:rollback",
+              label: "Rolling back a deploy",
+              description: "Guides › Deploys",
+              excerpt:
+                "A rollback redeploys the previous release instead of reverting commits, so it takes seconds and needs no build. It is the first move when a deploy breaks production; fix forward once the incident is over. Rollbacks keep the database as it is: a release that ran a migration needs the migration's down step first.",
+              highlight: ["deploy", "deploys", "deployed"],
+            },
+            {
+              id: "docs:secrets",
+              label: "Secrets",
+              description: "Reference › Configuration",
+              excerpt:
+                "Secrets are injected at start, never baked into the image. Changing one restarts the services that read it; the rest keep running. A deployed secret is never shown again in the dashboard, only replaced.",
+              highlight: ["deployed"],
+            },
+          ]
+          const text = q.toLowerCase()
+          const docs = pages
+            .filter((p) => [p.label, p.excerpt, ...p.highlight].some((t) => t.toLowerCase().includes(text)))
+            .map((p) => ({ ...p, icon: "lucide:file-text", group: "Docs" }))
+          return [...found, ...docs]
+        },
         // Recency is the app's to keep — here in memory, in a real app in
         // storage. The palette only reads it back.
         onRun: (id: string) => {
@@ -1121,7 +1150,7 @@ export const registry: ComponentEntry[] = [
   <LpCommandPalette
     v-model:open="open"
     :commands="commands"
-    :search="people"
+    :search="docs"
     :recent="recent"
     @run="onRun"
   />
