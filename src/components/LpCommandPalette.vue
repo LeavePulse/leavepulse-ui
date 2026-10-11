@@ -40,6 +40,7 @@ import { computed, nextTick, ref, shallowRef, useId, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
+import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 
@@ -210,7 +211,8 @@ const props = withDefaults(
     /**
      * Frosted glass instead of a solid panel: the page shows through,
      * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
-     * A look, not a behaviour, so it is the app's call and off by default.
+     * A look, not a behaviour, so it is the app's call: unset follows
+     * `provideGlass`, and without one it is off.
      */
     glass?: boolean
   }>(),
@@ -227,9 +229,11 @@ const props = withDefaults(
     groupLimit: 0,
     layoutFallback: true,
     previewPane: false,
-    glass: false,
+    glass: undefined,
   },
 )
+
+const frosted = useGlass(() => props.glass)
 
 const DEFAULT_LABELS: PaletteLabels = {
   navigate: "navigate",
@@ -864,12 +868,12 @@ useHotkeys(() =>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        :class="{ 'lp-scrim--light': glass }"
+        :class="{ 'lp-scrim--light': frosted }"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
       />
       <DialogContent
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
+        :class="[frosted ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :data-pane="paneOpen ? 'open' : undefined"
         @open-auto-focus.prevent
       >

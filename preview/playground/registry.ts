@@ -1,4 +1,4 @@
-import { reactive, type Component } from "vue"
+import { defineComponent, reactive, type Component } from "vue"
 import {
   LpActionBar,
   LpAddressInput,
@@ -73,6 +73,7 @@ import {
   LpTilt,
   LpTooltip,
   LpUptimeBar,
+  useHotkeys,
   useToast,
 } from "../../src"
 // A real image, so the avatar demos show the loaded state rather than only the
@@ -90,6 +91,21 @@ export interface ComponentEntry {
   /** Reactive state the template can bind to. */
   state?: () => Record<string, unknown>
 }
+
+/*
+ * Stands in for a screen with keys of its own: while it is mounted, its
+ * bindings are in the live reference, and they leave with it.
+ */
+const EditorKeys = defineComponent({
+  setup() {
+    useHotkeys([
+      { key: "z", code: "KeyZ", ctrl: true, help: { group: "Editor", label: "Undo" }, handler: () => {} },
+      { key: "z", code: "KeyZ", ctrl: true, shift: true, help: { group: "Editor", label: "Redo" }, handler: () => {} },
+      { key: "a", code: "KeyA", ctrl: true, help: { group: "Editor", label: "Select all" }, handler: () => {} },
+    ])
+    return () => null
+  },
+})
 
 const selectOpts = [
   { value: "eu", label: "Europe" },
@@ -1635,7 +1651,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third.",
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
     components: { LpModal, LpButton },
     state: () => {
       const s = reactive({
@@ -1756,11 +1772,12 @@ export const registry: ComponentEntry[] = [
     id: "shortcuts-dialog",
     name: "ShortcutsDialog",
     description:
-      "Keyboard reference, conventionally on F1. Groups are passed in as data — a binding knows its key but not what to call it, and one that only exists while its section is mounted would come and go from a list meant to be a reference. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards. Pairs with useHotkeys, which treats Ctrl and Meta as one modifier so only the label differs.",
-    components: { LpShortcutsDialog, LpButton },
+      "Keyboard reference, conventionally on F1. `groups` is the written list: keys that are not bindings (arrows in a list) and the ones worth knowing before their screen opens. `live` adds every mounted useHotkeys binding that carries `help`, so a screen documents its own keys while it is open: mount the editor below and its section appears. Same-titled groups merge and a combo is listed once. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards.",
+    components: { LpShortcutsDialog, LpButton, LpSwitch, EditorKeys },
     state: () =>
       reactive({
         open: false,
+        editor: false,
         groups: [
           {
             title: "Navigation",
@@ -1783,8 +1800,12 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div>
-  <LpButton variant="outline" @click="open = true">Show shortcuts</LpButton>
-  <LpShortcutsDialog v-model:open="open" :groups="groups" description="Everything the keyboard can do here." />
+  <div class="flex flex-wrap items-center gap-4">
+    <LpButton variant="outline" @click="open = true">Show shortcuts</LpButton>
+    <LpSwitch v-model="editor" label="Editor mounted" />
+  </div>
+  <EditorKeys v-if="editor" />
+  <LpShortcutsDialog v-model:open="open" :groups="groups" live description="Everything the keyboard can do here." />
 </div>`,
   },
   {

@@ -36,10 +36,10 @@ const props = withDefaults(
      */
     loading?: boolean
     loadingLabel?: string
-    /** Frosted glass panel, passed to LpModal. Off by default. */
+    /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
   }>(),
-  { confirmLabel: "Confirm", cancelLabel: "Cancel", loadingLabel: "Working…" },
+  { confirmLabel: "Confirm", cancelLabel: "Cancel", loadingLabel: "Working…", glass: undefined },
 )
 
 const emit = defineEmits<{

@@ -55,7 +55,7 @@ const props = withDefaults(
      * column inside the body, and the rail is no longer in the body.
      */
     fillBody?: boolean
-    /** Frosted glass panel, passed to LpModal. Off by default. */
+    /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
   }>(),
   {
@@ -64,6 +64,7 @@ const props = withDefaults(
     mobileBreakpoint: "lg",
     navLabel: "Sections",
     navSide: "start",
+    glass: undefined,
   },
 )
 

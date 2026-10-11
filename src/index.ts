@@ -141,7 +141,6 @@ export { default as LpServiceNode } from "./components/LpServiceNode.vue"
 export type { ServiceNodeData } from "./components/LpServiceNode.vue"
 export { default as LpShift } from "./components/LpShift.vue"
 export { default as LpShortcutsDialog } from "./components/LpShortcutsDialog.vue"
-export type { ShortcutEntry, ShortcutGroup } from "./components/LpShortcutsDialog.vue"
 export { default as LpSidebar } from "./components/LpSidebar.vue"
 export type { SidebarItem, SidebarSection } from "./components/LpSidebar.vue"
 export { default as LpSkeleton } from "./components/LpSkeleton.vue"
@@ -228,8 +227,15 @@ export type { UiConfig } from "./theme/config"
 
 export { useClipboard } from "./composables/useClipboard"
 export type { CopyOptions, UseClipboard } from "./composables/useClipboard"
-export { useHotkeys, isAppleKeyboard, appleModifierLabel } from "./composables/useHotkeys"
-export type { HotkeyBinding } from "./composables/useHotkeys"
+export {
+  useHotkeys,
+  isAppleKeyboard,
+  appleModifierLabel,
+  activeShortcuts,
+  mergeShortcutGroups,
+} from "./composables/useHotkeys"
+export type { HotkeyBinding, HotkeyHelp, ShortcutEntry, ShortcutGroup } from "./composables/useHotkeys"
+export { provideGlass, useGlass } from "./composables/useGlass"
 export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMergedClass"
 export { useInputFilter } from "./composables/useInputFilter"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"

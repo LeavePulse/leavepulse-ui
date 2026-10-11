@@ -31,6 +31,7 @@ import {
 } from "vaul-vue"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
+import { useGlass } from "../composables/useGlass"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
@@ -104,7 +105,8 @@ const props = withDefaults(
     /**
      * Frosted glass instead of a solid panel: the page shows through,
      * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
-     * A look, not a behaviour, so it is the app's call and off by default.
+     * A look, not a behaviour, so it is the app's call: unset follows
+     * `provideGlass`, and without one it is off.
      */
     glass?: boolean
   }>(),
@@ -117,9 +119,11 @@ const props = withDefaults(
     edgeOpenThreshold: 0.3,
     minSize: "22rem",
     maxSize: "96vw",
-    glass: false,
+    glass: undefined,
   },
 )
+
+const frosted = useGlass(() => props.glass)
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void
@@ -149,7 +153,7 @@ watch(() => props.open, (open) => (open ? claim() : release()), { immediate: tru
 onBeforeUnmount(release)
 
 const contentClass = computed(() => {
-  const surface = props.glass ? "lp-glass-overlay" : "bg-surface-raised"
+  const surface = frosted.value ? "lp-glass-overlay" : "bg-surface-raised"
   const base = `fixed z-(--z-modal) flex flex-col border-line ${surface} shadow-panel outline-none`
   const map: Record<Direction, string> = {
     left: "inset-y-0 left-0 border-r rounded-r-card",
@@ -439,7 +443,7 @@ const previewStyle = computed(() => {
     <div
       v-show="peeking || peek > 0"
       class="lp-scrim pointer-events-none fixed inset-0"
-      :class="{ 'lp-scrim--light': glass }"
+      :class="{ 'lp-scrim--light': frosted }"
       :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || reducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
     />
     <div
@@ -472,7 +476,7 @@ const previewStyle = computed(() => {
       <DrawerOverlay
         :style="{ zIndex: layer.scrim }"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
-        :class="{ 'lp-scrim--light': glass }"
+        :class="{ 'lp-scrim--light': frosted }"
       />
       <DrawerContent
         :class="contentClass"

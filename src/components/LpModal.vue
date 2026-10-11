@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
+import { useGlass } from "../composables/useGlass"
 import { useShift } from "../composables/useShift"
 import { useModalLayer } from "./modalDepth"
 import { CLOSE_ICON } from "./dropdown"
@@ -65,12 +66,15 @@ const props = withDefaults(
     /**
      * Frosted glass instead of a solid panel: the page shows through,
      * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
-     * A look, not a behaviour, so it is the app's call and off by default.
+     * A look, not a behaviour, so it is the app's call: unset follows
+     * `provideGlass`, and without one it is off.
      */
     glass?: boolean
   }>(),
-  { size: "md", autoFocus: "auto", glass: false },
+  { size: "md", autoFocus: "auto", glass: undefined },
 )
+
+const frosted = useGlass(() => props.glass)
 
 defineEmits<{ (e: "update:open", value: boolean): void }>()
 
@@ -228,7 +232,7 @@ watch(
   <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        :class="{ 'lp-scrim--light': glass }"
+        :class="{ 'lp-scrim--light': frosted }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />
@@ -298,7 +302,7 @@ watch(
       <div
         ref="panelRef"
         class="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
-        :class="[glass ? 'lp-glass-overlay' : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
+        :class="[frosted ? 'lp-glass-overlay' : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">

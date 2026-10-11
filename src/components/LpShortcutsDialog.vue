@@ -2,39 +2,48 @@
 /*
  * A keyboard reference, conventionally opened with F1.
  *
- * Shortcuts are passed in as data rather than read off a live binding list: a
- * binding knows its key but not what to call it, and in most apps half of them
- * are only mounted in the section they belong to — a reference that lists what
- * happens to be active is not a reference.
+ * Two sources, used together or apart. `groups` is the written list: keys
+ * that are not bindings at all (arrows inside a list, Backspace in a palette)
+ * and the ones worth knowing before their screen is open. `live` adds every
+ * mounted `useHotkeys` binding that carries `help`, so a screen with its own
+ * keys documents them while it is open and drops them when it closes. Groups
+ * of the same title merge, and a combo is listed once.
  *
- * Combos are written the way they read ("Ctrl+Shift+M", "←→↑↓") and split on
- * "+" into one <kbd> each.
+ * Combos are written the way they read ("Ctrl+Shift+M", "Ctrl++", "←→↑↓") and
+ * split on "+" into one <kbd> each.
  */
+import { computed } from "vue"
 import LpModal from "./LpModal.vue"
-import { appleModifierLabel } from "../composables/useHotkeys"
-
-export interface ShortcutEntry {
-  /** Rendered one <kbd> per "+"-separated key, so write it the way it reads. */
-  combo: string
-  label: string
-}
-
-export interface ShortcutGroup {
-  title: string
-  entries: ShortcutEntry[]
-}
+import {
+  activeShortcuts,
+  appleModifierLabel,
+  mergeShortcutGroups,
+  type ShortcutGroup,
+} from "../composables/useHotkeys"
 
 const props = withDefaults(
   defineProps<{
     open?: boolean
-    groups: ShortcutGroup[]
+    groups?: ShortcutGroup[]
+    /** Also list the bindings mounted right now (`useHotkeys` with `help`). */
+    live?: boolean
     title?: string
     description?: string
-    /** Frosted glass panel, passed to LpModal. Off by default. */
+    /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
   }>(),
-  { open: false, title: "Keyboard shortcuts" },
+  { open: false, groups: () => [], live: false, title: "Keyboard shortcuts", glass: undefined },
 )
+
+/*
+ * One key per "+", except a "+" that is the key itself: "Ctrl++" is Ctrl and
+ * plus, not Ctrl and two blanks.
+ */
+function keysOf(combo: string): string[] {
+  return combo.split(/\+(?!$)/)
+}
+
+const shown = computed(() => (props.live ? mergeShortcutGroups(props.groups, activeShortcuts.value) : props.groups))
 
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
 </script>
@@ -49,13 +58,13 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
     @update:open="(value: boolean) => emit('update:open', value)"
   >
     <div class="shortcut-groups">
-      <section v-for="group in props.groups" :key="group.title" class="shortcut-group">
+      <section v-for="group in shown" :key="group.title" class="shortcut-group">
         <h3>{{ group.title }}</h3>
         <dl>
           <div v-for="entry in group.entries" :key="entry.combo" class="shortcut-row">
             <dt>{{ entry.label }}</dt>
             <dd>
-              <kbd v-for="(key, index) in entry.combo.split('+')" :key="`${key}-${index}`">
+              <kbd v-for="(key, index) in keysOf(entry.combo)" :key="`${key}-${index}`">
                 {{ appleModifierLabel(key.trim()) }}
               </kbd>
             </dd>
