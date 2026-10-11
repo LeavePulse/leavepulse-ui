@@ -780,6 +780,11 @@ function onEscape(event: KeyboardEvent) {
 // into the mode someone left three screens deep is never what they meant by
 // ⌘K, and a pending request from last time is dropped rather than landing in
 // the new list.
+//
+// Immediate, because a palette mounted already open — lazily, on the first
+// ⌘K — never sees `open` change, and reka's own auto-focus is turned off
+// below: without this the first open left focus on the page and the first
+// keystrokes went nowhere.
 watch(
   () => props.open,
   async (o) => {
@@ -795,6 +800,7 @@ watch(
       inputRef.value?.focus()
     }
   },
+  { immediate: true },
 )
 
 // Through useHotkeys rather than a listener of its own: the palette is the one
