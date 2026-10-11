@@ -6,9 +6,11 @@
  * arrows move the highlight — the pattern the LeavePulse frontend palette uses.
  *
  * Presentation-only and data-agnostic: the consumer supplies `commands` (a
- * composable can assemble them from routes/docs/API). Scoring ranks label >
- * keywords > description; matches are highlighted; the active row scrolls into
- * view. Open state is v-model:open; a global ⌘K/Ctrl-K toggle is on by default.
+ * composable can assemble them from routes/docs/API). Every query word must
+ * hit, in any order; scoring ranks label > keywords > description > a typo in
+ * the label, with a keyboard-layout retry when nothing matches; matches are
+ * highlighted; the active row scrolls into view. Open state is v-model:open;
+ * a global ⌘K/Ctrl-K toggle is on by default.
  *
  * Three things a palette outgrows the moment it stops being a list of routes,
  * all of them here rather than in each app that hit the wall:
@@ -160,6 +162,12 @@ const props = withDefaults(
      * other group off the screen. 0 shows everything.
      */
     groupLimit?: number
+    /**
+     * When the query matches nothing, retry it as if typed in the other
+     * keyboard layout (QWERTY ↔ ЙЦУКЕН). Off for an app whose commands are
+     * meant to be typed in one layout only.
+     */
+    layoutFallback?: boolean
   }>(),
   {
     placeholder: "Type a command or search…",
@@ -172,6 +180,7 @@ const props = withDefaults(
     resultsLabel: "Results",
     excerptLines: 4,
     groupLimit: 0,
+    layoutFallback: true,
   },
 )
 
@@ -331,25 +340,97 @@ function refresh() {
  */
 const source = computed<Command[]>(() => (mode.value ? modeItems.value : props.commands))
 
-// No query → everything (grouped). With a query, score by where it hits:
-// label > keywords > description, then alphabetical. Mirrors the app palette.
-const ranked = computed<Command[]>(() => {
-  const q = query.value.trim().toLowerCase()
-  // Empty query: show everything EXCEPT hidden commands (they only surface once
-  // typed). With a query, hidden commands rank like any other.
-  if (!q) return source.value.filter((c) => !c.hidden)
-  return source.value
-    .map((c) => {
-      const label = c.label.toLowerCase().includes(q)
-      const kw = (c.keywords ?? []).some((k) => k.toLowerCase().includes(q))
-      const desc = c.description?.toLowerCase().includes(q) ?? false
-      const score = (label ? 4 : 0) + (kw ? 3 : 0) + (desc ? 2 : 0)
-      return { c, score }
-    })
+/*
+ * Keyboard layouts typed through each other: the query "cthdth" is "сервер"
+ * typed with the wrong layout on. Only the QWERTY ↔ ЙЦУКЕН pair is mapped —
+ * the one bilingual setup common enough to be worth a table — and it is a
+ * fallback, tried only when the query as typed matches nothing.
+ */
+const LATIN = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`"
+const CYRILLIC = "йцукенгшщзхъфывапролджэячсмитьбюё"
+const SWAP = new Map<string, string>()
+for (let i = 0; i < LATIN.length; i++) {
+  SWAP.set(LATIN[i]!, CYRILLIC[i]!)
+  SWAP.set(CYRILLIC[i]!, LATIN[i]!)
+}
+
+function swapLayout(term: string): string {
+  return [...term].map((ch) => SWAP.get(ch) ?? ch).join("")
+}
+
+/** Damerau-Levenshtein distance, giving up past 1: all a typo check needs. */
+function withinOne(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  if (i === a.length || i === b.length) return true
+  const rest = (x: number, y: number) => a.slice(i + x) === b.slice(i + y)
+  return rest(1, 1) || rest(1, 0) || rest(0, 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && rest(2, 2))
+}
+
+/*
+ * A typo in a word long enough to have one: a slip in a three-letter word
+ * makes it a different word. Compared against the word and its start, so
+ * "deplyo" finds "deploy" and "deployment" alike.
+ */
+const TYPO_MIN = 5
+function nearWord(term: string, label: string): boolean {
+  if (term.length < TYPO_MIN) return false
+  return label
+    .split(/[^\p{L}\p{N}]+/u)
+    .some((word) => withinOne(term, word) || (word.length > term.length && withinOne(term, word.slice(0, term.length))))
+}
+
+/*
+ * Every word of the query has to land somewhere, in any order: "branch deploy"
+ * finds "Deploy current branch". Per word, label > keywords > description,
+ * the same weights the palette always had; a typo match ranks below all of
+ * them, so an exact hit is never outranked by a near one.
+ */
+function score(c: Command, terms: string[]): number {
+  const label = c.label.toLowerCase()
+  const keywords = (c.keywords ?? []).map((k) => k.toLowerCase())
+  const description = c.description?.toLowerCase() ?? ""
+  let total = 0
+  for (const term of terms) {
+    let hit =
+      (label.includes(term) ? 4 : 0) +
+      (keywords.some((k) => k.includes(term)) ? 3 : 0) +
+      (description.includes(term) ? 2 : 0)
+    if (!hit && nearWord(term, label)) hit = 1
+    if (!hit) return 0
+    total += hit
+  }
+  return total
+}
+
+function rank(items: Command[], terms: string[]): Command[] {
+  return items
+    .map((c) => ({ c, score: score(c, terms) }))
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score || a.c.label.localeCompare(b.c.label))
     .map((e) => e.c)
+}
+
+const typedTerms = computed(() => query.value.trim().toLowerCase().split(/\s+/).filter(Boolean))
+
+/*
+ * The local match and the terms it matched with — the swapped ones when the
+ * layout fallback is what found it, so the highlight marks what actually hit.
+ */
+const local = computed<{ items: Command[]; terms: string[] }>(() => {
+  const terms = typedTerms.value
+  // Empty query: show everything EXCEPT hidden commands (they only surface once
+  // typed). With a query, hidden commands rank like any other.
+  if (!terms.length) return { items: source.value.filter((c) => !c.hidden), terms }
+  const items = rank(source.value, terms)
+  if (items.length || !props.layoutFallback) return { items, terms }
+  const swapped = terms.map(swapLayout)
+  const other = rank(source.value, swapped)
+  return other.length ? { items: other, terms: swapped } : { items, terms }
 })
+
+const ranked = computed<Command[]>(() => local.value.items)
 
 /*
  * Fetched results sit under their own heading unless they brought a group of
@@ -442,8 +523,7 @@ interface Part {
   hit: boolean
 }
 function highlight(value: string, extra: string[] = []): Part[] {
-  const typed = query.value.toLowerCase().trim().split(/\s+/)
-  const terms = [...new Set([...typed, ...extra.map((t) => t.toLowerCase())].filter((t) => t.length >= 2))].sort(
+  const terms = [...new Set([...local.value.terms, ...extra.map((t) => t.toLowerCase())].filter((t) => t.length >= 2))].sort(
     (a, b) => b.length - a.length,
   )
   if (!value || terms.length === 0) return value ? [{ text: value, hit: false }] : []
