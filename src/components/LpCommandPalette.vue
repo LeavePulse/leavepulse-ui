@@ -108,6 +108,12 @@ export interface Command {
    * and "copy link" after its own.
    */
   actions?: Command[]
+  /**
+   * The whole text behind this result, for the preview pane (`previewPane`):
+   * the section a docs hit points into, the ticket body, the message. Line
+   * breaks are kept. Without it the pane shows the `excerpt`.
+   */
+  preview?: string
   onSelect?: () => void
 }
 
@@ -130,6 +136,8 @@ export interface PaletteLabels {
   copyLink: string
   /** Toast after "copy link"; empty for none. */
   linkCopied: string
+  /** The preview pane when the highlighted row has nothing to show. */
+  noPreview: string
 }
 
 const props = withDefaults(
@@ -182,6 +190,15 @@ const props = withDefaults(
      * meant to be typed in one layout only.
      */
     layoutFallback?: boolean
+    /**
+     * A pane beside the list showing the highlighted result in full — its
+     * `preview` text, or the `preview` slot. For palettes that search
+     * content rather than commands: the excerpt says why a row matched, the
+     * pane lets it be read without leaving the page. Opt-in and fixed while
+     * open, so the dialog does not change width as results come and go.
+     * Hidden below the md breakpoint, where there is no room beside the list.
+     */
+    previewPane?: boolean
   }>(),
   {
     placeholder: "Type a command or search…",
@@ -195,6 +212,7 @@ const props = withDefaults(
     excerptLines: 4,
     groupLimit: 0,
     layoutFallback: true,
+    previewPane: false,
   },
 )
 
@@ -211,6 +229,7 @@ const DEFAULT_LABELS: PaletteLabels = {
   openInNewTab: "Open in new tab",
   copyLink: "Copy link",
   linkCopied: "Link copied",
+  noPreview: "No preview",
 }
 
 const text = computed<PaletteLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
@@ -573,6 +592,35 @@ function folded(name: string, items: Command[]): Command[] {
 
 // Flat list in render order — what arrow keys walk through.
 const flat = computed(() => grouped.value.flatMap((g) => g.items))
+
+defineSlots<{
+  /** Body of the preview pane for the highlighted command. */
+  preview?: (props: { command: Command }) => unknown
+}>()
+
+const active = computed<Command | undefined>(() => {
+  const c = flat.value[selectedIndex.value]
+  return c && !moreOf.has(c) ? c : undefined
+})
+const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
+
+/*
+ * A preview is opened for the match, so the pane lands on it: the first
+ * highlighted word is brought into view, and a result without one starts
+ * from the top rather than wherever the previous result was scrolled to.
+ */
+watch(
+  () => active.value?.id,
+  async () => {
+    if (!props.previewPane) return
+    await nextTick()
+    const viewport = previewRef.value?.viewportEl
+    if (!viewport) return
+    const mark = viewport.querySelector("mark")
+    if (mark) mark.scrollIntoView({ block: "center" })
+    else viewport.scrollTop = 0
+  },
+)
 function flatIndexOf(c: Command): number {
   return flat.value.indexOf(c)
 }
@@ -775,6 +823,7 @@ useHotkeys(() =>
       />
       <DialogContent
         class="fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] w-[min(92vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line lp-glass-overlay shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        :class="previewPane && 'md:h-[min(76vh,36rem)] md:w-[min(92vw,64rem)]'"
         @open-auto-focus.prevent
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>
@@ -827,114 +876,145 @@ useHotkeys(() =>
         </div>
 
         <!-- Results -->
-        <LpScrollArea ref="scrollRef" class="min-h-0 flex-1" content-class="p-2">
-          <!-- While a request is out there is nothing to say yet: "no results"
-               under a spinner reads as an answer, and it is not one. -->
-          <p v-if="flat.length === 0 && !failed" class="px-2 py-10 text-center text-sm text-muted">
-            {{ searching ? text.searching : emptyText }}
-          </p>
+        <div class="flex min-h-0 flex-1">
+          <LpScrollArea ref="scrollRef" class="min-h-0 min-w-0 flex-1" content-class="p-2">
+            <!-- While a request is out there is nothing to say yet: "no results"
+                 under a spinner reads as an answer, and it is not one. -->
+            <p v-if="flat.length === 0 && !failed" class="px-2 py-10 text-center text-sm text-muted">
+              {{ searching ? text.searching : emptyText }}
+            </p>
 
-          <div :id="listId" role="listbox">
-            <div
-              v-for="(group, gi) in grouped"
-              :key="group.name"
-              role="group"
-              :aria-labelledby="group.name ? `${listId}-g${gi}` : undefined"
-            >
+            <div :id="listId" role="listbox">
               <div
-                v-if="group.name"
-                :id="`${listId}-g${gi}`"
-                class="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+                v-for="(group, gi) in grouped"
+                :key="group.name"
+                role="group"
+                :aria-labelledby="group.name ? `${listId}-g${gi}` : undefined"
               >
-                {{ group.name }}
+                <div
+                  v-if="group.name"
+                  :id="`${listId}-g${gi}`"
+                  class="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+                >
+                  {{ group.name }}
+                </div>
+                <!-- tabindex -1: the rows are reached with the arrows from the box,
+                     so Tab should not walk through every one of them. -->
+                <component
+                  :is="c.href ? 'a' : 'button'"
+                  v-for="c in group.items"
+                  :id="optionId(flatIndexOf(c))"
+                  :key="c.id"
+                  :href="c.disabled ? undefined : c.href"
+                  :type="c.href ? undefined : 'button'"
+                  role="option"
+                  tabindex="-1"
+                  :aria-selected="flatIndexOf(c) === selectedIndex"
+                  :aria-disabled="c.disabled || undefined"
+                  :data-cmd-index="flatIndexOf(c)"
+                  :disabled="c.href ? undefined : c.disabled"
+                  class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
+                  :class="[
+                    c.excerpt ? 'items-start' : 'items-center',
+                    flatIndexOf(c) === selectedIndex
+                      ? 'bg-brand-soft text-brand'
+                      : moreOf.has(c)
+                        ? 'text-muted hover:bg-surface-soft/60'
+                        : 'text-ink hover:bg-surface-soft/60',
+                  ]"
+                  @click="onRowClick($event, c)"
+                  @pointerenter="selectedIndex = flatIndexOf(c)"
+                >
+                  <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate font-medium">
+                      <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
+                        <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
+                        <template v-else>{{ p.text }}</template>
+                      </template>
+                    </span>
+                    <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
+                      <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
+                        <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
+                        <template v-else>{{ p.text }}</template>
+                      </template>
+                    </span>
+                    <!-- Wraps rather than truncates: a passage cut to one line
+                         stops before the part that explains the match. Ink, not
+                         brand, on the active row: a paragraph in accent colour is
+                         hard to read. -->
+                    <span
+                      v-if="c.excerpt"
+                      class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
+                      :style="{ '-webkit-line-clamp': excerptLines }"
+                    >
+                      <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
+                        <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
+                        <template v-else>{{ p.text }}</template>
+                      </template>
+                    </span>
+                  </span>
+                  <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
+                  <!-- Drills in rather than runs: worth saying before the click,
+                       since the two look identical otherwise. -->
+                  <LpIcon
+                    v-else-if="c.children"
+                    name="lucide:chevron-right"
+                    :size="14"
+                    class="shrink-0 text-muted"
+                  />
+                </component>
               </div>
-              <!-- tabindex -1: the rows are reached with the arrows from the box,
-                   so Tab should not walk through every one of them. -->
-              <component
-                :is="c.href ? 'a' : 'button'"
-                v-for="c in group.items"
-                :id="optionId(flatIndexOf(c))"
-                :key="c.id"
-                :href="c.disabled ? undefined : c.href"
-                :type="c.href ? undefined : 'button'"
-                role="option"
-                tabindex="-1"
-                :aria-selected="flatIndexOf(c) === selectedIndex"
-                :aria-disabled="c.disabled || undefined"
-                :data-cmd-index="flatIndexOf(c)"
-                :disabled="c.href ? undefined : c.disabled"
-                class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
-                :class="[
-                  c.excerpt ? 'items-start' : 'items-center',
-                  flatIndexOf(c) === selectedIndex
-                    ? 'bg-brand-soft text-brand'
-                    : moreOf.has(c)
-                      ? 'text-muted hover:bg-surface-soft/60'
-                      : 'text-ink hover:bg-surface-soft/60',
-                ]"
-                @click="onRowClick($event, c)"
-                @pointerenter="selectedIndex = flatIndexOf(c)"
+            </div>
+            <!-- Below what was found: the static matches are still worth
+                 picking, and the failure is about the part that is missing. -->
+            <div
+              v-if="failed"
+              role="alert"
+              class="flex items-center justify-center gap-2 px-2 text-sm text-muted"
+              :class="flat.length ? 'pb-1 pt-3' : 'py-10'"
+            >
+              <LpIcon name="lucide:circle-alert" :size="15" class="shrink-0" />
+              <span>{{ text.searchFailed }}</span>
+              <button
+                type="button"
+                class="rounded-md px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
+                @click="refresh(); inputRef?.focus()"
               >
-                <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate font-medium">
-                    <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
+                {{ text.retry }}
+              </button>
+            </div>
+          </LpScrollArea>
+          <aside
+            v-if="previewPane"
+            class="hidden min-h-0 w-[56%] shrink-0 flex-col border-l border-line md:flex"
+          >
+            <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
+              <template v-if="active">
+                <slot name="preview" :command="active">
+                  <div class="flex items-center gap-2 text-ink">
+                    <LpIcon v-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
+                    <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
+                  </div>
+                  <p v-if="active.description" class="mt-0.5 text-xs text-muted">{{ active.description }}</p>
+                  <p
+                    v-if="active.preview || active.excerpt"
+                    class="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
+                  >
+                    <template
+                      v-for="(p, pi) in highlight(active.preview ?? active.excerpt ?? '', active.highlight)"
+                      :key="`p${pi}`"
+                    >
                       <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
                       <template v-else>{{ p.text }}</template>
                     </template>
-                  </span>
-                  <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
-                    <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
-                      <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                      <template v-else>{{ p.text }}</template>
-                    </template>
-                  </span>
-                  <!-- Wraps rather than truncates: a passage cut to one line
-                       stops before the part that explains the match. Ink, not
-                       brand, on the active row: a paragraph in accent colour is
-                       hard to read. -->
-                  <span
-                    v-if="c.excerpt"
-                    class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
-                    :style="{ '-webkit-line-clamp': excerptLines }"
-                  >
-                    <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
-                      <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                      <template v-else>{{ p.text }}</template>
-                    </template>
-                  </span>
-                </span>
-                <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
-                <!-- Drills in rather than runs: worth saying before the click,
-                     since the two look identical otherwise. -->
-                <LpIcon
-                  v-else-if="c.children"
-                  name="lucide:chevron-right"
-                  :size="14"
-                  class="shrink-0 text-muted"
-                />
-              </component>
-            </div>
-          </div>
-          <!-- Below what was found: the static matches are still worth
-               picking, and the failure is about the part that is missing. -->
-          <div
-            v-if="failed"
-            role="alert"
-            class="flex items-center justify-center gap-2 px-2 text-sm text-muted"
-            :class="flat.length ? 'pb-1 pt-3' : 'py-10'"
-          >
-            <LpIcon name="lucide:circle-alert" :size="15" class="shrink-0" />
-            <span>{{ text.searchFailed }}</span>
-            <button
-              type="button"
-              class="rounded-md px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
-              @click="refresh(); inputRef?.focus()"
-            >
-              {{ text.retry }}
-            </button>
-          </div>
-        </LpScrollArea>
+                  </p>
+                  <p v-else class="mt-3 text-sm text-muted">{{ text.noPreview }}</p>
+                </slot>
+              </template>
+            </LpScrollArea>
+          </aside>
+        </div>
 
         <!-- Footer hints -->
         <div

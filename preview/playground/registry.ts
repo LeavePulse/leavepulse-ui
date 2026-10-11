@@ -1074,7 +1074,7 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `recent` floats what this person actually runs to the top.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
     components: { LpCommandPalette, LpButton },
     state: () => {
       const s: any = reactive({
@@ -1136,6 +1136,8 @@ export const registry: ComponentEntry[] = [
               excerpt:
                 "A rollback redeploys the previous release instead of reverting commits, so it takes seconds and needs no build. It is the first move when a deploy breaks production; fix forward once the incident is over. Rollbacks keep the database as it is: a release that ran a migration needs the migration's down step first.",
               highlight: ["deploy", "deploys", "deployed"],
+              preview:
+                "A rollback redeploys the previous release instead of reverting commits, so it takes seconds and needs no build. It is the first move when a deploy breaks production; fix forward once the incident is over.\n\nRollbacks keep the database as it is: a release that ran a migration needs the migration's down step first, or the old code meets a schema it does not know.\n\nTo roll back, open the service, pick the release under History and choose Redeploy. The previous build is kept for thirty days; older ones need a fresh build from their commit.",
             },
             {
               id: "docs:secrets",
@@ -1145,6 +1147,8 @@ export const registry: ComponentEntry[] = [
               excerpt:
                 "Secrets are injected at start, never baked into the image. Changing one restarts the services that read it; the rest keep running. A deployed secret is never shown again in the dashboard, only replaced.",
               highlight: ["deployed"],
+              preview:
+                "Secrets are injected at start, never baked into the image. Changing one restarts the services that read it; the rest keep running.\n\nA deployed secret is never shown again in the dashboard, only replaced. Keep the source of truth in your password manager, not in the dashboard.",
             },
           ]
           const text = q.toLowerCase()
@@ -1169,6 +1173,7 @@ export const registry: ComponentEntry[] = [
     :search="docs"
     :recent="recent"
     :group-limit="3"
+    preview-pane
     @run="onRun"
   />
 </div>`,
