@@ -1104,7 +1104,7 @@ export const registry: ComponentEntry[] = [
         // palette's side — a query in, commands out, late answers discarded.
         people: async (q: string) => {
           await new Promise((r) => setTimeout(r, 250))
-          return ["Ada Lovelace", "Grace Hopper", "Alan Turing"]
+          return ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra", "Barbara Liskov", "Donald Knuth"]
             .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
             .map((n) => ({ id: `user:${n}`, label: n, description: "Open profile", icon: "lucide:user", group: "People" }))
         },
@@ -1157,6 +1157,7 @@ export const registry: ComponentEntry[] = [
     :commands="commands"
     :search="docs"
     :recent="recent"
+    :group-limit="3"
     @run="onRun"
   />
 </div>`,

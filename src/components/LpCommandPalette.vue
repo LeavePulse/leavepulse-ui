@@ -112,6 +112,8 @@ export interface PaletteLabels {
   /** Shown when `search` (or a fetching mode) threw. */
   searchFailed: string
   retry: string
+  /** The row that unfolds a group cut by `groupLimit`; `{count}` is how many are hidden. */
+  showMore: string
 }
 
 const props = withDefaults(
@@ -152,6 +154,12 @@ const props = withDefaults(
     labels?: Partial<PaletteLabels>
     /** Lines an `excerpt` may wrap to before it is clamped. */
     excerptLines?: number
+    /**
+     * Rows a group shows before folding the rest behind a "Show N more" row.
+     * One provider answering with thirty people would otherwise push every
+     * other group off the screen. 0 shows everything.
+     */
+    groupLimit?: number
   }>(),
   {
     placeholder: "Type a command or search…",
@@ -163,6 +171,7 @@ const props = withDefaults(
     recentLabel: "Recent",
     resultsLabel: "Results",
     excerptLines: 4,
+    groupLimit: 0,
   },
 )
 
@@ -174,6 +183,7 @@ const DEFAULT_LABELS: PaletteLabels = {
   searching: "Searching…",
   searchFailed: "Search is unavailable right now.",
   retry: "Retry",
+  showMore: "Show {count} more",
 }
 
 const text = computed<PaletteLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
@@ -391,8 +401,32 @@ const grouped = computed<{ name: string; items: Command[] }[]>(() => {
   // the same row on screen twice with nothing to tell them apart.
   for (const c of ranked.value) if (!recent.includes(c)) push(c, c.group ?? "")
   for (const c of fetched.value) push(c, c.group ?? "")
-  return order.map((name) => ({ name, items: map.get(name)! }))
+  return order.map((name) => ({ name, items: folded(name, map.get(name)!) }))
 })
+
+/*
+ * Groups unfolded by their "Show more" row. Reset with the list it applies
+ * to: a new query or another mode is a new list, and its groups start folded.
+ */
+const expanded = ref(new Set<string>())
+const moreOf = new WeakMap<Command, string>()
+
+/*
+ * Folding hides at least two rows: a "Show 1 more" row takes the same space
+ * as the row it hides.
+ */
+function folded(name: string, items: Command[]): Command[] {
+  const limit = props.groupLimit
+  if (!limit || items.length <= limit + 1 || expanded.value.has(name)) return items
+  const more: Command = {
+    id: `lp-cmd-more:${name}`,
+    label: text.value.showMore.replace("{count}", String(items.length - limit)),
+    icon: "lucide:chevron-down",
+    keepOpen: true,
+  }
+  moreOf.set(more, name)
+  return [...items.slice(0, limit), more]
+}
 
 // Flat list in render order — what arrow keys walk through.
 const flat = computed(() => grouped.value.flatMap((g) => g.items))
@@ -441,6 +475,9 @@ function highlight(value: string, extra: string[] = []): Part[] {
 watch(query, () => {
   selectedIndex.value = 0
   refresh()
+})
+watch([query, trail, () => props.open], () => {
+  expanded.value = new Set()
 })
 watch(
   () => flat.value.length,
@@ -497,6 +534,14 @@ function onRowClick(event: MouseEvent, c: Command) {
 
 function run(c: Command | undefined) {
   if (!c || c.disabled) return
+  // The highlight stays on the same index, which is now the first row that
+  // was hidden: the arrows carry on from where the fold was.
+  const group = moreOf.get(c)
+  if (group !== undefined) {
+    expanded.value = new Set([...expanded.value, group])
+    inputRef.value?.focus()
+    return
+  }
   emit("select", c)
   c.onSelect?.()
   if (!c.onSelect && c.href && !c.children) window.location.assign(c.href)
@@ -678,7 +723,11 @@ useHotkeys(() =>
                 class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
                 :class="[
                   c.excerpt ? 'items-start' : 'items-center',
-                  flatIndexOf(c) === selectedIndex ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-surface-soft/60',
+                  flatIndexOf(c) === selectedIndex
+                    ? 'bg-brand-soft text-brand'
+                    : moreOf.has(c)
+                      ? 'text-muted hover:bg-surface-soft/60'
+                      : 'text-ink hover:bg-surface-soft/60',
                 ]"
                 @click="onRowClick($event, c)"
                 @pointerenter="selectedIndex = flatIndexOf(c)"
