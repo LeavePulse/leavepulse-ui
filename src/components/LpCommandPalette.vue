@@ -109,6 +109,9 @@ export interface PaletteLabels {
   /** Hint for leaving a mode, shown only while inside one. */
   back: string
   searching: string
+  /** Shown when `search` (or a fetching mode) threw. */
+  searchFailed: string
+  retry: string
 }
 
 const props = withDefaults(
@@ -169,6 +172,8 @@ const DEFAULT_LABELS: PaletteLabels = {
   close: "close",
   back: "back",
   searching: "Searching…",
+  searchFailed: "Search is unavailable right now.",
+  retry: "Retry",
 }
 
 const text = computed<PaletteLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
@@ -275,9 +280,18 @@ function cancel() {
   task.cancel()
 }
 
+/*
+ * A provider that threw used to leave the list as if it had answered "nothing
+ * matches", which is a claim about the data the palette cannot make. A failure
+ * says so and offers the same request again. Aborts never land here: the task
+ * drops a superseded request before `fail` runs.
+ */
+const failed = ref(false)
+
 function refresh() {
   cancel()
   found.value = []
+  failed.value = false
   const run = fetcher()
   if (!run) return
   const q = query.value.trim()
@@ -286,11 +300,15 @@ function refresh() {
   // not — ⌘K would fire a request at every open.
   const inMode = mode.value !== null
   if (!inMode && q.length < Math.max(1, props.minChars)) return
-  // Abort or a failing provider: the static commands still stand.
+  // A failing provider: the static commands still stand, with a line saying
+  // that the rest could not be fetched.
   task.run((signal) => run(q, signal), {
     delay: props.debounce,
     apply: (hits) => (found.value = hits),
-    fail: () => (found.value = []),
+    fail: () => {
+      found.value = []
+      failed.value = true
+    },
   })
 }
 
@@ -536,6 +554,7 @@ watch(
     trail.value = []
     modeItems.value = []
     found.value = []
+    failed.value = false
     if (o) {
       await nextTick()
       inputRef.value?.focus()
@@ -623,7 +642,7 @@ useHotkeys(() =>
         <LpScrollArea ref="scrollRef" class="min-h-0 flex-1" content-class="p-2">
           <!-- While a request is out there is nothing to say yet: "no results"
                under a spinner reads as an answer, and it is not one. -->
-          <p v-if="flat.length === 0" class="px-2 py-10 text-center text-sm text-muted">
+          <p v-if="flat.length === 0 && !failed" class="px-2 py-10 text-center text-sm text-muted">
             {{ searching ? text.searching : emptyText }}
           </p>
 
@@ -704,6 +723,24 @@ useHotkeys(() =>
                 />
               </component>
             </div>
+          </div>
+          <!-- Below what was found: the static matches are still worth
+               picking, and the failure is about the part that is missing. -->
+          <div
+            v-if="failed"
+            role="alert"
+            class="flex items-center justify-center gap-2 px-2 text-sm text-muted"
+            :class="flat.length ? 'pb-1 pt-3' : 'py-10'"
+          >
+            <LpIcon name="lucide:circle-alert" :size="15" class="shrink-0" />
+            <span>{{ text.searchFailed }}</span>
+            <button
+              type="button"
+              class="rounded-md px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
+              @click="refresh(); inputRef?.focus()"
+            >
+              {{ text.retry }}
+            </button>
           </div>
         </LpScrollArea>
 

@@ -1113,6 +1113,8 @@ export const registry: ComponentEntry[] = [
         // server matched ("deploys", "deployed") next to the typed query. Each
         // hit is a link (`href`), so Ctrl-click or Ctrl+Enter opens a new tab.
         docs: async (q: string) => {
+          // Type "offline" to see a provider that throws.
+          if (q.toLowerCase() === "offline") throw new Error("offline")
           const found = await s.people(q)
           const pages = [
             {
