@@ -7,6 +7,7 @@ import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
+import { DEFAULT_MASK_TOKENS, useInputMask, type MaskSpec, type MaskTokens } from "../composables/useInputMask"
 import { mergeClass } from "../composables/useMergedClass"
 import LpFormField from "./LpFormField.vue"
 import LpIcon from "./LpIcon.vue"
@@ -73,16 +74,55 @@ const props = withDefaults(
      * disallowed input/paste at the source — cursor- and IME-safe.
      */
     restrict?: RegExp
+    /**
+     * Format-as-you-type mask ("+0 (000) 000-00-00", a list, or a function of
+     * the raw value). The model holds the masked text; `update:raw` carries
+     * the accepted characters alone.
+     */
+    mask?: MaskSpec
+    /** Extra or replacement mask tokens, one-character RegExps by key. */
+    maskTokens?: MaskTokens
   }>(),
   { type: "text", size: "md" },
 )
 
-defineEmits<{ (e: "update:modelValue", value: string): void }>()
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string): void
+  (e: "update:raw", value: string): void
+}>()
 
 const { isInvalid, onBeforeInput, onInput: filterInput, onCompositionEnd, onPaste } = useInputFilter({
   pattern: () => props.pattern,
   restrict: () => props.restrict,
 })
+
+const masking = useInputMask({
+  mask: () => props.mask,
+  tokens: () => (props.maskTokens ? { ...DEFAULT_MASK_TOKENS, ...props.maskTokens } : undefined),
+  onChange: (_masked, raw) => emit("update:raw", raw),
+})
+const shown = computed(() => (masking.active.value ? masking.format(props.modelValue).masked : props.modelValue))
+
+function onBefore(event: InputEvent): void {
+  onBeforeInput(event)
+  if (!event.defaultPrevented) masking.onBeforeInput(event)
+  if (event.defaultPrevented && masking.active.value && event.target instanceof HTMLInputElement) {
+    emit("update:modelValue", event.target.value)
+  }
+}
+
+function onInputEvent(event: Event): void {
+  if (masking.active.value) masking.onInput(event)
+  else filterInput(event)
+  emit("update:modelValue", (event.target as HTMLInputElement).value)
+}
+
+function onComposed(event: CompositionEvent): void {
+  if (masking.active.value) {
+    masking.onCompositionEnd(event)
+    emit("update:modelValue", (event.target as HTMLInputElement).value)
+  } else onCompositionEnd(event)
+}
 
 // Pattern failure folds into the same invalid state as the explicit prop/error.
 const patternInvalid = computed(() => isInvalid(props.modelValue))
@@ -150,7 +190,7 @@ defineExpose({
         v-bind="inputAttrs"
         :id="field.id"
         :type="type"
-        :value="modelValue"
+        :value="shown"
         :placeholder="placeholder"
         :disabled="field.disabled"
         :required="field.required || undefined"
@@ -161,10 +201,10 @@ defineExpose({
           hasLeading ? 'pl-2' : padX[size ?? 'md'],
           hasTrailing ? '' : padX[size ?? 'md'],
         ]"
-        @beforeinput="onBeforeInput"
+        @beforeinput="onBefore"
         @paste="onPaste"
-        @compositionend="onCompositionEnd"
-        @input="filterInput($event); $emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+        @compositionend="onComposed"
+        @input="onInputEvent"
       />
       <slot name="trailing" />
     </div>
