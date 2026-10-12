@@ -11,7 +11,8 @@ import {
   ToastTitle,
   ToastViewport,
 } from "reka-ui"
-import { onBeforeUnmount, ref, watch } from "vue"
+import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
+import { prefersReducedMotion } from "../composables/easing"
 import { useLabels } from "../composables/useLpConfig"
 import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
@@ -21,6 +22,52 @@ const props = defineProps<{ labels?: Partial<{ dismiss: string }> }>()
 const text = useLabels("toast", { dismiss: "Dismiss" }, () => props.labels)
 
 const { queue, dismiss } = useToast()
+
+/*
+ * The stack slides rather than jumps. A new toast lands at the bottom and the
+ * ones above used to leap up by its height in a single frame; one leaving let
+ * the rest drop the same way. Each toast's layout position (offsetTop, which
+ * ignores transforms) is remembered, and when the list changes every toast
+ * that moved is played from where it was to where it is (FLIP). The observer
+ * fires after the DOM changes and before the frame is painted, so the jump is
+ * never seen. Toasts render through reka's portal into the viewport, which is
+ * why this watches the DOM rather than a TransitionGroup.
+ */
+let observer: MutationObserver | undefined
+const tops = new WeakMap<Element, number>()
+
+function toastsIn(root: Element): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>("li[data-state]")]
+}
+
+function slide(root: Element) {
+  const reduce = prefersReducedMotion()
+  const height = (root as HTMLElement).offsetHeight
+  for (const el of toastsIn(root)) {
+    const before = tops.get(el)
+    const now = el.offsetTop - height
+    tops.set(el, now)
+    if (before === undefined || before === now || reduce || el.hasAttribute("data-swipe")) continue
+    el.animate([{ translate: `0 ${before - now}px` }, { translate: "0 0" }], {
+      duration: 220,
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
+    })
+  }
+}
+
+// The viewport's component root is a wrapper fragment, not the list, so the
+// list is found by a mark of its own once it is teleported into place.
+const viewportId = useId()
+onMounted(() =>
+  nextTick(() => {
+    const root = document.querySelector(`[data-lp-toasts="${viewportId}"]`)
+    if (!root || typeof MutationObserver === "undefined") return
+    for (const el of toastsIn(root)) tops.set(el, el.offsetTop - (root as HTMLElement).offsetHeight)
+    observer = new MutationObserver(() => slide(root))
+    observer.observe(root, { childList: true, subtree: true })
+  }),
+)
+onBeforeUnmount(() => observer?.disconnect())
 
 // A toast replaced through its `key` keeps its id and gets a new revision, so
 // everything tied to one rendered toast goes by both.
@@ -256,6 +303,7 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
          --z-toast (200) > --z-modal (110) wins as intended. -->
     <Teleport to="body">
       <ToastViewport
+        :data-lp-toasts="viewportId"
         class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 outline-none"
       />
     </Teleport>
