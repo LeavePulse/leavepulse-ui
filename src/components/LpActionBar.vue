@@ -209,7 +209,7 @@ onBeforeUnmount(() => observer?.disconnect())
          Reduced motion skips it entirely rather than holding a frame it never
          animated to. -->
     <Transition
-      enter-active-class="animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)]"
+      enter-active-class="animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none"
       leave-active-class="animate-[rise-out_var(--duration-fast)_ease_forwards] motion-reduce:animate-none"
     >
       <div

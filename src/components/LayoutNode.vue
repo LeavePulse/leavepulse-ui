@@ -1,10 +1,19 @@
 <script setup lang="ts">
-import { Motion } from "motion-v"
+import { Motion, useReducedMotion } from "motion-v"
 import { computed, onBeforeUnmount, ref } from "vue"
 import type { LayoutNode, Leaf, Side, Split } from "../layout/tree"
 import type { BlockRegistry } from "../layout/registry"
 import { blockTitle } from "../layout/registry"
 import LpIcon from "./LpIcon.vue"
+
+// Same spring as LpTabs' panel height; instant under reduced motion, which
+// motion-v does not apply on its own.
+const reduceMotion = useReducedMotion()
+const layoutTransition = computed(() =>
+  reduceMotion.value
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 },
+)
 
 const props = defineProps<{
   node: LayoutNode
@@ -185,7 +194,7 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
   <Motion
     v-else-if="leaf"
     :layout="true"
-    :transition="{ type: 'spring', stiffness: 520, damping: 42, mass: 0.9 }"
+    :transition="layoutTransition"
     class="relative flex min-h-0 min-w-0 flex-col"
     :class="{ 'opacity-35': dragId === node.id }"
   >

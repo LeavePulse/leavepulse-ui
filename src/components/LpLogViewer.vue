@@ -825,13 +825,13 @@ onBeforeUnmount(() => {
 // (a component :is can't carry TransitionGroup-only props inertly otherwise).
 const transitionProps = {
   tag: "ol",
-  "enter-active-class": "transition duration-200 ease-[var(--ease-emphasized)]",
+  "enter-active-class": "transition duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]",
   "enter-from-class": "-translate-x-1 opacity-0",
   "leave-active-class":
-    "overflow-hidden transition-all duration-200 ease-[var(--ease-emphasized)]",
+    "overflow-hidden transition-all duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]",
   "leave-from-class": "max-h-8 opacity-100",
   "leave-to-class": "max-h-0 -translate-y-1 opacity-0",
-  "move-class": "transition-transform duration-200 ease-[var(--ease-emphasized)]",
+  "move-class": "transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]",
 }
 
 // The viewer draws its own card frame and hides its overflow; a consumer
@@ -1068,13 +1068,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
                  Keyed on count so each new fold re-mounts the chip and pops it,
                  cueing where the duplicate just merged. -->
             <Transition
-              enter-active-class="inline-block transition duration-200 ease-[var(--ease-emphasized)]"
+              enter-active-class="transition duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]"
               enter-from-class="scale-50 opacity-0"
             >
               <span
                 v-if="count > 1"
                 :key="count"
-                class="ml-2 select-none rounded-pill bg-surface-soft px-1.5 align-[1px] text-[10px] font-semibold tabular-nums text-muted-strong"
+                class="ml-2 inline-block select-none rounded-pill bg-surface-soft px-1.5 align-[1px] text-[10px] font-semibold tabular-nums text-muted-strong"
                 :title="text.identical.replace('{n}', String(count))"
               >×{{ count }}</span>
             </Transition>
@@ -1095,9 +1095,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
          Transition rides an outer wrapper so its transform/opacity don't fight
          the button's own -translate-x-1/2 centring and hover colour transition. -->
     <Transition
-      enter-active-class="transition duration-200 ease-[var(--ease-emphasized)]"
+      enter-active-class="transition duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]"
       enter-from-class="translate-y-3 scale-90 opacity-0"
-      leave-active-class="transition duration-150 ease-in"
+      leave-active-class="transition duration-[var(--duration-fast)] ease-in"
       leave-to-class="translate-y-3 scale-90 opacity-0"
     >
       <div v-if="showJump" class="absolute inset-x-0 bottom-3 flex justify-center">
@@ -1109,7 +1109,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           <LpIcon
             name="lucide:arrow-down"
             :size="14"
-            class="transition-transform duration-200 ease-[var(--ease-emphasized)] group-hover:translate-y-0.5"
+            class="transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] group-hover:translate-y-0.5"
           />
           {{ text.jump }}
         </button>
