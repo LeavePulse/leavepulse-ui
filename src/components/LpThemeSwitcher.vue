@@ -34,9 +34,9 @@ const props = withDefaults(
     cycleThemes?: (string | TokenSet)[]
     /**
      * Trigger style:
-     *  - "swatch" (default): a square showing the active theme's brand colour.
+     *  - "swatch" (default): a round chip previewing the theme's surface and brand.
      *  - "icon": a sun/moon icon following the active theme's mode.
-     *  - "pill": swatch + the theme name in a pill (always shows the label).
+     *  - "pill": the chip and the theme name in a rounded pill.
      */
     variant?: "swatch" | "icon" | "pill"
     /** Show the active theme's name next to the trigger (forced on for "pill"). */
@@ -104,13 +104,11 @@ onMounted(() => {
 })
 
 const SIZES = { sm: "size-7", md: "size-8", lg: "size-9" } as const
+const HEIGHTS = { sm: "h-7", md: "h-8", lg: "h-9" } as const
 const ICON_SIZE = { sm: 15, md: 16, lg: 18 } as const
+const CHIP = { sm: "size-3.5", md: "size-4", lg: "size-[18px]" } as const
 
 const wantsLabel = computed(() => props.showLabel || props.variant === "pill")
-
-// Labelless icon variant renders as a plain square icon button (no border/fill),
-// so it sits inline with other toolbar icon buttons. Other variants stay framed.
-const bareIcon = computed(() => props.variant === "icon" && !wantsLabel.value)
 
 // Apply a theme through the kit's self-managed setter (it persists + updates
 // the shared `current`), then notify. The reveal animates from the click point.
@@ -228,30 +226,28 @@ const triggerLabel = computed(
       type="button"
       :aria-label="triggerLabel"
       :title="triggerLabel"
-      class="inline-flex items-center justify-center gap-2 rounded-control outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      class="inline-flex shrink-0 items-center justify-center gap-2 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
       :class="
-        bareIcon
-          ? [SIZES[size], 'text-muted hover:bg-surface-soft hover:text-ink']
-          : [
-              'border border-line bg-surface-raised px-1.5 text-ink hover:border-line-strong',
-              wantsLabel ? 'py-1 pr-2.5' : '',
+        wantsLabel
+          ? [
+              HEIGHTS[size],
+              'rounded-full border border-line bg-surface-raised pl-2 pr-3 text-ink hover:border-line-strong hover:bg-surface-soft',
             ]
+          : [SIZES[size], 'rounded-control text-muted hover:bg-surface-soft hover:text-ink']
       "
       @click="cycle"
     >
-      <!-- swatch: brand over surface, read from the applied variables rather
-           than the theme object, so the server's render (painted from the
-           cookie) and the client's agree without a hydration patch -->
+      <!-- A preview of the applied theme: its surface and brand halves. Read from
+           the applied variables rather than the theme object, so the server's
+           render (painted from the cookie) and the client's agree. -->
       <span
         v-if="variant !== 'icon'"
-        class="grid shrink-0 place-items-center rounded-control border border-line/60"
-        :class="SIZES[size]"
-        style="background: var(--color-surface)"
-      >
-        <span class="size-3 rounded-full" style="background: var(--color-brand)" />
-      </span>
-      <!-- icon: sun/moon by mode, chosen by CSS from the applied theme's mode -->
-      <span v-else class="grid shrink-0 place-items-center" :class="SIZES[size]">
+        class="shrink-0 rounded-full shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-ink)_22%,transparent)]"
+        :class="CHIP[size]"
+        style="background: linear-gradient(135deg, var(--color-surface) 50%, var(--color-brand) 50%)"
+      />
+      <!-- sun/moon by mode, chosen by CSS from the applied theme's mode -->
+      <span v-else class="grid shrink-0 place-items-center">
         <LpIcon
           name="lucide:moon"
           :size="ICON_SIZE[size]"
