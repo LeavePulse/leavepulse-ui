@@ -19,3 +19,11 @@ test("ranks a group scope and exclusion", () => {
   const terms = parseCommandQuery("in:server -archive")
   expect(rankCommandItems(items, terms).map((item) => item.id)).toEqual(["logs"])
 })
+
+test("a label that is exactly the query outranks one that merely contains it", () => {
+  const items = [
+    { id: "a", label: "ThemeSwitcher", keywords: ["theme-switcher"], description: "Theme picker" },
+    { id: "b", label: "Theme", keywords: ["theme"] },
+  ]
+  expect(rankCommandItems(items, parseCommandQuery("theme")).map((c) => c.id)).toEqual(["b", "a"])
+})

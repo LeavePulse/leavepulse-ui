@@ -63,6 +63,12 @@ function score(command: SearchableCommand, terms: CommandSearchTerms): number {
     if (!hit) return 0
     total += hit
   }
+  // A label that IS what was typed, or starts with it, is what the person is
+  // naming: "theme" must put the Theme command above ThemeSwitcher, which only
+  // contains the word but also matches its keywords and description.
+  const typed = terms.include.join(" ")
+  if (typed && label === typed) total += 6
+  else if (typed && label.startsWith(typed)) total += 2
   return total
 }
 

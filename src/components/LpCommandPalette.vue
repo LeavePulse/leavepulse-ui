@@ -181,6 +181,12 @@ const props = withDefaults(
      * so a stored history never resurrects a command that has gone away.
      */
     recent?: string[]
+    /**
+     * Let the palette keep the history itself, in localStorage under this key:
+     * every top-level command run is remembered, newest first. Ignored while
+     * `recent` is bound, which stays the way to store it somewhere else.
+     */
+    recentKey?: string
     /** How many recent commands to surface. */
     recentLimit?: number
     /** Headings the palette adds itself. */
@@ -351,6 +357,31 @@ function onTab(event: KeyboardEvent) {
   enter({ id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions })
 }
 
+/*
+ * A mode holds the command it was entered through, and a static `children`
+ * list is a snapshot of that moment. When the app rebuilds its commands (a
+ * theme list whose tick follows the active theme), the open mode is matched
+ * to the new commands by id along its path and takes their children, so a
+ * `keepOpen` pick inside it shows its own effect.
+ */
+watch(
+  () => props.commands,
+  (commands) => {
+    if (!trail.value.length) return
+    let level: Command[] = commands
+    const next: Command[] = []
+    for (const step of trail.value) {
+      const fresh = level.find((c) => c.id === step.id)
+      if (!fresh) return
+      next.push(fresh)
+      level = Array.isArray(fresh.children) ? fresh.children : []
+    }
+    trail.value = next
+    const last = next[next.length - 1]
+    if (last && Array.isArray(last.children)) modeItems.value = last.children
+  },
+)
+
 function enter(c: Command) {
   trailState.value = [...trailState.value, { query: query.value, selectedId: selectedId.value }]
   trail.value = [...trail.value, c]
@@ -498,11 +529,36 @@ const fetched = computed<Command[]>(() => {
  * Only on the root's empty query: once someone types, or drills into a mode,
  * relevance is the better order and a duplicated row is just noise.
  */
+const RECENT_KEEP = 20
+const ownRecent = ref<string[]>([])
+watch(
+  () => props.recentKey,
+  (key) => {
+    if (!key || typeof localStorage === "undefined") return
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]")
+      ownRecent.value = Array.isArray(stored) ? stored.filter((v): v is string => typeof v === "string") : []
+    } catch {
+      ownRecent.value = []
+    }
+  },
+  { immediate: true },
+)
+function remember(id: string) {
+  const key = props.recentKey
+  if (!key || props.recent) return
+  ownRecent.value = [id, ...ownRecent.value.filter((v) => v !== id)].slice(0, RECENT_KEEP)
+  try {
+    localStorage.setItem(key, JSON.stringify(ownRecent.value))
+  } catch {}
+}
+const recentIds = computed(() => props.recent ?? (props.recentKey ? ownRecent.value : []))
+
 const recentItems = computed<Command[]>(() => {
-  if (mode.value || query.value.trim() || !props.recent?.length) return []
+  if (mode.value || query.value.trim() || !recentIds.value.length) return []
   const byId = new Map(props.commands.map((c) => [c.id, c]))
   const out: Command[] = []
-  for (const id of props.recent) {
+  for (const id of recentIds.value) {
     const c = byId.get(id)
     if (c && !c.disabled && !out.includes(c)) out.push(c)
     if (out.length >= props.recentLimit) break
@@ -768,11 +824,16 @@ function run(c: Command | undefined) {
     return
   }
   emit("run", c.id, c)
+  if (!mode.value) remember(c.id)
   if (c.keepOpen) {
     // Back to the top of a fresh list: the query that found this command is
     // spent, and leaving it would hide whatever the action just changed.
     query.value = ""
-    select(0)
+    // Inside a mode the highlight stays on what was just picked, so trying
+    // themes one after another is a matter of the arrow keys; at the root the
+    // list it came from is gone and the top is the honest place to land.
+    if (mode.value) void nextTick(() => select(Math.max(0, flat.value.findIndex((x) => x.id === c.id))))
+    else select(0)
     inputRef.value?.focus()
     return
   }

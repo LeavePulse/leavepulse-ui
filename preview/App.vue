@@ -10,11 +10,14 @@ import {
   LpEmptyState,
   LpIcon,
   LpScrollArea,
+  LpShortcutsDialog,
   LpToaster,
   presets,
   type RevealOrigin,
+  useHotkeys,
   useTheme,
   type PresetName,
+  type ShortcutGroup,
   type TokenSet,
 } from "../src"
 import ComponentPage from "./playground/ComponentPage.vue"
@@ -140,16 +143,26 @@ const paletteOpen = ref(false)
 // page is about, so the site palette steps aside there.
 const siteHotkey = computed(() => !(route.value.kind === "component" && route.value.id === "commandpalette"))
 
+/*
+ * The palette the way an app would use it: a history it keeps itself, the
+ * description in the preview pane, every row a real link (so Tab offers "open
+ * in new tab" and "copy link"), themes behind one row that drills into its
+ * own list and stays open while you try them, and G-then-key jumps.
+ */
+const pageLink = (id: string) => href({ kind: "page", id })
+
 const commands = computed<Command[]>(() => [
   ...registry.map((entry) => ({
     id: `component/${entry.id}`,
     label: entry.name,
     description: entry.description,
+    preview: entry.description,
     icon: "lucide:box",
     group: "Components",
     // The description is prose, so searching it alone misses the id a consumer
     // actually types ("otp", "toc"). Match that too.
     keywords: [entry.id],
+    href: href({ kind: "component", id: entry.id }),
     onSelect: () => navigate({ kind: "component", id: entry.id }),
   })),
   ...Object.entries(PAGE_TITLES).map(([id, title]) => ({
@@ -158,17 +171,67 @@ const commands = computed<Command[]>(() => [
     icon: "lucide:layout-dashboard",
     group: "Pages",
     keywords: [id],
+    shortcut: GOTO.find((g) => g.page === id)?.combo,
+    href: pageLink(id),
     onSelect: () => navigate({ kind: "page", id }),
   })),
-  ...THEMES.map((name) => ({
-    id: `theme/${name}`,
-    label: presets[name].name,
-    icon: THEME_ICON[name],
-    group: "Theme",
-    keywords: ["theme", name],
-    onSelect: () => setTheme(name),
-  })),
+  {
+    id: "theme",
+    label: "Theme",
+    description: `Now: ${presets[theme.value].name}`,
+    icon: "lucide:palette",
+    group: "Preferences",
+    keywords: ["theme", "dark", "light", ...THEMES],
+    childPlaceholder: "Pick a theme…",
+    children: THEMES.map((name) => ({
+      id: `theme/${name}`,
+      label: presets[name].name,
+      icon: theme.value === name ? "lucide:check" : THEME_ICON[name],
+      keepOpen: true,
+      onSelect: () => setTheme(name),
+    })),
+  },
+  {
+    id: "shortcuts",
+    label: "Keyboard shortcuts",
+    icon: "lucide:keyboard",
+    group: "Preferences",
+    shortcut: "F1",
+    onSelect: () => (shortcutsOpen.value = true),
+  },
 ])
+
+const GOTO = [
+  { key: "h", combo: "G H", label: "Home", go: () => navigate({ kind: "home" }), page: "" },
+  { key: "s", combo: "G S", label: "Landing showcase", go: () => navigate({ kind: "page", id: "showcase" }), page: "showcase" },
+  { key: "l", combo: "G L", label: "Layout canvas", go: () => navigate({ kind: "page", id: "layout" }), page: "layout" },
+  { key: "i", combo: "G I", label: "Infra canvas", go: () => navigate({ kind: "page", id: "infra" }), page: "infra" },
+  { key: "a", combo: "G A", label: "App shell", go: () => navigate({ kind: "page", id: "appshell" }), page: "appshell" },
+]
+useHotkeys(
+  GOTO.map((g) => ({
+    sequence: `g ${g.key}`,
+    help: { group: "Go to", label: g.label },
+    handler: g.go,
+  })),
+)
+
+// F1 opens the site's key reference, which lists what is bound right now. The
+// ShortcutsDialog page mounts its own F1 example, so the site steps aside there.
+const shortcutsOpen = ref(false)
+const siteShortcutsKey = computed(() =>
+  route.value.kind === "component" && route.value.id === "shortcuts-dialog" ? undefined : "F1",
+)
+const SITE_KEYS: ShortcutGroup[] = [
+  {
+    title: "Palette",
+    entries: [
+      { combo: "Ctrl+K", label: "Open the palette" },
+      { combo: "Tab", label: "Actions for the highlighted row" },
+      { combo: "Ctrl+Enter", label: "Open the highlighted row in a new tab" },
+    ],
+  },
+]
 
 const chip = "rounded-control px-3 py-1.5 text-sm transition-colors"
 const on = "bg-surface-soft text-ink"
@@ -229,7 +292,17 @@ const on = "bg-surface-soft text-ink"
       v-model:open="paletteOpen"
       :hotkey="siteHotkey"
       :commands="commands"
+      recent-key="lp-preview-palette-recent"
+      preview-pane
+      :group-limit="8"
       placeholder="Jump to a component, page or theme…"
+    />
+    <LpShortcutsDialog
+      v-model:open="shortcutsOpen"
+      :hotkey="siteShortcutsKey"
+      :groups="SITE_KEYS"
+      live
+      description="What the keyboard does on this site, including the keys bound on the page you are on."
     />
 
     <LpToaster />
