@@ -18,6 +18,7 @@ export default { inheritAttrs: false }
  */
 import { Motion } from "motion-v"
 import { computed, ref, shallowRef, watch, onMounted, onBeforeUnmount } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
@@ -25,6 +26,8 @@ import {
   areaPath,
   axisTicks,
   barPath,
+  chartSummary,
+  markerIndex,
   extent,
   formatTick,
   linePath,
@@ -38,12 +41,22 @@ import {
   xAt,
   yAt,
   type Box,
+  type ChartMarker,
   type ChartSeries,
+  type ChartThreshold,
 } from "./chart"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpShift from "./LpShift.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+
+export interface ChartText {
+  [key: string]: string
+  empty: string
+  rightAxis: string
+  /** Prefix of the keyboard readout, before the point's label. */
+  point: string
+}
 
 /** What was under the pointer when a point was clicked or right-clicked. */
 export interface ChartPointEvent {
@@ -94,6 +107,16 @@ const props = withDefaults(
     animate?: boolean
     /** Shown when every series is empty. */
     emptyLabel?: string
+    /** Reference lines and bands (SLOs, budgets, alert levels). */
+    thresholds?: ChartThreshold[]
+    /** Vertical markers at x positions (deploys, incidents). */
+    markers?: ChartMarker[]
+    /** Accessible name for the plot. Defaults to a generated summary. */
+    ariaLabel?: string
+    /** Render the data as a visually hidden table for screen readers. */
+    dataTable?: boolean
+    /** Text overrides (`labels` is taken by the x axis). */
+    text?: Partial<ChartText>
     /**
      * Right-click menu for a point, built from whatever was hit. Return [] to
      * leave the browser's own menu alone for that point. Which actions a point
@@ -113,8 +136,16 @@ const props = withDefaults(
     showLegend: true,
     yTicks: 4,
     animate: true,
-    emptyLabel: "No data",
+    thresholds: () => [],
+    markers: () => [],
+    dataTable: false,
   },
+)
+
+const strings = useLabels<ChartText>(
+  "chart",
+  { empty: "No data", rightAxis: "Measured on the right axis", point: "Point" },
+  () => props.text,
 )
 
 const emit = defineEmits<{
@@ -139,12 +170,16 @@ let ro: ResizeObserver | null = null
  * two combine into one question: should this draw itself right now?
  */
 const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animate })
-const drawing = computed(() => props.animate && revealed.value)
+// SMIL ignores the reduced-motion media query, so the wipe is skipped here.
+const reduced = ref(false)
+const still = computed(() => !props.animate || reduced.value)
+const drawing = computed(() => !still.value && revealed.value)
 
 onMounted(() => {
   // One element, two observers: hand the composable the same node rather than
   // wrapping the chart in a spare div just to carry a second ref.
   revealAnchor.value = root.value
+  reduced.value = prefersReducedMotion()
   if (!root.value || typeof ResizeObserver === "undefined") return
   ro = new ResizeObserver(([entry]) => {
     width.value = entry.contentRect.width
@@ -165,16 +200,19 @@ onBeforeUnmount(() => {
 // ── data ───────────────────────────────────────
 const hidden = ref(new Set<string>())
 
-const toggleSeries = (name: string) => {
+const toggleSeries = (id: string) => {
   const next = new Set(hidden.value)
-  if (next.has(name)) next.delete(name)
-  else next.add(name)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
   // Never hide the last visible series — an empty plot reads as broken.
   if (next.size < props.series.length) hidden.value = next
 }
 
-const allSeries = computed(() => normalise(props.series))
-const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.name)))
+// Identity is position plus name, so two series sharing a name stay separate.
+const allSeries = computed(() =>
+  normalise(props.series).map((s, i) => ({ ...s, id: `${i}:${s.name}` })),
+)
+const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.id)))
 
 /*
  * How present each series is, 1 to 0, driven per frame rather than by CSS.
@@ -206,7 +244,7 @@ let presenceFrame: number | undefined
  * reported the end state — so a series being hidden jumped to the floor while
  * one being shown eased up from it.
  */
-const presenceOf = (name: string) => presence.value.get(name) ?? 1
+const presenceOf = (id: string) => presence.value.get(id) ?? 1
 
 watch(
   // A string, not the Set: `hidden` is replaced wholesale on every toggle, and a
@@ -214,15 +252,15 @@ watch(
   // and sees a change it cannot describe — or, with a stale copy in the array,
   // no change at all. The names that are currently off say it exactly.
   () =>
-    allSeries.value.map((s) => `${s.name}:${hidden.value.has(s.name) ? 0 : 1}`).join(","),
+    allSeries.value.map((s) => `${s.id}:${hidden.value.has(s.id) ? 0 : 1}`).join(","),
   () => {
-    const targets = new Map(allSeries.value.map((s) => [s.name, hidden.value.has(s.name) ? 0 : 1]))
+    const targets = new Map(allSeries.value.map((s) => [s.id, hidden.value.has(s.id) ? 0 : 1]))
     if (!props.animate || prefersReducedMotion()) {
       presence.value = targets
       return
     }
 
-    const from = new Map(allSeries.value.map((s) => [s.name, presenceOf(s.name)]))
+    const from = new Map(allSeries.value.map((s) => [s.id, presenceOf(s.id)]))
     if ([...targets].every(([name, to]) => from.get(name) === to)) return
 
     const start = performance.now()
@@ -299,12 +337,27 @@ const hasRightAxis = computed(
   () => declaredRight.value.length > 0 && declaredLeft.value.length > 0,
 )
 
+/** A reference level must be on the plot, or it says nothing. */
+const withThresholds = (raw: { min: number; max: number }, axis: "left" | "right") => {
+  let { min, max } = raw
+  for (const t of props.thresholds) {
+    if ((t.axis ?? "left") !== axis) continue
+    for (const v of [t.value, t.to]) {
+      if (v == null || !Number.isFinite(v)) continue
+      min = Math.min(min, v)
+      max = Math.max(max, v)
+    }
+  }
+  return { min, max }
+}
+
 const scaleFor = (members: typeof visible.value) => {
   const totals = stackTotals.value
   const raw = totals
     ? { min: Math.min(0, ...totals.neg), max: Math.max(0, ...totals.pos) }
     : extent(members, zeroBased.value)
-  return niceScale(raw.min, raw.max, props.yTicks)
+  const wide = hasData.value ? withThresholds(raw, "left") : raw
+  return niceScale(wide.min, wide.max, props.yTicks)
 }
 
 const targetScale = computed(() =>
@@ -367,7 +420,7 @@ const targetRightScale = computed(() => {
      axis holds the range it had — an axis that keeps its place while its curve
      leaves, rather than collapsing to a degenerate 0..1 behind it. */
   const members = onRight.value.length ? onRight.value : declaredRight.value
-  const raw = extent(members, zeroBased.value)
+  const raw = withThresholds(extent(members, zeroBased.value), "right")
   /* Steps come from the TARGET left scale. Reading the animated one rebuilt this
      axis from a fractional range every frame, so a right-hand series jittered
      against a scale being redrawn underneath it. */
@@ -588,7 +641,7 @@ const baseY = computed(() =>
 const lines = computed(() =>
   allSeries.value.map((s) => {
     const g = geoOf(s)
-    const p = presenceOf(s.name)
+    const p = presenceOf(s.id)
     // Values pulled toward the axis floor, so the curve flattens into it.
     const base = Math.min(Math.max(0, g.min), g.max)
     const values = p === 1 ? s.values : s.values.map((v) => (v == null ? null : base + (v - base) * p))
@@ -660,7 +713,7 @@ const bars = computed(() => {
         h = Math.abs(top - base)
       }
       out.push({
-        key: `${s.name}-${i}`,
+        key: `${s.id}-${i}`,
         x,
         y,
         w: Math.max(1, slot - (props.stacked ? 0 : 2)),
@@ -711,6 +764,7 @@ const active = ref(-1)
 const pointer = ref({ x: 0, y: 0 })
 
 const onMove = (e: PointerEvent) => {
+  keyboard.value = false
   const el = e.currentTarget as SVGElement
   const rect = el.getBoundingClientRect()
   const x = e.clientX - rect.left
@@ -729,7 +783,11 @@ const pointEvent = (originalEvent: MouseEvent): ChartPointEvent => ({
   originalEvent,
 })
 
+/* A tap fires pointerleave before click, which has already cleared the hover,
+   so the index comes from the click itself. */
 const onClick = (e: MouseEvent) => {
+  const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
+  active.value = nearestIndex(e.clientX - rect.left, geo.value)
   if (active.value < 0) return
   emit("pointClick", pointEvent(e))
 }
@@ -772,6 +830,7 @@ const activePoints = computed(() => {
       const sc = scaleOf(s)
       return {
         color: s.color,
+        id: s.id,
         name: s.name,
         value: v,
         y: yAt(v, sc.min, sc.max, box.value),
@@ -783,6 +842,7 @@ const tooltipRows = computed(() =>
   active.value < 0
     ? []
     : visible.value.map((s) => ({
+        id: s.id,
         name: s.name,
         color: s.color,
         text:
@@ -825,12 +885,13 @@ const floatTransition = usePillTransition("float")
 // One clip rect wipes across the plot; re-keyed on data change so an update
 // replays the reveal instead of snapping.
 const revealKey = shallowRef(0)
+/* Keyed on the chart's SHAPE, not its values: a polled dashboard refreshing
+   its numbers every few seconds must not re-wipe on every tick. */
 watch(
-  () => [props.series, props.type] as const,
+  () => `${props.type}|${count.value}|${allSeries.value.map((s) => s.id).join(",")}`,
   () => {
     revealKey.value++
   },
-  { deep: true },
 )
 
 const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
@@ -853,6 +914,103 @@ const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
  */
 const gradientId = (name: string, index: number) =>
   `${clipId}-g-${index}-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`
+
+// ── overlays ───────────────────────────────────
+const thresholdMarks = computed(() =>
+  props.thresholds.flatMap((t, i) => {
+    if (!Number.isFinite(t.value) || width.value <= 0) return []
+    const sc = t.axis === "right" && rightScale.value ? rightScale.value : scale.value
+    const y = yAt(t.value, sc.min, sc.max, box.value)
+    const to = t.to != null && Number.isFinite(t.to) ? yAt(t.to, sc.min, sc.max, box.value) : null
+    return [
+      {
+        key: i,
+        y,
+        top: to == null ? y : Math.min(y, to),
+        height: to == null ? 0 : Math.abs(to - y),
+        label: t.label,
+        color: t.color ?? "var(--color-line-strong)",
+        solid: !!t.solid,
+      },
+    ]
+  }),
+)
+
+const markerMarks = computed(() =>
+  props.markers.flatMap((m, i) => {
+    const index = markerIndex(m.at, labels.value, count.value)
+    if (index < 0 || width.value <= 0) return []
+    return [
+      {
+        key: i,
+        x: xAt(index, count.value, box.value, banded.value),
+        label: m.label,
+        color: m.color ?? "var(--color-line-strong)",
+      },
+    ]
+  }),
+)
+
+// ── keyboard & assistive text ──────────────────
+const summary = computed(
+  () => props.ariaLabel ?? chartSummary(visible.value, labels.value, fmtSeries, props.title),
+)
+
+/* Arrow keys walk the points the way the pointer does; the readout below is
+   announced politely so each step is heard without stealing focus. */
+const keyboard = ref(false)
+
+const onKeydown = (e: KeyboardEvent) => {
+  if (!count.value || !hasData.value) return
+  const last = count.value - 1
+  let next: number
+  switch (e.key) {
+    case "ArrowRight":
+      next = active.value < 0 ? 0 : Math.min(last, active.value + 1)
+      break
+    case "ArrowLeft":
+      next = active.value < 0 ? last : Math.max(0, active.value - 1)
+      break
+    case "Home":
+      next = 0
+      break
+    case "End":
+      next = last
+      break
+    case "Enter":
+    case " ":
+      if (active.value < 0) return
+      e.preventDefault()
+      emit("pointClick", pointEvent(new MouseEvent("click")))
+      return
+    case "Escape":
+      active.value = -1
+      return
+    default:
+      return
+  }
+  e.preventDefault()
+  keyboard.value = true
+  active.value = next
+  const first = activePoints.value[0]
+  pointer.value = {
+    x: activeX.value,
+    y: first ? first.y : box.value.top + plotHeight(box.value) / 2,
+  }
+}
+
+const onBlur = () => {
+  if (keyboard.value) active.value = -1
+  keyboard.value = false
+}
+
+const readout = computed(() =>
+  keyboard.value && active.value >= 0
+    ? `${labels.value[active.value] ?? `${strings.value.point} ${active.value + 1}`}: ${tooltipRows.value
+        .map((r) => `${r.name} ${r.text}`)
+        .join(", ")}`
+    : "",
+)
 
 // The chart fills its container's width and sets its own gap between plot and legend — both are layout decisions the page makes, not the chart.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -878,11 +1036,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     >
       <button
         v-for="s in allSeries"
-        :key="s.name"
+        :key="s.id"
         type="button"
         class="group flex cursor-pointer items-center gap-1.5 rounded-md text-xs outline-none transition-opacity duration-fast focus-visible:ring-2 focus-visible:ring-ring"
-        :class="hidden.has(s.name) ? 'opacity-40' : ''"
-        @click="toggleSeries(s.name)"
+        :class="hidden.has(s.id) ? 'opacity-40' : ''"
+        :aria-pressed="!hidden.has(s.id)"
+        @click="toggleSeries(s.id)"
       >
         <span
           class="size-2 shrink-0 rounded-full transition-transform duration-fast group-hover:scale-125"
@@ -892,7 +1051,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <span
           v-if="hasRightAxis && s.axis === 'right'"
           class="text-[10px] text-muted"
-          title="Measured on the right axis"
+          :title="strings.rightAxis"
         >
           ↗
         </span>
@@ -904,13 +1063,22 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     <LpContextMenu :items="menuEntries" :always="!!menuItems">
       <!-- `group/plot` + data-state lets the tooltip hide itself while the
            context menu is up: the two would otherwise stack on the same point. -->
-      <div class="group/plot relative" :style="{ height: `${height}px` }">
+      <div
+        class="group/plot relative rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :style="{ height: `${height}px` }"
+        :tabindex="hasData ? 0 : undefined"
+        :role="hasData ? 'group' : undefined"
+        aria-roledescription="chart"
+        :aria-label="hasData ? summary : undefined"
+        @keydown="onKeydown"
+        @blur="onBlur"
+      >
         <div
           v-if="!hasData"
           class="flex size-full flex-col items-center justify-center gap-2 rounded-control border border-dashed border-line text-muted"
         >
           <LpIcon name="lucide:chart-no-axes-column" :size="18" />
-          <span class="text-xs">{{ emptyLabel }}</span>
+          <span class="text-xs">{{ emptyLabel ?? strings.empty }}</span>
         </div>
 
         <svg
@@ -918,6 +1086,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :width="width"
           :height="height"
           class="overflow-visible touch-none select-none"
+          aria-hidden="true"
           @pointermove="onMove"
           @pointerleave="onLeave"
           @click="onClick"
@@ -927,7 +1096,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             <linearGradient
               v-for="(s, i) in lines"
               :id="gradientId(s.name, i)"
-              :key="s.name"
+              :key="s.id"
               x1="0"
               y1="0"
               x2="0"
@@ -945,7 +1114,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                 :x="box.left"
                 :y="0"
                 :height="height"
-                :width="animate ? 0 : plotWidth(box)"
+                :width="still ? plotWidth(box) : 0"
               >
                 <!-- keySplines is --ease-travel written out: SMIL cannot read a
                      CSS custom property, so the curve is duplicated here. Change
@@ -1022,6 +1191,18 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             opacity="0.5"
           />
 
+          <!-- threshold bands sit under the data -->
+          <rect
+            v-for="t in thresholdMarks.filter((m) => m.height > 0)"
+            :key="`band-${t.key}`"
+            :x="box.left"
+            :y="t.top"
+            :width="plotWidth(box)"
+            :height="t.height"
+            :fill="t.color"
+            opacity="0.08"
+          />
+
           <g :clip-path="`url(#${clipId}-reveal)`">
             <!-- bars: paths, so a stack rounds as one shape (see barPath) -->
             <path
@@ -1034,7 +1215,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             />
 
             <!-- one group per series, so hiding one drops only that curve -->
-            <g v-for="(s, i) in lines" :key="`s-${s.name}`" :style="{ opacity: s.alpha }">
+            <g v-for="(s, i) in lines" :key="`s-${s.id}`" :style="{ opacity: s.alpha }">
               <path
                 v-show="type === 'area'"
                 :d="s.fill"
@@ -1064,6 +1245,49 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             </g>
           </g>
 
+          <!-- threshold lines and markers sit over the data, under the crosshair -->
+          <g v-for="t in thresholdMarks" :key="`t-${t.key}`">
+            <line
+              :x1="box.left"
+              :x2="box.width - box.right"
+              :y1="t.y"
+              :y2="t.y"
+              :stroke="t.color"
+              stroke-width="1"
+              :stroke-dasharray="t.solid ? undefined : '4 3'"
+            />
+            <text
+              v-if="t.label"
+              :x="box.width - box.right - 4"
+              :y="t.top - 4"
+              text-anchor="end"
+              class="text-[10px]"
+              :fill="t.color"
+            >
+              {{ t.label }}
+            </text>
+          </g>
+          <g v-for="m in markerMarks" :key="`m-${m.key}`">
+            <line
+              :x1="m.x"
+              :x2="m.x"
+              :y1="box.top"
+              :y2="box.top + plotHeight(box)"
+              :stroke="m.color"
+              stroke-width="1"
+              stroke-dasharray="2 3"
+            />
+            <text
+              v-if="m.label"
+              :x="m.x + 4"
+              :y="box.top + 9"
+              class="text-[10px]"
+              :fill="m.color"
+            >
+              {{ m.label }}
+            </text>
+          </g>
+
           <!-- crosshair -->
           <g v-if="active >= 0 && type !== 'bar'">
             <line
@@ -1077,7 +1301,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             />
             <circle
               v-for="p in activePoints"
-              :key="p.name"
+              :key="p.id"
               :cx="activeX"
               :cy="p.y"
               r="4"
@@ -1125,7 +1349,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             <div class="flex flex-col gap-1">
               <div
                 v-for="r in tooltipRows"
-                :key="r.name"
+                :key="r.id"
                 class="flex items-center justify-between gap-3 text-xs"
               >
                 <span class="flex items-center gap-1.5 text-muted">
@@ -1137,8 +1361,28 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             </div>
           </LpShift>
         </Motion>
+
+        <span class="sr-only" aria-live="polite">{{ readout }}</span>
       </div>
     </LpContextMenu>
+
+    <table v-if="dataTable && hasData" class="sr-only">
+      <caption v-if="title">{{ title }}</caption>
+      <thead>
+        <tr>
+          <th scope="col"></th>
+          <th v-for="s in allSeries" :key="s.id" scope="col">{{ s.name }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(label, i) in labels" :key="i">
+          <th scope="row">{{ label }}</th>
+          <td v-for="s in allSeries" :key="s.id">
+            {{ s.values[i] == null ? "—" : fmtSeries(s, s.values[i] as number) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 

@@ -13,6 +13,8 @@ import LpPagination from "./LpPagination.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useRovingFocus } from "../composables/useRovingFocus"
+import { useLabels } from "../composables/useLpConfig"
+import { compareValues } from "./tableSort"
 
 export interface TableColumn<Row> {
   key: string
@@ -21,6 +23,10 @@ export interface TableColumn<Row> {
   width?: string
   /** Allow clicking the header to sort by this column. */
   sortable?: boolean
+  /** The value this column sorts by, when the cell holds something else. */
+  sortValue?: (row: Row) => unknown
+  /** Full control over the order; wins over `sortValue`. Ascending order. */
+  compare?: (a: Row, b: Row) => number
   /**
    * Offer "show only these values" in the header's menu, built from the values
    * actually present in the rows. For a column that holds a small vocabulary —
@@ -36,6 +42,19 @@ export interface TableColumn<Row> {
   /** Keep this column out of the show/hide list — an actions column has no
    *  name to offer and nothing to gain from being hidden. */
   alwaysVisible?: boolean
+}
+
+export interface TableLabels {
+  [key: string]: string
+  loading: string
+  error: string
+  empty: string
+  sortAsc: string
+  sortDesc: string
+  sortClear: string
+  filter: string
+  showAll: string
+  columns: string
 }
 
 export interface SortState {
@@ -68,6 +87,7 @@ export interface TablePage<Row> {
 
 type RowKey = string | number
 
+
 const props = withDefaults(
   defineProps<{
     columns: TableColumn<T>[]
@@ -86,7 +106,11 @@ const props = withDefaults(
     debounce?: number
     loadingLabel?: string
     errorLabel?: string
-    /** Stable id per row — required for selection; falls back to index otherwise. */
+    /**
+     * Stable id per row. Without it a row is keyed by its position in `rows`,
+     * which survives sorting and filtering but not a new array; set it whenever
+     * rows are replaced (`load`, polling) and selection must carry over.
+     */
     rowKey?: keyof T | ((row: T) => RowKey)
     emptyLabel?: string
     emptyIcon?: string
@@ -111,26 +135,49 @@ const props = withDefaults(
     filterLabel?: string
     showAllLabel?: string
     columnsLabel?: string
+    /** All of the wording above in one object, and the config-level scope "table". */
+    labels?: Partial<TableLabels>
   }>(),
   {
     rows: () => [],
     pageSize: 25,
     debounce: 150,
-    loadingLabel: "Loading…",
-    errorLabel: "Could not load",
-    emptyLabel: "Nothing here yet",
     emptyIcon: "lucide:inbox",
     selectable: false,
     selected: () => [],
-    sort: null,
-    sortAscLabel: "Sort ascending",
-    sortDescLabel: "Sort descending",
-    sortClearLabel: "Clear sorting",
-    filterLabel: "Show only",
-    showAllLabel: "Show all",
-    columnsLabel: "Columns",
+    // undefined, not null: null is a parent saying "unsorted", undefined is no
+    // parent at all, and only the latter lets the table keep its own sort.
+    sort: undefined,
   },
 )
+
+const labelSet = useLabels<TableLabels>(
+  "table",
+  {
+    loading: "Loading…",
+    error: "Could not load",
+    empty: "Nothing here yet",
+    sortAsc: "Sort ascending",
+    sortDesc: "Sort descending",
+    sortClear: "Clear sorting",
+    filter: "Show only",
+    showAll: "Show all",
+    columns: "Columns",
+  },
+  () => props.labels,
+)
+const text = computed<TableLabels>(() => ({
+  ...labelSet.value,
+  loading: props.loadingLabel ?? labelSet.value.loading,
+  error: props.errorLabel ?? labelSet.value.error,
+  empty: props.emptyLabel ?? labelSet.value.empty,
+  sortAsc: props.sortAscLabel ?? labelSet.value.sortAsc,
+  sortDesc: props.sortDescLabel ?? labelSet.value.sortDesc,
+  sortClear: props.sortClearLabel ?? labelSet.value.sortClear,
+  filter: props.filterLabel ?? labelSet.value.filter,
+  showAll: props.showAllLabel ?? labelSet.value.showAll,
+  columns: props.columnsLabel ?? labelSet.value.columns,
+}))
 
 /*
  * Layout classes belong on the root, not on the scroll area. Since the pager
@@ -156,7 +203,9 @@ const emit = defineEmits<{
 function keyFor(row: T, index: number): RowKey {
   if (typeof props.rowKey === "function") return props.rowKey(row)
   if (props.rowKey) return row[props.rowKey] as RowKey
-  return index
+  // Position in the source, not in the sorted view: a sort must not move a
+  // tick from one row to another.
+  return sourceIndex.value.get(row) ?? index
 }
 
 function alignClass(align?: "left" | "right" | "center"): string {
@@ -207,7 +256,7 @@ const contextMenu = computed<ContextMenuItemDef[]>(() => {
 // emitted an event nobody was listening for, and left the rows exactly as they
 // were: a control that answers a click by doing nothing.
 const ownSort = ref<SortState | null>(null)
-const activeSort = computed(() => props.sort ?? ownSort.value)
+const activeSort = computed(() => (props.sort !== undefined ? props.sort : ownSort.value))
 
 // ── server-backed rows ───────────────────────────────────────
 const loaded = shallowRef<T[]>([])
@@ -219,6 +268,7 @@ const task = useAsyncTask<TablePage<T>>()
 const loading = task.pending
 
 const sourceRows = computed<T[]>(() => (props.load ? loaded.value : props.rows))
+const sourceIndex = computed(() => new Map(sourceRows.value.map((row, i) => [row, i])))
 
 // The tallest page shown so far, held as a floor: the last page is usually
 // short, and without it the pager below jumps up the moment you reach it.
@@ -321,16 +371,12 @@ const displayRows = computed<T[]>(() => {
   const col = props.columns.find((c) => c.key === s.key)
   if (!col?.sortable) return filteredRows.value
   const factor = s.dir === "asc" ? 1 : -1
-  return [...filteredRows.value].sort((a, b) => compare(a[s.key], b[s.key]) * factor)
+  const own = col.compare
+  const value = col.sortValue ?? ((row: T) => row[s.key])
+  return [...filteredRows.value].sort(
+    (a, b) => (own ? own(a, b) : compareValues(value(a), value(b))) * factor,
+  )
 })
-
-function compare(a: unknown, b: unknown): number {
-  if (a == null && b == null) return 0
-  if (a == null) return -1
-  if (b == null) return 1
-  if (typeof a === "number" && typeof b === "number") return a - b
-  return String(a).localeCompare(String(b), undefined, { numeric: true })
-}
 
 function toggleSort(col: TableColumn<T>) {
   if (!col.sortable) return
@@ -377,19 +423,19 @@ function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
   if (col.sortable) {
     items.push(
       {
-        label: props.sortAscLabel,
+        label: text.value.sortAsc,
         icon: "lucide:arrow-up",
         disabled: s?.key === col.key && s.dir === "asc",
         onSelect: set({ key: col.key, dir: "asc" }),
       },
       {
-        label: props.sortDescLabel,
+        label: text.value.sortDesc,
         icon: "lucide:arrow-down",
         disabled: s?.key === col.key && s.dir === "desc",
         onSelect: set({ key: col.key, dir: "desc" }),
       },
       {
-        label: props.sortClearLabel,
+        label: text.value.sortClear,
         icon: "lucide:x",
         disabled: !s,
         onSelect: set(null),
@@ -402,7 +448,7 @@ function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
   if (col.filterable) {
     const hidden = hiddenValues.value[col.key]
     items.push({
-      label: props.filterLabel,
+      label: text.value.filter,
       icon: "lucide:filter",
       separatorBefore: items.length > 0,
       children: [
@@ -412,7 +458,7 @@ function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
           onSelect: () => toggleValue(col.key, value),
         })),
         {
-          label: props.showAllLabel,
+          label: text.value.showAll,
           icon: "lucide:list",
           separatorBefore: true,
           disabled: !hidden?.size,
@@ -435,7 +481,7 @@ function tableMenu(): ContextMenuItemDef[] {
   if (!offered.length) return []
   return [
     {
-      label: props.columnsLabel,
+      label: text.value.columns,
       icon: "lucide:columns-3",
       children: offered.map((col) => ({
         label: col.label,
@@ -462,6 +508,13 @@ function fetchPage(delay = 0) {
   task.run((signal) => load(query, signal), {
     delay,
     apply: (result) => {
+      // Rows deleted from the last page leave it past the end; step back to
+      // the page that now exists rather than strand the user on an empty one.
+      const last = Math.max(1, Math.ceil(result.total / props.pageSize))
+      if (page.value > last) {
+        page.value = last
+        return
+      }
       loaded.value = result.rows
       total.value = result.total
       facets.value = result.facets ?? {}
@@ -488,7 +541,8 @@ defineExpose({ reload: () => fetchPage() })
 
 // ── selection ────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selected))
-const allKeys = computed(() => sourceRows.value.map((r, i) => keyFor(r, i)))
+// "All" is what the user can see: rows a header filter hides are left alone.
+const allKeys = computed(() => filteredRows.value.map((r, i) => keyFor(r, i)))
 const allChecked = computed(
   () => allKeys.value.length > 0 && allKeys.value.every((k) => selectedSet.value.has(k)),
 )
@@ -497,7 +551,12 @@ const someChecked = computed(
 )
 
 function toggleAll(checked: boolean) {
-  emit("update:selected", checked ? [...allKeys.value] : [])
+  const next = new Set(selectedSet.value)
+  for (const key of allKeys.value) {
+    if (checked) next.add(key)
+    else next.delete(key)
+  }
+  emit("update:selected", [...next])
 }
 
 function toggleRow(key: RowKey, checked: boolean) {
@@ -507,7 +566,7 @@ function toggleRow(key: RowKey, checked: boolean) {
   emit("update:selected", [...next])
 }
 
-const colSpan = computed(() => props.columns.length + (props.selectable ? 1 : 0))
+const colSpan = computed(() => visibleColumns.value.length + (props.selectable ? 1 : 0))
 
 /*
  * Keyboard navigation over the rows. A table is one Tab stop, not one per row:
@@ -703,7 +762,7 @@ const barInsetTop = computed(() =>
               class="mx-auto mb-2 opacity-60"
               :class="loading ? 'animate-spin' : ''"
             />
-            <div>{{ loading ? loadingLabel : failed ? errorLabel : emptyLabel }}</div>
+            <div>{{ loading ? text.loading : failed ? text.error : text.empty }}</div>
           </td>
         </tr>
         <!-- A plain <tr>, because TransitionGroup animates element children and

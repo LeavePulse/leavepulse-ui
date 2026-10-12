@@ -22,6 +22,7 @@ import { computed, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
 
 const props = withDefaults(
   defineProps<{
@@ -35,8 +36,15 @@ const props = withDefaults(
     /** Pages shown on each side of the current one in the inner run. */
     siblings?: number
     disabled?: boolean
+    labels?: Partial<Record<"nav" | "previous" | "next", string>>
   }>(),
   { page: 1, pageSize: 10, siblings: 1 },
+)
+
+const text = useLabels(
+  "pagination",
+  { nav: "Pagination", previous: "Previous page", next: "Next page" },
+  () => props.labels,
 )
 
 const emit = defineEmits<{
@@ -45,12 +53,20 @@ const emit = defineEmits<{
 }>()
 
 const count = computed(() => {
-  if (props.pageCount != null) return Math.max(1, props.pageCount)
-  if (props.total != null) return Math.max(1, Math.ceil(props.total / props.pageSize))
-  return 1
+  // Guarded so a zero page size or a total still loading never yields an
+  // "Infinity" or "NaN" page.
+  const n =
+    props.pageCount != null
+      ? props.pageCount
+      : props.total != null && props.pageSize > 0
+        ? Math.ceil(props.total / props.pageSize)
+        : 1
+  return Number.isFinite(n) ? Math.max(1, Math.floor(n)) : 1
 })
 
-const current = computed(() => Math.min(Math.max(1, props.page), count.value))
+const current = computed(() =>
+  Number.isFinite(props.page) ? Math.min(Math.max(1, Math.floor(props.page)), count.value) : 1,
+)
 
 // A fixed run of page slots. Each slot is either a real page or a gap ("…").
 // The number of slots is constant for a given `count`, so the row width is
@@ -122,12 +138,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 <template>
   <nav
     :class="rootClass"
-    v-bind="rest" aria-label="Pagination">
+    v-bind="rest" :aria-label="text.nav">
     <button
       type="button"
       :class="[navBase, navArrow]"
       :disabled="disabled || current === 1"
-      aria-label="Previous page"
+      :aria-label="text.previous"
       @click="go(current - 1)"
     >
       <LpIcon name="lucide:chevron-left" :size="16" />
@@ -171,7 +187,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       type="button"
       :class="[navBase, navArrow]"
       :disabled="disabled || current === count"
-      aria-label="Next page"
+      :aria-label="text.next"
       @click="go(current + 1)"
     >
       <LpIcon name="lucide:chevron-right" :size="16" />

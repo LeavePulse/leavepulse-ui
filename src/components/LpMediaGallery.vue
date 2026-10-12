@@ -24,7 +24,7 @@
  * cover is per image and the reveal is remembered per image, because a set is
  * usually mixed — one marked screenshot among plain ones.
  */
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 import type { LightboxItem } from "./lightbox"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
@@ -87,6 +87,12 @@ defineSlots<{
 
 const open = ref(false)
 const index = ref(0)
+
+// Closing happens inside the lightbox (Escape, the scrim, the X), so the gallery
+// reports both edges of v-model:open, not only the one it starts.
+watch(open, (value, was) => {
+  if (!value && was) emit("update:open", false)
+})
 
 // `max` counts what is SHOWN, so the badge reads "+N more" rather than "N
 // total". A set of 7 capped at 4 shows 4 cells, the last one badged +3.
@@ -188,8 +194,8 @@ function activate(i: number) {
   const at = openIndexOf(i)
   if (at === -1) return
   index.value = at
+  if (!open.value) emit("update:open", true)
   open.value = true
-  emit("update:open", true)
 }
 
 /** The badge is about the FIRST hidden image, so that is where it opens. */

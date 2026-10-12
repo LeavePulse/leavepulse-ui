@@ -10,6 +10,7 @@ import { AvatarFallback, AvatarImage, AvatarRoot } from "reka-ui"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, onMounted, ref } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 
 const avatar = tv({
   base: "inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-surface-soft font-medium text-muted-strong",
@@ -65,8 +66,21 @@ const sizeStyle = computed(() =>
     : undefined,
 )
 
-const initials = computed(
-  () => props.fallback ?? props.alt?.slice(0, 2).toUpperCase() ?? "?",
+/* "John Doe" → "JD", "Ada" → "AD". Split by code point, so a name starting
+   with an emoji or an astral letter is not cut in half. */
+const initials = computed(() => {
+  if (props.fallback) return props.fallback
+  const words = (props.alt ?? "").trim().split(/\s+/).filter(Boolean)
+  if (!words.length) return "?"
+  const first = Array.from(words[0])
+  const letters =
+    words.length > 1 ? [first[0], Array.from(words[words.length - 1])[0]] : first.slice(0, 2)
+  return letters.join("").toUpperCase()
+})
+
+// A consumer's `size-20` must beat the preset's `size-9`, not race it.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  avatar({ size: props.pixelSize ? undefined : props.size, shape: props.shape, ring: props.ring }),
 )
 
 // reka's AvatarImage resolves the image load on the client, so SSR renders the
@@ -83,13 +97,13 @@ onMounted(() => {
 
 <template>
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <AvatarRoot :class="avatar({ size: pixelSize ? undefined : size, shape, ring })" :style="sizeStyle" v-bind="$attrs">
+    <AvatarRoot :class="rootClass" :style="sizeStyle" v-bind="rest">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
-  <AvatarRoot v-else :class="avatar({ size: pixelSize ? undefined : size, shape, ring })" :style="sizeStyle" v-bind="$attrs">
-    <AvatarImage v-if="src" :src="src" :alt="alt" class="size-full object-cover" />
+  <AvatarRoot v-else :class="rootClass" :style="sizeStyle" v-bind="rest">
+    <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
     <AvatarFallback>{{ initials }}</AvatarFallback>
   </AvatarRoot>
 </template>

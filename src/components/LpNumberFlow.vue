@@ -126,6 +126,15 @@ const travel = (to: number) => {
   const from = displayed.value
   if (from === to) return
 
+  // Infinity and NaN (a rate divided by zero) have no digits to roll through.
+  if (!Number.isFinite(to) || !Number.isFinite(from)) {
+    displayed.value = to
+    lastTarget = to
+    settled.value = true
+    padTo.value = 0
+    return
+  }
+
   if (prefersReducedMotion() || props.duration <= 0) {
     displayed.value = to
     return
@@ -221,7 +230,11 @@ const UNITS = [
 
 const scaleFor = (v: number) => {
   const abs = Math.abs(v)
-  const unit = UNITS.find((u) => abs >= u.limit)
+  let at = UNITS.findIndex((u) => abs >= u.limit)
+  // 999 950 at one place reads "1000.0k"; that is the next unit up.
+  if (at > 0 && Math.abs(Number((v / UNITS[at].limit).toFixed(1))) >= 1000) at--
+  if (at === -1 && abs >= 999.5) at = UNITS.length - 1
+  const unit = UNITS[at]
   if (!unit) return { divisor: 1, suffix: "", decimals: 0 }
   // One decimal is what makes 1.2k readable; a value that lands exactly on the
   // unit (5M) keeps none, matching how these are written by hand.
@@ -234,11 +247,13 @@ const scaleFor = (v: number) => {
 }
 
 
-const formatted = computed(() => {
-  // Rounded first: every branch below should render the shape the endpoints
-  // imply, not whatever precision an intermediate value happens to carry.
-  const v = round(displayed.value)
+const formatted = computed(() => formatAt(round(displayed.value), !settled.value))
+
+// Rounded first by the caller: every branch should render the shape the
+// endpoints imply, not whatever precision an intermediate value carries.
+function formatAt(v: number, padded: boolean): string {
   if (props.format) return props.format(v)
+  if (!Number.isFinite(v)) return String(v)
   if (props.compact) {
     /*
      * The unit tracks the CURRENT value, not the destination — the way a real
@@ -254,7 +269,7 @@ const formatted = computed(() => {
     const places = divisor === 1 ? 0 : 1
     return `${(v / divisor).toFixed(places)}${suffix}`
   }
-  const pad = settled.value ? 1 : Math.max(1, padTo.value)
+  const pad = padded ? Math.max(1, padTo.value) : 1
   if (props.grouped)
     return v.toLocaleString(props.locale, {
       minimumFractionDigits: props.decimals,
@@ -271,7 +286,7 @@ const formatted = computed(() => {
   const int = dot === -1 ? body : body.slice(0, dot)
   const rest = dot === -1 ? "" : body.slice(dot)
   return `${neg ? "-" : ""}${int.padStart(pad, "0")}${rest}`
-})
+}
 
 interface Cell {
   /** Stable across renders so a column keeps its identity as digits shift. */
@@ -357,8 +372,10 @@ const offsetFor = (digit: number) => {
   return digit
 }
 
+/* What a screen reader hears: the settled value, formatted the way it will
+   land, never a frame of the roll. */
 const label = computed(
-  () => `${props.prefix ?? ""}${props.value}${props.suffix ?? ""}`,
+  () => `${props.prefix ?? ""}${formatAt(props.value, false)}${props.suffix ?? ""}`,
 )
 </script>
 
@@ -368,9 +385,8 @@ const label = computed(
   <span
     ref="revealAnchor"
     class="lp-nf inline-flex items-baseline tabular-nums"
-    :aria-label="label"
-    role="text"
   >
+    <span class="sr-only">{{ label }}</span>
     <span v-if="prefix" aria-hidden="true">{{ prefix }}</span>
 
     <span class="lp-nf__track inline-flex items-baseline" aria-hidden="true">

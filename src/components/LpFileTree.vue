@@ -38,10 +38,21 @@ import LpEmptyState from "./LpEmptyState.vue"
 import LpFileTreeNode from "./LpFileTreeNode.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
 
 export type { FileNode } from "./fileTree"
 
 /** Rolled-up stats for the ticked entries — what a backup picker summarises. */
+export interface FileTreeLabels {
+  [key: string]: string
+  empty: string
+  emptyDescription: string
+  file: string
+  files: string
+  folder: string
+  folders: string
+}
+
 export interface FileTreeSummary {
   /** Ticked files (directories excluded — they're containers, not payload). */
   files: number
@@ -84,6 +95,7 @@ const props = withDefaults(
     /** Empty-state copy when `nodes` is empty. */
     emptyLabel?: string
     emptyDescription?: string
+    labels?: Partial<FileTreeLabels>
   }>(),
   {
     sort: true,
@@ -93,8 +105,6 @@ const props = withDefaults(
     showModified: false,
     loading: false,
     skeletonRows: 8,
-    emptyLabel: "No files",
-    emptyDescription: "This folder is empty.",
   },
 )
 
@@ -129,6 +139,19 @@ watch(
   (ids) => {
     if (ids) openIds.value = new Set(ids)
   },
+)
+
+const text = useLabels<FileTreeLabels>(
+  "fileTree",
+  {
+    empty: "No files",
+    emptyDescription: "This folder is empty.",
+    file: "file",
+    files: "files",
+    folder: "folder",
+    folders: "folders",
+  },
+  () => props.labels,
 )
 
 const loadingSet = computed(() => new Set(props.loadingIds ?? []))
@@ -229,7 +252,7 @@ const summary = computed<FileTreeSummary>(() => {
   }
 })
 
-watch(summary, (value) => emit("summary", value), { deep: false })
+watch(summary, (value) => emit("summary", value), { immediate: true })
 
 function setChecked(next: Set<string>) {
   checkedIds.value = next
@@ -350,6 +373,9 @@ function expand(node: FileNode) {
 
 function collapse(node: FileNode) {
   if (!openIds.value.has(node.id)) return
+  // A fetch that failed left `children` unset; collapsing lets the next open
+  // ask again instead of showing an empty folder forever.
+  if (node.children === undefined && !loadingSet.value.has(node.id)) requested.delete(node.id)
   const next = new Set(openIds.value)
   next.delete(node.id)
   setExpanded(next)
@@ -506,8 +532,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <LpEmptyState
     v-else-if="!roots.length"
     icon="lucide:folder-search"
-    :title="emptyLabel"
-    :description="emptyDescription"
+    :title="emptyLabel ?? text.empty"
+    :description="emptyDescription ?? text.emptyDescription"
   />
 
   <!-- h-full so the tree fills whatever box the caller gave it and the scroll
@@ -558,9 +584,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       class="shrink-0 border-t border-line px-2 py-1.5 text-xs text-muted"
     >
       <slot name="summary" v-bind="summary">
-        {{ summary.files }} {{ summary.files === 1 ? "file" : "files" }}<template
+        {{ summary.files }} {{ summary.files === 1 ? text.file : text.files }}<template
           v-if="summary.dirs"
-        >, {{ summary.dirs }} {{ summary.dirs === 1 ? "folder" : "folders" }}</template>
+        >, {{ summary.dirs }} {{ summary.dirs === 1 ? text.folder : text.folders }}</template>
         <template v-if="summary.bytes !== undefined"> · {{ summary.sizeLabel }}</template>
       </slot>
     </div>

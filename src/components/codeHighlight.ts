@@ -79,19 +79,67 @@ const BOOLEANS = new Set([
   "Some", "Ok", "Err", // rust common variants read as constants
 ])
 
-// One master regex, alternation ordered so longer/greedier rules win first.
-// Order: comments → strings → numbers → identifiers → punctuation.
-const MASTER = new RegExp(
-  [
-    "(\\/\\/[^\\n]*|#[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)", // 1 comment
-    "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`(?:\\\\.|[^`\\\\])*`)", // 2 string
-    "(@[A-Za-z_$][\\w$]*)", // 3 annotation (@Override, @ConfigSerializable — JVM)
-    "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:e[+-]?\\d+)?[fFlLdD]?\\b)", // 4 number (JVM suffixes)
-    "([A-Za-z_$][\\w$]*)", // 5 identifier (keyword/bool/func/prop/plain)
-    "([{}()\\[\\];:,.<>=+\\-*/%!&|?]+)", // 6 punctuation
-  ].join("|"),
-  "g",
-)
+/*
+ * Comment syntax is the one thing the shared tokenizer cannot guess: `#` opens
+ * a comment in shell, Python, YAML and TOML but is a private field in
+ * TypeScript, and `//` is a comment in C-family code but part of every URL in a
+ * YAML file. So each language names its own comment forms.
+ */
+type CommentStyle = "c" | "hash" | "html" | "none"
+
+const COMMENTS: Record<CodeLang, CommentStyle> = {
+  ts: "c",
+  js: "c",
+  json: "none",
+  bash: "hash",
+  html: "html",
+  python: "hash",
+  rust: "c",
+  yaml: "hash",
+  toml: "hash",
+  kotlin: "c",
+  java: "c",
+  groovy: "c",
+  plain: "none",
+}
+
+const COMMENT_PATTERN: Record<CommentStyle, string> = {
+  c: "\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/",
+  // A `#` only starts a comment at the start of a word, so `a#b` in a URL or
+  // `${#arr[@]}` in shell stay code.
+  hash: "(?<![\\w$])#[^\\n]*",
+  html: "<!--[\\s\\S]*?-->",
+  none: "(?!)",
+}
+
+/** Where an unterminated block comment opens on a line, and what closes it. */
+const BLOCK: Partial<Record<CommentStyle, { open: string; close: string }>> = {
+  c: { open: "/*", close: "*/" },
+  html: { open: "<!--", close: "-->" },
+}
+
+const masters = new Map<CommentStyle, RegExp>()
+
+// One master regex per comment style, alternation ordered so longer/greedier
+// rules win first. Order: comments → strings → numbers → identifiers → punctuation.
+function masterFor(style: CommentStyle): RegExp {
+  let re = masters.get(style)
+  if (!re) {
+    re = new RegExp(
+      [
+        `(${COMMENT_PATTERN[style]})`, // 1 comment
+        "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|`(?:\\\\.|[^`\\\\])*`)", // 2 string
+        "(@[A-Za-z_$][\\w$]*)", // 3 annotation (@Override, @ConfigSerializable — JVM)
+        "(\\b\\d[\\d_]*(?:\\.\\d+)?(?:e[+-]?\\d+)?[fFlLdD]?\\b)", // 4 number (JVM suffixes)
+        "(#?[A-Za-z_$][\\w$]*)", // 5 identifier (keyword/bool/func/prop/plain), incl. #private
+        "([{}()\\[\\];:,.<>=+\\-*/%!&|?]+)", // 6 punctuation
+      ].join("|"),
+      "g",
+    )
+    masters.set(style, re)
+  }
+  return re
+}
 
 function classifyIdent(name: string, before: string, after: string): string {
   if (KEYWORDS.has(name)) return C.keyword
@@ -103,11 +151,13 @@ function classifyIdent(name: string, before: string, after: string): string {
 
 /** Tokenize one line into coloured spans. JSON keys get the property colour. */
 export function tokenizeLine(line: string, lang: CodeLang): Token[] {
+  if (lang === "plain") return line ? [{ text: line, cls: "" }] : []
   const out: Token[] = []
   let last = 0
   let m: RegExpExecArray | null
-  MASTER.lastIndex = 0
-  while ((m = MASTER.exec(line)) !== null) {
+  const master = masterFor(COMMENTS[lang])
+  master.lastIndex = 0
+  while ((m = master.exec(line)) !== null) {
     if (m.index > last) out.push({ text: line.slice(last, m.index), cls: "" })
     const [full, comment, str, annotation, num, ident, punct] = m
     if (comment != null) out.push({ text: full, cls: C.comment })
@@ -133,5 +183,51 @@ export function tokenizeLine(line: string, lang: CodeLang): Token[] {
     last = m.index + full.length
   }
   if (last < line.length) out.push({ text: line.slice(last), cls: "" })
+  return out
+}
+
+/**
+ * Tokenize a whole snippet, carrying a block comment (`/* … *\/`, `<!-- … -->`)
+ * across the lines it spans. `tokenizeLine` alone sees each line in isolation
+ * and coloured the middle of a doc comment as code.
+ */
+export function tokenizeLines(lines: string[], lang: CodeLang): Token[][] {
+  const block = BLOCK[COMMENTS[lang]]
+  if (!block) return lines.map((line) => tokenizeLine(line, lang))
+  const out: Token[][] = []
+  let open = false
+  for (const line of lines) {
+    let rest = line
+    const tokens: Token[] = []
+    if (open) {
+      const end = rest.indexOf(block.close)
+      if (end === -1) {
+        out.push(rest ? [{ text: rest, cls: C.comment }] : [])
+        continue
+      }
+      tokens.push({ text: rest.slice(0, end + block.close.length), cls: C.comment })
+      rest = rest.slice(end + block.close.length)
+      open = false
+    }
+    const lineTokens = tokenizeLine(rest, lang)
+    // A closed comment is already a comment token, so an opener left in plain
+    // code is one the line never closes: from there on, the line is comment.
+    const at = lineTokens.findIndex(
+      (t) => t.cls !== C.comment && t.cls !== C.string && t.text.includes(block.open),
+    )
+    if (at >= 0) {
+      const cut = lineTokens[at].text.indexOf(block.open)
+      const tail = lineTokens
+        .slice(at)
+        .map((t) => t.text)
+        .join("")
+        .slice(cut)
+      tokens.push(...lineTokens.slice(0, at))
+      if (cut > 0) tokens.push({ text: lineTokens[at].text.slice(0, cut), cls: lineTokens[at].cls })
+      tokens.push({ text: tail, cls: C.comment })
+      open = true
+    } else tokens.push(...lineTokens)
+    out.push(tokens)
+  }
   return out
 }

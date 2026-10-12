@@ -166,9 +166,11 @@ watch(
   () => runSweep(props.value, props.duration),
 )
 
-const pct = computed(() =>
-  Math.max(0, Math.min(100, (shown.value / props.max) * 100)),
-)
+// A zero or missing max (no quota known yet) reads as empty, not as NaN%.
+const pct = computed(() => {
+  const ratio = props.max > 0 ? (shown.value / props.max) * 100 : 0
+  return Number.isFinite(ratio) ? Math.max(0, Math.min(100, ratio)) : 0
+})
 
 /*
  * The tone actually painted. `auto` reads the fill and crosses two thresholds;

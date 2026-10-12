@@ -126,7 +126,8 @@ export function formatSize(bytes: number): string {
   const units = ["KB", "MB", "GB", "TB", "PB"]
   let value = bytes / 1024
   let i = 0
-  while (value >= 1024 && i < units.length - 1) {
+  // Compare the value as it will print, so 1 048 575 B is "1.0 MB", not "1024 KB".
+  while (Math.round(value) >= 1024 && i < units.length - 1) {
     value /= 1024
     i++
   }
@@ -191,14 +192,20 @@ export function checkStateOf(node: FileNode, checked: ReadonlySet<string>): Chec
   }
   let all = true
   let any = false
+  let considered = 0
   for (const child of node.children) {
     const state = checkStateOf(child, checked)
+    // A locked, unticked entry can never be ticked, so it must not hold its
+    // folder at "indeterminate" forever.
+    if (child.disabled && state === "unchecked") continue
+    considered++
     if (state === "checked") any = true
     else if (state === "indeterminate") {
       any = true
       all = false
     } else all = false
   }
+  if (!considered) return checked.has(node.id) ? "checked" : "unchecked"
   if (all) return "checked"
   return any ? "indeterminate" : "unchecked"
 }
@@ -271,14 +278,18 @@ export function computeStats(
     let total = 0
     let bytes = 0
     let sized = node.size !== undefined
+    let considered = 0
 
     for (const child of node.children) {
       const childStats = visit(child)
-      if (childStats.state === "checked") any = true
-      else if (childStats.state === "indeterminate") {
-        any = true
-        all = false
-      } else all = false
+      if (!child.disabled || childStats.state !== "unchecked") {
+        considered++
+        if (childStats.state === "checked") any = true
+        else if (childStats.state === "indeterminate") {
+          any = true
+          all = false
+        } else all = false
+      }
       count += childStats.checked
       total += childStats.total
       if (childStats.size !== undefined) {
@@ -287,8 +298,9 @@ export function computeStats(
       }
     }
 
+    const own: CheckState = checked.has(node.id) ? "checked" : "unchecked"
     const self: NodeStats = {
-      state: all ? "checked" : any ? "indeterminate" : "unchecked",
+      state: !considered ? own : all ? "checked" : any ? "indeterminate" : "unchecked",
       checked: count,
       total,
       // An explicit size on the directory wins: a server-side listing usually

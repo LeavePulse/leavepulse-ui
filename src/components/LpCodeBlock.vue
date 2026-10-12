@@ -24,7 +24,8 @@ export default { inheritAttrs: false }
  */
 import { computed, reactive, ref, watch } from "vue"
 import { useClipboard } from "../composables/useClipboard"
-import { type CodeLang, tokenizeLine } from "./codeHighlight"
+import { type CodeLang, tokenizeLines } from "./codeHighlight"
+import { useLabels } from "../composables/useLpConfig"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -49,6 +50,7 @@ const props = withDefaults(
     height?: string
     /** Auto-collapse a leading import/package block (no markers needed). */
     foldImports?: boolean
+    labels?: Partial<Record<"unlock" | "lock" | "copy" | "copied" | "imports" | "details" | "lines", string>>
   }>(),
   {
     lang: "plain",
@@ -65,6 +67,21 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void
   (e: "update:locked", value: boolean): void
 }>()
+
+const text = useLabels(
+  "codeBlock",
+  {
+    unlock: "Unlock to edit",
+    lock: "Lock (read-only)",
+    copy: "Copy code",
+    copied: "Copied",
+    imports: "imports",
+    details: "details",
+    /** `{n}` is replaced by the count. */
+    lines: "({n} lines)",
+  },
+  () => props.labels,
+)
 
 const code = computed(() => props.modelValue ?? "")
 const rawLines = computed(() => code.value.replace(/\n$/, "").split("\n"))
@@ -114,7 +131,7 @@ const segments = computed<Segment[]>(() => {
       flushPlain()
       const lines: NumberedLine[] = []
       for (let k = start; k < realEnd; k++) lines.push({ n: k + 1, text: src[k] })
-      out.push({ kind: "fold", id: foldId++, label: "imports", defaultOpen: false, lines })
+      out.push({ kind: "fold", id: foldId++, label: text.value.imports, defaultOpen: false, lines })
       i = realEnd
     }
   }
@@ -126,7 +143,7 @@ const segments = computed<Segment[]>(() => {
       flushPlain()
       const rest = startMatch[1] ?? ""
       const defaultOpen = /\bopen\b/.test(rest)
-      const label = rest.replace(/\bopen\b/, "").trim() || "details"
+      const label = rest.replace(/\bopen\b/, "").trim() || text.value.details
       const lines: NumberedLine[] = []
       i++
       for (; i < src.length; i++) {
@@ -143,6 +160,7 @@ const segments = computed<Segment[]>(() => {
 })
 
 const hasFolds = computed(() => segments.value.some((s) => s.kind === "fold"))
+const editing = computed(() => !props.locked && !hasFolds.value)
 
 // Per-region open state, keyed by fold id, defaulting to each region's declared
 // open flag. Reset when the set of folds changes.
@@ -159,9 +177,21 @@ function toggleFold(id: number) {
   openState[id] = !openState[id]
 }
 
-/** Highlight one line's text into tokens. */
-function tokens(text: string) {
-  return tokenizeLine(text, props.lang)
+/* Highlighted once for the whole snippet, so a block comment that spans lines
+   is coloured as one; looked up by the line's 1-based number. */
+const highlighted = computed(() => tokenizeLines(rawLines.value, props.lang))
+function tokens(n: number) {
+  return highlighted.value[n - 1] ?? []
+}
+
+/* The textarea is the scroller while editing; the highlighted copy under it
+   follows, or the caret drifts over the wrong text on a long line. */
+const preEl = ref<HTMLElement | null>(null)
+function syncScroll(e: Event) {
+  const area = e.target as HTMLTextAreaElement
+  if (!preEl.value) return
+  preEl.value.scrollLeft = area.scrollLeft
+  preEl.value.scrollTop = area.scrollTop
 }
 
 // Copied text is the real code with marker lines removed (so it pastes clean),
@@ -214,7 +244,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           v-if="lockToggle"
           type="button"
           class="group/lock flex items-center gap-1 rounded px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="locked ? 'Unlock to edit' : 'Lock (read-only)'"
+          :aria-label="locked ? text.unlock : text.lock"
           @click="toggleLock"
         >
           <LpIcon
@@ -227,7 +257,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           v-if="copyable"
           type="button"
           class="group/copy flex items-center gap-1 rounded px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="copied ? 'Copied' : 'Copy code'"
+          :aria-label="copied ? text.copied : text.copy"
           @click="copy"
         >
           <LpIcon
@@ -245,7 +275,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     <div
       class="lp-scrollbar-none relative"
       :style="height ? { height } : undefined"
-      :class="height ? 'overflow-auto' : ''"
+      :class="height ? (editing ? 'overflow-hidden' : 'overflow-auto') : ''"
     >
       <!-- Editable overlay: only when unlocked and there are no folds. -->
       <textarea
@@ -253,12 +283,18 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :value="code"
         spellcheck="false"
         class="lp-scrollbar-none absolute inset-0 size-full resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-relaxed text-transparent caret-brand outline-none"
-        :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', lineNumbers ? 'pl-12' : '']"
+        :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', lineNumbers ? 'pl-13' : '']"
         @input="onInput"
+        @scroll="syncScroll"
       />
       <pre
+        ref="preEl"
         class="lp-scrollbar-none m-0 overflow-auto p-3 leading-relaxed"
-        :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', !locked && !hasFolds ? 'pointer-events-none' : '']"
+        :class="[
+          wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre',
+          editing ? 'pointer-events-none' : '',
+          editing && height ? 'h-full overflow-hidden' : '',
+        ]"
       ><code class="block"><template
           v-for="(seg, s) in segments"
           :key="s"
@@ -271,7 +307,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                 class="mr-3 inline-block w-7 select-none text-right text-muted/60"
                 aria-hidden="true"
               >{{ ln.n }}</span><span
-                v-for="(tok, j) in tokens(ln.text)"
+                v-for="(tok, j) in tokens(ln.n)"
                 :key="j"
                 :class="tok.cls"
               >{{ tok.text }}</span></span></template><!-- Fold region --><template
@@ -288,7 +324,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               /><span class="select-none">{{ openState[seg.id] ? seg.label : seg.label + ' …' }}</span><span
                 v-if="!openState[seg.id]"
                 class="select-none text-muted/50"
-              >({{ seg.lines.length }} lines)</span></button><template
+              >{{ text.lines.replace("{n}", String(seg.lines.length)) }}</span></button><template
               v-if="openState[seg.id]"
             ><span
                 v-for="ln in seg.lines"
@@ -299,7 +335,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                   class="mr-3 inline-block w-7 select-none text-right text-muted/60"
                   aria-hidden="true"
                 >{{ ln.n }}</span><span
-                  v-for="(tok, j) in tokens(ln.text)"
+                  v-for="(tok, j) in tokens(ln.n)"
                   :key="j"
                   :class="tok.cls"
                 >{{ tok.text }}</span></span></template></template></template></code></pre>

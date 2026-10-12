@@ -16,6 +16,7 @@
  */
 import { computed } from "vue"
 import { useReveal } from "../composables/useReveal"
+import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
 
 const props = withDefaults(
@@ -56,6 +57,7 @@ const props = withDefaults(
      * watched being drawn — not a figure mostly spent easing out.
      */
     duration?: number
+    labels?: Partial<Record<"empty" | "up" | "down" | "flat" | "latest", string>>
   }>(),
   { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900 },
 )
@@ -131,14 +133,20 @@ const lastPoint = computed(() => {
 const hasData = computed(() => series.value[0].values.some((v) => v != null))
 
 /* A bare <svg> is invisible to a screen reader; say the shape out loud. */
+const text = useLabels(
+  "sparkline",
+  { empty: "No data", up: "trending up", down: "trending down", flat: "flat", latest: "latest" },
+  () => props.labels,
+)
+
 const label = computed(() => {
   if (props.ariaLabel) return props.ariaLabel
   const values = series.value[0].values.filter((v): v is number => v != null)
-  if (!values.length) return "No data"
+  if (!values.length) return text.value.empty
   const first = values[0]
   const last = values[values.length - 1]
-  const dir = last > first ? "trending up" : last < first ? "trending down" : "flat"
-  return `${dir}, latest ${last}`
+  const dir = last > first ? text.value.up : last < first ? text.value.down : text.value.flat
+  return `${dir}, ${text.value.latest} ${last}`
 })
 
 /*

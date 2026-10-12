@@ -25,6 +25,7 @@ import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +46,8 @@ const props = withDefaults(
     zoomOutLabel?: string
     locateLabel?: string
     recentreLabel?: string
+    /** Accessible name of the map itself. */
+    mapLabel?: string
   }>(),
   {
     tiles: () => OSM_TILES,
@@ -52,14 +55,25 @@ const props = withDefaults(
     center: () => ({ lat: 50.11, lon: 14.44 }),
     height: "20rem",
     locatable: true,
-    zoomInLabel: "Zoom in",
-    zoomOutLabel: "Zoom out",
-    locateLabel: "Use my location",
-    recentreLabel: "Back to the pin",
   },
 )
 
 const emit = defineEmits<{ (e: "update:modelValue", value: LatLon): void }>()
+
+const labelSet = useLabels("mapPicker", {
+  zoomIn: "Zoom in",
+  zoomOut: "Zoom out",
+  locate: "Use my location",
+  recentre: "Back to the pin",
+  map: "Map — arrows pan, +/− zoom, Enter drops the pin in the centre",
+})
+const text = computed(() => ({
+  zoomIn: props.zoomInLabel ?? labelSet.value.zoomIn,
+  zoomOut: props.zoomOutLabel ?? labelSet.value.zoomOut,
+  locate: props.locateLabel ?? labelSet.value.locate,
+  recentre: props.recentreLabel ?? labelSet.value.recentre,
+  map: props.mapLabel ?? labelSet.value.map,
+}))
 
 const PAN_STEP = 80
 const ZOOM_MS = 220
@@ -452,6 +466,15 @@ function onKeydown(e: KeyboardEvent) {
       e.preventDefault()
       recentre()
       break
+    // Without this a keyboard could pan and zoom but never actually pick.
+    case "Enter":
+    case " ": {
+      const el = viewport.value
+      if (!el) return
+      e.preventDefault()
+      emit("update:modelValue", toLatLon({ x: el.clientWidth / 2, y: el.clientHeight / 2 }))
+      break
+    }
   }
 }
 
@@ -563,7 +586,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :class="disabled ? 'cursor-not-allowed opacity-55' : panning ? 'cursor-grabbing' : 'cursor-grab'"
       :tabindex="disabled ? -1 : 0"
       role="application"
-      :aria-label="recentreLabel"
+      :aria-label="text.map"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
@@ -616,8 +639,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :class="CONTROL"
         type="button"
         :disabled="disabled || level >= maxZoom"
-        :title="zoomInLabel"
-        :aria-label="zoomInLabel"
+        :title="text.zoomIn"
+        :aria-label="text.zoomIn"
         @click="zoomBy(1)"
       >
         <LpIcon name="lucide:plus" :size="16" />
@@ -626,8 +649,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :class="CONTROL"
         type="button"
         :disabled="disabled || level <= minZoom"
-        :title="zoomOutLabel"
-        :aria-label="zoomOutLabel"
+        :title="text.zoomOut"
+        :aria-label="text.zoomOut"
         @click="zoomBy(-1)"
       >
         <LpIcon name="lucide:minus" :size="16" />
@@ -636,8 +659,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         v-if="canRecentre"
         :class="CONTROL"
         type="button"
-        :title="recentreLabel"
-        :aria-label="recentreLabel"
+        :title="text.recentre"
+        :aria-label="text.recentre"
         @click="recentre"
       >
         <LpIcon name="lucide:locate-fixed" :size="16" />
@@ -647,8 +670,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :class="CONTROL"
         type="button"
         :disabled="disabled || locating"
-        :title="locateLabel"
-        :aria-label="locateLabel"
+        :title="text.locate"
+        :aria-label="text.locate"
         @click="locate"
       >
         <LpIcon

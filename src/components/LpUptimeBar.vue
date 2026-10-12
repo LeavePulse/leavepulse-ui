@@ -11,6 +11,7 @@ import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpTooltip from "./LpTooltip.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
 
 export type UptimeStatus = "operational" | "degraded" | "down" | "maintenance" | "empty"
 
@@ -39,6 +40,8 @@ const props = withDefaults(
      * `{ degraded: '#ffb84d' }` to recolour just one state.
      */
     colors?: Partial<Record<UptimeStatus, string>>
+    /** Status names, for the tooltip and screen readers. */
+    labels?: Partial<Record<UptimeStatus, string>>
   }>(),
   { showUptime: true },
 )
@@ -64,13 +67,17 @@ const opacityFor = (status: UptimeStatus): number =>
 const colorFor = (status: UptimeStatus): string =>
   props.colors?.[status] ?? defaultColor[status]
 
-const statusLabel: Record<UptimeStatus, string> = {
-  operational: "Operational",
-  degraded: "Degraded",
-  down: "Down",
-  maintenance: "Maintenance",
-  empty: "No data",
-}
+const statusLabel = useLabels(
+  "uptimeBar",
+  {
+    operational: "Operational",
+    degraded: "Degraded",
+    down: "Down",
+    maintenance: "Maintenance",
+    empty: "No data",
+  },
+  () => props.labels,
+)
 
 // Uptime counts only slices with data; operational + maintenance are "up".
 const uptimePct = computed(() => {
@@ -114,8 +121,34 @@ const tip = computed(() => {
   if (i == null) return null
   const seg = props.segments[i]
   if (!seg) return null
-  return { status: seg.status, text: seg.label ?? statusLabel[seg.status] }
+  return { status: seg.status, text: seg.label ?? statusLabel.value[seg.status] }
 })
+
+/*
+ * One Tab stop for the whole bar, arrows to walk it. A quarter's worth of
+ * slices as separate stops made the bar ninety Tab presses to get past.
+ */
+const focusIndex = ref(-1)
+const slots = ref<HTMLElement[]>([])
+const tabStop = computed(() =>
+  focusIndex.value >= 0 && focusIndex.value < props.segments.length
+    ? focusIndex.value
+    : props.segments.length - 1,
+)
+
+function onSlotKeydown(e: KeyboardEvent, i: number) {
+  const last = props.segments.length - 1
+  const next =
+    e.key === "ArrowRight" ? Math.min(last, i + 1)
+    : e.key === "ArrowLeft" ? Math.max(0, i - 1)
+    : e.key === "Home" ? 0
+    : e.key === "End" ? last
+    : -1
+  if (next < 0) return
+  e.preventDefault()
+  focusIndex.value = next
+  slots.value[next]?.focus()
+}
 
 const uptimeDecimals = computed(() => {
   const v = uptimePct.value
@@ -168,10 +201,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <button
           v-for="(seg, i) in segments"
           :key="i"
+          ref="slots"
           type="button"
           class="lp-uptime__slot min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :tabindex="i === tabStop ? 0 : -1"
           :aria-label="seg.label ?? statusLabel[seg.status]"
           @pointerenter="hovered = i"
+          @focus="focusIndex = i; hovered = i"
+          @blur="hovered === i && (hovered = null)"
+          @keydown="onSlotKeydown($event, i)"
         >
           <span
             class="lp-uptime__mark block h-full rounded-[1px] transition-[opacity,scale] duration-[var(--duration-fast)] motion-reduce:transition-none"

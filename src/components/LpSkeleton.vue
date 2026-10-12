@@ -88,7 +88,10 @@ const isBlock = computed(() => !slots.default)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-skeleton-item {
+  /* Repeats the descendant form: it outranks a bare class, and grouped items
+     kept pulsing under reduced motion. */
+  .lp-skeleton-item,
+  .lp-skeleton .lp-skeleton-item {
     animation: none;
     opacity: 0.75;
   }

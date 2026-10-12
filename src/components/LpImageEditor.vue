@@ -24,6 +24,8 @@ export default { inheritAttrs: false }
  * already know from every avatar cropper.
  */
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
+import { coverScale, cropGeometry, isSideways } from "./imageCrop"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useReveal } from "../composables/useReveal"
 import { useZoomPan } from "../composables/useZoomPan"
@@ -81,15 +83,18 @@ const props = withDefaults(
 // mount. An editor inside a dialog that opens a minute later still draws.
 const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animate })
 
-const text = computed(() => ({
-  rotateLeft: "Rotate left",
-  rotateRight: "Rotate right",
-  zoomIn: "Zoom in",
-  zoomOut: "Zoom out",
-  reset: "Reset",
-  canvas: "Crop area — arrows pan, +/− zoom, R rotates, Alt+wheel turns freely",
-  ...props.labels,
-}))
+const text = useLabels(
+  "imageEditor",
+  {
+    rotateLeft: "Rotate left",
+    rotateRight: "Rotate right",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    reset: "Reset",
+    canvas: "Crop area — arrows pan, +/− zoom, R rotates, Alt+wheel turns freely",
+  },
+  () => props.labels,
+)
 
 const ASPECTS: Record<string, number | null> = {
   free: null,
@@ -105,7 +110,24 @@ const rotation = ref(0)
 const viewport = ref<HTMLElement | null>(null)
 const zoom = useZoomPan({ min: 1, max: 6 })
 
-watch(viewport, (el) => zoom.setViewport(el))
+const frameSize = ref<{ width: number; height: number } | null>(null)
+let frameObserver: ResizeObserver | null = null
+
+watch(viewport, (el) => {
+  zoom.setViewport(el)
+  frameObserver?.disconnect()
+  frameObserver = null
+  if (!el) return
+  // Fractional, not clientWidth: a rounded-down frame left a hairline of
+  // background showing along the edges of a turned picture.
+  frameSize.value = { width: el.clientWidth, height: el.clientHeight }
+  if (typeof ResizeObserver !== "undefined") {
+    frameObserver = new ResizeObserver(([entry]) => {
+      frameSize.value = { width: entry.contentRect.width, height: entry.contentRect.height }
+    })
+    frameObserver.observe(el)
+  }
+})
 
 /** Which way up it ends, 0-270, whatever the accumulated angle. */
 const upright = computed(() => ((rotation.value % 360) + 360) % 360)
@@ -114,14 +136,24 @@ const upright = computed(() => ((rotation.value % 360) + 360) % 360)
  *  back to where it started is not an edit, however far the dial travelled. */
 const edited = computed(() => upright.value !== 0 || zoom.scale.value !== 1)
 
+// Each file gets a generation: a slow decode of an earlier file must neither
+// replace the current picture nor leak the bitmap it produced.
+let generation = 0
+
 watch(
   () => props.file,
   async (file) => {
     revoke()
     rotation.value = 0
     zoom.reset()
+    const mine = ++generation
     objectUrl.value = URL.createObjectURL(file)
-    source.value = await decode(file, objectUrl.value)
+    const decoded = await decode(file, objectUrl.value)
+    if (mine !== generation) {
+      if (decoded instanceof ImageBitmap) decoded.close()
+      return
+    }
+    source.value = decoded
   },
   { immediate: true },
 )
@@ -172,7 +204,11 @@ function revoke() {
   source.value = null
 }
 
-onBeforeUnmount(revoke)
+onBeforeUnmount(() => {
+  generation++
+  revoke()
+  frameObserver?.disconnect()
+})
 
 function rotate(by: number) {
   // Accumulated, never wrapped to 0-359. Normalising made the fourth quarter
@@ -218,7 +254,9 @@ const boxRatio = computed(() => {
   if (ratio) return ratio
   const size = sourceSize.value
   if (!size) return 1
-  const turned = upright.value % 180 !== 0
+  // Snapped to the nearest quarter: a few degrees of levelling must not flip a
+  // landscape frame to portrait.
+  const turned = isSideways(rotation.value)
   const w = turned ? size.height : size.width
   const h = turned ? size.width : size.height
   return w / h
@@ -226,7 +264,31 @@ const boxRatio = computed(() => {
 
 const frameStyle = computed(() => ({ aspectRatio: String(boxRatio.value) }))
 
+/*
+ * The picture is sized to cover the frame AFTER its turn, and centred. Filling
+ * the frame with object-cover and then rotating the element left empty bands
+ * on any non-square frame turned sideways, and at a free angle bare corners.
+ */
+const sized = computed(() => {
+  const size = sourceSize.value
+  const frame = frameSize.value
+  if (!size || !frame || !frame.width || !frame.height) return null
+  const cover = coverScale(size.width, size.height, frame.width, frame.height, rotation.value)
+  const width = size.width * cover
+  const height = size.height * cover
+  return {
+    width: `${width}px`,
+    height: `${height}px`,
+    left: "50%",
+    top: "50%",
+    marginLeft: `${-width / 2}px`,
+    marginTop: `${-height / 2}px`,
+    maxWidth: "none",
+  }
+})
+
 const imageStyle = computed(() => ({
+  ...sized.value,
   ...zoom.style.value,
   // Rotation sits innermost, after the composable's scale and translate, so a
   // drag still moves the picture the way the pointer went once it is turned.
@@ -254,51 +316,31 @@ async function exportImage(): Promise<Blob | null> {
   if (!picture || !size || !frame) return null
   if (!edited.value && props.aspect === "free") return null
 
-  // Work in "upright space": the picture as the person sees it, already
-  // turned. The rotation is re-applied once, when drawing, which keeps the
-  // maths free of quarter-turn special cases.
-  const turned = upright.value % 180 !== 0
-  const uprightW = turned ? size.height : size.width
-  const uprightH = turned ? size.width : size.height
+  // The crop in upright space, from the same geometry the preview is drawn
+  // with, then the whole source drawn through one transform: no per-quarter
+  // special cases, and a free angle comes out as it looked on screen.
+  const crop = cropGeometry({
+    sourceWidth: size.width,
+    sourceHeight: size.height,
+    frameWidth: frameSize.value?.width ?? frame.clientWidth,
+    frameHeight: frameSize.value?.height ?? frame.clientHeight,
+    rotation: rotation.value,
+    scale: zoom.scale.value,
+    offset: zoom.offset.value,
+  })
 
-  // object-cover: the picture fills the frame and the overflow is what panning
-  // reaches. One frame pixel is this many upright pixels.
-  const cover = Math.max(frame.clientWidth / uprightW, frame.clientHeight / uprightH)
-  const shown = cover * zoom.scale.value
-  const cropW = Math.min(uprightW, frame.clientWidth / shown)
-  const cropH = Math.min(uprightH, frame.clientHeight / shown)
-
-  // `offset` is in content pixels — the same space the cover scale maps from —
-  // so it converts with `cover`, not with the zoomed scale.
-  const centreX = clamp(
-    uprightW / 2 - zoom.offset.value.x / cover,
-    cropW / 2,
-    uprightW - cropW / 2,
-  )
-  const centreY = clamp(
-    uprightH / 2 - zoom.offset.value.y / cover,
-    cropH / 2,
-    uprightH - cropH / 2,
-  )
-
-  const scale = Math.min(1, props.maxEdge / Math.max(cropW, cropH))
+  const scale = Math.min(1, props.maxEdge / Math.max(crop.width, crop.height))
   const canvas = document.createElement("canvas")
-  canvas.width = Math.max(1, Math.round(cropW * scale))
-  canvas.height = Math.max(1, Math.round(cropH * scale))
+  canvas.width = Math.max(1, Math.round(crop.width * scale))
+  canvas.height = Math.max(1, Math.round(crop.height * scale))
   const ctx = canvas.getContext("2d")
   if (!ctx) return null
 
   ctx.translate(canvas.width / 2, canvas.height / 2)
-  ctx.rotate((upright.value * Math.PI) / 180)
   ctx.scale(scale, scale)
-
-  // Back to source coordinates for the read: a quarter turn swaps the axes.
-  const readW = turned ? cropH : cropW
-  const readH = turned ? cropW : cropH
-  const readX = (turned ? centreY : centreX) - readW / 2
-  const readY = (turned ? centreX : centreY) - readH / 2
-
-  ctx.drawImage(picture, readX, readY, readW, readH, -readW / 2, -readH / 2, readW, readH)
+  ctx.translate(-crop.centre.x, -crop.centre.y)
+  ctx.rotate((rotation.value * Math.PI) / 180)
+  ctx.drawImage(picture, -size.width / 2, -size.height / 2)
 
   return await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, outputType.value, props.quality),
@@ -311,10 +353,6 @@ const outputType = computed(() => {
   if (props.type !== "source") return props.type
   return ENCODABLE.has(props.file.type) ? props.file.type : "image/png"
 })
-
-function clamp(value: number, low: number, high: number) {
-  return Math.min(Math.max(value, low), Math.max(low, high))
-}
 
 /*
  * The wheel.
@@ -425,8 +463,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :src="objectUrl"
         alt=""
         draggable="false"
-        class="lp-editor__image absolute inset-0 size-full select-none object-cover motion-reduce:transition-none"
+        class="lp-editor__image absolute select-none motion-reduce:transition-none"
         :class="[
+          sized ? '' : 'inset-0 size-full object-cover',
           zoom.panning.value ? 'cursor-grabbing' : 'cursor-grab',
           animate && !revealed ? 'lp-editor__image--waiting' : '',
         ]"

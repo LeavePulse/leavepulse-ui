@@ -31,6 +31,16 @@ import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpTooltip from "./LpTooltip.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
+
+export interface PieText {
+  [key: string]: string
+  empty: string
+  other: string
+  total: string
+  /** "{n} selected"; `{n}` is replaced by the count. */
+  selected: string
+}
 
 /** A slice, as reported by every interaction event. */
 export interface SliceEvent {
@@ -107,21 +117,26 @@ const props = withDefaults(
      */
     menuItems?: (slice: SliceEvent, selection: SliceEvent[]) => ContextMenuItemDef[]
     emptyLabel?: string
+    /** Accessible name for the chart. Defaults to a generated summary. */
+    ariaLabel?: string
+    /** Render the slices as a visually hidden table for screen readers. */
+    dataTable?: boolean
+    /** Text overrides (`labels` is taken by the callout switch). */
+    text?: Partial<PieText>
   }>(),
   {
     type: "donut",
     size: 180,
     innerRatio: 0.62,
     maxSlices: 6,
-    otherLabel: "Other",
     showPercent: true,
     showTotal: true,
     labelWidth: 140,
     padAngle: 1.5,
     cornerRadius: 4,
     hoverOffset: 8,
-    emptyLabel: "No data",
     animate: true,
+    dataTable: false,
     duration: 900,
   },
 )
@@ -134,11 +149,17 @@ const emit = defineEmits<{
   (e: "sliceContextMenu", payload: SliceEvent): void
 }>()
 
+const strings = useLabels<PieText>(
+  "pie",
+  { empty: "No data", other: "Other", total: "total", selected: "{n} selected" },
+  () => props.text,
+)
+
 const resolved = computed(() =>
   resolveSlices(
     props.slices,
     props.maxSlices || undefined,
-    props.otherLabel,
+    props.otherLabel ?? strings.value.other,
     !props.sortBySize,
   ),
 )
@@ -336,6 +357,23 @@ const dragging = ref(false)
 
 const isSelected = (i: number) => selected.value.has(i)
 
+/*
+ * Indices only mean something against the slices they were taken from. When
+ * the data changes shape, a selection or hover pointing past the end would read
+ * a slice that no longer exists, so anything out of range is dropped.
+ */
+watch(
+  () => arcs.value.length,
+  (n) => {
+    if (active.value >= n) active.value = -1
+    if (anchor.value >= n) anchor.value = -1
+    if ([...selected.value].some((i) => i >= n)) {
+      selected.value = new Set([...selected.value].filter((i) => i < n))
+      emitSelection()
+    }
+  },
+)
+
 const payloadFor = (i: number) => {
   const a = arcs.value[i]
   return { index: i, label: a.label, value: a.value, isOther: a.isOther }
@@ -354,7 +392,9 @@ const rangeTo = (i: number) => {
   return next
 }
 
-const onSlicePointerDown = (i: number, e: PointerEvent) => {
+type Modifiers = Pick<MouseEvent, "button" | "shiftKey" | "ctrlKey" | "metaKey">
+
+const onSlicePointerDown = (i: number, e: Modifiers, drag = true) => {
   // Right-click opens a menu; it must not disturb a selection the menu acts on.
   if (e.button === 2) return
 
@@ -372,10 +412,16 @@ const onSlicePointerDown = (i: number, e: PointerEvent) => {
     const only = selected.value.size === 1 && selected.value.has(i)
     selected.value = only ? new Set() : new Set([i])
     anchor.value = only ? -1 : i
-    if (!only) beginDrag()
+    if (!only && drag) beginDrag()
   }
   emitSelection()
   emit("sliceClick", payloadFor(i))
+}
+
+/* Enter and Space on a legend entry arrive as a click with no pointer behind
+   it (detail 0); pointer clicks were already handled on pointerdown. */
+const onLegendClick = (i: number, e: MouseEvent) => {
+  if (e.detail === 0) onSlicePointerDown(i, e, false)
 }
 
 /** Drag across slices to gather them — same gesture as a rubber-band in a list. */
@@ -516,8 +562,10 @@ const onSliceContextMenu = (i: number) => {
 
 /** The slice the centre reads out: the hovered one, else a lone selection. */
 const focused = computed(() => {
-  if (active.value >= 0) return active.value
-  return selected.value.size === 1 ? [...selected.value][0] : -1
+  const n = arcs.value.length
+  if (active.value >= 0 && active.value < n) return active.value
+  const only = selected.value.size === 1 ? [...selected.value][0] : -1
+  return only < n ? only : -1
 })
 
 /** Unselected slices only recede once something is actually selected. */
@@ -526,11 +574,14 @@ const dimmed = (i: number) => selected.value.size > 0 && !selected.value.has(i)
 const total = computed(() => resolved.value.total)
 
 const selectedArcs = computed(() =>
-  [...selected.value].sort((x, y) => x - y).map((i) => arcs.value[i]),
+  [...selected.value]
+    .sort((x, y) => x - y)
+    .filter((i) => i < arcs.value.length)
+    .map((i) => arcs.value[i]),
 )
 
 /** The slice under the pointer; null over the gaps, which disables the tip. */
-const hovered = computed(() => (active.value >= 0 ? arcs.value[active.value] : null))
+const hovered = computed(() => arcs.value[active.value] ?? null)
 
 /* Sticky copy for the tooltip's own contents: `hovered` drops to null the
    instant the pointer leaves a slice, and reading it directly would blank the
@@ -550,9 +601,21 @@ const centreValue = computed(() => {
 
 const centreLabel = computed(() => {
   if (focused.value >= 0) return arcs.value[focused.value].label
-  if (selected.value.size > 1) return `${selected.value.size} selected`
-  return "total"
+  if (selected.value.size > 1)
+    return strings.value.selected.replace("{n}", String(selected.value.size))
+  return strings.value.total
 })
+
+const summary = computed(
+  () =>
+    props.ariaLabel ??
+    [
+      props.title,
+      ...arcs.value.map((a) => `${a.label}: ${fmt(a.value)} (${pct(a.fraction)})`),
+    ]
+      .filter(Boolean)
+      .join(", "),
+)
 
 // The pie sets its own gap between chart and legend, which a narrow card has to close up.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -575,7 +638,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :style="{ width: `${size}px`, height: `${size}px` }"
     >
       <LpIcon name="lucide:chart-pie" :size="18" />
-      <span class="text-xs">{{ emptyLabel }}</span>
+      <span class="text-xs">{{ emptyLabel ?? strings.empty }}</span>
     </div>
 
     <!-- items-start, not items-center: an unfolded legend can be taller than
@@ -644,6 +707,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               :width="canvasWidth"
               :height="canvasHeight"
               class="touch-none select-none"
+              role="img"
+              :aria-label="summary"
               @pointerleave="leaveChart"
               @pointerup="endDrag"
               @click.self="clearSelection"
@@ -672,7 +737,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               <g :clip-path="animate ? `url(#${sweepId}-sweep)` : undefined">
                 <path
                   v-for="(a, i) in arcs"
-                  :key="a.label"
+                  :key="`${i}-${a.label}`"
                   :d="a.d"
                   :fill="a.color"
                   class="pointer-events-none transition-[transform,opacity] duration-medium ease-[var(--ease-emphasized)] motion-reduce:transition-none"
@@ -684,7 +749,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               <!-- Invisible, unmoving, and on top: the actual hit area. -->
               <path
                 v-for="(a, i) in arcs"
-                :key="`hit-${a.label}`"
+                :key="`hit-${i}-${a.label}`"
                 :d="a.d"
                 fill="transparent"
                 class="cursor-pointer"
@@ -765,7 +830,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <div v-if="legendShown" class="flex min-w-0 flex-col gap-1.5" @pointerup="endDrag">
           <button
             v-for="(a, i) in arcs"
-            :key="a.label"
+            :key="`${i}-${a.label}`"
             type="button"
             class="group flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-xs outline-none transition-[opacity,background-color] duration-fast focus-visible:ring-2 focus-visible:ring-ring"
             :class="[dimmed(i) ? 'opacity-45' : '', isSelected(i) ? 'bg-surface-soft' : '']"
@@ -773,6 +838,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             @pointerenter="onSlicePointerEnter(i)"
             @pointerleave="onSlicePointerLeave(i)"
             @pointerdown="onSlicePointerDown(i, $event)"
+            @click="onLegendClick(i, $event)"
+            @focus="active = i"
+            @blur="active === i && (active = -1)"
             @contextmenu="onSliceContextMenu(i)"
           >
             <span
@@ -789,5 +857,16 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </div>
       </div>
     </LpContextMenu>
+
+    <table v-if="dataTable && hasData" class="sr-only">
+      <caption v-if="title">{{ title }}</caption>
+      <tbody>
+        <tr v-for="(a, i) in arcs" :key="`${i}-${a.label}`">
+          <th scope="row">{{ a.label }}</th>
+          <td>{{ fmt(a.value) }}</td>
+          <td>{{ pct(a.fraction) }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>

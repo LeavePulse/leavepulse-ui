@@ -31,6 +31,26 @@ import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
+
+export interface LogViewerLabels {
+  [key: string]: string
+  empty: string
+  frozen: string
+  noMatch: string
+  loadingOlder: string
+  copyMessage: string
+  copyLine: string
+  copyTimestamp: string
+  copied: string
+  /** `{source}` is replaced by the line's source. */
+  filterSource: string
+  /** `{level}` is replaced by the line's level. */
+  filterLevel: string
+  /** `{n}` is replaced by the count. */
+  identical: string
+  jump: string
+}
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "success"
 
@@ -103,6 +123,7 @@ const props = withDefaults(
      * so a duplicate level word / timestamp doesn't repeat in the message body.
      */
     parse?: boolean
+    labels?: Partial<LogViewerLabels>
   }>(),
   {
     showTime: true,
@@ -111,8 +132,6 @@ const props = withDefaults(
     wrap: false,
     tail: true,
     height: "20rem",
-    emptyLabel: "No logs yet",
-    frozenLabel: "Held — release Ctrl to resume",
     rowMenu: true,
     parse: false,
   },
@@ -128,6 +147,25 @@ const emit = defineEmits<{
    */
   (e: "reach-top"): void
 }>()
+
+const text = useLabels<LogViewerLabels>(
+  "logViewer",
+  {
+    empty: "No logs yet",
+    frozen: "Held — release Ctrl to resume",
+    noMatch: "No lines match",
+    loadingOlder: "loading older…",
+    copyMessage: "Copy message",
+    copyLine: "Copy line",
+    copyTimestamp: "Copy timestamp",
+    copied: "Copied to clipboard",
+    filterSource: "Filter by [{source}]",
+    filterLevel: "Filter by {level}",
+    identical: "{n} identical lines",
+    jump: "Jump to latest",
+  },
+  () => props.labels,
+)
 
 // Level → gutter rail + text colour. Reads only semantic tokens so re-skinning
 // just works. trace/debug stay muted; success is green; warn amber; error/fatal
@@ -336,6 +374,24 @@ const visibleLines = computed<{ line: LogLine; n: number; count: number }[]>(() 
   return folded
 })
 
+/*
+ * Rows are keyed by the identity of the line object the consumer passed, not by
+ * position: prepending older history shifts every index, and index keys made
+ * the bottom rows play the enter animation instead of the new top ones.
+ */
+const lineIds = new WeakMap<LogLine, number>()
+let nextLineId = 0
+function lineKey(n: number): number {
+  const line = sourceLines.value[n]
+  if (!line) return -1 - n
+  let id = lineIds.get(line)
+  if (id === undefined) {
+    id = nextLineId++
+    lineIds.set(line, id)
+  }
+  return id
+}
+
 // True when filtering has emptied an otherwise non-empty stream.
 const filteredEmpty = computed(
   () => props.lines.length > 0 && visibleLines.value.length === 0,
@@ -356,7 +412,7 @@ function fmtTime(time?: number | string): string {
 // A menu item closes the menu as it runs, leaving nothing on screen to say the
 // copy happened — so unlike LpCodeBlock's button, this one announces itself.
 const { copy: writeClipboard } = useClipboard()
-const copy = (text: string) => writeClipboard(text, { toast: "Copied to clipboard" })
+const copy = (value: string) => writeClipboard(value, { toast: text.value.copied })
 
 // The whole line as one copyable string: "time LEVEL [source] message".
 function lineText(line: LogLine): string {
@@ -398,15 +454,15 @@ function onRowPointerDown(e: PointerEvent) {
 function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
   if (!props.rowMenu) return []
   const items: ContextMenuItemDef[] = [
-    { label: "Copy message", icon: "lucide:copy", onSelect: () => copy(line.message) },
-    { label: "Copy line", icon: "lucide:clipboard-list", onSelect: () => copy(lineText(line)) },
+    { label: text.value.copyMessage, icon: "lucide:copy", onSelect: () => copy(line.message) },
+    { label: text.value.copyLine, icon: "lucide:clipboard-list", onSelect: () => copy(lineText(line)) },
   ]
   if (line.time != null) {
-    items.push({ label: "Copy timestamp", icon: "lucide:clock", onSelect: () => copy(fmtTime(line.time)) })
+    items.push({ label: text.value.copyTimestamp, icon: "lucide:clock", onSelect: () => copy(fmtTime(line.time)) })
   }
   if (line.source) {
     items.push({
-      label: `Filter by [${line.source}]`,
+      label: text.value.filterSource.replace("{source}", line.source),
       icon: "lucide:filter",
       separatorBefore: true,
       onSelect: () => emit("filter", { source: line.source }),
@@ -414,7 +470,7 @@ function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
   }
   if (line.level) {
     items.push({
-      label: `Filter by ${line.level}`,
+      label: text.value.filterLevel.replace("{level}", line.level),
       icon: "lucide:filter",
       separatorBefore: !line.source,
       onSelect: () => emit("filter", { level: line.level }),
@@ -576,8 +632,15 @@ function scrollToBottom() {
 // Snapshot the scroll anchor BEFORE the DOM updates for a line change (flush:pre)
 // so a prepend can be compensated post-update. Only matters when NOT pinned to
 // the bottom (i.e. the user is reading history up the stream).
+/*
+ * A capped buffer (shift + push, or slice(-N)) keeps the length constant once
+ * full, so the length alone stops seeing new lines. The array, its length and
+ * its last line together change on every append, prepend or replacement.
+ */
+const linesSignal = () => [props.lines, props.lines.length, props.lines[props.lines.length - 1]]
+
 watch(
-  () => props.lines.length,
+  linesSignal,
   () => {
     if (!pinned.value) captureScrollAnchor()
   },
@@ -587,7 +650,7 @@ watch(
 // After the DOM updates: tail to the bottom if pinned, else keep the view glued
 // to where it was so a top prepend (older history) doesn't yank it.
 watch(
-  () => props.lines.length,
+  linesSignal,
   async () => {
     await nextTick()
     if (props.tail && pinned.value) {
@@ -673,7 +736,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
         v-if="frozen"
         class="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-pill bg-brand px-2.5 py-1 text-[11px] font-medium text-ink-inverse"
       >
-        {{ frozenLabel }}
+        {{ frozenLabel ?? text.frozen }}
       </div>
     </Transition>
 
@@ -691,7 +754,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
         v-if="lines.length === 0 || filteredEmpty"
         class="flex h-full flex-col items-center justify-center gap-1 px-4 py-10 text-center"
       >
-        <span class="text-muted">{{ filteredEmpty ? "No lines match" : emptyLabel }}</span>
+        <span class="text-muted">{{ filteredEmpty ? text.noMatch : (emptyLabel ?? text.empty) }}</span>
         <span v-if="filteredEmpty" class="text-muted/70">“{{ highlight }}”</span>
       </div>
 
@@ -704,7 +767,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           class="flex items-center justify-center gap-2 py-2 text-muted"
         >
           <LpIcon name="lucide:loader-circle" :size="14" class="animate-spin" />
-          <span class="text-[11px]">loading older…</span>
+          <span class="text-[11px]">{{ text.loadingOlder }}</span>
         </div>
 
       <!-- ONE context menu wraps the whole list (not each row): @contextmenu
@@ -738,7 +801,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
         />
         <li
           v-for="{ line, n, count } in renderedLines"
-          :key="n"
+          :key="lineKey(n)"
           :data-log-row="n"
           class="group relative flex items-start gap-0 px-0 leading-5 transition-colors hover:bg-surface-soft/60"
           :class="metaFor(line.level).sel"
@@ -785,7 +848,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
             class="min-w-0 pr-3"
             :class="[metaFor(line.level).text, wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre']"
           >
-            <template v-for="(part, p) in splitHighlight(line.message)" :key="p">
+            <!-- Virtualised rows must stay one row tall, so a multi-line
+                 message (a stack trace) is shown on one line with ↵ marks;
+                 copying still yields the original text. -->
+            <template
+              v-for="(part, p) in splitHighlight(virtualise ? line.message.replace(/\r?\n/g, ' ↵ ') : line.message)"
+              :key="p"
+            >
               <mark
                 v-if="part.hit"
                 class="rounded-xs bg-accent/30 text-ink"
@@ -803,7 +872,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
                 v-if="count > 1"
                 :key="count"
                 class="ml-2 select-none rounded-pill bg-surface-soft px-1.5 align-[1px] text-[10px] font-semibold tabular-nums text-muted-strong"
-                :title="`${count} identical lines`"
+                :title="text.identical.replace('{n}', String(count))"
               >×{{ count }}</span>
             </Transition>
           </span>
@@ -839,7 +908,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
             :size="14"
             class="transition-transform duration-200 ease-[var(--ease-emphasized)] group-hover:translate-y-0.5"
           />
-          Jump to latest
+          {{ text.jump }}
         </button>
       </div>
     </Transition>

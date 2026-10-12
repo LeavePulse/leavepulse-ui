@@ -30,6 +30,62 @@ export interface ChartSeries {
 
 export type ChartAxis = "left" | "right"
 
+/**
+ * A reference level drawn across the plot: a line at `value`, or a band from
+ * `value` to `to`. SLOs, budgets, alert thresholds.
+ */
+export interface ChartThreshold {
+  value: number
+  /** Upper (or lower) edge of a band. Omit for a single line. */
+  to?: number
+  label?: string
+  /** Any CSS colour. Defaults to the strong line token. */
+  color?: string
+  axis?: ChartAxis
+  /** Solid instead of the default dashed line. */
+  solid?: boolean
+}
+
+/**
+ * A vertical marker at one x position: a deploy, an incident, a release.
+ * `at` is a point index or one of the x labels.
+ */
+export interface ChartMarker {
+  at: number | string
+  label?: string
+  color?: string
+}
+
+/** The x index a marker points at, or -1 when it names nothing on the axis. */
+export const markerIndex = (at: number | string, labels: string[], count: number): number => {
+  if (typeof at === "number") return Number.isInteger(at) && at >= 0 && at < count ? at : -1
+  return labels.indexOf(at)
+}
+
+/**
+ * A one-sentence reading of the chart for assistive technology: what is
+ * plotted, over how many points, and each series' range and latest value.
+ */
+export const chartSummary = (
+  series: NormalSeries[],
+  labels: string[],
+  fmt: (s: NormalSeries, v: number) => string,
+  title?: string,
+): string => {
+  const parts: string[] = []
+  const span = labels.length ? `${labels.length} points, ${labels[0]} to ${labels[labels.length - 1]}` : ""
+  parts.push([title, span].filter(Boolean).join(", "))
+  for (const s of series) {
+    const values = s.values.filter((v): v is number => v != null)
+    if (!values.length) continue
+    const last = values[values.length - 1]
+    parts.push(
+      `${s.name}: from ${fmt(s, Math.min(...values))} to ${fmt(s, Math.max(...values))}, latest ${fmt(s, last)}`,
+    )
+  }
+  return parts.filter(Boolean).join(". ")
+}
+
 export interface NormalSeries {
   name: string
   color: string
@@ -592,6 +648,7 @@ export const calloutLabels = (
       return side === "right" ? a : -a
     }
     const list = sides[side].sort((p, q) => rank(p.mid) - rank(q.mid))
+    if (!list.length) continue
 
     /*
      * Resolve collisions by NUDGING, not by stacking.
@@ -676,11 +733,26 @@ export const calloutLabels = (
   return out
 }
 
-/** Compact default tick formatting: 1.2k, 3.4M — never 1200.0000001. */
+/** Compact default tick formatting: 1.2k, 3.4M — never 1200.0000001 or 1000k. */
 export const formatTick = (v: number): string => {
+  if (!Number.isFinite(v)) return String(v)
+  const units: [number, string][] = [
+    [1e3, "k"],
+    [1e6, "M"],
+    [1e9, "B"],
+    [1e12, "T"],
+  ]
   const abs = Math.abs(v)
-  if (abs >= 1e9) return `${Number((v / 1e9).toFixed(1))}B`
-  if (abs >= 1e6) return `${Number((v / 1e6).toFixed(1))}M`
-  if (abs >= 1e3) return `${Number((v / 1e3).toFixed(1))}k`
-  return String(Number(v.toFixed(2)))
+  let i = units.length - 1
+  while (i >= 0 && abs < units[i][0]) i--
+  if (i < 0) {
+    const plain = Number(v.toFixed(2))
+    return Math.abs(plain) >= 1000 ? formatTick(Math.sign(v) * 1000) : String(plain)
+  }
+  const scaled = Number((v / units[i][0]).toFixed(1))
+  // 999 950 rounds to "1000k"; it reads as the next unit up.
+  if (Math.abs(scaled) >= 1000 && i < units.length - 1) {
+    return `${Number((v / units[i + 1][0]).toFixed(1))}${units[i + 1][1]}`
+  }
+  return `${scaled}${units[i][1]}`
 }
