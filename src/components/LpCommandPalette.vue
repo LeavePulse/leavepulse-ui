@@ -276,6 +276,7 @@ function optionId(index: number): string {
 }
 const activeId = computed(() => (flat.value.length ? optionId(selectedIndex.value) : undefined))
 const selectedIndex = ref(0)
+const selectedId = ref<string | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
 const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 
@@ -290,6 +291,7 @@ const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
  * a row of data), and deep-tracking them would walk it on every keystroke.
  */
 const trail = shallowRef<Command[]>([])
+const trailState = shallowRef<{ query: string; selectedId: string | null }[]>([])
 const mode = computed<Command | null>(() => trail.value[trail.value.length - 1] ?? null)
 
 /*
@@ -332,21 +334,20 @@ const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]
  * actions it keeps that default.
  */
 function onTab(event: KeyboardEvent) {
+  event.preventDefault()
+  event.stopPropagation()
   if (event.shiftKey) return
   const c = flat.value[selectedIndex.value]
   const actions = selectedActions.value
   if (!c || !actions.length) return
-  // The dialog's focus trap handles Tab too, and would hand focus to the
-  // mode chip this is about to render.
-  event.preventDefault()
-  event.stopPropagation()
   enter({ id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions })
 }
 
 function enter(c: Command) {
+  trailState.value = [...trailState.value, { query: query.value, selectedId: selectedId.value }]
   trail.value = [...trail.value, c]
   query.value = ""
-  selectedIndex.value = 0
+  select(0)
   modeItems.value = Array.isArray(c.children) ? c.children : []
   refresh()
   // Entering by click leaves the focus on the button that no longer exists,
@@ -357,13 +358,19 @@ function enter(c: Command) {
 
 /** Unwind the trail to `depth` entries — 0 is the root. */
 function popTo(depth: number) {
+  const state = trailState.value[depth] || { query: "", selectedId: null }
   const next = trail.value.slice(0, Math.max(0, depth))
+  trailState.value = trailState.value.slice(0, Math.max(0, depth))
   trail.value = next
-  query.value = ""
-  selectedIndex.value = 0
   const parent = next[next.length - 1]
   modeItems.value = parent && Array.isArray(parent.children) ? parent.children : []
+  query.value = state.query
+  select(0)
   refresh()
+  void nextTick(() => {
+    const index = state.selectedId ? flat.value.findIndex((c) => c.id === state.selectedId) : -1
+    select(index >= 0 ? index : 0)
+  })
   inputRef.value?.focus()
 }
 
@@ -487,12 +494,43 @@ function nearWord(term: string, label: string): boolean {
  * the same weights the palette always had; a typo match ranks below all of
  * them, so an exact hit is never outranked by a near one.
  */
-function score(c: Command, terms: string[]): number {
+interface SearchTerms {
+  include: string[]
+  exclude: string[]
+  groups: string[]
+}
+
+const QUERY_TOKEN = /(-?)(?:(in):)?(?:"([^"]*)"|(\S+))/giu
+
+function searchTerms(value: string): SearchTerms {
+  const out: SearchTerms = { include: [], exclude: [], groups: [] }
+  QUERY_TOKEN.lastIndex = 0
+  for (let match; (match = QUERY_TOKEN.exec(value)); ) {
+    const text = (match[3] ?? match[4] ?? "").trim().toLowerCase()
+    if (!text) continue
+    if (match[2] && !match[1]) out.groups.push(text)
+    else if (match[1]) out.exclude.push(text)
+    else out.include.push(text)
+  }
+  return out
+}
+
+function matches(c: Command, term: string): boolean {
+  return (
+    c.label.toLowerCase().includes(term) ||
+    (c.keywords ?? []).some((keyword) => keyword.toLowerCase().includes(term)) ||
+    (c.description?.toLowerCase().includes(term) ?? false)
+  )
+}
+
+function score(c: Command, terms: SearchTerms): number {
   const label = c.label.toLowerCase()
   const keywords = (c.keywords ?? []).map((k) => k.toLowerCase())
   const description = c.description?.toLowerCase() ?? ""
-  let total = 0
-  for (const term of terms) {
+  const group = c.group?.toLowerCase() ?? ""
+  if (terms.exclude.some((term) => matches(c, term)) || terms.groups.some((term) => !group.includes(term))) return 0
+  let total = terms.include.length ? 0 : 1
+  for (const term of terms.include) {
     let hit =
       (label.includes(term) ? 4 : 0) +
       (keywords.some((k) => k.includes(term)) ? 3 : 0) +
@@ -504,7 +542,7 @@ function score(c: Command, terms: string[]): number {
   return total
 }
 
-function rank(items: Command[], terms: string[]): Command[] {
+function rank(items: Command[], terms: SearchTerms): Command[] {
   return items
     .map((c) => ({ c, score: score(c, terms) }))
     .filter((e) => e.score > 0)
@@ -512,22 +550,27 @@ function rank(items: Command[], terms: string[]): Command[] {
     .map((e) => e.c)
 }
 
-const typedTerms = computed(() => query.value.trim().toLowerCase().split(/\s+/).filter(Boolean))
-
 /*
  * The local match and the terms it matched with — the swapped ones when the
  * layout fallback is what found it, so the highlight marks what actually hit.
  */
 const local = computed<{ items: Command[]; terms: string[] }>(() => {
-  const terms = typedTerms.value
+  const terms = searchTerms(query.value)
+  const filtered = query.value.trim()
+    ? source.value
+    : source.value.filter((c) => !c.hidden)
   // Empty query: show everything EXCEPT hidden commands (they only surface once
   // typed). With a query, hidden commands rank like any other.
-  if (!terms.length) return { items: source.value.filter((c) => !c.hidden), terms }
-  const items = rank(source.value, terms)
-  if (items.length || !props.layoutFallback) return { items, terms }
-  const swapped = terms.map(swapLayout)
-  const other = rank(source.value, swapped)
-  return other.length ? { items: other, terms: swapped } : { items, terms }
+  if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
+  const items = rank(filtered, terms)
+  if (items.length || !props.layoutFallback) return { items, terms: terms.include }
+  const swapped: SearchTerms = {
+    include: terms.include.map(swapLayout),
+    exclude: terms.exclude.map(swapLayout),
+    groups: terms.groups.map(swapLayout),
+  }
+  const other = rank(filtered, swapped)
+  return other.length ? { items: other, terms: swapped.include } : { items, terms: terms.include }
 })
 
 const ranked = computed<Command[]>(() => local.value.items)
@@ -706,16 +749,17 @@ function highlight(value: string, extra: string[] = []): Part[] {
 
 // ── selection + keyboard ─────────────────────────────────────
 watch(query, () => {
-  selectedIndex.value = 0
+  select(0)
   refresh()
 })
 watch([query, trail, () => props.open], () => {
   expanded.value = new Set()
 })
 watch(
-  () => flat.value.length,
-  (len) => {
-    if (selectedIndex.value >= len) selectedIndex.value = Math.max(0, len - 1)
+  () => flat.value.map((c) => c.id).join("|"),
+  () => {
+    const index = selectedId.value ? flat.value.findIndex((c) => c.id === selectedId.value) : -1
+    select(index >= 0 ? index : 0)
   },
 )
 watch([selectedIndex, () => flat.value.map((c) => c.id).join("|")], async () => {
@@ -730,13 +774,42 @@ function scrollSelectedIntoView() {
   el?.scrollIntoView({ block: "nearest" })
 }
 
+const keyboardSelection = ref(false)
+
+function select(index: number, keyboard = false) {
+  const len = flat.value.length
+  selectedIndex.value = len ? Math.max(0, Math.min(index, len - 1)) : 0
+  selectedId.value = flat.value[selectedIndex.value]?.id ?? null
+  if (keyboard) keyboardSelection.value = true
+}
+
 function moveDown() {
   const len = flat.value.length
-  if (len) selectedIndex.value = (selectedIndex.value + 1) % len
+  if (len) select((selectedIndex.value + 1) % len, true)
 }
 function moveUp() {
   const len = flat.value.length
-  if (len) selectedIndex.value = (selectedIndex.value - 1 + len) % len
+  if (len) select((selectedIndex.value - 1 + len) % len, true)
+}
+function movePage(direction: -1 | 1) {
+  select(selectedIndex.value + direction * 8, true)
+}
+function onPaletteKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (!(["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"] as string[]).includes(event.key)) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.key === "ArrowDown") moveDown()
+  else if (event.key === "ArrowUp") moveUp()
+  else if (event.key === "Home") select(0, true)
+  else if (event.key === "End") select(flat.value.length - 1, true)
+  else movePage(event.key === "PageDown" ? 1 : -1)
+}
+function onPointerMove() {
+  keyboardSelection.value = false
+}
+function onPointerEnter(c: Command) {
+  if (!keyboardSelection.value) select(flatIndexOf(c))
 }
 function runSelected(event?: KeyboardEvent) {
   const c = flat.value[selectedIndex.value]
@@ -789,7 +862,7 @@ function run(c: Command | undefined) {
     // Back to the top of a fresh list: the query that found this command is
     // spent, and leaving it would hide whatever the action just changed.
     query.value = ""
-    selectedIndex.value = 0
+    select(0)
     inputRef.value?.focus()
     return
   }
@@ -833,8 +906,10 @@ watch(
   async (o) => {
     cancel()
     query.value = ""
-    selectedIndex.value = 0
+    select(0)
+    selectedId.value = null
     trail.value = []
+    trailState.value = []
     modeItems.value = []
     found.value = []
     failed.value = false
@@ -876,6 +951,7 @@ useHotkeys(() =>
         :class="[frosted ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :data-pane="paneOpen ? 'open' : undefined"
         @open-auto-focus.prevent
+        @keydown.capture="onPaletteKeydown"
       >
         <DialogTitle class="sr-only">Command palette</DialogTitle>
         <DialogDescription class="sr-only">Search and run a command.</DialogDescription>
@@ -916,8 +992,6 @@ useHotkeys(() =>
             :aria-activedescendant="activeId"
             :placeholder="mode?.childPlaceholder ?? placeholder"
             class="h-12 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
-            @keydown.down.prevent="moveDown"
-            @keydown.up.prevent="moveUp"
             @keydown.enter.prevent="runSelected"
             @keydown.backspace="onBackspace"
             @keydown.esc="onEscape"
@@ -927,7 +1001,7 @@ useHotkeys(() =>
         </div>
 
         <!-- Results -->
-        <div class="flex min-h-0 flex-1">
+        <div class="flex min-h-0 flex-1" @pointermove="onPointerMove">
           <LpScrollArea ref="scrollRef" class="lp-cmd-list min-h-0 min-w-0 flex-1" content-class="p-2">
             <!-- While a request is out there is nothing to say yet: "no results"
                  under a spinner reads as an answer, and it is not one. -->
@@ -974,7 +1048,7 @@ useHotkeys(() =>
                         : 'text-ink hover:bg-surface-soft/60',
                   ]"
                   @click="onRowClick($event, c)"
-                  @pointerenter="selectedIndex = flatIndexOf(c)"
+                  @pointerenter="onPointerEnter(c)"
                 >
                   <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
                   <span class="min-w-0 flex-1">
