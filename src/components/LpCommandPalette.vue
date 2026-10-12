@@ -36,13 +36,15 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, ref, shallowRef, useId, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
+import { useModalLayer } from "./modalDepth"
+import { parseCommandQuery, rankCommandItems, swapCommandTerms } from "./commandSearch"
 
 export interface Command {
   id: string
@@ -234,6 +236,7 @@ const props = withDefaults(
 )
 
 const frosted = useGlass(() => props.glass)
+const { claim, release, layer } = useModalLayer()
 
 const DEFAULT_LABELS: PaletteLabels = {
   navigate: "navigate",
@@ -453,123 +456,22 @@ const source = computed<Command[]>(() => (mode.value ? modeItems.value : props.c
  * the one bilingual setup common enough to be worth a table — and it is a
  * fallback, tried only when the query as typed matches nothing.
  */
-const LATIN = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`"
-const CYRILLIC = "йцукенгшщзхъфывапролджэячсмитьбюё"
-const SWAP = new Map<string, string>()
-for (let i = 0; i < LATIN.length; i++) {
-  SWAP.set(LATIN[i]!, CYRILLIC[i]!)
-  SWAP.set(CYRILLIC[i]!, LATIN[i]!)
-}
-
-function swapLayout(term: string): string {
-  return [...term].map((ch) => SWAP.get(ch) ?? ch).join("")
-}
-
-/** Damerau-Levenshtein distance, giving up past 1: all a typo check needs. */
-function withinOne(a: string, b: string): boolean {
-  if (Math.abs(a.length - b.length) > 1) return false
-  let i = 0
-  while (i < a.length && i < b.length && a[i] === b[i]) i++
-  if (i === a.length || i === b.length) return true
-  const rest = (x: number, y: number) => a.slice(i + x) === b.slice(i + y)
-  return rest(1, 1) || rest(1, 0) || rest(0, 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && rest(2, 2))
-}
-
-/*
- * A typo in a word long enough to have one: a slip in a three-letter word
- * makes it a different word. Compared against the word and its start, so
- * "deplyo" finds "deploy" and "deployment" alike.
- */
-const TYPO_MIN = 5
-function nearWord(term: string, label: string): boolean {
-  if (term.length < TYPO_MIN) return false
-  return label
-    .split(/[^\p{L}\p{N}]+/u)
-    .some((word) => withinOne(term, word) || (word.length > term.length && withinOne(term, word.slice(0, term.length))))
-}
-
-/*
- * Every word of the query has to land somewhere, in any order: "branch deploy"
- * finds "Deploy current branch". Per word, label > keywords > description,
- * the same weights the palette always had; a typo match ranks below all of
- * them, so an exact hit is never outranked by a near one.
- */
-interface SearchTerms {
-  include: string[]
-  exclude: string[]
-  groups: string[]
-}
-
-const QUERY_TOKEN = /(-?)(?:(in):)?(?:"([^"]*)"|(\S+))/giu
-
-function searchTerms(value: string): SearchTerms {
-  const out: SearchTerms = { include: [], exclude: [], groups: [] }
-  QUERY_TOKEN.lastIndex = 0
-  for (let match; (match = QUERY_TOKEN.exec(value)); ) {
-    const text = (match[3] ?? match[4] ?? "").trim().toLowerCase()
-    if (!text) continue
-    if (match[2] && !match[1]) out.groups.push(text)
-    else if (match[1]) out.exclude.push(text)
-    else out.include.push(text)
-  }
-  return out
-}
-
-function matches(c: Command, term: string): boolean {
-  return (
-    c.label.toLowerCase().includes(term) ||
-    (c.keywords ?? []).some((keyword) => keyword.toLowerCase().includes(term)) ||
-    (c.description?.toLowerCase().includes(term) ?? false)
-  )
-}
-
-function score(c: Command, terms: SearchTerms): number {
-  const label = c.label.toLowerCase()
-  const keywords = (c.keywords ?? []).map((k) => k.toLowerCase())
-  const description = c.description?.toLowerCase() ?? ""
-  const group = c.group?.toLowerCase() ?? ""
-  if (terms.exclude.some((term) => matches(c, term)) || terms.groups.some((term) => !group.includes(term))) return 0
-  let total = terms.include.length ? 0 : 1
-  for (const term of terms.include) {
-    let hit =
-      (label.includes(term) ? 4 : 0) +
-      (keywords.some((k) => k.includes(term)) ? 3 : 0) +
-      (description.includes(term) ? 2 : 0)
-    if (!hit && nearWord(term, label)) hit = 1
-    if (!hit) return 0
-    total += hit
-  }
-  return total
-}
-
-function rank(items: Command[], terms: SearchTerms): Command[] {
-  return items
-    .map((c) => ({ c, score: score(c, terms) }))
-    .filter((e) => e.score > 0)
-    .sort((a, b) => b.score - a.score || a.c.label.localeCompare(b.c.label))
-    .map((e) => e.c)
-}
-
 /*
  * The local match and the terms it matched with — the swapped ones when the
  * layout fallback is what found it, so the highlight marks what actually hit.
  */
 const local = computed<{ items: Command[]; terms: string[] }>(() => {
-  const terms = searchTerms(query.value)
+  const terms = parseCommandQuery(query.value)
   const filtered = query.value.trim()
     ? source.value
     : source.value.filter((c) => !c.hidden)
   // Empty query: show everything EXCEPT hidden commands (they only surface once
   // typed). With a query, hidden commands rank like any other.
   if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
-  const items = rank(filtered, terms)
+  const items = rankCommandItems(filtered, terms)
   if (items.length || !props.layoutFallback) return { items, terms: terms.include }
-  const swapped: SearchTerms = {
-    include: terms.include.map(swapLayout),
-    exclude: terms.exclude.map(swapLayout),
-    groups: terms.groups.map(swapLayout),
-  }
-  const other = rank(filtered, swapped)
+  const swapped = swapCommandTerms(terms)
+  const other = rankCommandItems(filtered, swapped)
   return other.length ? { items: other, terms: swapped.include } : { items, terms: terms.include }
 })
 
@@ -904,6 +806,8 @@ function onEscape(event: KeyboardEvent) {
 watch(
   () => props.open,
   async (o) => {
+    if (o) claim()
+    else release()
     cancel()
     query.value = ""
     select(0)
@@ -920,6 +824,8 @@ watch(
   },
   { immediate: true },
 )
+
+onBeforeUnmount(release)
 
 // Through useHotkeys rather than a listener of its own: the palette is the one
 // shortcut that has to work from inside a text field, and `code` is what makes
@@ -943,12 +849,14 @@ useHotkeys(() =>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        :class="{ 'lp-scrim--light': frosted }"
-        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
+        class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
-        class="lp-cmd-dialog fixed left-1/2 top-[12vh] z-(--z-modal) flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="[frosted ? 'lp-glass-overlay' : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
+        class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        :class="[frosted ? (layer.nested ? 'lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
+        :style="{ zIndex: layer.panel }"
         :data-pane="paneOpen ? 'open' : undefined"
         @open-auto-focus.prevent
         @keydown.capture="onPaletteKeydown"

@@ -1656,6 +1656,7 @@ export const registry: ComponentEntry[] = [
     state: () => {
       const s = reactive({
         open: false,
+        nested: false,
         frosted: false,
         lazy: false,
         loading: true,
@@ -1677,9 +1678,14 @@ export const registry: ComponentEntry[] = [
   <LpModal v-model:open="open" size="lg" title="Confirm action" description="A token-driven modal on reka Dialog.">
     <p>Body content. Escape or overlay-click closes it.</p>
     <template #footer>
+      <LpButton variant="outline" @click="nested = true">Open nested</LpButton>
       <LpButton variant="ghost" @click="open = false">Cancel</LpButton>
       <LpButton variant="solid" @click="open = false">Confirm</LpButton>
     </template>
+  </LpModal>
+
+  <LpModal v-model:open="nested" size="sm" title="Nested modal">
+    <p>Only this layer dims the first modal; the page keeps its original blur.</p>
   </LpModal>
 
   <LpModal v-model:open="frosted" size="lg" title="Glass" description="The page shows through, blurred." glass>

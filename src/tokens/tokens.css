@@ -171,14 +171,6 @@
   --z-tooltip: 130;
   --z-toast: 200;
 
-  /* A lightbox is usually opened FROM a dialog — click a thumbnail in a modal
-     and the full image comes up over it. Sharing --z-overlay/--z-modal left
-     that order to DOM insertion alone, so the lightbox's own scrim landed on
-     top of the modal panel and swallowed it while double-darkening the page
-     behind. Its own rung above the modal (but below tooltip/toast, which must
-     outrank everything) makes the stack explicit. */
-  --z-lightbox-overlay: 140;
-  --z-lightbox: 150;
 }
 
 /* ── overlay enter/exit animations ───────────────
@@ -512,17 +504,6 @@
 }
 
 /*
- * A lightbox is the one scrim that hides a whole page behind a photo, and it is
- * usually opened FROM a dialog — so it is the layer the mild shared tint serves
- * worst: without the blur, the content behind stayed readable around the image.
- * It gets its own value instead of raising the shared one, which would darken
- * every stacked pair.
- */
-:root[data-lp-no-backdrop] .lp-scrim--deep {
-  --scrim-opacity: 0.78;
-}
-
-/*
  * Under a glass panel (.lp-glass-overlay) the usual tint leaves nothing but
  * grey to see through it, so the scrim dims less and the panel's own blur
  * does the separating. Without a working blur the no-backdrop rule above is
@@ -530,6 +511,12 @@
  */
 .lp-scrim--light {
   --scrim-opacity: 0.32;
+}
+
+.lp-scrim--nested {
+  --scrim-opacity: 0.24;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /*
@@ -548,6 +535,13 @@
   background-image: linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 45%);
   -webkit-backdrop-filter: blur(var(--glass-overlay-blur, 28px)) saturate(170%);
   backdrop-filter: blur(var(--glass-overlay-blur, 28px)) saturate(170%);
+}
+
+.lp-glass-overlay--nested {
+  background-color: color-mix(in srgb, var(--color-surface-raised) 88%, transparent);
+  background-image: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 :root[data-lp-no-backdrop] .lp-glass-overlay {

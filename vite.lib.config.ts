@@ -3,7 +3,6 @@ import { readdirSync } from "node:fs"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
-import dts from "vite-plugin-dts"
 import { libInjectCss } from "vite-plugin-lib-inject-css"
 
 const require = createRequire(import.meta.url)
@@ -53,11 +52,6 @@ export default defineConfig({
     // so a consumer importing one component still gets its styles. Requires
     // the multiple-entry (not preserveModules) layout above.
     libInjectCss(),
-    dts({
-      include: ["src"],
-      exclude: ["src/**/*.spec.ts", "src/_css-entry.ts"],
-      tsconfigPath: "./tsconfig.build.json",
-    }),
   ],
   build: {
     outDir: "dist",

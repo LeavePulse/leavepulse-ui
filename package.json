@@ -45,10 +45,11 @@
   "scripts": {
     "dev": "vite",
     "gen:names": "node scripts/gen-component-names.mjs",
-    "build": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
+    "build": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
     "prepublishOnly": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
     "typecheck": "vue-tsc --noEmit",
+    "test": "bun test",
     "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags"
@@ -83,7 +84,6 @@
     "tailwindcss": "^4.2.4",
     "typescript": "^5.6.3",
     "vite": "^7.0.0",
-    "vite-plugin-dts": "^5.0.2",
     "vite-plugin-lib-inject-css": "^2.2.2",
     "vue": "3.5.31",
     "vue-tsc": "^3.0.0"

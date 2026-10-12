@@ -153,7 +153,7 @@ watch(() => props.open, (open) => (open ? claim() : release()), { immediate: tru
 onBeforeUnmount(release)
 
 const contentClass = computed(() => {
-  const surface = frosted.value ? "lp-glass-overlay" : "bg-surface-raised"
+  const surface = frosted.value ? (layer.value.nested ? "lp-glass-overlay--nested" : "lp-glass-overlay") : "bg-surface-raised"
   const base = `fixed z-(--z-modal) flex flex-col border-line ${surface} shadow-panel outline-none`
   const map: Record<Direction, string> = {
     left: "inset-y-0 left-0 border-r rounded-r-card",
@@ -443,7 +443,7 @@ const previewStyle = computed(() => {
     <div
       v-show="peeking || peek > 0"
       class="lp-scrim pointer-events-none fixed inset-0"
-      :class="{ 'lp-scrim--light': frosted }"
+      :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
       :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || reducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
     />
     <div
@@ -476,7 +476,7 @@ const previewStyle = computed(() => {
       <DrawerOverlay
         :style="{ zIndex: layer.scrim }"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
-        :class="{ 'lp-scrim--light': frosted }"
+        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
       />
       <DrawerContent
         :class="contentClass"

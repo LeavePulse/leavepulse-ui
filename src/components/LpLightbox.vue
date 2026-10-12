@@ -21,10 +21,11 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useZoomPan } from "../composables/useZoomPan"
 import { fileNameOf, type LightboxItem } from "./lightbox"
 import LpIcon from "./LpIcon.vue"
+import { useModalLayer } from "./modalDepth"
 
 const props = withDefaults(
   defineProps<{
@@ -66,6 +67,10 @@ const emit = defineEmits<{
   /** Copy finished — `false` when the browser refused (tainted/cross-origin). */
   (e: "copy", item: LightboxItem, ok: boolean): void
 }>()
+
+const { claim, release, layer } = useModalLayer()
+watch(() => props.open, (open) => (open ? claim() : release()), { immediate: true })
+onBeforeUnmount(release)
 
 defineSlots<{
   /** Replace the caption block under the image. */
@@ -335,13 +340,14 @@ const ARROW =
 <template>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
-      <!-- Sits on the lightbox rung, not the shared modal one: opening this
-           from inside a dialog must cover that dialog, not tie with it. -->
       <DialogOverlay
-        class="lp-scrim lp-scrim--deep fixed inset-0 z-(--z-lightbox-overlay) data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
+        :class="{ 'lp-scrim--nested': layer.nested }"
+        :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
-        class="fixed inset-0 z-(--z-lightbox) flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
+        class="fixed inset-0 flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
+        :style="{ zIndex: layer.panel }"
         @keydown="onKeydown"
       >
         <!-- reka wants both for a labelled dialog; the caption is the title. -->
