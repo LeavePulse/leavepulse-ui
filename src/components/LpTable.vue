@@ -12,6 +12,7 @@ import LpIcon from "./LpIcon.vue"
 import LpPagination from "./LpPagination.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
+import { usePaintSelect } from "../composables/usePaintSelect"
 import { useRovingFocus } from "../composables/useRovingFocus"
 import { useLabels } from "../composables/useLpConfig"
 import { compareValues } from "./tableSort"
@@ -60,6 +61,8 @@ export interface TableLabels {
   showAll: string
   columns: string
   exportCsv: string
+  selectAll: string
+  shortcutsGroup: string
 }
 
 export interface TableExportOptions extends CsvOptions {
@@ -185,6 +188,8 @@ const labelSet = useLabels<TableLabels>(
     showAll: "Show all",
     columns: "Columns",
     exportCsv: "Export CSV",
+    selectAll: "Select every row",
+    shortcutsGroup: "Table",
   },
   () => props.labels,
 )
@@ -294,11 +299,16 @@ const sourceIndex = computed(() => new Map(sourceRows.value.map((row, i) => [row
 
 // The tallest page shown so far, held as a floor: the last page is usually
 // short, and without it the pager below jumps up the moment you reach it.
-const tableEl = ref<HTMLElement | null>(null)
+/*
+ * The table sits in LpContextMenu's as-child trigger, which re-clones its child
+ * on every render and leaves a template ref on it undefined after the first
+ * update. The component's own root is stable, so the table is found from it.
+ */
+const frameEl = ref<HTMLElement | null>(null)
 const floor = ref(0)
 async function holdHeight() {
   await nextTick()
-  const height = tableEl.value?.offsetHeight ?? 0
+  const height = frameEl.value?.querySelector("table")?.offsetHeight ?? 0
   if (height > floor.value) floor.value = height
 }
 
@@ -616,6 +626,21 @@ function toggleRow(key: RowKey, checked: boolean) {
   emit("update:selected", [...next])
 }
 
+// Press a row's tick and sweep down the column to tick (or clear) the run,
+// as in a file manager; Ctrl+A inside the table ticks every row shown.
+const keyByText = computed(
+  () => new Map(displayRows.value.map((row, index) => [String(keyFor(row, index)), keyFor(row, index)])),
+)
+const paint = usePaintSelect<RowKey>({
+  root: frameEl,
+  enabled: () => props.selectable,
+  selection: () => props.selected,
+  set: (keys) => emit("update:selected", keys),
+  resolve: (raw) => keyByText.value.get(raw),
+  selectAll: () => [...new Set([...props.selected, ...allKeys.value])],
+  help: () => ({ group: text.value.shortcutsGroup, label: text.value.selectAll }),
+})
+
 const colSpan = computed(() => visibleColumns.value.length + (props.selectable ? 1 : 0))
 
 /*
@@ -701,7 +726,7 @@ const barInsetTop = computed(() =>
 <template>
   <!-- No top fade: a sticky header sits in the masked band and would be dimmed
        by it. The bottom edge is left crisp with it for symmetry. -->
-  <div class="flex flex-col gap-3" :class="rootClass">
+  <div ref="frameEl" class="flex flex-col gap-3" :class="rootClass">
   <div v-if="exportable" class="flex justify-end">
     <LpButton variant="ghost" size="sm" @click="exportCsv()">
       <LpIcon name="lucide:download" :size="14" />
@@ -719,7 +744,7 @@ const barInsetTop = computed(() =>
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
     <LpContextMenu :items="contextMenu" always>
-    <table ref="tableEl" class="w-full border-collapse text-sm">
+    <table class="w-full border-collapse text-sm">
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
            rows show through that seam — a band of body text rides across the
@@ -834,7 +859,13 @@ const barInsetTop = computed(() =>
           @click="emit('rowClick', row)"
           @keydown="onRowKeydown"
         >
-          <td v-if="selectable" class="w-px px-4 py-3" @click.stop>
+          <td
+            v-if="selectable"
+            class="w-px cursor-pointer px-4 py-3 select-none"
+            :data-paint-key="String(keyFor(row, index))"
+            @click.stop
+            @pointerdown="paint.onPointerDown($event, keyFor(row, index))"
+          >
             <LpCheckbox
               :model-value="selectedSet.has(keyFor(row, index))"
               @update:model-value="(v) => toggleRow(keyFor(row, index), v)"

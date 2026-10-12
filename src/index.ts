@@ -286,6 +286,8 @@ export { LP_CONFIG, lpConfig, mergeConfig, provideLpConfig, useLabels, useLinkCo
 export type { LabelScope, LpConfig } from "./composables/useLpConfig"
 export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMergedClass"
 export { anchorPattern, stripDisallowed, useInputFilter } from "./composables/useInputFilter"
+export { usePaintSelect } from "./composables/usePaintSelect"
+export type { UsePaintSelectOptions } from "./composables/usePaintSelect"
 export { LP_FIELD, fieldMessageId, provideField, useField, useFieldControl } from "./composables/useField"
 export { FIELD_NOTICE_MS, useFieldNotice } from "./composables/useFieldNotice"
 export type { FieldNotice, FieldNoticeOptions, FieldNoticeTone } from "./composables/useFieldNotice"
