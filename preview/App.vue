@@ -101,7 +101,6 @@ const THEME_ICON: Record<PresetName, string> = {
   dark: "lucide:moon",
   light: "lucide:sun",
   lime: "lucide:sprout",
-  leavepulse: "lucide:waves",
   rose: "lucide:flower",
   amber: "lucide:flame",
   violet: "lucide:gem",

@@ -50,14 +50,14 @@ Themes are JSON token sets applied at runtime. Paint the saved one before the
 app mounts, so the first frame already has the right colours:
 
 ```ts
-import { bootstrapTheme, leavepulse, useTheme } from "@leavepulse/ui"
+import { bootstrapTheme, dark, light, nord, useTheme } from "@leavepulse/ui"
 
-bootstrapTheme(leavepulse)
+bootstrapTheme(dark)
 createApp(App).mount("#app")
 
 // later, from a switcher or settings page
 useTheme().setTheme(nord)
-useTheme().setSystem({ light, dark: leavepulse }) // follow the OS colour scheme
+useTheme().setSystem({ light, dark }) // follow the OS colour scheme
 ```
 
 `LpThemeProvider` applies a theme to one subtree only (a dark sidebar in a light

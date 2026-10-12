@@ -17,7 +17,7 @@
 // Through the barrel, not "../theme/…": this file is compiled by the consuming
 // app, where the barrel resolves to the same dist instance the components use.
 import {
-  leavepulse,
+  dark,
   presets,
   THEME_COOKIE,
   themeFromCookie,
@@ -43,7 +43,7 @@ export default defineNuxtPlugin(() => {
   }
 
   const themes = [...(appThemes as TokenSet[]), ...(Object.values(presets) as TokenSet[])]
-  const fallback = themes.find((theme) => theme.name === options.defaultTheme) ?? leavepulse
+  const fallback = themes.find((theme) => theme.name === options.defaultTheme) ?? dark
 
   // Raw value: themeFromCookie decodes safely itself, a throwing decode here
   // would turn a malformed cookie into a 500 on every request.

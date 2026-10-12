@@ -1,4 +1,4 @@
-import type { SurfaceTokens, TokenSet } from "./tokens"
+import type { TokenSet } from "./tokens"
 
 /*
  * Built-in theme presets — plain TokenSet objects (JSON). These ARE the themes;
@@ -15,9 +15,8 @@ const interFont = {
 
 /*
  * NOTE on naming: the exported CONST names are frozen for compatibility (apps
- * import `dark` / `leavepulse` directly), but the display `name` changed —
- * `leavepulse` is now the one called "Dark" (it is the product's dark theme),
- * and this near-black neutral became "Onyx" to free that label up.
+ * import `dark` directly), while the display `name` of this near-black neutral
+ * is "Onyx".
  */
 export const dark: TokenSet = {
   name: "Onyx",
@@ -118,63 +117,6 @@ export const lime: TokenSet = {
     sans: '"Space Grotesk", "Inter", system-ui, sans-serif',
     mono: '"IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace',
   },
-}
-
-/*
- * Glass skin — frosted panels with backdrop blur, a faint top-down highlight
- * overlay, a layered drop shadow and an inset highlight line. Opt a theme into
- * it by setting its `surface` axis to this (the LeavePulse site uses it).
- */
-const glassSurface: SurfaceTokens = {
-  borderWidth: "1px",
-  panelBlur: "10px",
-  panelSaturate: "120%",
-  panelOverlay:
-    "linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01))",
-  panelShadow: "0 20px 60px rgba(0, 0, 0, 0.35)",
-  panelInset: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
-}
-
-/*
- * LeavePulse site theme — the colours the website shipped before the kit
- * migration (deep navy surfaces, cyan brand, teal accent), with the glass skin.
- * Distinct from `dark` (which is a near-black neutral) so the site keeps its
- * look when it switches its CSS-var dictionary over to the kit.
- */
-export const leavepulse: TokenSet = {
-  name: "Dark",
-  mode: "dark",
-  colors: {
-    surface: "#020618",
-    surfaceRaised: "#0b1222",
-    surfaceSoft: "rgba(11, 18, 34, 0.7)",
-    ink: "#f3f6ff",
-    inkInverse: "#0b1222",
-    muted: "#94a3bf",
-    mutedStrong: "#cad5e2",
-    brand: "#00bcff",
-    brandHover: "#19c3ff",
-    brandSoft: "rgba(0, 188, 255, 0.2)",
-    action: "#44c2ad",
-    actionHover: "#56d3be",
-    actionSoft: "rgba(68, 194, 173, 0.14)",
-    accent: "#d36a2c",
-    accentHover: "#da824e",
-    accentSoft: "rgba(211, 106, 44, 0.14)",
-    danger: "#f87171",
-    dangerHover: "#fca5a5",
-    dangerSoft: "rgba(248, 113, 113, 0.14)",
-    line: "#1c2740",
-    lineStrong: "rgba(255, 255, 255, 0.15)",
-    ring: "rgba(0, 188, 255, 0.35)",
-  },
-  shape: { ...sharedShape, radiusControl: 12 },
-  density: { ...sharedDensity },
-  font: {
-    sans: '"Inter", "IBM Plex Sans", "Segoe UI", sans-serif',
-    mono: '"JetBrains Mono", "SF Mono", ui-monospace, monospace',
-  },
-  surface: glassSurface,
 }
 
 export const rose: TokenSet = {
@@ -305,5 +247,5 @@ export const nord: TokenSet = {
   font: { ...interFont },
 }
 
-export const presets = { dark, light, lime, leavepulse, rose, amber, violet, nord } as const
+export const presets = { dark, light, lime, rose, amber, violet, nord } as const
 export type PresetName = keyof typeof presets
