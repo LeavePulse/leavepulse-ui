@@ -646,6 +646,18 @@ const paragraphs = computed(() =>
     .filter(Boolean),
 )
 
+/*
+ * The row's description heads the pane only when it says something the body
+ * does not: a command whose full text opens with its description (or is it)
+ * would otherwise print the same sentences twice, once small and once large.
+ */
+const paneDescription = computed(() => {
+  const description = active.value?.description?.trim()
+  if (!description) return undefined
+  const body = paragraphs.value.join(" ")
+  return body.startsWith(description) ? undefined : description
+})
+
 /** Stagger between paragraphs, capped so a long section does not trickle in. */
 const STAGGER_MS = 45
 const STAGGER_MAX = 10
@@ -1106,8 +1118,8 @@ useHotkeys(() =>
                       <LpIcon v-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
                       <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
                     </div>
-                    <p v-if="active.description" class="lp-cmd-para mt-0.5 text-xs text-muted">
-                      {{ active.description }}
+                    <p v-if="paneDescription" class="lp-cmd-para mt-0.5 text-xs text-muted">
+                      {{ paneDescription }}
                     </p>
                     <p
                       v-for="(para, i) in paragraphs"
