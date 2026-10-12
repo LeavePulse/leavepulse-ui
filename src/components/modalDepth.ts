@@ -27,8 +27,8 @@ export function useModalLayer(): {
     layer: computed(() => {
       const drop = fromTop.value * STEP
       return {
-        scrim: `calc(var(--z-toast) - 20 - ${drop})`,
-        panel: `calc(var(--z-toast) - 10 - ${drop})`,
+        scrim: `calc(var(--z-overlay) - ${drop})`,
+        panel: `calc(var(--z-modal) - ${drop})`,
         nested: stack.value.indexOf(id) > 0,
       }
     }),
