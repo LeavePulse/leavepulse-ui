@@ -224,6 +224,7 @@ const inputAttrs = computed(() => {
 
       <ComboboxPortal>
         <ComboboxContent
+          :collision-padding="8"
           position="popper"
           align="start"
           :side-offset="6"

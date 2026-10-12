@@ -87,7 +87,7 @@ function returnFocus(event: Event) {
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal v-if="items.length">
-      <ContextMenuContent :class="PANEL" @close-auto-focus="returnFocus">
+      <ContextMenuContent :collision-padding="8" :class="PANEL" @close-auto-focus="returnFocus">
         <ContextMenuItems :items="items" :panel="PANEL" />
       </ContextMenuContent>
     </ContextMenuPortal>

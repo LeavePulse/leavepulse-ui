@@ -28,6 +28,7 @@ defineProps<{ items: MenuItem[] }>()
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
       <DropdownMenuContent
+        :collision-padding="8"
         :side-offset="6"
         align="end"
         :class="[POPOVER_PANEL, 'z-(--z-popover) min-w-44 p-1 outline-none']"

@@ -41,8 +41,11 @@ const Boundary = defineComponent({
 </script>
 
 <template>
-  <div class="rounded-card border border-line bg-surface">
-    <div class="flex min-h-32 items-center justify-center p-8">
+  <div class="min-w-0 rounded-card border border-line bg-surface">
+    <!-- A demo wider than a phone scrolls inside its card instead of being cut
+         off or pushing the page sideways; "safe" centring keeps its left edge
+         reachable when it overflows. -->
+    <div class="flex min-h-32 items-center [justify-content:safe_center] overflow-x-auto p-4 sm:p-8 *:max-w-full *:min-w-0">
       <Boundary :key="template">
         <component :is="Dynamic" />
       </Boundary>

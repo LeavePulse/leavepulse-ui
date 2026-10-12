@@ -296,7 +296,7 @@ export const registry: ComponentEntry[] = [
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
     state: () => reactive({ on: true, checked: true, notify: false, plan: "pro", tier: "pro", radioOpts }),
     template: `<div class="flex flex-col gap-6">
-  <div class="flex items-start gap-8">
+  <div class="flex flex-wrap items-start gap-8">
     <LpSwitch v-model="on" />
     <LpSwitch v-model="on" label="Dark mode" />
     <LpCheckbox v-model="checked" label="Remember me" />
@@ -528,7 +528,7 @@ export const registry: ComponentEntry[] = [
     description:
       "Metric tile: label, mono value, hint, and an optional delta/trend badge. Numeric delta auto-derives direction & sign; invertTrend flips colours for \"lower is better\" metrics (latency, errors).",
     components: { LpStat },
-    template: `<div class="grid w-full grid-cols-2 gap-6">
+    template: `<div class="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
   <LpStat online label="Servers online" value="43" hint="Responding now." />
   <LpStat label="Revenue" value="€8,420" :delta="12.4" delta-suffix="%" hint="vs last week" />
   <LpStat label="Avg latency" value="48 ms" :delta="-6" invert-trend hint="lower is better" />
@@ -549,7 +549,7 @@ export const registry: ComponentEntry[] = [
           { label: "Sign out", icon: "lucide:log-out", danger: true, separatorBefore: true },
         ],
       }),
-    template: `<div class="flex items-center gap-3">
+    template: `<div class="flex flex-wrap items-center gap-3">
   <LpAvatar size="sm" :src="avatarSample" alt="THEROER" />
   <LpAvatar size="md" :src="avatarSample" alt="THEROER" />
   <LpAvatar size="lg" :src="avatarSample" alt="THEROER" ring />
@@ -597,7 +597,7 @@ export const registry: ComponentEntry[] = [
     <LpProgress title="Disk" :value="94" tone="auto" caption="924 GB / 983 GB" />
   </div>
 
-  <div class="flex items-center gap-6">
+  <div class="flex flex-wrap items-center gap-6">
     <LpProgress variant="ring" :value="85" label />
     <LpProgress variant="ring" :value="92" tone="action" label />
     <LpProgress variant="ring" :value="68" tone="accent" label />
@@ -629,7 +629,7 @@ export const registry: ComponentEntry[] = [
       }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-10">
   <div class="flex flex-col gap-4">
-    <div class="flex items-baseline gap-6">
+    <div class="flex flex-wrap items-baseline gap-6">
       <LpNumberFlow class="font-mono text-4xl font-medium text-ink" :value="n" grouped />
       <LpNumberFlow class="font-mono text-4xl font-medium text-brand" :value="n" compact />
       <LpNumberFlow class="font-mono text-2xl text-muted-strong" :value="money" prefix="€" :decimals="2" grouped />
@@ -647,7 +647,7 @@ export const registry: ComponentEntry[] = [
   </div>
 
   <div class="flex flex-col gap-4">
-    <div class="flex items-center gap-6">
+    <div class="flex flex-wrap items-center gap-6">
       <LpRollingText
         class="font-mono text-2xl font-medium text-ink"
         :value="status"
@@ -796,7 +796,7 @@ export const registry: ComponentEntry[] = [
       }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-8">
   <!-- In a stat tile: the delta says how much, the shape says how. -->
-  <div class="flex gap-10">
+  <div class="flex flex-wrap gap-10">
     <LpStat label="Revenue" :value="61200" prefix="€" compact :delta="12.5" delta-suffix="%">
       <template #trend>
         <LpSparkline :data="revenue" area show-last :width="96" />
@@ -812,7 +812,7 @@ export const registry: ComponentEntry[] = [
   <!-- In a list: one row per machine, the trend inline with the number. -->
   <div class="flex flex-col divide-y divide-line rounded-card border border-line">
     <div v-for="h in hosts" :key="h.name" class="flex items-center gap-4 px-4 py-2.5">
-      <span class="w-32 shrink-0 truncate font-mono text-sm text-ink">{{ h.name }}</span>
+      <span class="w-24 shrink-0 truncate sm:w-32 font-mono text-sm text-ink">{{ h.name }}</span>
       <span class="w-14 shrink-0 text-right font-mono text-sm tabular-nums text-muted-strong">{{ h.now }}</span>
       <LpSparkline :data="h.load" :tone="h.tone" show-last />
       <LpBadge :tone="h.up ? 'success' : 'neutral'" class="ml-auto">
@@ -1724,8 +1724,8 @@ export const registry: ComponentEntry[] = [
       return s
     },
     template: `<div class="flex w-[36rem] max-w-full flex-col gap-3">
-  <div class="flex items-center gap-3">
-    <LpInput v-model="query" icon="lucide:search" placeholder="Highlight…" class="flex-1" />
+  <div class="flex flex-wrap items-center gap-3">
+    <LpInput v-model="query" icon="lucide:search" placeholder="Highlight…" class="min-w-48 flex-1" />
     <Transition
       enter-active-class="transition duration-150 ease-[var(--ease-emphasized)]"
       enter-from-class="-translate-x-1 scale-95 opacity-0"
@@ -2198,7 +2198,7 @@ export const registry: ComponentEntry[] = [
       "Anchored overlays. Popover takes side/align, `side-offset`, `panel-class` (width/padding/overflow) and a controllable `v-model:open`; left unbound it stays uncontrolled.",
     components: { LpPopover, LpButton },
     state: () => reactive({ open: false }),
-    template: `<div class="flex items-center gap-3">
+    template: `<div class="flex flex-wrap items-center gap-3">
   <LpPopover>
     <template #trigger><LpButton variant="ghost">Open popover</LpButton></template>
     <p class="font-semibold text-ink">Popover content</p>

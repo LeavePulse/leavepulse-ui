@@ -263,6 +263,7 @@ function clear() {
 
     <ComboboxPortal>
       <ComboboxContent
+        :collision-padding="8"
         position="popper"
         :side-offset="6"
         :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"

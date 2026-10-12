@@ -158,6 +158,7 @@ const showClear = computed(() => props.clearable && !!props.modelValue && !field
       </PopoverTrigger>
       <PopoverPortal>
         <PopoverContent
+          :collision-padding="8"
           :side-offset="6"
           align="start"
           :class="[POPOVER_PANEL, 'z-(--z-popover) rounded-card p-0 outline-none']"

@@ -53,9 +53,9 @@ function clear() {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 w-full flex-1">
+  <div class="flex h-full min-h-0 w-full flex-1 flex-col md:flex-row">
     <!-- Consumer-owned config panel (launcher: a settings tab). -->
-    <aside class="flex w-60 shrink-0 flex-col gap-5 border-r border-line bg-surface-raised p-4">
+    <aside class="flex max-h-[40%] shrink-0 flex-col gap-5 overflow-y-auto border-b border-line bg-surface-raised p-4 md:max-h-none md:w-60 md:border-r md:border-b-0">
       <div class="flex items-center gap-1.5">
         <span class="text-[11px] font-medium uppercase tracking-wider text-muted">Mode</span>
         <button

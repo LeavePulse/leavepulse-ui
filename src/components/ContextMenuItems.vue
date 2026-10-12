@@ -44,7 +44,7 @@ const ICON =
         <LpIcon name="lucide:chevron-right" :size="14" class="text-muted" />
       </ContextMenuSubTrigger>
       <ContextMenuPortal>
-        <ContextMenuSubContent :class="panel" :side-offset="2" :align-offset="-4">
+        <ContextMenuSubContent :collision-padding="8" :class="panel" :side-offset="2" :align-offset="-4">
           <ContextMenuItems :items="item.children" :panel="panel" />
         </ContextMenuSubContent>
       </ContextMenuPortal>

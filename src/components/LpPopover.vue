@@ -32,6 +32,7 @@ const open = defineModel<boolean>("open")
     </PopoverTrigger>
     <PopoverPortal>
       <PopoverContent
+        :collision-padding="8"
         :side="side"
         :align="align"
         :side-offset="sideOffset"

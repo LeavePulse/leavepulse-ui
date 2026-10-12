@@ -241,15 +241,25 @@ const on = "bg-surface-soft text-ink"
   <div class="flex h-full flex-col">
     <nav class="flex items-center gap-3 border-b border-line bg-surface-raised px-4 py-2.5">
       <!-- A real link: middle-click / cmd-click open it in a new tab. -->
-      <a :href="href({ kind: 'home' })" class="text-sm font-bold text-ink" @click="goHome">
+      <a :href="href({ kind: 'home' })" class="shrink-0 text-sm font-bold text-ink" @click="goHome">
         LeavePulse UI
       </a>
       <template v-if="crumb && !notFound">
         <span class="text-muted">/</span>
-        <span class="text-sm text-ink">{{ crumb }}</span>
+        <span class="min-w-0 truncate text-sm text-ink">{{ crumb }}</span>
       </template>
 
-      <div class="ml-auto flex items-center gap-2 text-xs text-muted">
+      <div class="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted">
+        <!-- The palette is the way around the site, and a phone has no Ctrl+K. -->
+        <button
+          type="button"
+          :class="[chip, 'inline-flex items-center gap-1.5 hover:bg-surface-soft hover:text-ink']"
+          aria-label="Search components, pages and themes"
+          @click="paletteOpen = true"
+        >
+          <LpIcon name="lucide:search" :size="16" />
+          <kbd class="hidden font-sans text-[11px] sm:inline">Ctrl K</kbd>
+        </button>
         <!-- Left-click cycles themes; right-click opens the full picker. The
              circular reveal grows from the button (same as LeaveHosting). -->
         <LpContextMenu :items="themeItems">

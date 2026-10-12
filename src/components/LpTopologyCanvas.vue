@@ -417,8 +417,12 @@ defineExpose({ fitView, setViewport: applyViewport })
     class="lp-topology"
   >
     <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
+    <!-- On a phone the minimap, the zoom controls and the legend would all
+         share the bottom of a canvas a few hundred pixels wide and cover each
+         other and the graph; pinch-zoom and panning do the minimap's job there. -->
     <MiniMap
       v-if="minimap"
+      class="max-sm:!hidden"
       pannable
       zoomable
       node-color="var(--color-surface-soft)"

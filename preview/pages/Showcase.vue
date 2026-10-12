@@ -15,9 +15,9 @@ const features = [
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-5xl flex-col gap-12 p-8">
+  <div class="mx-auto flex max-w-5xl flex-col gap-12 px-4 py-6 sm:p-8">
     <!-- Stat grid 3×2 -->
-    <LpCard variant="flat" class="grid grid-cols-3 gap-x-10 gap-y-8 p-8">
+    <LpCard variant="flat" class="grid grid-cols-2 gap-x-6 gap-y-8 p-5 sm:grid-cols-3 sm:gap-x-10 sm:p-8">
       <LpStat online label="Servers online right now" value="43" hint="Active servers responding in monitoring." />
       <LpStat online label="Players online right now" value="127" hint="Players on monitored servers." />
       <LpStat label="Servers with LeavePulse agent" value="10" hint="Extended metrics available." icon="lucide:cpu" />
@@ -36,7 +36,7 @@ const features = [
     </div>
 
     <!-- Profile cards -->
-    <div class="grid grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <LpCard interactive class="flex flex-col gap-4">
         <div class="flex items-start justify-between">
           <div class="flex items-center gap-3">

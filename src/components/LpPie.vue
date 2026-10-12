@@ -697,16 +697,19 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               </span>
             </LpShift>
           </template>
+            <!-- The canvas keeps its natural size where there is room and scales
+                 down as a whole where there is not (a phone, a narrow column):
+                 the callout labels widen the box well past the circle, and at a
+                 fixed width they ran off the screen. -->
             <div
-              class="relative shrink-0"
-              :style="{ width: `${canvasWidth}px`, height: `${canvasHeight}px` }"
+              class="relative max-w-full shrink-0"
+              :style="{ width: `${canvasWidth}px`, aspectRatio: `${canvasWidth} / ${canvasHeight}` }"
             >
             <!-- Clicking the empty middle (or the gaps) clears, so a selection can
                  be dropped without hunting for somewhere outside the chart. -->
             <svg
-              :width="canvasWidth"
-              :height="canvasHeight"
-              class="touch-none select-none"
+              :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
+              class="block size-full touch-none select-none"
               role="img"
               :aria-label="summary"
               @pointerleave="leaveChart"

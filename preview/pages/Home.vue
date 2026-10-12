@@ -39,7 +39,7 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-5xl flex-col gap-10 p-10">
+  <div class="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:p-10">
     <div class="flex flex-col gap-2">
       <h1 class="text-2xl font-semibold text-ink">LeavePulse UI</h1>
       <p class="text-sm text-muted">

@@ -115,7 +115,7 @@ function toggleOnline() {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 w-full">
+  <div class="flex h-full min-h-0 w-full flex-col md:flex-row">
     <div class="relative min-h-0 flex-1">
       <div class="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-3">
         <span class="text-sm font-semibold text-ink">Topology</span>
@@ -130,7 +130,7 @@ function toggleOnline() {
       />
     </div>
 
-    <aside class="w-72 shrink-0 border-l border-line bg-surface-raised p-4">
+    <aside class="max-h-[40%] shrink-0 overflow-y-auto border-t border-line bg-surface-raised p-4 md:max-h-none md:w-72 md:border-t-0 md:border-l">
       <template v-if="sel">
         <div class="flex items-center justify-between">
           <span class="text-sm font-semibold text-ink">{{ sel.data.name }}</span>

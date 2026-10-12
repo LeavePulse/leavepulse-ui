@@ -13,7 +13,7 @@ import { resolveLink, type LinkTarget } from "./link"
 
 const button = tv({
   base: [
-    "inline-flex select-none items-center justify-center gap-2 font-semibold",
+    "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-semibold",
     "rounded-control transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]",
     // tactile press: dips slightly on click, springs back on release.
     "active:scale-[0.97] motion-reduce:active:scale-100",

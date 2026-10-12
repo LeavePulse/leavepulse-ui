@@ -20,7 +20,7 @@ watch(
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-4xl flex-col gap-6 p-8">
+  <div class="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-6 px-4 py-6 sm:p-8">
     <div class="flex flex-col gap-1">
       <h1 class="text-2xl font-semibold text-ink">{{ entry.name }}</h1>
       <p class="text-sm text-muted">{{ entry.description }}</p>

@@ -1127,9 +1127,10 @@ useHotkeys(() =>
           </Transition>
         </div>
 
-        <!-- Footer hints -->
+        <!-- Footer hints. Keyboard-only, so a touch screen without a keyboard
+             gets the row back for results. -->
         <div
-          class="flex shrink-0 items-center gap-4 border-t border-line px-4 py-2.5 text-[11px] text-muted"
+          class="flex shrink-0 items-center gap-4 border-t border-line px-4 py-2.5 text-[11px] text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden"
         >
           <span class="flex items-center gap-1">
             <kbd class="rounded border border-line px-1 text-[10px]">↑</kbd>

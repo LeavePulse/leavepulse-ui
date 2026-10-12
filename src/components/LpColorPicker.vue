@@ -654,6 +654,7 @@ defineExpose({ open })
 
     <PopoverPortal>
       <PopoverContent
+        :collision-padding="8"
         :side="side"
         :align="align"
         :side-offset="6"
