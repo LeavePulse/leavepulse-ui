@@ -30,6 +30,12 @@ export interface TableColumn<Row> {
   label: string
   align?: "left" | "right" | "center"
   width?: string
+  /**
+   * Keep the cell on one line. For ids, codes, dates and amounts, which a
+   * narrow screen otherwise breaks at a hyphen or a space ("ORD-" / "1040");
+   * the table scrolls sideways instead.
+   */
+  nowrap?: boolean
   /** Allow clicking the header to sort by this column. */
   sortable?: boolean
   /** The value this column sorts by, when the cell holds something else. */
@@ -575,6 +581,20 @@ function sortIcon(col: TableColumn<T>): string {
  * Empty for a column that does not sort, and LpContextMenu passes an empty
  * list straight through to the browser's own menu.
  */
+// Opened from the header menu: the menu has to finish closing and hand focus
+// back before the popover can take it, or the popover reads that focus move as
+// an outside interaction and dismisses itself. So the trigger is clicked once
+// the menu is gone.
+function openFilter(key: string) {
+  const open = () => frameEl.value?.querySelector<HTMLElement>(`[data-lp-filter="${CSS.escape(key)}"]`)?.click()
+  const started = performance.now()
+  const wait = () => {
+    if (!document.querySelector("[data-reka-menu-content]") || performance.now() - started > 600) setTimeout(open, 30)
+    else requestAnimationFrame(wait)
+  }
+  requestAnimationFrame(wait)
+}
+
 function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
   const s = activeSort.value
   const set = (next: SortState | null) => () =>
@@ -608,29 +628,26 @@ function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
     )
   }
 
-  // "Show only the mains leads" asked of the column that says which is which,
-  // rather than of a filter bar somewhere else on the page.
+  // The values themselves live in the funnel's popover, where they can be
+  // searched, painted and narrowed to one; the menu only leads there, and
+  // offers the one-step way back. A second, plainer list here meant two
+  // places to filter that behaved differently.
   if (col.filterable) {
     const hidden = hiddenValues.value[col.key]
-    items.push({
-      label: text.value.filter,
-      icon: "lucide:filter",
-      separatorBefore: items.length > 0,
-      children: [
-        ...valuesOf(col).map((value) => ({
-          label: col.valueLabel?.(value) ?? String(value ?? "—"),
-          checked: !isValueHidden(col.key, value),
-          onSelect: () => toggleValue(col.key, value),
-        })),
-        {
-          label: text.value.showAll,
-          icon: "lucide:list",
-          separatorBefore: true,
-          disabled: !hidden?.size,
-          onSelect: () => showAllValues(col.key),
-        },
-      ],
-    })
+    items.push(
+      {
+        label: text.value.filterColumn.replace("{column}", col.label),
+        icon: "lucide:filter",
+        separatorBefore: items.length > 0,
+        onSelect: () => openFilter(col.key),
+      },
+      {
+        label: text.value.showAll,
+        icon: "lucide:list",
+        disabled: !hidden?.size,
+        onSelect: () => showAllValues(col.key),
+      },
+    )
   }
 
   return items
@@ -1166,6 +1183,7 @@ const barInsetTop = computed(() =>
                   class="ml-0.5 inline-grid size-5 place-items-center rounded align-middle outline-none transition-colors duration-fast hover:bg-surface-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
                   :class="hiddenValues[col.key]?.size ? 'text-brand' : 'opacity-60'"
                   :aria-label="text.filterColumn.replace('{column}', col.label)"
+                  :data-lp-filter="col.key"
                 >
                   <LpIcon :name="hiddenValues[col.key]?.size ? 'lucide:filter-x' : 'lucide:filter'" :size="12" />
                 </button>
@@ -1245,7 +1263,7 @@ const barInsetTop = computed(() =>
             v-for="(col, ci) in visibleColumns"
             :key="col.key"
             class="px-4 text-ink"
-            :class="[alignClass(col.align), cellY]"
+            :class="[alignClass(col.align), cellY, col.nowrap ? 'whitespace-nowrap' : '']"
           >
             <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
               {{ row[col.key] }}
