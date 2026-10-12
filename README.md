@@ -6,9 +6,15 @@ JSON token sets), and a composable block-layout canvas.
 
 ## Install
 
-The kit is consumed by the LeavePulse apps via a `file:`/git dependency. It needs
-the peer deps it declares (`vue`, `reka-ui`, `tailwindcss`, `tailwind-variants`,
-`tailwind-merge`, `motion-v`, `@iconify/vue`).
+Published to the public npm registry:
+
+```bash
+npm install @leavepulse/ui
+```
+
+Peer dependencies to install alongside: `vue` 3.5+, `reka-ui` 2.9+, `tailwindcss` 4,
+`tailwind-variants` 3, `motion-v` 2, `@iconify/vue` 5, `@iconify-json/lucide` and
+`@internationalized/date`. `@nuxt/kit` is only needed for the Nuxt module.
 
 ## Usage
 
@@ -32,6 +38,65 @@ import { LpButton, LpModal } from "@leavepulse/ui"
 The kit does **not** ship a precompiled stylesheet — your Tailwind build emits the
 utilities its components use, scoped via the `@source` globs in the CSS entry.
 
+Apps using the topology canvas (`LpTopologyCanvas`) also import its stylesheet:
+
+```css
+@import "@leavepulse/ui/canvas.css";
+```
+
+### Theme before mount (plain Vue)
+
+Themes are JSON token sets applied at runtime. Paint the saved one before the
+app mounts, so the first frame already has the right colours:
+
+```ts
+import { bootstrapTheme, leavepulse, useTheme } from "@leavepulse/ui"
+
+bootstrapTheme(leavepulse)
+createApp(App).mount("#app")
+
+// later, from a switcher or settings page
+useTheme().setTheme(nord)
+useTheme().setSystem({ light, dark: leavepulse }) // follow the OS colour scheme
+```
+
+`LpThemeProvider` applies a theme to one subtree only (a dark sidebar in a light
+app, a live preview).
+
+### App-wide configuration
+
+`provideLpConfig` (or `app.use(lpConfig({...}))`) sets the link component that
+internal links render (`LpLink`, `LpButton` with `to`/`href`, `LpBreadcrumbs`,
+`LpSidebar` items) and overrides the English text the kit renders, per scope:
+
+```ts
+import { RouterLink } from "vue-router"
+import { lpConfig } from "@leavepulse/ui"
+
+app.use(lpConfig({
+  linkComponent: RouterLink,
+  labels: { sidebar: { search: "Suche" }, appShell: { openMenu: "Menü öffnen" } },
+}))
+```
+
+A component's own `labels` prop wins over the configuration.
+
+### Nuxt
+
+```ts
+export default defineNuxtConfig({
+  modules: ["@leavepulse/ui/nuxt"],
+  leavepulseUi: {
+    defaultTheme: "Nord",  // fallback when nothing is saved
+    themes: "~/themes",    // optional: module whose default export is your TokenSet[]
+  },
+})
+```
+
+The module registers every exported component, paints the saved theme during
+SSR (from the `lp-theme` cookie, no flash), and provides `NuxtLink` as the link
+component. `theme: false`, `link: false` and `exclude: ["Name"]` opt out.
+
 ### Native scrollbar skin (opt-in)
 
 `LpScrollArea` skins the scroll it owns. For everything it can't — the page
@@ -51,11 +116,14 @@ Hide a specific scrollbar with the `lp-scrollbar-none` class.
 ## Develop
 
 ```bash
-bun install          # also builds dist via the prepare hook
+bun install
 bun run dev          # live preview/playground on http://127.0.0.1:4500
-bun run build        # type-check + build the library to dist/
+bun test             # unit tests
+bun run build        # type-check + build the library and declarations to dist/
+npm run check:pack   # the tarball has its declarations and every export target
 bun run dev:dist     # rebuild dist on change (for a linked consumer)
 ```
 
-`dist/` is generated, not committed — the `prepare` hook rebuilds it on install so
-any consumer gets a fresh build.
+`dist/` is generated, not committed. Releases: `npm run release` (or
+`release:minor`) bumps the version and pushes the tag; CI tests, builds and
+publishes it.

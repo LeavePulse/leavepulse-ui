@@ -31,7 +31,8 @@ export default { inheritAttrs: false }
  * Overlays that aren't part of the frame (command palette, toaster) live in the
  * host next to <LpAppShell>.
  */
-import { computed, watch } from "vue"
+import { computed, ref, useId, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -81,6 +82,8 @@ const props = withDefaults(
     fullBleed?: boolean
     /** Loading skeleton for the nav. */
     loading?: boolean
+    /** Text overrides: the burger's name and the skip link. */
+    labels?: Partial<{ openMenu: string; skipToContent: string }>
   }>(),
   {
     mobileBreakpoint: "lg",
@@ -140,10 +143,30 @@ const drawerOpen = computed({
   get: () => props.open ?? false,
   set: (v) => emit("update:open", v),
 })
+const text = useLabels(
+  "appShell",
+  { openMenu: "Open menu", skipToContent: "Skip to content" },
+  () => props.labels,
+)
+
+/*
+ * The page scrolls inside the shell's own region, not the window, so the
+ * router's scroll behaviour never reaches it: without this a route change from
+ * a scrolled page landed mid-way down the next one.
+ */
+const scrollArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
+const mainId = `lp-main-${useId()}`
+
+// Focus instead of following the hash, which a router would treat as a navigation.
+function skipToMain() {
+  document.getElementById(mainId)?.focus()
+}
+
 watch(
   () => props.path,
   () => {
     if (drawerOpen.value) emit("update:open", false)
+    scrollArea.value?.viewportEl?.scrollTo({ top: 0, left: 0, behavior: "instant" })
   },
 )
 
@@ -176,6 +199,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <div
     :class="rootClass"
     v-bind="rest">
+    <a
+      :href="`#${mainId}`"
+      @click.prevent="skipToMain"
+      class="sr-only z-(--z-toast) rounded-control bg-surface-raised px-3 py-2 text-sm font-medium text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:outline-none focus:ring-2 focus:ring-ring"
+    >
+      {{ text.skipToContent }}
+    </a>
     <LpSidebar
       :model-value="modelValue"
       :items="items"
@@ -225,7 +255,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           variant="ghost"
           size="sm"
           square
-          aria-label="Open menu"
+          :aria-label="text.openMenu"
           @click="emit('update:open', true)"
         >
           <LpIcon name="lucide:menu" :size="18" />
@@ -265,16 +295,19 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
       <!-- full-bleed: page owns the whole region (canvas/map); otherwise the
            single scroll region with padding. -->
-      <div v-if="fullBleed" class="min-h-0 flex-1 overflow-hidden">
-        <slot />
-      </div>
-      <LpScrollArea
-        v-else
-        class="min-h-0 flex-1"
-        :content-class="`px-4 py-6 md:px-6 ${contentClass}`"
-      >
-        <slot />
-      </LpScrollArea>
+      <main :id="mainId" tabindex="-1" class="flex min-h-0 flex-1 flex-col outline-none">
+        <div v-if="fullBleed" class="min-h-0 flex-1 overflow-hidden">
+          <slot />
+        </div>
+        <LpScrollArea
+          v-else
+          ref="scrollArea"
+          class="min-h-0 flex-1"
+          :content-class="`px-4 py-6 md:px-6 ${contentClass}`"
+        >
+          <slot />
+        </LpScrollArea>
+      </main>
     </div>
 
     <slot name="overlays" />

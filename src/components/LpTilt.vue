@@ -31,12 +31,12 @@ const props = withDefaults(
   { max: 10, lift: 8, scale: 1.03, glare: false, perspective: 900 },
 )
 
-const tilt = useTilt({
+const tilt = useTilt(() => ({
   max: props.max,
   lift: props.lift,
   scale: props.scale,
   glare: props.glare,
-})
+}))
 
 const stageStyle = computed(() => ({ perspective: `${props.perspective}px` }))
 </script>

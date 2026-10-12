@@ -11,6 +11,7 @@
  */
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { usePillTransition } from "../composables/usePillTransition"
 
 export interface TocLink {
@@ -23,13 +24,28 @@ export interface TocLink {
 const props = withDefaults(
   defineProps<{
     links: TocLink[]
-    /** Heading shown above the list. */
+    /** Heading shown above the list (defaults to the `title` label). */
     title?: string
     /** px offset from the top used as the scroll-spy trigger line. */
     offset?: number
+    labels?: Partial<{ title: string }>
   }>(),
-  { title: "On this page", offset: 96 },
+  { offset: 96 },
 )
+
+const text = useLabels("toc", { title: "On this page" }, () => props.labels)
+const heading = computed(() => props.title ?? text.value.title)
+
+// Every level of the tree as one ordered list; depth drives the indent, so
+// links nested deeper than two levels render instead of vanishing.
+interface TocRow {
+  link: TocLink
+  depth: number
+}
+function flatten(links: TocLink[], depth = 0): TocRow[] {
+  return links.flatMap((link) => [{ link, depth }, ...flatten(link.children ?? [], depth + 1)])
+}
+const rows = computed(() => flatten(props.links))
 
 const activeId = ref<string>("")
 // The id the pointer is hovering (null when not hovering). The indicator bar
@@ -97,13 +113,28 @@ function unfreeze() {
   safetyTimer = null
 }
 
-function suppressSpyUntilScrollEnds() {
+/*
+ * The element that actually scrolls to the heading. Inside an app shell that is
+ * a scroll region, not the window, and watching window.scrollY there saw no
+ * movement and unfroze on the first frame.
+ */
+function scrollerOf(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node)
+    if (/(auto|scroll|overlay)/.test(overflowY) && node.scrollHeight > node.clientHeight) return node
+  }
+  return null
+}
+
+function suppressSpyUntilScrollEnds(target: HTMLElement) {
   spySuppressed = true
   if (rafId != null) cancelAnimationFrame(rafId)
   if (safetyTimer != null) clearTimeout(safetyTimer)
-  let last = window.scrollY
+  const scroller = scrollerOf(target)
+  const position = () => (scroller ? scroller.scrollTop : window.scrollY)
+  let last = position()
   const tick = () => {
-    const y = window.scrollY
+    const y = position()
     if (y === last) {
       unfreeze() // position held for a frame → scrolling has come to rest
       return
@@ -122,9 +153,11 @@ function onClick(id: string, ev: MouseEvent) {
   if (!el) return
   ev.preventDefault()
   activeId.value = id // mark immediately so the bar jumps to the clicked item
-  suppressSpyUntilScrollEnds()
+  suppressSpyUntilScrollEnds(el)
   el.scrollIntoView({ behavior: "smooth", block: "start" })
-  history.replaceState(null, "", `#${id}`)
+  // Keep the router's own state: replacing it with null broke scroll
+  // restoration and back/forward bookkeeping in vue-router apps.
+  history.replaceState(history.state, "", `#${id}`)
 }
 
 onMounted(setup)
@@ -136,16 +169,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <nav :aria-label="title" class="text-sm">
+  <nav :aria-label="heading" class="text-sm">
     <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-      {{ title }}
+      {{ heading }}
     </p>
     <ul class="relative flex flex-col gap-0.5 border-l border-line" @mouseleave="hoveredId = null">
-      <li v-for="link in links" :key="link.id" class="flex flex-col">
+      <li v-for="{ link, depth } in rows" :key="link.id" class="flex flex-col">
         <a
           :href="`#${link.id}`"
-          class="relative -ml-px block py-1 pl-3.5 leading-snug transition-colors duration-[var(--duration-fast)]"
-          :class="litId === link.id ? 'text-brand' : 'text-muted hover:text-ink'"
+          class="relative -ml-px block py-1 leading-snug transition-colors duration-[var(--duration-fast)]"
+          :class="[
+            depth > 0 ? 'text-[13px]' : '',
+            litId === link.id ? 'text-brand' : 'text-muted hover:text-ink',
+          ]"
+          :style="{ paddingLeft: `${0.875 + depth * 0.875}rem` }"
+          :aria-current="activeId === link.id ? 'location' : undefined"
           @click="onClick(link.id, $event)"
           @mouseenter="hoveredId = link.id"
         >
@@ -157,26 +195,6 @@ onBeforeUnmount(() => {
           />
           {{ link.text }}
         </a>
-
-        <ul v-if="link.children?.length" class="flex flex-col gap-0.5">
-          <li v-for="child in link.children" :key="child.id">
-            <a
-              :href="`#${child.id}`"
-              class="relative -ml-px block py-1 pl-7 text-[13px] leading-snug transition-colors duration-[var(--duration-fast)]"
-              :class="litId === child.id ? 'text-brand' : 'text-muted hover:text-ink'"
-              @click="onClick(child.id, $event)"
-              @mouseenter="hoveredId = child.id"
-            >
-              <Motion
-                v-if="litId === child.id"
-                :layout-id="pillId"
-                :transition="pillTransition"
-                class="absolute -left-px top-0 h-full w-0.5 rounded-full bg-brand"
-              />
-              {{ child.text }}
-            </a>
-          </li>
-        </ul>
       </li>
     </ul>
   </nav>

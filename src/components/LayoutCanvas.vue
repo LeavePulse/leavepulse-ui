@@ -22,7 +22,8 @@ import {
   type Split,
 } from "../layout/tree"
 import type { BlockRegistry } from "../layout/registry"
-import { ref } from "vue"
+import { layoutController, type LayoutController } from "../layout/useLayout"
+import { computed, ref } from "vue"
 
 const props = defineProps<{
   modelValue: Split
@@ -42,13 +43,30 @@ defineSlots<{
 
 const dragId = ref<string | null>(null)
 
+// A tree owned by useLayout() is edited through its controller, so every edit
+// lands in undo history; a bare tree is mutated directly as before.
+const edits = computed<LayoutController>(() => {
+  const tree = props.modelValue
+  return (
+    layoutController(tree) ?? {
+      move: (movingId, targetId, side) => moveLeaf(tree, movingId, targetId, side),
+      removeBlock: (leafId, index) => removeBlock(tree, leafId, index),
+      reorderTab: (leafId, from, to) => reorderTab(tree, leafId, from, to),
+      setActive: (leafId, index) => setActiveTab(tree, leafId, index),
+      resize: (parent, index, delta) => resizeAt(parent, index, delta),
+      beginResize: () => {},
+      endResize: () => {},
+    }
+  )
+})
+
 function onDrop(targetId: string, side: Side) {
-  if (dragId.value) moveLeaf(props.modelValue, dragId.value, targetId, side)
+  if (dragId.value) edits.value.move(dragId.value, targetId, side)
   dragId.value = null
 }
 
 function onResize(parent: Split, index: number, delta: number) {
-  resizeAt(parent, index, delta)
+  edits.value.resize(parent, index, delta)
 }
 </script>
 
@@ -63,10 +81,12 @@ function onResize(parent: Split, index: number, delta: number) {
       @dragstart="(id) => (dragId = id)"
       @dragend="dragId = null"
       @drop="onDrop"
-      @set-active="(leafId, i) => setActiveTab(modelValue, leafId, i)"
-      @remove-block="(leafId, i) => removeBlock(modelValue, leafId, i)"
-      @reorder-tab="(leafId, from, to) => reorderTab(modelValue, leafId, from, to)"
+      @set-active="(leafId, i) => edits.setActive(leafId, i)"
+      @remove-block="(leafId, i) => edits.removeBlock(leafId, i)"
+      @reorder-tab="(leafId, from, to) => edits.reorderTab(leafId, from, to)"
       @resize="onResize"
+      @resize-start="edits.beginResize()"
+      @resize-end="edits.endResize()"
     >
       <template #block="slotProps">
         <slot name="block" v-bind="slotProps" />

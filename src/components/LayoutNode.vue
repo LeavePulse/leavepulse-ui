@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Motion } from "motion-v"
-import { computed, ref } from "vue"
+import { computed, onBeforeUnmount, ref } from "vue"
 import type { LayoutNode, Leaf, Side, Split } from "../layout/tree"
 import type { BlockRegistry } from "../layout/registry"
 import { blockTitle } from "../layout/registry"
@@ -21,6 +21,8 @@ const emit = defineEmits<{
   (e: "remove-block", leafId: string, index: number): void
   (e: "reorder-tab", leafId: string, from: number, to: number): void
   (e: "resize", parent: Split, index: number, deltaFraction: number): void
+  (e: "resize-start"): void
+  (e: "resize-end"): void
 }>()
 
 // Explicit slot shape so the recursive #block pass-through types cleanly.
@@ -97,10 +99,18 @@ function onDragOver(ev: DragEvent) {
   else hoverSide.value = "center"
 }
 
+let stopSplitter: (() => void) | null = null
+onBeforeUnmount(() => stopSplitter?.())
+
 function startSplitter(ev: PointerEvent, parent: Split, index: number) {
   ev.preventDefault()
-  const host = (ev.currentTarget as HTMLElement).parentElement
+  const handle = ev.currentTarget as HTMLElement
+  const host = handle.parentElement
   if (!host) return
+  // Capture keeps the moves coming when the pointer crosses an iframe or leaves
+  // the window; pointercancel (a touch the browser took over) ends it too.
+  handle.setPointerCapture?.(ev.pointerId)
+  emit("resize-start")
   const rect = host.getBoundingClientRect()
   const horizontal = parent.dir === "row"
   const span = horizontal ? rect.width : rect.height
@@ -114,9 +124,14 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
   const up = () => {
     window.removeEventListener("pointermove", move)
     window.removeEventListener("pointerup", up)
+    window.removeEventListener("pointercancel", up)
+    stopSplitter = null
+    emit("resize-end")
   }
+  stopSplitter = up
   window.addEventListener("pointermove", move)
   window.addEventListener("pointerup", up)
+  window.addEventListener("pointercancel", up)
 }
 </script>
 
@@ -141,6 +156,8 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
         @remove-block="(l, idx) => emit('remove-block', l, idx)"
         @reorder-tab="(l, from, to) => emit('reorder-tab', l, from, to)"
         @resize="(p, idx, d) => emit('resize', p, idx, d)"
+        @resize-start="emit('resize-start')"
+        @resize-end="emit('resize-end')"
       >
         <template #block="slotProps">
           <slot name="block" v-bind="slotProps" />

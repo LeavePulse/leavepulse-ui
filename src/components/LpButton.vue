@@ -1,6 +1,15 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own rather than appended,
+// so `class="h-12"` or `class="px-6"` beats the size's defaults.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, type Component } from "vue"
+import { useLinkComponent } from "../composables/useLpConfig"
+import { useMergedAttrs } from "../composables/useMergedClass"
+import { resolveLink, type LinkTarget } from "./link"
 
 const button = tv({
   base: [
@@ -16,13 +25,15 @@ const button = tv({
       solid: "bg-brand text-ink-inverse hover:bg-brand-hover",
       action:
         "bg-action text-ink-inverse shadow-[0_14px_28px_color-mix(in_srgb,var(--color-action)_24%,transparent)] hover:bg-action-hover",
-      outline: "border border-line-strong text-ink hover:border-brand hover:bg-white/[0.04]",
+      outline: "border border-line-strong text-ink hover:border-brand hover:bg-ink/[0.04]",
       // raised surface tile with a border — a visible, neutral filled button
       soft: "border border-line bg-surface-raised/80 text-ink hover:border-line-strong hover:bg-surface-soft",
-      ghost: "text-ink hover:bg-white/[0.06]",
-      muted: "text-muted hover:bg-white/[0.04] hover:text-ink",
-      // high-contrast light fill (e.g. a "download" CTA on a dark hero)
-      light: "border border-white/20 bg-white text-ink-inverse hover:bg-white/90",
+      ghost: "text-ink hover:bg-ink/[0.06]",
+      muted: "text-muted hover:bg-ink/[0.04] hover:text-ink",
+      // high-contrast light fill (e.g. a "download" CTA on a dark hero). The
+      // text is a fixed dark tone: `ink-inverse` is light in light themes,
+      // which made this white on white there.
+      light: "border border-black/10 bg-white text-[#0b1210] hover:bg-white/90",
       danger: "bg-danger text-ink-inverse hover:bg-danger-hover",
     },
     size: {
@@ -58,7 +69,7 @@ const button = tv({
       glow: true,
       variant: "light",
       class:
-        "shadow-[0_8px_18px_rgba(255,255,255,0.2)] hover:shadow-[0_12px_24px_rgba(255,255,255,0.3)]",
+        "shadow-[0_8px_18px_color-mix(in_srgb,var(--color-ink)_20%,transparent)] hover:shadow-[0_12px_24px_color-mix(in_srgb,var(--color-ink)_30%,transparent)]",
     },
   ],
   defaultVariants: { variant: "solid", size: "md" },
@@ -74,20 +85,52 @@ const props = withDefaults(
     square?: boolean
     glow?: boolean
     /**
-     * Root element/component. Defaults to a native <button>. Pass a router link
-     * component (e.g. NuxtLink) or "a" to render a link-styled button; the kit
-     * stays DOM-agnostic, the consumer supplies the link component.
+     * Root element/component. Defaults to a native <button>, or a link when
+     * `to`/`href` is set (the link component from provideLpConfig for internal
+     * targets). Pass a component or "a" to override.
      */
     as?: string | Component
+    /** Router destination: renders the configured link component. */
+    to?: LinkTarget
+    /** Link URL: renders an anchor (or the link component for internal paths). */
+    href?: string
     type?: "button" | "submit" | "reset"
     disabled?: boolean
   }>(),
-  { as: "button", type: "button" },
+  { type: "button" },
 )
 
-const isNativeButton = computed(() => props.as === "button")
+const linkComponent = useLinkComponent()
 
-const classes = computed(() =>
+const resolved = computed<{ is: string | Component; props: Record<string, unknown> }>(() => {
+  if (props.as && props.as !== "a") {
+    const target = props.to != null ? { to: props.to } : props.href != null ? { href: props.href } : {}
+    return { is: props.as, props: props.as === "button" ? {} : target }
+  }
+  if (props.as === "a") return { is: "a", props: { href: props.href } }
+  return resolveLink(linkComponent.value, { to: props.to, href: props.href }) ?? { is: "button", props: {} }
+})
+
+const isNativeButton = computed(() => resolved.value.is === "button")
+
+/*
+ * A disabled link has no `disabled` attribute to lean on: it must leave the tab
+ * order and swallow the click. The capture phase runs before a router link's
+ * own handler, which skips navigation once the event is default-prevented.
+ */
+function blockDisabled(event: MouseEvent) {
+  if (!props.disabled || isNativeButton.value) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+}
+
+const linkProps = computed(() => {
+  if (isNativeButton.value) return {}
+  if (!props.disabled) return resolved.value.props
+  return resolved.value.is === "a" ? {} : resolved.value.props
+})
+
+const { class: classes, attrs: rest } = useMergedAttrs(() =>
   button({
     variant: props.variant,
     size: props.size,
@@ -100,11 +143,14 @@ const classes = computed(() =>
 
 <template>
   <component
-    :is="as"
+    :is="resolved.is"
+    v-bind="{ ...rest, ...linkProps }"
     :type="isNativeButton ? type : undefined"
     :disabled="isNativeButton ? disabled : undefined"
     :aria-disabled="!isNativeButton && disabled ? 'true' : undefined"
+    :tabindex="!isNativeButton && disabled ? -1 : undefined"
     :class="classes"
+    @click.capture="blockDisabled"
   >
     <slot />
   </component>

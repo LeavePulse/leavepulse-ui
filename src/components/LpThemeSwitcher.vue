@@ -12,6 +12,7 @@
  * fetches; it just drives the theme engine.
  */
 import { computed, onMounted, ref } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { presets } from "../theme/presets"
 import type { TokenSet } from "../theme/tokens"
 import { useTheme } from "../theme/useTheme"
@@ -51,6 +52,13 @@ const props = withDefaults(
     transition?: boolean
     size?: "sm" | "md" | "lg"
     "aria-label"?: string
+    /**
+     * Offer a "System" entry in the menu that follows the OS colour scheme,
+     * switching between these two themes (names from `themes`, or TokenSets).
+     */
+    system?: { light: string | TokenSet; dark: string | TokenSet }
+    /** Text overrides. `trigger` may contain `{name}`. */
+    labels?: Partial<{ trigger: string; system: string }>
   }>(),
   {
     variant: "swatch",
@@ -66,6 +74,12 @@ const emit = defineEmits<{
 
 const theme = useTheme()
 
+const text = useLabels(
+  "themeSwitcher",
+  { trigger: "Theme: {name}. Click to switch, right-click to choose.", system: "System" },
+  () => props.labels,
+)
+
 const list = computed<TokenSet[]>(() =>
   props.themes && props.themes.length ? props.themes : Object.values(presets),
 )
@@ -74,9 +88,6 @@ const list = computed<TokenSet[]>(() =>
 // kit remembers the theme like an i18n locale). Falls back to the first theme.
 const activeName = computed(
   () => props.modelValue ?? (theme.currentName.value || list.value[0]?.name || ""),
-)
-const active = computed<TokenSet | undefined>(
-  () => list.value.find((t) => t.name === activeName.value) ?? list.value[0],
 )
 
 // Apply the consumer's default on mount when nothing is cached yet. init()
@@ -140,18 +151,49 @@ function cycle(ev: MouseEvent) {
 // Right-click menu: every theme, the active one checked. A circular-reveal from
 // the (saved) click point isn't available here, so the menu picks reveal from
 // the trigger centre via applyWithTransition's default origin.
-const menu = computed<ContextMenuItemDef[]>(() =>
-  list.value.map((t) => ({
+function resolve(t: string | TokenSet): TokenSet | undefined {
+  return typeof t === "string" ? list.value.find((x) => x.name === t) : t
+}
+
+const systemPair = computed(() => {
+  if (!props.system) return null
+  const light = resolve(props.system.light)
+  const dark = resolve(props.system.dark)
+  return light && dark ? { light, dark } : null
+})
+
+function followSystem() {
+  const pair = systemPair.value
+  if (!pair) return
+  theme.setSystem(pair)
+  const next = theme.current.value as TokenSet | null
+  if (next) {
+    emit("update:modelValue", next.name)
+    emit("change", next)
+  }
+}
+
+const menu = computed<ContextMenuItemDef[]>(() => {
+  const following = theme.system.value
+  const items: ContextMenuItemDef[] = list.value.map((t) => ({
     label: t.name,
     icon:
-      t.name === activeName.value
+      !following && t.name === activeName.value
         ? "lucide:check"
         : t.mode === "dark"
           ? "lucide:moon"
           : "lucide:sun",
     onSelect: () => applyTheme(t),
-  })),
-)
+  }))
+  if (systemPair.value) {
+    items.unshift({
+      label: text.value.system,
+      icon: following ? "lucide:check" : "lucide:monitor",
+      onSelect: followSystem,
+    })
+  }
+  return items
+})
 
 /*
  * The theme the SERVER rendered is not necessarily the one the client restores:
@@ -176,7 +218,7 @@ const labelName = computed(() =>
 )
 
 const triggerLabel = computed(
-  () => props["aria-label"] ?? `Theme: ${labelName.value}. Click to switch, right-click to choose.`,
+  () => props["aria-label"] ?? text.value.trigger.replace("{name}", labelName.value),
 )
 </script>
 
@@ -197,23 +239,28 @@ const triggerLabel = computed(
       "
       @click="cycle"
     >
-      <!-- swatch: brand over surface, hinting the theme at a glance -->
+      <!-- swatch: brand over surface, read from the applied variables rather
+           than the theme object, so the server's render (painted from the
+           cookie) and the client's agree without a hydration patch -->
       <span
         v-if="variant !== 'icon'"
         class="grid shrink-0 place-items-center rounded-control border border-line/60"
         :class="SIZES[size]"
-        :style="{ background: active?.colors.surface }"
+        style="background: var(--color-surface)"
       >
-        <span
-          class="size-3 rounded-full"
-          :style="{ background: active?.colors.brand }"
-        />
+        <span class="size-3 rounded-full" style="background: var(--color-brand)" />
       </span>
-      <!-- icon: sun/moon by mode -->
+      <!-- icon: sun/moon by mode, chosen by CSS from the applied theme's mode -->
       <span v-else class="grid shrink-0 place-items-center" :class="SIZES[size]">
         <LpIcon
-          :name="active?.mode === 'dark' ? 'lucide:moon' : 'lucide:sun'"
+          name="lucide:moon"
           :size="ICON_SIZE[size]"
+          class="in-data-[theme-mode=light]:hidden"
+        />
+        <LpIcon
+          name="lucide:sun"
+          :size="ICON_SIZE[size]"
+          class="hidden in-data-[theme-mode=light]:block"
         />
       </span>
 

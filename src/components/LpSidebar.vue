@@ -14,6 +14,7 @@
  * the static <nav> it always has — existing call sites are unaffected.
  */
 import { computed, ref, useId } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import LpDrawer from "./LpDrawer.vue"
 import LpInput from "./LpInput.vue"
 import LpSidebarNav from "./LpSidebarNav.vue"
@@ -45,8 +46,10 @@ const props = withDefaults(
      * query is active — a hidden match is the same as no match.
      */
     searchable?: boolean
-    /** Placeholder for that field. */
+    /** Placeholder for that field (defaults to the `search` label). */
     searchPlaceholder?: string
+    /** Text overrides: `nav` names the landmark, `search` the filter field. */
+    labels?: Partial<{ nav: string; search: string }>
     /** The query, when the app wants to own it (v-model:search). */
     search?: string
     /** Show a skeleton placeholder instead of the items. */
@@ -113,7 +116,6 @@ const props = withDefaults(
     autoCollapseAfter?: number
   }>(),
   {
-    searchPlaceholder: "Search",
     skeletonRows: 6,
     skeletonHeader: true,
     responsive: false,
@@ -131,6 +133,9 @@ const emit = defineEmits<{
   (e: "select", item: SidebarItem): void
   (e: "update:search", value: string): void
 }>()
+
+const text = useLabels("sidebar", { nav: "Sidebar", search: "Search" }, () => props.labels)
+const placeholder = computed(() => props.searchPlaceholder ?? text.value.search)
 
 // Normalise both inputs to a single section list.
 const allGroups = computed<SidebarSection[]>(() =>
@@ -271,7 +276,7 @@ defineOptions({ inheritAttrs: false })
     class="h-full flex-col gap-1 p-3"
     :class="[railClass, chromeClass, width ? '' : 'w-60']"
     :style="width ? { width } : undefined"
-    aria-label="Sidebar"
+    :aria-label="text.nav"
     v-bind="$attrs"
   >
     <!-- Rail: edge-to-edge (negative margins cancel the p-3) and h-16 to match
@@ -298,8 +303,8 @@ defineOptions({ inheritAttrs: false })
       size="sm"
       icon="lucide:search"
       class="mb-2 shrink-0"
-      :placeholder="searchPlaceholder"
-      :aria-label="searchPlaceholder"
+      :placeholder="placeholder"
+      :aria-label="placeholder"
     />
     <LpSidebarNav
       :groups="groups"
@@ -339,7 +344,7 @@ defineOptions({ inheritAttrs: false })
     :edge-breakpoint="mobileBreakpoint"
     @update:open="(v) => emit('update:open', v)"
   >
-    <div class="flex h-full flex-col gap-1">
+    <nav class="flex h-full flex-col gap-1" :aria-label="text.nav">
       <div
         v-if="$slots.header"
         class="shrink-0"
@@ -357,8 +362,8 @@ defineOptions({ inheritAttrs: false })
         size="sm"
         icon="lucide:search"
         class="mb-2 shrink-0"
-        :placeholder="searchPlaceholder"
-        :aria-label="searchPlaceholder"
+        :placeholder="placeholder"
+        :aria-label="placeholder"
       />
       <LpSidebarNav
         :groups="groups"
@@ -383,6 +388,6 @@ defineOptions({ inheritAttrs: false })
       <div v-if="$slots.footer" class="mt-2 shrink-0 border-t border-line pt-3">
         <slot name="footer" />
       </div>
-    </div>
+    </nav>
   </LpDrawer>
 </template>

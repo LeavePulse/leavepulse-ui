@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, type Ref } from "vue"
+import { computed, ref, shallowRef, watch, type Ref } from "vue"
 import {
   addLeaf,
   addTab,
@@ -10,8 +10,10 @@ import {
   removeLeaf,
   reorderTab,
   resizeAt,
+  restoreLayout,
   setActiveTab,
   serializeLayout,
+  snapshotLayout,
   type Side,
   type Split,
 } from "./tree"
@@ -22,12 +24,33 @@ import {
  * tree.ts is a pile of pure-ish mutators; this composable is the ergonomic
  * surface a consumer actually wires to UI: it owns the reactive tree, snapshots
  * every structural edit for undo/redo, and exposes save/load/reset against a
- * serialized form. The canvas calls the same mutators for drag/drop/resize, so
- * those go through `record()` too and land in history.
+ * serialized form. A <LayoutCanvas v-model> bound to this tree finds the
+ * controller through `layoutController`, so drag-move, tab close/reorder and
+ * divider resizes land in history with no extra wiring.
  *
- * History holds serialized snapshots (plain JSON), not live trees, so an undo
- * can't smuggle stale reactive nodes back in.
+ * History holds snapshots (plain JSON with node ids), not live trees, so an
+ * undo can't smuggle stale reactive nodes back in, yet blocks keep their
+ * identity and are not remounted.
  */
+
+/** The edits a canvas performs, routed through history when a controller owns the tree. */
+export interface LayoutController {
+  move: (movingId: string, targetId: string, side: Side) => void
+  removeBlock: (leafId: string, index: number) => void
+  reorderTab: (leafId: string, from: number, to: number) => void
+  setActive: (leafId: string, index: number) => void
+  resize: (parent: Split, index: number, deltaFraction: number) => void
+  /** Bracket a continuous resize gesture so it records one history step. */
+  beginResize: () => void
+  endResize: () => void
+}
+
+const controllers = new WeakMap<Split, LayoutController>()
+
+/** The controller managing `tree`, if a useLayout() owns it. */
+export function layoutController(tree: Split): LayoutController | undefined {
+  return controllers.get(tree)
+}
 
 export interface UseLayoutOptions {
   /** Initial block ids, left-to-right, when no saved layout is loaded. */
@@ -57,6 +80,8 @@ export interface UseLayout {
   remove: (leafId: string) => void
   move: (movingId: string, targetId: string, side: Side) => void
   resize: (parent: Split, index: number, deltaFraction: number) => void
+  beginResize: () => void
+  endResize: () => void
   undo: () => void
   redo: () => void
   /** Replace the whole layout from a flat block list. */
@@ -77,19 +102,43 @@ export function useLayout(options: UseLayoutOptions): UseLayout {
   const canUndo = computed(() => past.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
 
-  const snapshot = () => JSON.stringify(serializeLayout(layout.value))
+  const snapshot = () => snapshotLayout(layout.value)
 
-  // Capture the pre-edit state, run the structural change, drop any redo branch.
-  function record(mutate: () => void) {
-    const before = snapshot()
-    mutate()
+  function push(before: string) {
+    if (before === snapshot()) return
     past.value.push(before)
     if (past.value.length > limit) past.value.shift()
     future.value = []
   }
 
+  // Capture the pre-edit state, run the structural change, drop any redo branch.
+  function record(mutate: () => void) {
+    const before = snapshot()
+    mutate()
+    push(before)
+  }
+
+  let resizeStart: string | null = null
+
+  const controller: LayoutController = {
+    move: (movingId, targetId, side) => record(() => moveLeaf(layout.value, movingId, targetId, side)),
+    removeBlock: (leafId, index) => record(() => removeBlock(layout.value, leafId, index)),
+    reorderTab: (leafId, from, to) => record(() => reorderTab(layout.value, leafId, from, to)),
+    setActive: (leafId, index) => setActiveTab(layout.value, leafId, index),
+    resize: (parent, index, delta) => resizeAt(parent, index, delta),
+    beginResize: () => {
+      resizeStart = snapshot()
+    },
+    endResize: () => {
+      if (resizeStart !== null) push(resizeStart)
+      resizeStart = null
+    },
+  }
+
+  watch(layout, (tree) => controllers.set(tree, controller), { immediate: true, flush: "sync" })
+
   function restore(serialized: string) {
-    layout.value = deserializeLayout(JSON.parse(serialized))
+    layout.value = restoreLayout(serialized)
   }
 
   return {
@@ -99,16 +148,17 @@ export function useLayout(options: UseLayoutOptions): UseLayout {
     canRedo,
     add: (block, side) => record(() => addLeaf(layout.value, block, side)),
     addTab: (leafId, block) => record(() => addTab(layout.value, leafId, block)),
-    setActive: (leafId, index) => setActiveTab(layout.value, leafId, index),
-    reorderTab: (leafId, from, to) => record(() => reorderTab(layout.value, leafId, from, to)),
-    removeBlock: (leafId, index) => record(() => removeBlock(layout.value, leafId, index)),
+    setActive: controller.setActive,
+    reorderTab: controller.reorderTab,
+    removeBlock: controller.removeBlock,
     remove: (leafId) => record(() => removeLeaf(layout.value, leafId)),
-    move: (movingId, targetId, side) =>
-      record(() => moveLeaf(layout.value, movingId, targetId, side)),
+    move: controller.move,
     // Resize fires continuously during a divider drag; recording every frame
-    // would flood history, so it mutates without a snapshot. (A consumer that
-    // wants resize in history can wrap a single record() around the gesture.)
-    resize: (parent, index, delta) => resizeAt(parent, index, delta),
+    // would flood history. The canvas brackets its gestures with
+    // beginResize/endResize, which records the whole drag as one step.
+    resize: controller.resize,
+    beginResize: controller.beginResize,
+    endResize: controller.endResize,
     undo: () => {
       const prev = past.value.pop()
       if (prev === undefined) return

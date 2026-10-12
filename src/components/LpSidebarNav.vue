@@ -21,6 +21,8 @@ import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
+import { resolveLink, type ResolvedLink } from "./link"
+import { useLinkComponent } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -75,6 +77,18 @@ function isOpen(section: SidebarSection): boolean {
 
 const pillTransition = usePillTransition()
 
+const linkComponent = useLinkComponent()
+
+/*
+ * A disabled item is always a disabled button: an anchor cannot be disabled,
+ * and the old enabled-button fallback for a disabled link stayed focusable.
+ */
+function rowOf(item: SidebarItem): ResolvedLink {
+  const link = item.disabled ? null : resolveLink(linkComponent.value, { to: item.to, href: item.href })
+  if (link) return link
+  return { is: "button", props: { type: "button", disabled: item.disabled || undefined } }
+}
+
 // The nav fills the remaining height with a fixed gap between groups; a short sidebar needs both under the consumer's control.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex min-h-0 flex-1 flex-col gap-4",
@@ -118,7 +132,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
            because a thing that reacts to a click must look like one. -->
       <CollapsibleTrigger
         v-if="section.title && section.collapsible"
-        class="group/section mt-2 flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-white/[0.04] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        class="group/section mt-2 flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-ink/[0.04] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <LpIcon
           v-if="section.icon"
@@ -165,10 +179,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :items="item.menu ?? []"
       >
         <component
-          :is="item.href && !item.disabled ? 'a' : 'button'"
-          :href="item.href && !item.disabled ? item.href : undefined"
-          :type="item.href ? undefined : 'button'"
-          :disabled="item.href ? undefined : item.disabled"
+          :is="rowOf(item).is"
+          v-bind="rowOf(item).props"
           :aria-current="itemActive(item) ? 'page' : undefined"
           :aria-disabled="item.disabled || undefined"
           class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"

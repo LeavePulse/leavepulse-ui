@@ -10,8 +10,14 @@ export interface SidebarItem {
   id: string
   label: string
   icon?: string
-  /** Render as a link instead of a button. */
+  /**
+   * Render as a link instead of a button. An app-relative path goes through
+   * the link component from provideLpConfig (NuxtLink under the Nuxt module),
+   * so it navigates client-side; other URLs render a plain anchor.
+   */
   href?: string
+  /** Router destination (rendered through the configured link component). */
+  to?: string | Record<string, unknown>
   /** Count chip on the right (number or short string). */
   badge?: number | string
   disabled?: boolean

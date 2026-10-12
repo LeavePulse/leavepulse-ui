@@ -22,7 +22,7 @@ import {
   type NodeTypesObject,
 } from "@vue-flow/core"
 import { MiniMap } from "@vue-flow/minimap"
-import { computed, markRaw, watch, type Component } from "vue"
+import { computed, defineComponent, h, markRaw, watch, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 import LpLaneNode from "./LpLaneNode.vue"
 import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
@@ -193,7 +193,18 @@ const emit = defineEmits<{
 // their own props (data/selected) which Vue Flow supplies at runtime as part of
 // NodeProps. Widen to `Component` (not the concrete DefineComponent) so the
 // registry types cleanly without a cast.
+// Vue Flow ships no "group" renderer, so a host frame without one warns and
+// draws nothing inside its styled box. The frame only needs its label.
+const GroupNode = defineComponent({
+  props: { label: { type: [String, Object], default: undefined } },
+  setup: (props) => () =>
+    typeof props.label === "string"
+      ? h("div", { class: "px-3 pt-2 text-xs font-medium text-muted" }, props.label)
+      : null,
+})
+
 const nodeTypes: NodeTypesObject = {
+  group: markRaw(GroupNode) as Component,
   infra: markRaw(LpInfraNode) as Component,
   service: markRaw(LpServiceNode) as Component,
   lane: markRaw(LpLaneNode) as Component,

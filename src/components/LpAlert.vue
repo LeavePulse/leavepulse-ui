@@ -37,9 +37,22 @@ const props = withDefaults(
     variant?: AlertVariants["variant"]
     title?: string
     icon?: string
+    /**
+     * Announce the alert to screen readers when it appears. "assertive"
+     * (role=alert) interrupts and is for something that needs action now,
+     * "polite" (role=status) waits its turn, false reads it in place. By
+     * default only `danger` interrupts: an info or success banner that is part
+     * of the page from the start should not be shouted on load.
+     */
+    live?: "assertive" | "polite" | false
   }>(),
-  { variant: "info" },
+  { variant: "info", live: undefined },
 )
+
+const role = computed(() => {
+  const live = props.live ?? (props.variant === "danger" ? "assertive" : false)
+  return live === "assertive" ? "alert" : live === "polite" ? "status" : undefined
+})
 
 const classes = computed(() => alert({ variant: props.variant }))
 const resolvedIcon = computed(() => props.icon ?? ICONS[props.variant ?? "info"])
@@ -47,8 +60,8 @@ const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
 </script>
 
 <template>
-  <div :class="classes" role="alert">
-    <LpIcon :name="resolvedIcon" :size="18" :class="['mt-0.5 shrink-0', iconTone]" />
+  <div :class="classes" :role="role">
+    <LpIcon :name="resolvedIcon" :size="18" :class="['mt-0.5 shrink-0', iconTone]" aria-hidden="true" />
     <div class="min-w-0">
       <p v-if="title" class="font-semibold text-ink">{{ title }}</p>
       <div :class="['text-muted-strong', title ? 'mt-0.5' : '']">

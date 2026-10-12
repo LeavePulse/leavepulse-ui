@@ -37,6 +37,13 @@ export type LayoutNode = Leaf | Split
 let uid = 0
 const nid = () => `lp-n${uid++}`
 
+// Keep fresh ids clear of ids restored from a snapshot.
+function claimId(id: string): string {
+  const n = /^lp-n(\d+)$/.exec(id)
+  if (n) uid = Math.max(uid, Number(n[1]) + 1)
+  return id
+}
+
 function leaf(block: string): Leaf {
   return { kind: "leaf", id: nid(), blocks: [block], active: 0, size: 1 }
 }
@@ -285,4 +292,27 @@ export function deserializeLayout(data: SerializedNode): Split {
     }
   }
   return reactive(hydrate(data) as Split)
+}
+
+// ── history snapshots ────────────────────────────────────────
+// Like serializeLayout, but keeping node ids: restoring an undo step with
+// fresh ids remounted every block and threw away its local state.
+type SnapshotNode =
+  | { kind: "leaf"; id: string; blocks: string[]; active: number; size: number }
+  | { kind: "split"; id: string; dir: Dir; size: number; children: SnapshotNode[] }
+
+export function snapshotLayout(root: Split): string {
+  const strip = (n: LayoutNode): SnapshotNode =>
+    n.kind === "leaf"
+      ? { kind: "leaf", id: n.id, blocks: [...n.blocks], active: n.active, size: n.size }
+      : { kind: "split", id: n.id, dir: n.dir, size: n.size, children: n.children.map(strip) }
+  return JSON.stringify(strip(root))
+}
+
+export function restoreLayout(snapshot: string): Split {
+  const hydrate = (n: SnapshotNode): LayoutNode =>
+    n.kind === "leaf"
+      ? { kind: "leaf", id: claimId(n.id), blocks: [...n.blocks], active: n.active, size: n.size }
+      : { kind: "split", id: claimId(n.id), dir: n.dir, size: n.size, children: n.children.map(hydrate) }
+  return reactive(hydrate(JSON.parse(snapshot) as SnapshotNode) as Split)
 }

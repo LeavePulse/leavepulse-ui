@@ -7,11 +7,15 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { computed, type Component } from "vue"
+import { useLinkComponent } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { resolveLink, type LinkTarget } from "./link"
 
 const props = withDefaults(
   defineProps<{
     href?: string
+    /** Router destination; rendered through the configured link component. */
+    to?: LinkTarget
     external?: boolean
     /** Shorthand for `tone="muted"`. */
     muted?: boolean
@@ -23,11 +27,9 @@ const props = withDefaults(
      */
     tone?: "brand" | "ink" | "muted" | "soft"
     /**
-     * Root element/component. Defaults to a native <a>. Pass a router link
-     * component (e.g. NuxtLink or RouterLink) to keep client-side navigation;
-     * the kit stays DOM-agnostic, the consumer supplies the link component.
-     * Router links take their destination through their own prop (`to`), which
-     * falls through as a plain attribute.
+     * Root element/component. By default an internal `to`/`href` renders the
+     * link component set with provideLpConfig (NuxtLink under the Nuxt module),
+     * anything else a native <a>. Pass a component here to override per link.
      */
     as?: string | Component
     /**
@@ -50,13 +52,23 @@ const props = withDefaults(
      */
     revealOn?: "self" | "group"
   }>(),
-  { variant: "default", as: "a", revealOn: "self" },
+  { variant: "default", revealOn: "self" },
 )
 
-// A router link component owns its destination through its own prop (`to`),
-// so `href` is only bound when this really renders an anchor. `target`/`rel`
-// stay in play either way — router links honour them for external targets.
-const isAnchor = computed(() => props.as === "a")
+const linkComponent = useLinkComponent()
+
+// An explicit `as` keeps its old contract (href on an anchor, `to` passed on to
+// the component). Otherwise the target decides, and an external link is always
+// a plain anchor.
+const resolved = computed(() => {
+  if (props.as) {
+    return props.as === "a"
+      ? { is: "a", props: { href: props.href } }
+      : { is: props.as, props: props.to != null ? { to: props.to } : { href: props.href } }
+  }
+  const component = props.external ? "a" : linkComponent.value
+  return resolveLink(component, { to: props.to, href: props.href }) ?? { is: "a", props: {} }
+})
 
 const rel = computed(() => (props.external ? "noopener noreferrer" : undefined))
 const target = computed(() => (props.external ? "_blank" : undefined))
@@ -121,12 +133,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 
 <template>
   <component
-    :is="as"
-    :href="isAnchor ? href : undefined"
+    :is="resolved.is"
+    v-bind="{ ...resolved.props, ...rest }"
     :target="target"
     :rel="rel"
     :class="rootClass"
-    v-bind="rest"
   >
     <slot />
   </component>

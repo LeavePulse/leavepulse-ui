@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Motion, useReducedMotion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { computed, ref, useId } from "vue"
+import { computed, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 
@@ -12,9 +12,11 @@ export interface TabItem {
   icon?: string
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue?: string
+    /** Initially active tab when `v-model` is not bound (default: the first). */
+    defaultValue?: string
     items: TabItem[]
     /**
      * "contained" (default) wraps the triggers in a bordered, filled bar.
@@ -31,7 +33,22 @@ withDefaults(
   }>(),
   { variant: "contained", accent: false, block: false },
 )
-defineEmits<{ (e: "update:modelValue", value: string): void }>()
+const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>()
+
+// Held here rather than left to reka, so the active marker follows the active
+// tab in uncontrolled use too: reading the prop alone left it unmarked.
+const current = ref(props.modelValue ?? props.defaultValue ?? props.items[0]?.value)
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (value !== undefined) current.value = value
+  },
+)
+
+function select(value: string) {
+  if (props.modelValue === undefined) current.value = value
+  emit("update:modelValue", value)
+}
 
 // The pill sits under the hovered tab, falling back to the active one
 // (UAProject header behaviour). motion-v shared layoutId animates the move.
@@ -80,8 +97,8 @@ function releaseFocusAfterPointer(event: PointerEvent) {
 
 <template>
   <TabsRoot
-    :model-value="modelValue"
-    @update:model-value="(v) => $emit('update:modelValue', v as string)"
+    :model-value="current"
+    @update:model-value="(v) => select(v as string)"
   >
     <TabsList
       class="gap-1"
@@ -109,7 +126,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
         <!-- Active marker: a bottom bar in "underline", a filled pill otherwise.
              Both slide between tabs via the shared motion layoutId. -->
         <Motion
-          v-if="pillUnder(item.value, modelValue)"
+          v-if="pillUnder(item.value, current)"
           :layout-id="pillId"
           :transition="pillTransition"
           :class="variant === 'underline'

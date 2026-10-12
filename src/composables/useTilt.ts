@@ -1,5 +1,5 @@
 import { useReducedMotion } from "motion-v"
-import { computed, ref, type ComputedRef, type CSSProperties, type Ref } from "vue"
+import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
 
 /*
  * useTilt — pointer-reactive 3D tilt for a "tactile" surface (a card, a tile, a
@@ -35,10 +35,8 @@ export interface UseTilt {
   active: Ref<boolean>
 }
 
-export function useTilt(options: UseTiltOptions = {}): UseTilt {
-  const max = options.max ?? 10
-  const lift = options.lift ?? 8
-  const scale = options.scale ?? 1.03
+export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt {
+  const options = computed(() => toValue(source))
   const reduceMotion = useReducedMotion()
 
   const active = ref(false)
@@ -72,6 +70,7 @@ export function useTilt(options: UseTiltOptions = {}): UseTilt {
     // rotateX tips away from the pointer's vertical position; rotateY toward its
     // horizontal one. Only tilt while active so it rests flat when the pointer
     // leaves (nx/ny are already zeroed on leave).
+    const { max = 10, lift = 8, scale = 1.03 } = options.value
     const rx = active.value ? -ny.value * max : 0
     const ry = active.value ? nx.value * max : 0
     const z = active.value ? lift : 0
@@ -86,7 +85,7 @@ export function useTilt(options: UseTiltOptions = {}): UseTilt {
   })
 
   const glareStyle = computed<CSSProperties>(() => {
-    if (!options.glare || reduceMotion.value || !active.value) {
+    if (!options.value.glare || reduceMotion.value || !active.value) {
       return { opacity: 0 }
     }
     // Bright spot tracks the pointer; map [-1,1] → [0%,100%].
