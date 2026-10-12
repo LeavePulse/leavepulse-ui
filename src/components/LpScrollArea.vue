@@ -55,6 +55,21 @@ const viewportEl = computed<HTMLElement | null>(
 )
 defineExpose({ viewportEl })
 
+/*
+ * The viewport is focusable so the keyboard can scroll it, and Chrome marks it
+ * :focus-visible as soon as any key is pressed after a click inside, so the
+ * browser's white outline framed the whole page on the first shortcut. The
+ * ring is kept for focus that arrived by Tab and dropped for focus a pointer
+ * put there.
+ */
+const pointerFocus = ref(false)
+function onViewportPointerDown() {
+  pointerFocus.value = true
+}
+function onViewportBlur() {
+  pointerFocus.value = false
+}
+
 // `opacity-0` + the hidden-state fade is what keeps the bar invisible at rest:
 // with force-mount the element stays in the DOM, so a one-shot fade-out alone
 // would snap back to visible once the animation finished.
@@ -241,10 +256,15 @@ function onThumbPointerDown() {
 
     <ScrollAreaViewport
       ref="viewportRef"
-      class="w-full min-h-0 min-w-0 flex-1 [&>div]:!block [&>div]:!min-w-0"
-      :class="instant ? '' : 'scroll-smooth motion-reduce:scroll-auto'"
+      class="w-full min-h-0 min-w-0 flex-1 rounded-[inherit] outline-none [&>div]:!block [&>div]:!min-w-0"
+      :class="[
+        instant ? '' : 'scroll-smooth motion-reduce:scroll-auto',
+        pointerFocus ? '' : 'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+      ]"
       :style="fade ? { maskImage: fadeMask, WebkitMaskImage: fadeMask } : undefined"
       @scroll.passive="onViewportScroll"
+      @pointerdown="onViewportPointerDown"
+      @focusout="(e: FocusEvent) => e.target === e.currentTarget && onViewportBlur()"
     >
       <div :class="contentClass">
         <slot />
