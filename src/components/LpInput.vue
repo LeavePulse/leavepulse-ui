@@ -174,7 +174,7 @@ defineExpose({
     :error="hasField ? error : undefined"
     :required="hasField ? required : undefined"
     :id="hasField ? field.id : undefined"
-    :class="hasField ? rootClass : undefined"
+    :class="hasField ? rootClass : 'contents'"
     :style="hasField ? rootStyle : undefined"
   >
     <div
