@@ -1888,6 +1888,7 @@ export const registry: ComponentEntry[] = [
         open: false,
         nested: false,
         frosted: false,
+        frostedNested: false,
         bare: false,
         sheet: false,
         fromSheet: false,
@@ -1924,8 +1925,13 @@ export const registry: ComponentEntry[] = [
   <LpModal v-model:open="frosted" size="lg" title="Glass" description="The page shows through, blurred." glass>
     <p>Same modal, frosted. A look rather than a behaviour, so it stays opt-in.</p>
     <template #footer>
+      <LpButton variant="outline" @click="frostedNested = true">Open nested</LpButton>
       <LpButton variant="solid" @click="frosted = false">Close</LpButton>
     </template>
+  </LpModal>
+
+  <LpModal v-model:open="frostedNested" size="sm" title="Nested glass" glass>
+    <p>Frosted too, a little denser: the text of the dialog below blurs instead of reading through.</p>
   </LpModal>
 
   <!-- Opens around a placeholder, then grows into the loaded body. -->
@@ -1974,6 +1980,7 @@ export const registry: ComponentEntry[] = [
     state: () => {
       const s = reactive({
         open: false,
+        glass: false,
         section: "activity",
         sections: [
           {
@@ -2000,12 +2007,16 @@ export const registry: ComponentEntry[] = [
       return s
     },
     template: `<div>
-  <LpButton variant="solid" @click="open = true">Open</LpButton>
+  <div class="flex flex-wrap gap-2">
+    <LpButton variant="solid" @click="glass = false; open = true">Open</LpButton>
+    <LpButton variant="outline" @click="glass = true; open = true">Open glass</LpButton>
+  </div>
 
   <LpModalNav
     v-model:open="open"
     v-model="section"
     :sections="sections"
+    :glass="glass"
     title="Staff member"
     description="Sections stay in view while you read one."
   >

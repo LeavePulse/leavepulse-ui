@@ -162,7 +162,7 @@ watch(() => props.open, (open) => (open ? claim() : release()), { immediate: tru
 onBeforeUnmount(release)
 
 const contentClass = computed(() => {
-  const surface = frosted.value ? (layer.value.nested ? "lp-glass-overlay--nested" : "lp-glass-overlay") : "bg-surface-raised"
+  const surface = frosted.value ? (layer.value.nested ? "lp-glass-overlay lp-glass-overlay--nested" : "lp-glass-overlay") : "bg-surface-raised"
   const base = `fixed z-(--z-modal) flex flex-col border-line ${surface} shadow-panel outline-none`
   const map: Record<Direction, string> = {
     left: "inset-y-0 left-0 border-r rounded-r-card",

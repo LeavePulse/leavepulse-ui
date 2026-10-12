@@ -550,11 +550,14 @@
   backdrop-filter: blur(var(--glass-overlay-blur, 28px)) saturate(170%);
 }
 
+/*
+ * A dialog opened over another is glass too: without its own blur the text of
+ * the dialog below read straight through the fill. Its scrim stays unblurred
+ * (.lp-scrim--nested), so the only blur is the panel's, and the fill is a
+ * little denser than the first layer's, since what it blurs is glass already.
+ */
 .lp-glass-overlay--nested {
-  background-color: color-mix(in srgb, var(--color-surface-raised) 88%, transparent);
-  background-image: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  --glass-overlay-fill: 62%;
 }
 
 :root[data-lp-no-backdrop] .lp-glass-overlay {

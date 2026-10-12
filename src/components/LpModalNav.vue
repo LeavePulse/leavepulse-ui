@@ -14,6 +14,7 @@
  * one the sections are simply unreachable on a phone.
  */
 import { computed, ref } from "vue"
+import { useGlass } from "../composables/useGlass"
 import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
@@ -127,6 +128,16 @@ const triggerClass = computed(() => TRIGGER_VISIBILITY[props.mobileBreakpoint])
  * consuming app's scan.
  */
 const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
+
+/*
+ * The rail is part of the dialog, so it takes the same surface: a glass
+ * dialog beside a solid rail read as two different windows.
+ */
+const frosted = useGlass(() => props.glass)
+const railPanel = computed(() => [
+  "rounded-card border border-line p-2 shadow-panel",
+  frosted.value ? "lp-glass-overlay" : "bg-surface-raised",
+])
 </script>
 
 <template>
@@ -158,7 +169,7 @@ const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
           responsive
           :mobile-breakpoint="mobileBreakpoint"
           :style="railStyle"
-          class="rounded-card border border-line bg-surface-raised p-2 shadow-panel"
+          :class="railPanel"
         />
       </div>
     </template>
@@ -178,7 +189,7 @@ const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
           responsive
           :mobile-breakpoint="mobileBreakpoint"
           :style="railStyle"
-          class="rounded-card border border-line bg-surface-raised p-2 shadow-panel"
+          :class="railPanel"
         />
       </div>
     </template>

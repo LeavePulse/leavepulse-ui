@@ -939,7 +939,7 @@ useHotkeys(() =>
       <DialogContent
         ref="contentRef"
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
-        :class="[frosted ? (layer.nested ? 'lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
+        :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :style="{ zIndex: layer.panel }"
         :data-pane="paneOpen ? 'open' : undefined"
         @open-auto-focus.prevent
