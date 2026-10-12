@@ -30,10 +30,12 @@ import {
 } from "reka-ui"
 import { computed, ref, useAttrs, useId } from "vue"
 import { fieldMessageId, useFieldControl } from "../composables/useField"
+import { useShift } from "../composables/useShift"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import LpFormField from "./LpFormField.vue"
 import LpIcon from "./LpIcon.vue"
+import LpShift from "./LpShift.vue"
 import { addTags, splitTags, type TagDuplicates, type TagRejection, type TagValidator } from "./tags"
 
 const props = withDefaults(
@@ -112,6 +114,26 @@ function explain(rejected: TagRejection): string {
 }
 
 const inputEl = ref<HTMLInputElement | null>(null)
+
+/*
+ * The box grows a row at a time as tags wrap, and shrinks back when they go:
+ * eased rather than snapped, so the fields below glide instead of jumping.
+ */
+const { el: boxEl, tweening, resizing } = useShift({ axis: "height" })
+
+/*
+ * Keys follow the tag, not its position: keyed by index, removing the first
+ * tag re-keyed every later one and they all replayed their entry. A repeated
+ * tag (duplicates "allow") is told apart by which occurrence it is.
+ */
+const keyed = computed(() => {
+  const seen = new Map<string, number>()
+  return props.modelValue.map((tag) => {
+    const n = seen.get(tag) ?? 0
+    seen.set(tag, n + 1)
+    return { tag, key: `${n}:${tag}` }
+  })
+})
 
 /** Add whatever `raw` splits into; returns the text that should stay typed. */
 function add(raw: string): string {
@@ -216,21 +238,26 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
       :id="field.id"
       :delimiter="/(?!)/"
       data-lp-ring-owner
+      :ref="(c) => (boxEl = (c as { $el?: HTMLElement } | null)?.$el ?? null)"
       :class="
         mergeClass(
           'flex min-h-(--size-control-md) w-full flex-wrap items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2 py-1.5 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55',
           field.invalid ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft' : '',
           hasField ? '' : (attrs.class as string),
+          tweening
+            ? 'transition-[height,border-color,box-shadow] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none'
+            : '',
+          resizing ? 'overflow-hidden' : '',
         )
       "
       :style="hasField ? undefined : attrs.style"
       @update:model-value="onModel"
     >
       <TagsInputItem
-        v-for="(tag, i) in modelValue"
-        :key="`${i}:${tag}`"
+        v-for="{ tag, key } in keyed"
+        :key="key"
         :value="tag"
-        class="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+        class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
       >
         <TagsInputItemText class="truncate" />
         <TagsInputItemDelete
@@ -254,7 +281,9 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
         @blur="onBlur"
       />
     </TagsInputRoot>
-    <p v-if="problem" :id="problemId" class="pt-1.5 text-xs text-danger">{{ problem }}</p>
+    <LpShift>
+      <p v-if="problem" :id="problemId" class="pt-1.5 text-xs text-danger">{{ problem }}</p>
+    </LpShift>
     <span class="sr-only" aria-live="polite">{{ announcement }}</span>
   </component>
 </template>

@@ -256,6 +256,13 @@
     transform: translateY(4px) scale(0.97);
   }
 }
+/* A chip joining a row of chips (tags): grows out of its own centre. */
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
 /* Option cascade: items slide in top→down on open. */
 @keyframes option-in {
   from {
