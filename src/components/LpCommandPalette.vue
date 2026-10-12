@@ -192,7 +192,7 @@ const props = withDefaults(
     groupLimit?: number
     /**
      * When the query matches nothing, retry it as if typed in the other
-     * keyboard layout (QWERTY ↔ ЙЦУКЕН). Off for an app whose commands are
+     * keyboard layout (QWERTY ↔ Cyrillic). Off for an app whose commands are
      * meant to be typed in one layout only.
      */
     layoutFallback?: boolean
@@ -451,8 +451,8 @@ function refresh() {
 const source = computed<Command[]>(() => (mode.value ? modeItems.value : props.commands))
 
 /*
- * Keyboard layouts typed through each other: the query "cthdth" is "сервер"
- * typed with the wrong layout on. Only the QWERTY ↔ ЙЦУКЕН pair is mapped —
+ * Keyboard layouts typed through each other use a QWERTY ↔ Cyrillic map.
+ * Only that pair is mapped —
  * the one bilingual setup common enough to be worth a table — and it is a
  * fallback, tried only when the query as typed matches nothing.
  */
@@ -829,7 +829,7 @@ onBeforeUnmount(release)
 
 // Through useHotkeys rather than a listener of its own: the palette is the one
 // shortcut that has to work from inside a text field, and `code` is what makes
-// it fire on a layout where Ctrl-K arrives as "л".
+// it fire on a layout where Ctrl-K has a different reported key.
 useHotkeys(() =>
   props.hotkey
     ? [

@@ -347,8 +347,8 @@ function onWheel(event: WheelEvent) {
  * Shortcuts, through the kit's registry rather than a switch of my own.
  *
  * useHotkeys answers three things a hand-rolled handler gets wrong, and one of
- * them bites here specifically: on a Cyrillic layout "R" arrives as
- * `key: "к"`, so matching the letter alone would leave the shortcut dead for
+ * them bites here specifically: a Cyrillic layout changes the reported key,
+ * so matching the letter alone would leave the shortcut dead for
  * the person most likely to be using this. Scoped to the viewport, so two
  * editors on a page do not both answer the same key.
  */

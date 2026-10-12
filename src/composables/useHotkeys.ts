@@ -9,7 +9,7 @@ import { computed, onBeforeUnmount, onMounted, shallowReactive, type MaybeRefOrG
  *
  *   layout — a binding names its key twice over. `key` is what the layout
  *     produced, `code` is the physical position, and either matching counts. On
- *     a Cyrillic layout Ctrl+K arrives as `key: "л"` with `code: "KeyK"`, and a
+ *     a Cyrillic layout Ctrl+K arrives under a different `key` with `code: "KeyK"`, and a
  *     user pressing the key printed "K" expects it to work either way.
  *
  *   IME — a composing input delivers every keystroke as its own event, so
