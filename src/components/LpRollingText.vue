@@ -86,6 +86,9 @@ const style = computed(() => ({
 
 .lp-roll__item {
   display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   backface-visibility: hidden;
 }

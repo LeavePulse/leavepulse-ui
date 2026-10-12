@@ -8,6 +8,7 @@ export default { inheritAttrs: false }
 <script setup lang="ts">
 import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface Step {
@@ -65,19 +66,28 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     >
       <div class="flex items-center gap-2">
         <span
-          class="flex size-7 shrink-0 items-center justify-center rounded-pill border text-xs font-semibold transition-colors"
+          class="flex size-7 shrink-0 items-center justify-center rounded-pill border text-xs font-semibold transition-colors duration-[var(--duration-medium)]"
           :class="isCompleted(step, i)
             ? 'border-transparent bg-brand text-ink-inverse'
             : isCurrent(i)
               ? 'border-brand text-brand'
               : 'border-line text-muted'"
         >
-          <LpIcon v-if="isCompleted(step, i)" name="lucide:check" :size="14" />
-          <LpIcon v-else-if="step.icon" :name="step.icon" :size="14" />
-          <template v-else>{{ i + 1 }}</template>
+          <!-- The number turns into the tick rather than swapping for it. -->
+          <LpRollingText
+            mode="flip"
+            :duration="260"
+            :value="isCompleted(step, i) ? 'done' : step.icon ? 'icon' : String(i + 1)"
+          >
+            <template #default="{ value }">
+              <LpIcon v-if="value === 'done'" name="lucide:check" :size="14" />
+              <LpIcon v-else-if="value === 'icon' && step.icon" :name="step.icon" :size="14" />
+              <template v-else>{{ value }}</template>
+            </template>
+          </LpRollingText>
         </span>
         <span
-          class="text-sm"
+          class="text-sm transition-colors duration-[var(--duration-medium)]"
           :class="isCompleted(step, i) || isCurrent(i) ? 'text-ink' : 'text-muted'"
         >
           {{ step.label }}
@@ -91,11 +101,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           }}</span>
         </span>
       </div>
-      <span
-        v-if="i < steps.length - 1"
-        class="h-px flex-1"
-        :class="isCompleted(step, i) ? 'bg-brand' : 'bg-line'"
-      />
+      <!-- The connector fills from the step it leaves towards the next one,
+           so finishing a step reads as moving forward. -->
+      <span v-if="i < steps.length - 1" class="relative h-px flex-1 overflow-hidden bg-line">
+        <span
+          class="absolute inset-0 origin-left bg-brand transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none rtl:origin-right"
+          :class="isCompleted(step, i) ? 'scale-x-100' : 'scale-x-0'"
+        />
+      </span>
     </li>
   </ol>
 </template>

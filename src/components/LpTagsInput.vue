@@ -321,12 +321,18 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
         :style="hasField ? undefined : attrs.style"
         @update:model-value="onModel"
       >
+        <!-- Tags grow in when added and shrink out when removed; the ones
+             already there on mount stay still (no `appear`). -->
+        <TransitionGroup
+          enter-active-class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none"
+          leave-active-class="animate-[chip-out_var(--duration-fast)_ease] motion-reduce:animate-none"
+        >
         <TagsInputItem
           v-for="{ tag, key } in keyed"
           :key="key"
           :data-tag-key="key"
           :value="tag"
-          class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+          class="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
         >
           <TagsInputItemText class="truncate" />
           <TagsInputItemDelete
@@ -337,6 +343,7 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
             <LpIcon name="lucide:x" :size="12" />
           </TagsInputItemDelete>
         </TagsInputItem>
+        </TransitionGroup>
         <TagsInputInput
           :ref="(c) => (inputEl = (c as { $el?: HTMLInputElement } | null)?.$el ?? null)"
           :placeholder="modelValue.length ? undefined : placeholder"

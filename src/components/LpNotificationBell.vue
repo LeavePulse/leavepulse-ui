@@ -16,6 +16,7 @@ import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
 import LpPopover from "./LpPopover.vue"
+import LpRollingText from "./LpRollingText.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpShift from "./LpShift.vue"
 
@@ -291,14 +292,21 @@ function timeAgo(iso?: string): string {
           @click="open = !open"
         >
           <LpIcon name="lucide:bell" :size="18" />
-          <LpBadge
-            v-if="hasUnread"
-            aria-hidden="true"
-            tone="danger"
-            class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4"
+          <!-- The badge pops in and out, and its count rolls rather than
+               swapping, so new mail reads as arriving. -->
+          <Transition
+            enter-active-class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none"
+            leave-active-class="animate-[chip-out_var(--duration-fast)_ease] motion-reduce:animate-none"
           >
-            {{ badgeLabel }}
-          </LpBadge>
+            <LpBadge
+              v-if="hasUnread"
+              aria-hidden="true"
+              tone="danger"
+              class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4"
+            >
+              <LpRollingText :value="badgeLabel" :duration="220" />
+            </LpBadge>
+          </Transition>
         </LpButton>
       </LpContextMenu>
     </template>

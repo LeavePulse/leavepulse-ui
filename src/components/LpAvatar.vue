@@ -98,12 +98,12 @@ onMounted(() => {
 <template>
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
     <AvatarRoot :class="rootClass" :style="sizeStyle" v-bind="rest">
-      <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
+      <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
       <AvatarFallback>{{ initials }}</AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
   <AvatarRoot v-else :class="rootClass" :style="sizeStyle" v-bind="rest">
-    <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover" />
+    <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
     <AvatarFallback>{{ initials }}</AvatarFallback>
   </AvatarRoot>
 </template>

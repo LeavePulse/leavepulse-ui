@@ -25,6 +25,7 @@ import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
 import LpCalendar from "./LpCalendar.vue"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
 import LpTimeField from "./LpTimeField.vue"
 
 const props = withDefaults(
@@ -145,9 +146,12 @@ const showClear = computed(() => props.clearable && !!props.modelValue && !field
           ]"
         >
           <LpIcon name="lucide:calendar" :size="16" class="shrink-0 text-muted" />
-          <span class="min-w-0 flex-1 truncate" :class="display ? '' : 'text-muted'">
-            {{ display || placeholder }}
-          </span>
+          <LpRollingText
+            :value="display || placeholder || ''"
+            align="start"
+            class="min-w-0 flex-1"
+            :class="display ? '' : 'text-muted'"
+          />
           <span v-if="showClear" class="w-[15px] shrink-0" aria-hidden="true" />
           <LpIcon
             name="lucide:chevron-down"

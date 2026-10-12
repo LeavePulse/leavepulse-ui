@@ -25,6 +25,7 @@ import {
 } from "./dateRange"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
 import LpRangeCalendar, { type RangeChange } from "./LpRangeCalendar.vue"
 
 export interface DateRangePickerLabels extends Record<string, string> {
@@ -156,9 +157,12 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
           ]"
         >
           <LpIcon name="lucide:calendar-range" :size="16" class="shrink-0 text-muted" />
-          <span class="min-w-0 flex-1 truncate" :class="display ? '' : 'text-muted'">
-            {{ display || placeholder || text.placeholder }}
-          </span>
+          <LpRollingText
+            :value="display || placeholder || text.placeholder"
+            align="start"
+            class="min-w-0 flex-1"
+            :class="display ? '' : 'text-muted'"
+          />
           <span v-if="showClear" class="w-[15px] shrink-0" aria-hidden="true" />
           <LpIcon
             name="lucide:chevron-down"
