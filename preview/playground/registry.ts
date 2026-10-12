@@ -2860,7 +2860,7 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     name: "Dropzone",
     description:
       "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree.",
-    components: { LpDropzone },
+    components: { LpDropzone, LpSelect },
     state: () => reactive({ taken: [] as string[], refused: [] as string[], tone: "sunken" }),
     template: `<div class="flex w-full max-w-md flex-col gap-3">
   <LpSelect
