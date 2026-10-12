@@ -12,14 +12,6 @@ export interface CommandSearchTerms {
 }
 
 const QUERY_TOKEN = /(-?)(?:(in):)?(?:"([^"]*)"|(\S+))/giu
-const LATIN = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`"
-const CYRILLIC = "\u0439\u0446\u0443\u043A\u0435\u043D\u0433\u0448\u0449\u0437\u0445\u044A\u0444\u044B\u0432\u0430\u043F\u0440\u043E\u043B\u0434\u0436\u044D\u044F\u0447\u0441\u043C\u0438\u0442\u044C\u0431\u044E\u0451"
-const SWAP = new Map<string, string>()
-
-for (let i = 0; i < LATIN.length; i++) {
-  SWAP.set(LATIN[i]!, CYRILLIC[i]!)
-  SWAP.set(CYRILLIC[i]!, LATIN[i]!)
-}
 
 export function parseCommandQuery(value: string): CommandSearchTerms {
   const out: CommandSearchTerms = { include: [], exclude: [], groups: [] }
@@ -32,15 +24,6 @@ export function parseCommandQuery(value: string): CommandSearchTerms {
     else out.include.push(text)
   }
   return out
-}
-
-export function swapCommandTerms(terms: CommandSearchTerms): CommandSearchTerms {
-  const swap = (term: string) => [...term].map((ch) => SWAP.get(ch) ?? ch).join("")
-  return {
-    include: terms.include.map(swap),
-    exclude: terms.exclude.map(swap),
-    groups: terms.groups.map(swap),
-  }
 }
 
 function matches(command: SearchableCommand, term: string): boolean {

@@ -44,7 +44,7 @@ import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
-import { parseCommandQuery, rankCommandItems, swapCommandTerms } from "./commandSearch"
+import { parseCommandQuery, rankCommandItems } from "./commandSearch"
 
 export interface Command {
   id: string
@@ -191,12 +191,6 @@ const props = withDefaults(
      */
     groupLimit?: number
     /**
-     * When the query matches nothing, retry it as if typed in the other
-     * keyboard layout (QWERTY ↔ Cyrillic). Off for an app whose commands are
-     * meant to be typed in one layout only.
-     */
-    layoutFallback?: boolean
-    /**
      * A pane beside the list showing the highlighted result in full — its
      * `preview` text, or the `preview` slot. For palettes that search
      * content rather than commands: the excerpt says why a row matched, the
@@ -229,7 +223,6 @@ const props = withDefaults(
     resultsLabel: "Results",
     excerptLines: 4,
     groupLimit: 0,
-    layoutFallback: true,
     previewPane: false,
     glass: undefined,
   },
@@ -469,10 +462,7 @@ const local = computed<{ items: Command[]; terms: string[] }>(() => {
   // typed). With a query, hidden commands rank like any other.
   if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
   const items = rankCommandItems(filtered, terms)
-  if (items.length || !props.layoutFallback) return { items, terms: terms.include }
-  const swapped = swapCommandTerms(terms)
-  const other = rankCommandItems(filtered, swapped)
-  return other.length ? { items: other, terms: swapped.include } : { items, terms: terms.include }
+  return { items, terms: terms.include }
 })
 
 const ranked = computed<Command[]>(() => local.value.items)
