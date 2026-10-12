@@ -30,11 +30,30 @@ import { topModalElement } from "../components/modalDepth"
  *
  * Modifier note: Ctrl and Meta are one modifier here, since macOS binds ⌘ where
  * the rest bind Ctrl. Label the difference in the UI, not in the binding.
+ *
+ * Sequences ("g i", as on GitHub and Gmail) are bindings with `sequence`. A key
+ * that starts a sequence is held while the next one is awaited: if it
+ * continues a sequence, the sequence runs; if not, or after the timeout, the
+ * single-key binding on the held key (if any) runs, and the new key is handled
+ * as a fresh press. A key that starts no sequence runs at once, so sequences
+ * cost nothing to the bindings they do not collide with.
  */
 
-export interface HotkeyBinding {
-  /** Layout-produced key, compared case-insensitively ("l", "f2", "escape"). */
+/** One key of a sequence: a bare key ("g") or a full chord. */
+export interface HotkeyStep {
   key: string
+  code?: string
+  ctrl?: boolean
+  shift?: boolean
+  alt?: boolean
+}
+
+export interface HotkeyBinding {
+  /**
+   * Layout-produced key, compared case-insensitively ("l", "f2", "escape").
+   * Required unless the binding is a `sequence`.
+   */
+  key?: string
   /**
    * Physical key position ("KeyL", "F2", "Digit1"). Matches on its own, which
    * is what makes non-Latin layouts work.
@@ -44,6 +63,16 @@ export interface HotkeyBinding {
   ctrl?: boolean
   shift?: boolean
   alt?: boolean
+  /**
+   * Keys pressed one after another: `"g i"`, or steps for chords and physical
+   * positions (`[{ key: "g", code: "KeyG" }, { key: "i", code: "KeyI" }]`).
+   * The string form splits on spaces, so a Space step needs the array form.
+   */
+  sequence?: string | (string | HotkeyStep)[]
+  /** How long a sequence waits for its next key, in ms. Default 1000. */
+  timeout?: number
+  /** Extra condition checked on every press; `false` leaves the key alone. */
+  when?: (event: KeyboardEvent) => boolean
   /**
    * Runs even while a text field has focus. Only for shortcuts that mean
    * something there — Escape, and the palette the user reaches from anywhere.
@@ -82,15 +111,20 @@ export interface HotkeyHelp {
   /**
    * Written the way it reads, "+"-separated. Defaults to one built from the
    * binding; set it where the binding is not the whole story, such as the
-   * second key of a chord ("G+D") or a key that needs Shift to type ("?").
+   * key that needs Shift to type ("?"). Sequences read with spaces: "G I".
    */
   combo?: string
 }
 
 export interface ShortcutEntry {
-  /** Rendered one <kbd> per "+"-separated key, so write it the way it reads. */
+  /**
+   * Rendered one <kbd> per "+"-separated key, so write it the way it reads.
+   * Spaces separate the steps of a sequence ("G I", "Ctrl+K Ctrl+S").
+   */
   combo: string
   label: string
+  /** Another mounted binding answers the same keys at the same priority. */
+  conflict?: boolean
 }
 
 export interface ShortcutGroup {
@@ -155,7 +189,10 @@ function isTextEntry(target: EventTarget | null): boolean {
 
 const MODIFIER_KEYS = new Set(["control", "meta", "shift", "alt"])
 
-export function matchesHotkey(event: KeyboardEvent, binding: HotkeyBinding): boolean {
+type KeyLike = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">
+
+export function matchesHotkey(event: KeyLike, binding: HotkeyBinding | HotkeyStep): boolean {
+  if (binding.key === undefined) return false
   const key = binding.key.toLowerCase()
   const ctrlHeld = event.ctrlKey || event.metaKey
   const wantsCtrl = Boolean(binding.ctrl) || key === "control" || key === "meta"
@@ -171,6 +208,31 @@ export function matchesHotkey(event: KeyboardEvent, binding: HotkeyBinding): boo
     event.key.toLowerCase() === key
     || (binding.code !== undefined && event.code === binding.code)
   )
+}
+
+/** The keys a binding waits for, in order: one step for a plain binding. */
+export function hotkeySteps(binding: HotkeyBinding): HotkeyStep[] {
+  const raw = binding.sequence
+  if (raw === undefined) {
+    if (binding.key === undefined) return []
+    const { key, code, ctrl, shift, alt } = binding
+    return [{ key, code, ctrl, shift, alt }]
+  }
+  const list = typeof raw === "string" ? raw.trim().split(/\s+/) : raw
+  return list.map((step) => (typeof step === "string" ? { key: step } : step))
+}
+
+/**
+ * Where a run of presses stands against a binding: "full" when they spell it
+ * out, "prefix" when more keys would, otherwise null.
+ */
+export function sequenceProgress(presses: KeyLike[], binding: HotkeyBinding): "full" | "prefix" | null {
+  const steps = hotkeySteps(binding)
+  if (!steps.length || presses.length > steps.length) return null
+  for (let i = 0; i < presses.length; i++) {
+    if (!matchesHotkey(presses[i]!, steps[i]!)) return null
+  }
+  return presses.length === steps.length ? "full" : "prefix"
 }
 
 /**
@@ -240,13 +302,35 @@ function insideOf(entry: MountedHotkeys, layer: Element): boolean {
   return !!node && layer.contains(node)
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (event.isComposing || event.defaultPrevented) return
+interface Candidate {
+  binding: HotkeyBinding
+  event: KeyboardEvent
+}
+
+const DEFAULT_TIMEOUT = 1000
+const pressed: KeyLike[] = []
+let held: Candidate[] = []
+let holdTimer: ReturnType<typeof setTimeout> | undefined
+const pendingKeys = ref<string[]>([])
+
+/**
+ * The keys of a sequence typed so far ("G" after the first key of "g i"),
+ * empty when nothing is pending. For a "G…" hint while the next key is awaited.
+ */
+export const pendingHotkey = computed(() => pendingKeys.value)
+
+function snapshot(event: KeyboardEvent): KeyLike {
+  const { key, code, ctrlKey, metaKey, shiftKey, altKey } = event
+  return { key, code, ctrlKey, metaKey, shiftKey, altKey }
+}
+
+function eligible(event: KeyboardEvent): HotkeyBinding[] {
   const inTextEntry = isTextEntry(event.target)
   const blocker = event.key === "Escape" ? topLayer() : topModalElement()
   const entries = [...mounted].sort(
     (a, b) => Number(toValue(b.priority) || 0) - Number(toValue(a.priority) || 0) || b.order - a.order,
   )
+  const out: HotkeyBinding[] = []
   for (const entry of entries) {
     if (toValue(entry.enabled) === false || !inScope(event.target, entry.scope)) continue
     const covered = !!blocker && !insideOf(entry, blocker)
@@ -254,12 +338,78 @@ function onKeydown(event: KeyboardEvent) {
       if (inTextEntry && !binding.allowInInput) continue
       if (event.repeat && binding.repeat === false) continue
       if (covered && !binding.overLayers) continue
-      if (!matchesHotkey(event, binding)) continue
-      if (binding.handler(event) === false) continue
+      if (binding.when && !binding.when(event)) continue
+      out.push(binding)
+    }
+  }
+  return out
+}
+
+function run(candidates: Candidate[]): boolean {
+  for (const { binding, event } of candidates) {
+    if (binding.handler(event) !== false) return true
+  }
+  return false
+}
+
+function resetSequence() {
+  clearTimeout(holdTimer)
+  holdTimer = undefined
+  pressed.length = 0
+  held = []
+  pendingKeys.value = []
+}
+
+function flushHeld() {
+  const waiting = held
+  resetSequence()
+  run(waiting)
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.defaultPrevented) return
+  if (pressed.length && MODIFIER_KEYS.has(event.key.toLowerCase())) return
+  if (pressed.length && event.key === "Escape") {
+    resetSequence()
+  }
+  const presses = [...pressed, snapshot(event)]
+  const bindings = eligible(event)
+  const full: Candidate[] = []
+  let waitFor = 0
+  for (const binding of bindings) {
+    const progress = sequenceProgress(presses, binding)
+    if (progress === "full") full.push({ binding, event })
+    else if (progress === "prefix") waitFor = Math.max(waitFor, binding.timeout ?? DEFAULT_TIMEOUT)
+  }
+  if (waitFor) {
+    clearTimeout(holdTimer)
+    pressed.push(snapshot(event))
+    held = full
+    pendingKeys.value = pressed.map(pressLabel)
+    holdTimer = setTimeout(flushHeld, waitFor)
+    event.preventDefault()
+    return
+  }
+  if (full.length) {
+    resetSequence()
+    if (run(full)) {
       event.preventDefault()
       return
     }
   }
+  if (pressed.length) {
+    flushHeld()
+    onKeydown(event)
+  }
+}
+
+function pressLabel(press: KeyLike): string {
+  return chordOf({
+    key: press.key,
+    ctrl: press.ctrlKey || press.metaKey,
+    alt: press.altKey,
+    shift: press.shiftKey && press.key.length !== 1,
+  })
 }
 
 export function useHotkeys(
@@ -280,8 +430,10 @@ export function useHotkeys(
   }
   onMounted(() => {
     mounted.add(entry)
+    warnConflicts()
     if (!state.listening) {
       window.addEventListener("keydown", onKeydown)
+      window.addEventListener("blur", resetSequence)
       state.listening = true
     }
   })
@@ -289,7 +441,9 @@ export function useHotkeys(
     mounted.delete(entry)
     if (!mounted.size && state.listening) {
       window.removeEventListener("keydown", onKeydown)
+      window.removeEventListener("blur", resetSequence)
       state.listening = false
+      resetSequence()
     }
   })
 }
@@ -307,10 +461,110 @@ const KEY_NAMES: Record<string, string> = {
   arrowright: "→",
 }
 
+function chordOf(step: HotkeyStep): string {
+  const key = step.key.toLowerCase()
+  const name = KEY_NAMES[key] ?? (key.length === 1 || /^f\d+$/.test(key) ? key.toUpperCase() : step.key)
+  return [step.ctrl && "Ctrl", step.alt && "Alt", step.shift && "Shift", name].filter(Boolean).join("+")
+}
+
 function comboOf(binding: HotkeyBinding): string {
-  const key = binding.key.toLowerCase()
-  const name = KEY_NAMES[key] ?? (key.length === 1 || /^f\d+$/.test(key) ? key.toUpperCase() : binding.key)
-  return [binding.ctrl && "Ctrl", binding.alt && "Alt", binding.shift && "Shift", name].filter(Boolean).join("+")
+  return hotkeySteps(binding).map(chordOf).join(" ")
+}
+
+/** Identity of the keys a binding answers, for telling two of them apart. */
+function signatureOf(binding: HotkeyBinding): string {
+  return hotkeySteps(binding)
+    .map((step) => {
+      const key = step.key.toLowerCase()
+      const symbol = key.length === 1 && key === key.toUpperCase()
+      const shift = step.shift === undefined && symbol ? "*" : String(Boolean(step.shift))
+      return `${Boolean(step.ctrl)}:${Boolean(step.alt)}:${shift}:${key}`
+    })
+    .join(" ")
+}
+
+export interface HotkeyConflict {
+  /** The keys both answer, written as in the shortcut reference. */
+  combo: string
+  /** `help` labels of the clashing bindings; unlabelled ones are omitted. */
+  labels: string[]
+  priority: number
+}
+
+/**
+ * Pure part of `hotkeyConflicts`: bindings from different `useHotkeys` calls
+ * answering the same keys at the same priority within the same scope. Within
+ * one call a repeat is deliberate (the first may decline), and a binding with
+ * `when` is conditional by design, so neither counts.
+ */
+export function findHotkeyConflicts(
+  groups: { bindings: HotkeyBinding[]; priority: number; scope: unknown }[],
+): HotkeyConflict[] {
+  const scopeIds = new Map<unknown, number>()
+  const seen = new Map<string, { combo: string; labels: string[]; owners: Set<number>; priority: number }>()
+  groups.forEach((group, owner) => {
+    if (!scopeIds.has(group.scope)) scopeIds.set(group.scope, scopeIds.size)
+    for (const binding of group.bindings) {
+      if (binding.when || !hotkeySteps(binding).length) continue
+      const id = `${group.priority}|${scopeIds.get(group.scope)}|${signatureOf(binding)}`
+      const slot = seen.get(id) ?? {
+        combo: binding.help?.combo ?? comboOf(binding),
+        labels: [],
+        owners: new Set<number>(),
+        priority: group.priority,
+      }
+      slot.owners.add(owner)
+      if (binding.help && !slot.labels.includes(binding.help.label)) slot.labels.push(binding.help.label)
+      seen.set(id, slot)
+    }
+  })
+  return [...seen.values()]
+    .filter((slot) => slot.owners.size > 1)
+    .map(({ combo, labels, priority }) => ({ combo, labels, priority }))
+}
+
+/** Bindings among the mounted ones that answer the same keys. */
+export const hotkeyConflicts = computed<HotkeyConflict[]>(() =>
+  findHotkeyConflicts(
+    [...mounted]
+      .filter((entry) => toValue(entry.enabled) !== false)
+      .map((entry) => ({
+        bindings: entry.read(),
+        priority: Number(toValue(entry.priority) || 0),
+        scope: toValue(entry.scope) ?? null,
+      })),
+  ),
+)
+
+const warned = new Set<string>()
+
+declare const process: { env: { NODE_ENV?: string } }
+
+/*
+ * Written as the literal `process.env.NODE_ENV` so the consumer's bundler
+ * replaces it (Vite and webpack both do for dependencies); where nothing
+ * replaces it and no `process` exists, the warning simply stays off.
+ */
+function isDev(): boolean {
+  try {
+    return process.env.NODE_ENV !== "production"
+  } catch {
+    return false
+  }
+}
+
+function warnConflicts() {
+  if (!isDev()) return
+  for (const conflict of hotkeyConflicts.value) {
+    const id = `${conflict.priority}|${conflict.combo}`
+    if (warned.has(id)) continue
+    warned.add(id)
+    console.warn(
+      `[@leavepulse/ui] ${conflict.combo} is bound more than once at priority ${conflict.priority}`
+        + (conflict.labels.length ? ` (${conflict.labels.join(", ")})` : "")
+        + "; only the most recently mounted one runs unless it declines.",
+    )
+  }
 }
 
 /**
@@ -321,13 +575,15 @@ function comboOf(binding: HotkeyBinding): string {
  */
 export const activeShortcuts = computed<ShortcutGroup[]>(() => {
   const groups = new Map<string, ShortcutEntry[]>()
+  const clashing = new Set(hotkeyConflicts.value.map((c) => c.combo))
   for (const entry of mounted) {
     if (toValue(entry.enabled) === false) continue
     for (const binding of entry.read()) {
       if (!binding.help) continue
       const combo = binding.help.combo ?? comboOf(binding)
       const entries = groups.get(binding.help.group) ?? []
-      if (!entries.some((e) => e.combo === combo)) entries.push({ combo, label: binding.help.label })
+      const conflict = clashing.has(combo) || undefined
+      if (!entries.some((e) => e.combo === combo)) entries.push({ combo, label: binding.help.label, conflict })
       groups.set(binding.help.group, entries)
     }
   }

@@ -10,7 +10,10 @@
  * of the same title merge, and a combo is listed once.
  *
  * Combos are written the way they read ("Ctrl+Shift+M", "Ctrl++", "←→↑↓") and
- * split on "+" into one <kbd> each.
+ * split on "+" into one <kbd> each; spaces separate the steps of a sequence
+ * ("G I" reads "G then I"). In `live` mode an entry whose keys another mounted
+ * binding also answers carries a marker, so a clash shows up where people
+ * look for keys rather than only in the console.
  */
 import { computed } from "vue"
 import LpModal from "./LpModal.vue"
@@ -37,15 +40,23 @@ const props = withDefaults(
   { open: false, groups: () => [], live: false, title: undefined, glass: undefined },
 )
 
-const text = useLabels("shortcuts", { title: "Keyboard shortcuts" })
+const text = useLabels("shortcuts", {
+  title: "Keyboard shortcuts",
+  then: "then",
+  conflict: "Also bound elsewhere: only one of them runs",
+})
 const apple = useAppleKeyboard()
 
 /*
  * One key per "+", except a "+" that is the key itself: "Ctrl++" is Ctrl and
  * plus, not Ctrl and two blanks.
  */
-function keysOf(combo: string): string[] {
-  return combo.split(/\+(?!$)/)
+function keysOf(chord: string): string[] {
+  return chord.split(/\+(?!$)/)
+}
+
+function stepsOf(combo: string): string[] {
+  return combo.trim().split(/\s+/)
 }
 
 const shown = computed(() => (props.live ? mergeShortcutGroups(props.groups, activeShortcuts.value) : props.groups))
@@ -67,11 +78,23 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
         <h3>{{ group.title }}</h3>
         <dl>
           <div v-for="entry in group.entries" :key="entry.combo" class="shortcut-row">
-            <dt>{{ entry.label }}</dt>
+            <dt>
+              {{ entry.label }}
+              <span
+                v-if="entry.conflict"
+                class="shortcut-conflict"
+                role="img"
+                :aria-label="text.conflict"
+                :title="text.conflict"
+              >!</span>
+            </dt>
             <dd>
-              <kbd v-for="(key, index) in keysOf(entry.combo)" :key="`${key}-${index}`">
-                {{ appleModifierLabel(key.trim(), apple) }}
-              </kbd>
+              <template v-for="(step, stepIndex) in stepsOf(entry.combo)" :key="`${step}-${stepIndex}`">
+                <span v-if="stepIndex" class="shortcut-then">{{ text.then }}</span>
+                <kbd v-for="(key, index) in keysOf(step)" :key="`${key}-${index}`">
+                  {{ appleModifierLabel(key.trim(), apple) }}
+                </kbd>
+              </template>
             </dd>
           </div>
         </dl>
@@ -117,6 +140,29 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
   color: var(--color-ink);
   font-size: 0.82rem;
   min-width: 0;
+}
+
+.shortcut-conflict {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 0.6rem;
+  font-weight: 700;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.shortcut-then {
+  align-self: center;
+  padding: 0 2px;
+  color: var(--color-muted);
+  font-size: 0.68rem;
 }
 
 .shortcut-row dd {
