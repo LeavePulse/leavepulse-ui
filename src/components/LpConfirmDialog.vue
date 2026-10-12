@@ -1,9 +1,17 @@
 <script setup lang="ts">
 // Confirmation dialog built on LpModal. Resolves an action via confirm/cancel.
-import { computed } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpModal from "./LpModal.vue"
+
+export type ConfirmLabels = {
+  confirm: string
+  cancel: string
+  loading: string
+  failed: string
+}
 
 const props = withDefaults(
   defineProps<{
@@ -33,13 +41,22 @@ const props = withDefaults(
      * The confirm action is in flight: the button disables and swaps to
      * `loadingLabel`, and confirming no longer closes the dialog — the owner
      * closes it once the work settles, so a failure can stay on screen.
+     * Setting it from the `confirm` handler is enough; the dialog waits a tick
+     * for it before deciding to close.
      */
     loading?: boolean
     loadingLabel?: string
+    /**
+     * The work behind the confirm button. When given, the dialog runs it,
+     * shows the loading state itself, closes once it resolves and stays open
+     * with the error's message when it rejects.
+     */
+    action?: () => unknown
     /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
+    labels?: Partial<ConfirmLabels>
   }>(),
-  { confirmLabel: "Confirm", cancelLabel: "Cancel", loadingLabel: "Working…", glass: undefined },
+  { glass: undefined },
 )
 
 const emit = defineEmits<{
@@ -48,29 +65,61 @@ const emit = defineEmits<{
   (e: "cancel"): void
 }>()
 
+const text = useLabels<ConfirmLabels>(
+  "confirm",
+  { confirm: "Confirm", cancel: "Cancel", loading: "Working…", failed: "Something went wrong." },
+  () => props.labels,
+)
+
 /*
  * Only a destructive prompt is marked by default. A routine confirmation
  * ("Save these changes?") with a warning badge cries wolf, and the badge stops
  * meaning anything on the dialog where it matters.
- *
- * "Not given" cannot be tested with `undefined` here. A prop whose type union
- * includes Boolean is boolean-cast by Vue, so an absent `icon` arrives as
- * `false` — the same value the caller passes to suppress the marker — and the
- * default silently never applied. A string is an override, and everything else
- * (absent, or an explicit false) falls through to the danger default.
  */
 const marker = computed<string>(() => {
   if (props.icon !== undefined) return props.icon
   return props.danger ? "lucide:triangle-alert" : ""
 })
 
-function confirm() {
+const running = ref(false)
+const error = ref("")
+const busy = computed(() => props.loading || running.value)
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) error.value = ""
+  },
+)
+
+async function confirm() {
+  if (busy.value) return
+  error.value = ""
   emit("confirm")
-  // An async confirm owns its own dismissal; closing here would tear the
-  // dialog down before the caller knows whether the action succeeded.
+  if (props.action) {
+    running.value = true
+    try {
+      await props.action()
+    } catch (e) {
+      error.value = e instanceof Error && e.message ? e.message : text.value.failed
+      return
+    } finally {
+      running.value = false
+    }
+    emit("update:open", false)
+    return
+  }
+  // A handler that sets `loading` does so through the parent, whose new props
+  // reach this component only on the next render.
+  await nextTick()
   if (!props.loading) emit("update:open", false)
 }
-function cancel() {
+
+// Every way out that is not the confirm button counts as a cancel: Escape, the
+// scrim, the close button. None of them may close it while work is in flight.
+function dismiss(open: boolean) {
+  if (open) return emit("update:open", true)
+  if (busy.value) return
   emit("cancel")
   emit("update:open", false)
 }
@@ -82,7 +131,8 @@ function cancel() {
     :open="open"
     :title="title"
     :description="description"
-    @update:open="(v) => $emit('update:open', v)"
+    role="alertdialog"
+    @update:open="dismiss"
   >
     <template v-if="marker" #title>
       <span class="inline-flex items-center gap-2.5">
@@ -100,16 +150,17 @@ function cancel() {
       </span>
     </template>
     <slot />
+    <p v-if="error" role="alert" class="mt-3 text-sm text-danger">{{ error }}</p>
     <template #footer>
-      <LpButton variant="ghost" :disabled="loading" @click="cancel">
-        {{ cancelLabel }}
+      <LpButton variant="ghost" :disabled="busy" @click="dismiss(false)">
+        {{ cancelLabel ?? text.cancel }}
       </LpButton>
       <LpButton
         :variant="danger ? 'danger' : 'solid'"
-        :disabled="loading"
+        :disabled="busy"
         @click="confirm"
       >
-        {{ loading ? loadingLabel : confirmLabel }}
+        {{ busy ? (loadingLabel ?? text.loading) : (confirmLabel ?? text.confirm) }}
       </LpButton>
     </template>
   </LpModal>

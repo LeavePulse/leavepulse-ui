@@ -28,13 +28,14 @@
  * them and the control stops opening. Put `aria-label` on the trigger instead.
  */
 import {
+  injectTooltipProviderContext,
   TooltipContent,
   TooltipPortal,
   TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
-import { onBeforeUnmount, ref, watch } from "vue"
+import { Fragment, onBeforeUnmount, ref, watch } from "vue"
 import {
   springSettled,
   springStep,
@@ -54,7 +55,7 @@ const props = withDefaults(
      * adding a description.
      */
     label?: boolean
-    /** Milliseconds before the tip appears on hover. */
+    /** Milliseconds before the tip appears on hover. Unset follows the provider, else 200. */
     delay?: number
     /**
      * Show on any focus, not just keyboard focus. Off by default: a tip that
@@ -83,7 +84,7 @@ const props = withDefaults(
      */
     disabled?: boolean
   }>(),
-  { delay: 200, side: "top" },
+  { side: "top" },
 )
 
 /*
@@ -101,6 +102,16 @@ const props = withDefaults(
  * the pointer exactly reads as jitter, while a slight lag reads as following.
  * Same reasoning, and the same shared "float" feel, as LpChart's readout.
  */
+/*
+ * A provider of its own only when none is above. Each tip in its own provider
+ * meant moving along a toolbar waited the full delay at every button; under a
+ * shared one (LpTooltipProvider at the root) the next tip opens at once.
+ */
+const shared = injectTooltipProviderContext(null)
+
+const reducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+
 const target = { x: 0, y: 0 }
 const offset = ref({ x: 0, y: 0 })
 
@@ -155,6 +166,11 @@ const onPointerMove = (e: PointerEvent) => {
   const half = props.side === "top" || props.side === "bottom" ? rect.height / 2 : 0
   const dir = props.side === "bottom" ? -1 : 1
   target.y = e.clientY - (rect.top + rect.height / 2) + half * dir
+  // Without motion the tip goes straight to the reading instead of trailing.
+  if (reducedMotion()) {
+    offset.value = { x: target.x, y: target.y }
+    return
+  }
   if (!frame) frame = requestAnimationFrame(settle)
 }
 
@@ -205,7 +221,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="delay">
+  <component :is="shared ? Fragment : TooltipProvider" v-bind="shared ? {} : { delayDuration: delay ?? 200 }">
     <!--
       `disable-closing-trigger` in follow mode: reka dismisses a tip when its
       trigger is clicked, which is right for a button (the tip explained the
@@ -214,6 +230,7 @@ onBeforeUnmount(() => {
     -->
     <TooltipRoot
       :open="open"
+      :delay-duration="delay"
       :ignore-non-keyboard-focus="!showOnPointerFocus"
       :disable-hoverable-content="followCursor"
       :disable-closing-trigger="followCursor"
@@ -245,7 +262,7 @@ onBeforeUnmount(() => {
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
-  </TooltipProvider>
+  </component>
 </template>
 
 <style>

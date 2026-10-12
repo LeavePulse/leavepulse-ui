@@ -1,4 +1,14 @@
-import { computed, onBeforeUnmount, onMounted, shallowReactive, type MaybeRefOrGetter, toValue } from "vue"
+import {
+  computed,
+  getCurrentInstance,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowReactive,
+  toValue,
+  type MaybeRefOrGetter,
+} from "vue"
+import { topModalElement } from "../components/modalDepth"
 
 /*
  * One keydown listener over a registry of bindings, so a shortcut is declared
@@ -39,6 +49,16 @@ export interface HotkeyBinding {
    * something there — Escape, and the palette the user reaches from anywhere.
    */
   allowInInput?: boolean
+  /**
+   * Runs even while an overlay owns the keyboard. By default a binding declared
+   * outside the topmost modal stays quiet while that modal is open, and an
+   * Escape binding declared outside the topmost dismissable layer (dialog,
+   * popover, menu) leaves Escape to that layer, so a page-level shortcut can
+   * neither act behind a dialog nor stop the dialog from closing.
+   */
+  overLayers?: boolean
+  /** Set `false` to ignore auto-repeat while the key is held. */
+  repeat?: boolean
   /**
    * How the key reference lists this binding while it is mounted. Bindings
    * without it still work, they just stay out of `activeShortcuts`.
@@ -88,11 +108,21 @@ export const isAppleKeyboard =
   && /Mac|iPhone|iPad|iPod/.test(navigator.platform || "")
 
 /**
+ * `isAppleKeyboard` for render paths: false until mounted, so the server and
+ * the hydrating client print the same label and the client switches after.
+ */
+export function useAppleKeyboard() {
+  const apple = ref(false)
+  onMounted(() => (apple.value = isAppleKeyboard))
+  return apple
+}
+
+/**
  * The symbol to print for a modifier on this platform. Bindings treat Ctrl and
  * Meta as one modifier, so only the label may differ — never the binding.
  */
-export function appleModifierLabel(key: string): string {
-  if (!isAppleKeyboard) return key
+export function appleModifierLabel(key: string, apple = isAppleKeyboard): string {
+  if (!apple) return key
   if (key === "Ctrl") return "⌘"
   if (key === "Alt") return "⌥"
   return key
@@ -123,13 +153,22 @@ function isTextEntry(target: EventTarget | null): boolean {
   return false
 }
 
-function matches(event: KeyboardEvent, binding: HotkeyBinding): boolean {
+const MODIFIER_KEYS = new Set(["control", "meta", "shift", "alt"])
+
+export function matchesHotkey(event: KeyboardEvent, binding: HotkeyBinding): boolean {
+  const key = binding.key.toLowerCase()
   const ctrlHeld = event.ctrlKey || event.metaKey
-  if (ctrlHeld !== Boolean(binding.ctrl)) return false
-  if (event.shiftKey !== Boolean(binding.shift)) return false
-  if (event.altKey !== Boolean(binding.alt)) return false
+  const wantsCtrl = Boolean(binding.ctrl) || key === "control" || key === "meta"
+  if (ctrlHeld !== wantsCtrl) return false
+  // Shift is part of typing a symbol on most layouts ("?", "+"), so a binding
+  // on a symbol that does not mention Shift accepts it either way.
+  const symbol = key.length === 1 && key.toLowerCase() === key.toUpperCase()
+  const shiftFree = key === "shift" || (binding.shift === undefined && symbol)
+  if (!shiftFree && event.shiftKey !== Boolean(binding.shift)) return false
+  if (key !== "alt" && event.altKey !== Boolean(binding.alt)) return false
+  if (MODIFIER_KEYS.has(key)) return event.key.toLowerCase() === key
   return (
-    event.key.toLowerCase() === binding.key.toLowerCase()
+    event.key.toLowerCase() === key
     || (binding.code !== undefined && event.code === binding.code)
   )
 }
@@ -165,11 +204,23 @@ interface MountedHotkeys {
   enabled: MaybeRefOrGetter<boolean> | undefined
   priority: MaybeRefOrGetter<number> | undefined
   order: number
+  /** Where the declaring component sits in the DOM, for the overlay check. */
+  host: () => Node | null
 }
 
-const mounted = shallowReactive(new Set<MountedHotkeys>())
-let mountOrder = 0
-let listening = false
+// Pinned to a global symbol for the same reason as the toast queue: a barrel
+// and a deep import must not end up with two registries and two listeners.
+const STATE_KEY = Symbol.for("@leavepulse/ui:hotkeys")
+type GlobalWithHotkeys = typeof globalThis & {
+  [STATE_KEY]?: { mounted: Set<MountedHotkeys>; order: number; listening: boolean }
+}
+const g = globalThis as GlobalWithHotkeys
+const state = (g[STATE_KEY] ??= {
+  mounted: shallowReactive(new Set<MountedHotkeys>()),
+  order: 0,
+  listening: false,
+})
+const mounted = state.mounted
 
 function inScope(target: EventTarget | null, scope: MountedHotkeys["scope"]): boolean {
   const el = toValue(scope)
@@ -178,17 +229,32 @@ function inScope(target: EventTarget | null, scope: MountedHotkeys["scope"]): bo
   return !!node && (el === node || el.contains(node))
 }
 
+function topLayer(): Element | null {
+  const layers = document.querySelectorAll("[data-dismissable-layer]")
+  return layers[layers.length - 1] ?? null
+}
+
+function insideOf(entry: MountedHotkeys, layer: Element): boolean {
+  const scope = toValue(entry.scope)
+  const node = scope ?? entry.host()
+  return !!node && layer.contains(node)
+}
+
 function onKeydown(event: KeyboardEvent) {
-  if (event.isComposing) return
+  if (event.isComposing || event.defaultPrevented) return
   const inTextEntry = isTextEntry(event.target)
+  const blocker = event.key === "Escape" ? topLayer() : topModalElement()
   const entries = [...mounted].sort(
     (a, b) => Number(toValue(b.priority) || 0) - Number(toValue(a.priority) || 0) || b.order - a.order,
   )
   for (const entry of entries) {
     if (toValue(entry.enabled) === false || !inScope(event.target, entry.scope)) continue
+    const covered = !!blocker && !insideOf(entry, blocker)
     for (const binding of entry.read()) {
       if (inTextEntry && !binding.allowInInput) continue
-      if (!matches(event, binding)) continue
+      if (event.repeat && binding.repeat === false) continue
+      if (covered && !binding.overLayers) continue
+      if (!matchesHotkey(event, binding)) continue
       if (binding.handler(event) === false) continue
       event.preventDefault()
       return
@@ -200,25 +266,30 @@ export function useHotkeys(
   bindings: MaybeRefOrGetter<HotkeyBinding[]>,
   options: UseHotkeysOptions = {},
 ) {
+  const instance = getCurrentInstance()
   const entry: MountedHotkeys = {
     read: () => toValue(bindings),
     scope: options.scope,
     enabled: options.enabled,
     priority: options.priority,
-    order: ++mountOrder,
+    order: ++state.order,
+    host: () => {
+      const el = instance?.vnode.el
+      return el instanceof Node ? el : null
+    },
   }
   onMounted(() => {
     mounted.add(entry)
-    if (!listening) {
+    if (!state.listening) {
       window.addEventListener("keydown", onKeydown)
-      listening = true
+      state.listening = true
     }
   })
   onBeforeUnmount(() => {
     mounted.delete(entry)
-    if (!mounted.size && listening) {
+    if (!mounted.size && state.listening) {
       window.removeEventListener("keydown", onKeydown)
-      listening = false
+      state.listening = false
     }
   })
 }

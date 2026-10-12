@@ -44,6 +44,7 @@ import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
+import { useLabels } from "../composables/useLpConfig"
 import { parseCommandQuery, rankCommandItems } from "./commandSearch"
 
 export interface Command {
@@ -87,7 +88,7 @@ export interface Command {
    * `onSelect` still runs when the mode opens, so a command can both act and
    * drill in.
    */
-  children?: Command[] | ((query: string) => Command[] | Promise<Command[]>)
+  children?: Command[] | ((query: string, signal: AbortSignal) => Command[] | Promise<Command[]>)
   /** Placeholder while inside this command's mode. */
   childPlaceholder?: string
   /**
@@ -121,7 +122,7 @@ export interface Command {
 }
 
 /** Footer hints and the mode chip, spelled out so an app can translate them. */
-export interface PaletteLabels {
+export type PaletteLabels = {
   navigate: string
   select: string
   close: string
@@ -144,6 +145,11 @@ export interface PaletteLabels {
    * text is never displayed. Kept so existing `labels` objects still type-check.
    */
   noPreview?: string
+  /** Accessible name and description of the dialog, read by screen readers only. */
+  title?: string
+  description?: string
+  /** The key hint printed beside the box and in the footer. */
+  esc?: string
 }
 
 const props = withDefaults(
@@ -229,9 +235,10 @@ const props = withDefaults(
 )
 
 const frosted = useGlass(() => props.glass)
-const { claim, release, layer } = useModalLayer()
+const contentRef = ref<{ $el: HTMLElement } | null>(null)
+const { claim, release, layer } = useModalLayer({ element: () => contentRef.value?.$el })
 
-const DEFAULT_LABELS: PaletteLabels = {
+const DEFAULT_LABELS: Required<PaletteLabels> = {
   navigate: "navigate",
   select: "select",
   close: "close",
@@ -245,9 +252,12 @@ const DEFAULT_LABELS: PaletteLabels = {
   copyLink: "Copy link",
   linkCopied: "Link copied",
   noPreview: "No preview",
+  title: "Command palette",
+  description: "Search and run a command.",
+  esc: "esc",
 }
 
-const text = computed<PaletteLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
+const text = useLabels("palette", DEFAULT_LABELS, () => props.labels)
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void
@@ -330,12 +340,14 @@ const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]
  * actions it keeps that default.
  */
 function onTab(event: KeyboardEvent) {
-  event.preventDefault()
-  event.stopPropagation()
+  // Without actions Tab stays Tab, so the trail chips and a Retry button are
+  // still reachable from the keyboard.
   if (event.shiftKey) return
   const c = flat.value[selectedIndex.value]
   const actions = selectedActions.value
   if (!c || !actions.length) return
+  event.preventDefault()
+  event.stopPropagation()
   enter({ id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions })
 }
 
@@ -392,7 +404,7 @@ function fetcher(): ((q: string, signal: AbortSignal) => Command[] | Promise<Com
   const current = mode.value
   if (current) {
     return typeof current.children === "function"
-      ? (q: string) => (current.children as (q: string) => Command[] | Promise<Command[]>)(q)
+      ? current.children
       : null
   }
   return props.search ?? null
@@ -599,8 +611,11 @@ watch(
     else viewport.scrollTop = 0
   },
 )
+// Rows ask for their index several times per render; a lookup keeps that O(1)
+// instead of a scan of the whole list per row.
+const flatIndex = computed(() => new Map(flat.value.map((c, i) => [c, i])))
 function flatIndexOf(c: Command): number {
-  return flat.value.indexOf(c)
+  return flatIndex.value.get(c) ?? -1
 }
 
 // ── highlight ────────────────────────────────────────────────
@@ -689,6 +704,9 @@ function movePage(direction: -1 | 1) {
 function onPaletteKeydown(event: KeyboardEvent) {
   if (event.isComposing) return
   if (!(["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"] as string[]).includes(event.key)) return
+  // Home and End belong to the caret while there is text to move it through.
+  const typing = event.target instanceof HTMLInputElement && event.target.value !== ""
+  if (typing && (event.key === "Home" || event.key === "End")) return
   event.preventDefault()
   event.stopPropagation()
   if (event.key === "ArrowDown") moveDown()
@@ -828,6 +846,8 @@ useHotkeys(() =>
           code: "KeyK",
           ctrl: true,
           allowInInput: true,
+          overLayers: true,
+          repeat: false,
           handler: () => emit("update:open", !props.open),
         },
       ]
@@ -844,6 +864,7 @@ useHotkeys(() =>
         :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
+        ref="contentRef"
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :style="{ zIndex: layer.panel }"
@@ -851,8 +872,8 @@ useHotkeys(() =>
         @open-auto-focus.prevent
         @keydown.capture="onPaletteKeydown"
       >
-        <DialogTitle class="sr-only">Command palette</DialogTitle>
-        <DialogDescription class="sr-only">Search and run a command.</DialogDescription>
+        <DialogTitle class="sr-only">{{ text.title }}</DialogTitle>
+        <DialogDescription class="sr-only">{{ text.description }}</DialogDescription>
 
         <!-- Filter. The trail sits inside the box as chips, the way a scoped
              search reads everywhere else: what you type is filtered by what is
@@ -895,7 +916,7 @@ useHotkeys(() =>
             @keydown.esc="onEscape"
             @keydown.tab="onTab"
           />
-          <kbd class="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">esc</kbd>
+          <kbd class="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">{{ text.esc }}</kbd>
         </div>
 
         <!-- Results -->
@@ -1069,7 +1090,7 @@ useHotkeys(() =>
             {{ text.back }}
           </span>
           <span class="ml-auto flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">esc</kbd>
+            <kbd class="rounded border border-line px-1 text-[10px]">{{ text.esc }}</kbd>
             {{ text.close }}
           </span>
         </div>

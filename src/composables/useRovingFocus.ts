@@ -1,5 +1,7 @@
 import { computed, ref, watch, type MaybeRefOrGetter, toValue } from "vue"
 
+const NON_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"])
+
 /*
  * Arrow-key navigation over a list, with a roving tabindex.
  *
@@ -152,7 +154,16 @@ export function useRovingFocus(
     }
   }
 
+  function isTextEntry(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true
+    return target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type)
+  }
+
   function onKeydown(event: KeyboardEvent) {
+    // A field inside a row (an inline rename, a filter) owns its keys: the list
+    // taking letters for typeahead or Space for activation made it untypeable.
+    if (event.isComposing || isTextEntry(event.target)) return
     const vertical = orientation === "vertical" || orientation === "both"
     const horizontal = orientation === "horizontal" || orientation === "both"
 

@@ -14,6 +14,8 @@ withDefaults(
     sideOffset?: number
     /** Extra classes for the floating panel (width, padding, overflow). */
     panelClass?: string
+    /** Accessible name of the panel, which reka exposes as a dialog. */
+    ariaLabel?: string
   }>(),
   { side: "bottom", align: "center", sideOffset: 6 },
 )
@@ -33,6 +35,7 @@ const open = defineModel<boolean>("open")
         :side="side"
         :align="align"
         :side-offset="sideOffset"
+        :aria-label="ariaLabel"
         :class="[POPOVER_PANEL, 'z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none', panelClass]"
       >
         <slot />

@@ -1,4 +1,4 @@
-import { computed, ref, type ComputedRef, type CSSProperties, type Ref } from "vue"
+import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
 
 /*
  * useZoomPan — zoom + pan for a single element inside a viewport, the way an
@@ -15,8 +15,8 @@ import { computed, ref, type ComputedRef, type CSSProperties, type Ref } from "v
 export interface UseZoomPanOptions {
   /** Smallest allowed scale. Default 1 (fit — never shrink past the viewport). */
   min?: number
-  /** Largest allowed scale. Default 8. */
-  max?: number
+  /** Largest allowed scale. Default 8. Read on every change, so it may be a getter. */
+  max?: MaybeRefOrGetter<number | undefined>
   /** Multiplier per wheel notch. Default 1.15. */
   step?: number
   /** Scale that a double-click/tap toggles to, from `min`. Default 2. */
@@ -62,7 +62,7 @@ export interface UseZoomPan {
 
 export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
   const min = options.min ?? 1
-  const max = options.max ?? 8
+  const maxOf = () => toValue(options.max) ?? 8
   const step = options.step ?? 1.15
   const zoomedScale = options.zoomedScale ?? 2
 
@@ -104,7 +104,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
 
   /** Zoom to `next`, holding the viewport-relative point `px,py` in place. */
   function zoomAbout(next: number, px: number, py: number) {
-    const clamped = clamp(next, min, max)
+    const clamped = clamp(next, min, maxOf())
     if (clamped === scale.value) return
     // Where the cursor sits in content space before the change; solving for the
     // same content point after gives the translate that keeps it under the
@@ -215,7 +215,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
 
   function setView(view: { x: number; y: number; scale?: number }) {
     if (view.scale !== undefined) {
-      scale.value = Math.min(max, Math.max(min, view.scale))
+      scale.value = Math.min(maxOf(), Math.max(min, view.scale))
     }
     x.value = view.x
     y.value = view.y

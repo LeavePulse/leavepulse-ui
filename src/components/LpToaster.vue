@@ -12,37 +12,47 @@ import {
   ToastViewport,
 } from "reka-ui"
 import { onBeforeUnmount, ref, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
+const props = defineProps<{ labels?: Partial<{ dismiss: string }> }>()
+const text = useLabels("toast", { dismiss: "Dismiss" }, () => props.labels)
+
 const { queue, dismiss } = useToast()
+
+// A toast replaced through its `key` keeps its id and gets a new revision, so
+// everything tied to one rendered toast goes by both.
+const tag = (t: ToastItem) => `${t.id}:${t.rev}`
 
 // Toasts that are playing their exit animation. We don't splice them out of the
 // queue immediately on close — that would unmount before `toast-out` can run.
 // Instead we flip `open` to false (reka sets data-state=closed → the keyframe
 // plays), then drop the toast for real once `animationend` fires. A safety
 // timer removes it even if the animationend event is missed (e.g. tab hidden).
-const closing = ref<Set<number>>(new Set())
+const closing = ref<Set<string>>(new Set())
 
-function beginClose(id: number) {
-  if (closing.value.has(id)) return
-  closing.value = new Set(closing.value).add(id)
+function beginClose(t: ToastItem) {
+  const at = tag(t)
+  if (closing.value.has(at)) return
+  closing.value = new Set(closing.value).add(at)
   // Fallback slightly longer than the 140ms toast-out duration.
-  window.setTimeout(() => finishClose(id), 220)
+  window.setTimeout(() => finishClose(t.id, at), 220)
 }
 
-function finishClose(id: number) {
-  if (!closing.value.has(id)) return
+function finishClose(id: number, at: string) {
+  if (!closing.value.has(at)) return
   const next = new Set(closing.value)
-  next.delete(id)
+  next.delete(at)
   closing.value = next
-  dismiss(id)
+  // Replaced while it was leaving: the new revision stays.
+  if (queue.some((t) => tag(t) === at)) dismiss(id)
 }
 
-function onAnimEnd(e: AnimationEvent, id: number) {
+function onAnimEnd(e: AnimationEvent, t: ToastItem) {
   // Only the exit keyframe should trigger removal, not toast-in.
-  if (e.animationName === "toast-out") finishClose(id)
+  if (e.animationName === "toast-out") finishClose(t.id, tag(t))
 }
 
 const variantIcon: Record<ToastItem["variant"], string> = {
@@ -97,7 +107,7 @@ watch(
     // Same for the closing set — a toast evicted by the queue cap or clear()
     // leaves without an animationend, so prune dead ids here.
     if (closing.value.size) {
-      const live = new Set([...closing.value].filter((id) => queue.some((t) => t.id === id)))
+      const live = new Set([...closing.value].filter((at) => queue.some((t) => tag(t) === at)))
       if (live.size !== closing.value.size) closing.value = live
     }
     if (queue.some((t) => t.dismissAt !== null)) startTimer()
@@ -126,16 +136,41 @@ function progress(t: ToastItem): number {
   return Math.max(0, Math.min(100, (remaining / t.duration) * 100))
 }
 
-async function runClick(t: ToastItem) {
-  if (t.onClick) {
-    await t.onClick()
-    beginClose(t.id)
+/*
+ * reka cancels the click that ends a swipe by adding a listener after ours, so
+ * by the time it runs our handler has already acted on it: a swiped-away
+ * "View details" toast navigated. The swipe marks the toast instead, and the
+ * mark lasts only until that trailing click has had its chance.
+ */
+let swiped: string | null = null
+function onSwipeDone(t: ToastItem) {
+  swiped = tag(t)
+  window.setTimeout(() => (swiped = null), 0)
+}
+
+const busy = ref<Set<string>>(new Set())
+
+async function settle(t: ToastItem, run: () => void | Promise<void>) {
+  const at = tag(t)
+  if (busy.value.has(at)) return
+  busy.value = new Set(busy.value).add(at)
+  try {
+    await run()
+    beginClose(t)
+  } finally {
+    const next = new Set(busy.value)
+    next.delete(at)
+    busy.value = next
   }
 }
 
-async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[number]) {
-  await action.onClick()
-  beginClose(t.id)
+function runClick(t: ToastItem) {
+  if (swiped === tag(t)) return
+  if (t.onClick) return settle(t, t.onClick)
+}
+
+function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[number]) {
+  return settle(t, action.onClick)
 }
 </script>
 
@@ -143,13 +178,16 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
   <ToastProvider>
     <ToastRoot
       v-for="t in queue"
-      :key="t.id"
-      :open="!closing.has(t.id)"
+      :key="tag(t)"
+      :open="!closing.has(tag(t))"
       :duration="t.duration"
+      :type="t.variant === 'error' || t.variant === 'warning' ? 'foreground' : 'background'"
       class="pointer-events-auto relative overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel data-[state=open]:animate-[toast-in_200ms_var(--ease-emphasized)] data-[state=closed]:animate-[toast-out_140ms_ease]"
       :class="{ 'cursor-pointer': t.onClick }"
-      @update:open="(open) => !open && beginClose(t.id)"
-      @animationend="(e: AnimationEvent) => onAnimEnd(e, t.id)"
+      @update:open="(open) => !open && beginClose(t)"
+      @animationend="(e: AnimationEvent) => onAnimEnd(e, t)"
+      @swipe-end="onSwipeDone(t)"
+      @swipe-cancel="onSwipeDone(t)"
       @pause="onPause(t)"
       @resume="onResume(t)"
       @click="runClick(t)"
@@ -178,7 +216,9 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
               v-for="(action, i) in t.actions"
               :key="i"
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink outline-none transition-[border-color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:border-line-strong hover:bg-surface-soft/70 active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
+              :disabled="busy.has(tag(t))"
+              :aria-busy="busy.has(tag(t)) || undefined"
+              class="inline-flex items-center gap-1.5 rounded-control disabled:opacity-60 border border-line bg-surface-soft px-2.5 py-1 text-xs font-medium text-ink outline-none transition-[border-color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:border-line-strong hover:bg-surface-soft/70 active:scale-95 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
               @click="runAction(t, action)"
             >
               <LpIcon v-if="action.icon" :name="action.icon" :size="14" />
@@ -190,8 +230,8 @@ async function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>
         <button
           type="button"
           class="group -mr-1 -mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
-          aria-label="Dismiss"
-          @click.stop="beginClose(t.id)"
+          :aria-label="text.dismiss"
+          @click.stop="beginClose(t)"
         >
           <LpIcon
             name="lucide:x"

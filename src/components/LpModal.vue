@@ -10,6 +10,7 @@ import {
 } from "reka-ui"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { useGlass } from "../composables/useGlass"
+import { useLabels } from "../composables/useLpConfig"
 import { useShift } from "../composables/useShift"
 import { useModalLayer } from "./modalDepth"
 import { CLOSE_ICON } from "./dropdown"
@@ -33,7 +34,8 @@ import LpScrollArea from "./LpScrollArea.vue"
  * same fix, as the lightbox's own rungs in tokens.css — only the depth here is
  * not known until a dialog finds itself inside another.
  */
-const { claim, release, layer } = useModalLayer()
+const panelRef = ref<HTMLElement | null>(null)
+const { claim, release, layer } = useModalLayer({ element: () => panelRef.value?.parentElement })
 
 const props = withDefaults(
   defineProps<{
@@ -70,9 +72,19 @@ const props = withDefaults(
      * `provideGlass`, and without one it is off.
      */
     glass?: boolean
+    /**
+     * Accessible name for a dialog without a visible `title`. Rendered as a
+     * visually hidden title, so assistive tech still announces what opened.
+     */
+    ariaLabel?: string
+    /** `alertdialog` for a prompt that interrupts the user (a confirmation). */
+    role?: "dialog" | "alertdialog"
+    labels?: Partial<{ close: string }>
   }>(),
   { size: "md", autoFocus: "auto", glass: undefined },
 )
+
+const text = useLabels("modal", { close: "Close" }, () => props.labels)
 
 const frosted = useGlass(() => props.glass)
 
@@ -95,9 +107,10 @@ const onInteractOutside = (event: Event) => {
   }
 }
 
-const describedByAttrs = computed(() =>
-  props.description ? {} : { "aria-describedby": undefined },
-)
+const describedByAttrs = computed(() => ({
+  ...(props.description ? {} : { "aria-describedby": undefined }),
+  ...(props.role ? { role: props.role } : {}),
+}))
 
 const widthClass = computed(() => {
   if (props.width) return ""
@@ -152,15 +165,13 @@ const bodyPad = computed(() =>
  * scroll area exactly as before. A panel whose size never moves is pinned once
  * and never transitions.
  */
-const panelRef = ref<HTMLElement | null>(null)
-
 /**
  * Controls that are worth landing on when the dialog opens, in order of
  * preference. A field the user is going to type in wins over a button, since
  * typing is the reason most dialogs exist.
  */
 const AUTO_FOCUS_ORDER = [
-  "input:not([type=hidden]):not([disabled]):not([readonly])",
+  "input:not([type=hidden]):not([disabled]):not([readonly]):not([tabindex='-1'])",
   "textarea:not([disabled]):not([readonly])",
   "select:not([disabled])",
   "[data-lp-autofocus]",
@@ -178,6 +189,18 @@ const AUTO_FOCUS_ORDER = [
  *
  * Both are fixed here: pick a meaningful target, and mark it so the ring shows.
  */
+/**
+ * Whether a candidate can actually take focus: reka renders hidden form inputs
+ * for its switches and checkboxes, and a control hidden at this breakpoint
+ * (`lg:hidden`) is in the DOM but not on screen.
+ */
+function focusable(el: HTMLElement): boolean {
+  if (el.hasAttribute("disabled") || el.getAttribute("tabindex") === "-1") return false
+  if (el.closest("[aria-hidden='true'], [data-hidden], [inert]")) return false
+  if (typeof el.checkVisibility === "function") return el.checkVisibility({ visibilityProperty: true })
+  return el.getClientRects().length > 0
+}
+
 function onOpenAutoFocus(event: Event) {
   if (props.autoFocus === "none") return
   const panel = panelRef.value
@@ -186,26 +209,26 @@ function onOpenAutoFocus(event: Event) {
   const selectors =
     props.autoFocus === "auto" ? AUTO_FOCUS_ORDER : [props.autoFocus]
   for (const selector of selectors) {
-    const target = panel.querySelector<HTMLElement>(selector)
-    if (!target || target.hasAttribute("disabled")) continue
-    event.preventDefault()
-    // `focus-visible` is the browser's own heuristic and cannot be forced, so
-    // the ring is driven off an attribute the kit owns. Removed as soon as the
-    // element loses focus, leaving normal focus-visible behaviour in charge.
-    //
-    // Skipped for a control whose own shell already draws a ring on
-    // focus-within: our fields put the border and ring on the wrapper, so
-    // adding one to the bare <input> stacks a second ring inside the first.
-    if (!target.closest("[data-lp-ring-owner]")) {
-      target.setAttribute("data-lp-focus-ring", "")
-      target.addEventListener(
-        "blur",
-        () => target.removeAttribute("data-lp-focus-ring"),
-        { once: true },
-      )
+    for (const target of panel.querySelectorAll<HTMLElement>(selector)) {
+      if (!focusable(target)) continue
+      target.focus()
+      // Only once focus really landed: a prevented auto-focus that failed would
+      // leave the keyboard on the page behind the dialog.
+      if (document.activeElement !== target) continue
+      event.preventDefault()
+      // `focus-visible` is the browser's own heuristic and cannot be forced, so
+      // the ring is driven off an attribute the kit owns. Skipped for a control
+      // whose own shell already draws a ring on focus-within.
+      if (!target.closest("[data-lp-ring-owner]")) {
+        target.setAttribute("data-lp-focus-ring", "")
+        target.addEventListener(
+          "blur",
+          () => target.removeAttribute("data-lp-focus-ring"),
+          { once: true },
+        )
+      }
+      return
     }
-    target.focus()
-    return
   }
 }
 // The panel's height eases between content-derived sizes — see
@@ -305,6 +328,9 @@ watch(
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >
+        <DialogTitle v-if="!(title || $slots.title) && ariaLabel" class="sr-only">
+          {{ ariaLabel }}
+        </DialogTitle>
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
           <div class="flex flex-col gap-1">
             <DialogTitle class="text-base font-semibold text-ink">
@@ -319,7 +345,7 @@ watch(
           <DialogClose
             data-lp-dialog-close
             class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close"
+            :aria-label="text.close"
           >
             <LpIcon
               name="lucide:x"

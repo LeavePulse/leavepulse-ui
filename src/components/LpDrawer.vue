@@ -1,8 +1,11 @@
 <script lang="ts">
-import { ref as sharedRef } from "vue"
+import { ref as sharedRef, type Ref } from "vue"
 
-// One pull at a time across every edge-open drawer on the page.
-const edgeOwner = sharedRef<symbol | null>(null)
+// One pull at a time across every edge-open drawer on the page, pinned to a
+// global symbol so a barrel and a deep import still share it.
+const EDGE_KEY = Symbol.for("@leavepulse/ui:drawer-edge-owner")
+type GlobalWithEdge = typeof globalThis & { [EDGE_KEY]?: Ref<symbol | null> }
+const edgeOwner = ((globalThis as GlobalWithEdge)[EDGE_KEY] ??= sharedRef<symbol | null>(null))
 </script>
 
 <script setup lang="ts">
@@ -32,6 +35,7 @@ import {
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import { useGlass } from "../composables/useGlass"
+import { useLabels } from "../composables/useLpConfig"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
@@ -109,6 +113,9 @@ const props = withDefaults(
      * `provideGlass`, and without one it is off.
      */
     glass?: boolean
+    /** Accessible name for a drawer without a visible `title`. */
+    ariaLabel?: string
+    labels?: Partial<{ close: string }>
   }>(),
   {
     side: "right",
@@ -124,6 +131,7 @@ const props = withDefaults(
 )
 
 const frosted = useGlass(() => props.glass)
+const text = useLabels("drawer", { close: "Close" }, () => props.labels)
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void
@@ -148,7 +156,8 @@ const SIZES = { sm: 22, md: 28, lg: 36, xl: 48 } // rem along the main axis
  * settings drawer) claimed those same rungs and the tie went to DOM order —
  * the drawer, portalled later on reopen, covered the dialog it had opened.
  */
-const { claim, release, layer } = useModalLayer()
+const contentRef = ref<{ $el: HTMLElement } | null>(null)
+const { claim, release, layer } = useModalLayer({ element: () => contentRef.value?.$el })
 watch(() => props.open, (open) => (open ? claim() : release()), { immediate: true })
 onBeforeUnmount(release)
 
@@ -179,35 +188,59 @@ const sizeStyle = computed(() => {
   return isHorizontal.value ? { width: len } : { height: len }
 })
 
+// Resolve a CSS length to px against the viewport. Anything it cannot read
+// (calc(), min()) comes back NaN for the caller to fall back on.
+function toPx(css: string): number {
+  const n = Number.parseFloat(css)
+  if (css.endsWith("rem")) {
+    const root = typeof document === "undefined" ? 16 : Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    return n * root
+  }
+  if (css.endsWith("vw")) return (n / 100) * window.innerWidth
+  if (css.endsWith("vh")) return (n / 100) * window.innerHeight
+  if (css.endsWith("px") || /^[\d.]+$/.test(css.trim())) return n
+  return Number.NaN
+}
+
 // Drag the inner edge to resize. For a right drawer the panel grows as the
-// pointer moves left (width = viewportRight − clientX); mirror for left.
+// pointer moves left (width = viewportRight − clientX); mirror for left. The
+// pointer is captured, so a release over an iframe or outside the window still
+// ends the drag, and a cancelled touch ends it too.
+let endResize: (() => void) | null = null
+
 function startResize(e: PointerEvent) {
   if (!props.resizable || !isHorizontal.value) return
   e.preventDefault()
+  endResize?.()
+  const grip = e.currentTarget instanceof HTMLElement ? e.currentTarget : null
+  grip?.setPointerCapture(e.pointerId)
   const fromRight = dir.value === "right"
-  const toPx = (css: string) => {
-    // Resolve rem/vw to px against the viewport for clamping.
-    if (css.endsWith("rem")) return Number.parseFloat(css) * 16
-    if (css.endsWith("vw")) return (Number.parseFloat(css) / 100) * window.innerWidth
-    return Number.parseFloat(css)
-  }
   const min = toPx(props.minSize)
   const max = toPx(props.maxSize)
   const onMove = (ev: PointerEvent) => {
+    if (ev.pointerId !== e.pointerId) return
     const raw = fromRight ? window.innerWidth - ev.clientX : ev.clientX
-    resizedPx.value = Math.max(min, Math.min(max, raw))
+    resizedPx.value = Math.max(Number.isNaN(min) ? 0 : min, Math.min(Number.isNaN(max) ? Infinity : max, raw))
   }
-  const onUp = () => {
+  const end = () => {
     window.removeEventListener("pointermove", onMove)
-    window.removeEventListener("pointerup", onUp)
+    window.removeEventListener("pointerup", end)
+    window.removeEventListener("pointercancel", end)
+    grip?.removeEventListener("lostpointercapture", end)
     document.body.style.userSelect = ""
     document.body.style.cursor = ""
+    endResize = null
   }
+  endResize = end
   document.body.style.userSelect = "none"
   document.body.style.cursor = "ew-resize"
   window.addEventListener("pointermove", onMove)
-  window.addEventListener("pointerup", onUp)
+  window.addEventListener("pointerup", end)
+  window.addEventListener("pointercancel", end)
+  grip?.addEventListener("lostpointercapture", end)
 }
+
+onBeforeUnmount(() => endResize?.())
 
 const slots = useSlots()
 const hasHeader = computed(() => Boolean(props.title || slots.title))
@@ -281,9 +314,9 @@ watch(
 // Resolve the panel's main-axis size in px to map drag distance → progress.
 function panelPx(): number {
   const vw = typeof window === "undefined" ? 0 : window.innerWidth
-  // mirror sizeStyle's min(94vw, SIZES[size]rem); 1rem≈16px.
-  const cap = props.width ? Number.parseFloat(props.width) : SIZES[props.size] * 16
-  return Math.min(vw * 0.94, Number.isFinite(cap) ? cap : SIZES[props.size] * 16)
+  const preset = toPx(`${SIZES[props.size]}rem`)
+  const cap = props.width ? toPx(props.width) : preset
+  return Math.min(vw * 0.94, Number.isFinite(cap) ? cap : preset)
 }
 
 function edgeEnabled(): boolean {
@@ -479,6 +512,8 @@ const previewStyle = computed(() => {
         :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
       />
       <DrawerContent
+        ref="contentRef"
+        v-bind="description ? {} : { 'aria-describedby': undefined }"
         :class="contentClass"
         :style="[sizeStyle, { zIndex: layer.panel }]"
         :data-vaul-animate="handingOff || skipOpenSlide ? 'false' : undefined"
@@ -497,6 +532,8 @@ const previewStyle = computed(() => {
             :class="dir === 'right' ? 'left-0' : 'right-0'"
           />
         </div>
+
+        <DrawerTitle v-if="!hasHeader && ariaLabel" class="sr-only">{{ ariaLabel }}</DrawerTitle>
 
         <!-- Drag handle: a pill the user grabs; vaul wires the drag to it. -->
         <DrawerHandle
@@ -519,7 +556,7 @@ const previewStyle = computed(() => {
           </div>
           <DrawerClose
             class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Close"
+            :aria-label="text.close"
           >
             <LpIcon
               name="lucide:x"

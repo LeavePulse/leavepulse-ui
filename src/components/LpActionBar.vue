@@ -20,7 +20,8 @@
  * name rather than `alertdialog` — it is a landmark you can Tab into, not a
  * thing demanding an answer before anything else can happen.
  */
-import { computed, nextTick, ref, useSlots, watch } from "vue"
+import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { useBarStack } from "./actionBar"
 import { CLOSE_ICON } from "./dropdown"
 import LpButton from "./LpButton.vue"
@@ -85,6 +86,7 @@ const props = withDefaults(
     maxWidth?: string
     /** Accessible name for the landmark. Falls back to `title`. */
     ariaLabel?: string
+    labels?: Partial<{ dismiss: string }>
   }>(),
   {
     open: true,
@@ -100,6 +102,7 @@ const emit = defineEmits<{
 }>()
 
 const slots = useSlots()
+const text = useLabels("actionBar", { dismiss: "Dismiss" }, () => props.labels)
 
 // The last action is the primary one unless the caller has said otherwise; the
 // rest default to `ghost` so a bar with three buttons still has one obvious
@@ -154,19 +157,39 @@ const stackOffset = computed(() => {
   return offset()
 })
 
+/*
+ * The height is watched, not measured once: a description that wraps after a
+ * rotation, or content swapped while the bar is up, changes it, and the bars
+ * above would overlap this one.
+ */
+let observer: ResizeObserver | null = null
+
 watch(
   () => props.open,
-  async (isOpen) => {
+  (isOpen) => {
+    // Nothing on the server ever unregisters, so registering there would leak
+    // one slot per rendered request into every later page.
+    if (typeof window === "undefined") return
     if (!isOpen) {
       unregister()
       return
     }
     register()
-    await nextTick()
-    if (root.value) setHeight(root.value.getBoundingClientRect().height)
   },
   { immediate: true },
 )
+
+watch(root, (el) => {
+  observer?.disconnect()
+  observer = null
+  if (!el) return
+  setHeight(el.getBoundingClientRect().height)
+  if (typeof ResizeObserver === "undefined") return
+  observer = new ResizeObserver(() => setHeight(el.getBoundingClientRect().height))
+  observer.observe(el)
+})
+
+onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
@@ -194,9 +217,9 @@ watch(
         ref="root"
         role="region"
         :aria-label="ariaLabel ?? title"
-        class="pointer-events-none fixed inset-x-0 bottom-0 z-(--z-modal) flex justify-center transition-[translate] duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+        class="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center transition-[translate] duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
         :class="width === 'full' ? '' : 'p-3 sm:p-4'"
-        :style="{ translate: `0 -${stackOffset}px` }"
+        :style="{ translate: `0 -${stackOffset}px`, zIndex: 'calc(var(--z-overlay) - 1)' }"
       >
         <div
           class="lp-skin-panel pointer-events-auto flex items-center gap-3 border-solid bg-surface-overlay"
@@ -261,7 +284,7 @@ watch(
             <button
               v-if="dismissible"
               type="button"
-              aria-label="Dismiss"
+              :aria-label="text.dismiss"
               class="group -mr-1 flex size-8 shrink-0 items-center justify-center rounded-control text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               @click="dismiss"
             >

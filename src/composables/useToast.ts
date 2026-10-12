@@ -11,6 +11,9 @@ export interface ToastAction {
 
 export interface ToastItem {
   id: number
+  /** Bumped when a toast with the same `key` replaces this one in place. */
+  rev: number
+  key?: string
   title?: string
   message: string
   variant: ToastVariant
@@ -23,6 +26,12 @@ export interface ToastItem {
 }
 
 export interface ToastOptions {
+  /**
+   * A toast with the same key replaces the one on screen instead of stacking
+   * beside it: "Saved" ten times is one toast, and a progress toast can turn
+   * into its result.
+   */
+  key?: string
   title?: string
   duration?: number
   actions?: ToastAction[]
@@ -48,10 +57,12 @@ function push(
   message: string,
   options: ToastOptions = {},
 ): number {
-  const id = state.nextId++
+  // A server render has no one to show it to, and the queue would outlive the
+  // request and surface in the next visitor's page.
+  if (typeof window === "undefined") return -1
   const duration = options.duration ?? DEFAULT_DURATION
-  const item: ToastItem = {
-    id,
+  const fields = {
+    key: options.key,
     title: options.title,
     message,
     variant,
@@ -61,12 +72,52 @@ function push(
     onClick: options.onClick,
   }
 
+  const same = options.key === undefined ? -1 : queue.findIndex((t) => t.key === options.key)
+  const existing = queue[same]
+  if (existing) {
+    queue.splice(same, 1, { ...fields, id: existing.id, rev: existing.rev + 1 })
+    return existing.id
+  }
+
+  const id = state.nextId++
   // Cap the active count: drop the oldest beyond the limit.
   const overflow = queue.length - (MAX_ACTIVE - 1)
   if (overflow > 0) queue.splice(0, overflow)
-  queue.push(item)
+  queue.push({ ...fields, id, rev: 0 })
 
   return id
+}
+
+export interface ToastPromiseMessages<T> {
+  loading: string
+  success: string | ((value: T) => string)
+  error: string | ((error: unknown) => string)
+}
+
+let promiseKey = 0
+
+/**
+ * One toast that follows a promise: a persistent "loading" toast that turns
+ * into the success or error toast when it settles. Returns the promise itself.
+ */
+function promise<T>(
+  task: Promise<T>,
+  messages: ToastPromiseMessages<T>,
+  options: ToastOptions = {},
+): Promise<T> {
+  const key = options.key ?? `@leavepulse/ui:promise-${promiseKey++}`
+  push("info", messages.loading, { ...options, key, duration: 0, actions: undefined })
+  task.then(
+    (value) => {
+      const text = typeof messages.success === "function" ? messages.success(value) : messages.success
+      push("success", text, { ...options, key })
+    },
+    (error: unknown) => {
+      const text = typeof messages.error === "function" ? messages.error(error) : messages.error
+      push("error", text, { ...options, key })
+    },
+  )
+  return task
 }
 
 function dismiss(id: number): void {
@@ -86,6 +137,7 @@ export function useToast() {
     success: (message: string, o?: ToastOptions) => push("success", message, o),
     warning: (message: string, o?: ToastOptions) => push("warning", message, o),
     error: (message: string, o?: ToastOptions) => push("error", message, o),
+    promise,
     /** Low-level push for bridges (e.g. @leavepulse/ui-sdk apiError). */
     push,
     dismiss,

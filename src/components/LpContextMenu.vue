@@ -6,20 +6,10 @@
  * long-press on touch) opens the menu at the pointer. Shares the floating-panel
  * surface + option-row look with the rest of the kit via dropdown.ts.
  */
-import {
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuPortal,
-  ContextMenuRoot,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "reka-ui"
+import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from "reka-ui"
 import { computed } from "vue"
+import ContextMenuItems from "./ContextMenuItems.vue"
 import { POPOVER_PANEL } from "./dropdown"
-import LpIcon from "./LpIcon.vue"
 
 export interface ContextMenuItemDef {
   label: string
@@ -30,7 +20,7 @@ export interface ContextMenuItemDef {
   disabled?: boolean
   separatorBefore?: boolean
   onSelect?: () => void
-  /** Nested submenu. When present, onSelect is ignored. */
+  /** Nested submenu, to any depth. When present, onSelect is ignored. */
   children?: ContextMenuItemDef[]
   /**
    * Renders as a tick-box rather than a plain item, and the menu stays open on
@@ -52,17 +42,13 @@ const props = defineProps<{
   always?: boolean
 }>()
 
-// With no items, render just the trigger slot — no reka machinery — so the
-// element keeps the browser's native context menu. Lets callers wrap
-// unconditionally and pass [] to opt out per element. `always` overrides this so
-// a late-populated menu is ready on the very first click.
+// With no items the trigger is disabled, so the element keeps the browser's
+// native context menu. Lets callers wrap unconditionally and pass [] to opt out
+// per element. `always` overrides this so a late-populated menu is ready on the
+// very first click.
 const enabled = computed(() => props.always || props.items.length > 0)
 
 const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
-const ITEM =
-  "group/item flex cursor-pointer select-none items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
-const ICON =
-  "transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[highlighted]/item:translate-x-0.5"
 
 // A menu opened over a text field takes focus, and on close reka hands it to the
 // trigger, so the caret and the selection the user right-clicked are gone — the
@@ -92,104 +78,17 @@ function returnFocus(event: Event) {
 </script>
 
 <template>
-  <slot v-if="!enabled" />
-
-  <ContextMenuRoot v-else>
-    <ContextMenuTrigger as-child @contextmenu.capture="rememberField">
+  <!-- One tree whether or not there are items: swapping between a bare slot and
+       the reka trigger remounted the wrapped content whenever items arrived
+       late, losing its state and focus. A disabled trigger leaves the browser's
+       own menu in place. -->
+  <ContextMenuRoot>
+    <ContextMenuTrigger as-child :disabled="!enabled" @contextmenu.capture="rememberField">
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal v-if="items.length">
       <ContextMenuContent :class="PANEL" @close-auto-focus="returnFocus">
-        <template v-for="(item, i) in items" :key="i">
-          <ContextMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />
-
-          <!-- Submenu branch -->
-          <ContextMenuSub v-if="item.children?.length">
-            <ContextMenuSubTrigger
-              :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand data-[state=open]:bg-brand-soft data-[state=open]:text-brand']"
-            >
-              <span class="flex items-center gap-2">
-                <LpIcon v-if="item.icon" :name="item.icon" :size="15" :class="ICON" />
-                {{ item.label }}
-              </span>
-              <LpIcon name="lucide:chevron-right" :size="14" class="text-muted" />
-            </ContextMenuSubTrigger>
-            <ContextMenuPortal>
-              <ContextMenuSubContent :class="PANEL" :side-offset="2" :align-offset="-4">
-                <template v-for="(sub, j) in item.children" :key="j">
-                  <ContextMenuSeparator v-if="sub.separatorBefore" class="my-1 h-px bg-line" />
-                  <!-- The tick-box case, as in the top-level menu: this is
-                       where most of them live, since a submenu is what a list
-                       of choices opens into. -->
-                  <ContextMenuItem
-                    v-if="sub.checked !== undefined"
-                    :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand']"
-                    :disabled="sub.disabled"
-                    @select.prevent="sub.onSelect?.()"
-                  >
-                    <span class="flex items-center gap-2">
-                      <LpIcon
-                        :name="sub.checked ? 'lucide:check' : 'lucide:minus'"
-                        :size="15"
-                        :class="[ICON, sub.checked ? '' : 'opacity-25']"
-                      />
-                      {{ sub.label }}
-                    </span>
-                    <kbd v-if="sub.shortcut" class="text-xs text-muted">{{ sub.shortcut }}</kbd>
-                  </ContextMenuItem>
-
-                  <ContextMenuItem
-                    v-else
-                    :class="[ITEM, 'justify-between', sub.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand']"
-                    :disabled="sub.disabled"
-                    @select="sub.onSelect?.()"
-                  >
-                    <span class="flex items-center gap-2">
-                      <LpIcon v-if="sub.icon" :name="sub.icon" :size="15" :class="ICON" />
-                      {{ sub.label }}
-                    </span>
-                    <kbd v-if="sub.shortcut" class="text-xs text-muted">{{ sub.shortcut }}</kbd>
-                  </ContextMenuItem>
-                </template>
-              </ContextMenuSubContent>
-            </ContextMenuPortal>
-          </ContextMenuSub>
-
-          <!-- Tick-box item. `@select.prevent` keeps the menu open: these come
-               in lists where several are set in one visit, and closing after
-               each tick would mean reopening for the next. The tick occupies a
-               fixed slot so unticked rows stay aligned with ticked ones. -->
-          <ContextMenuItem
-            v-else-if="item.checked !== undefined"
-            :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand']"
-            :disabled="item.disabled"
-            @select.prevent="item.onSelect?.()"
-          >
-            <span class="flex items-center gap-2">
-              <LpIcon
-                :name="item.checked ? 'lucide:check' : 'lucide:minus'"
-                :size="15"
-                :class="[ICON, item.checked ? '' : 'opacity-25']"
-              />
-              {{ item.label }}
-            </span>
-            <kbd v-if="item.shortcut" class="text-xs text-muted">{{ item.shortcut }}</kbd>
-          </ContextMenuItem>
-
-          <!-- Leaf item -->
-          <ContextMenuItem
-            v-else
-            :class="[ITEM, 'justify-between', item.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand']"
-            :disabled="item.disabled"
-            @select="item.onSelect?.()"
-          >
-            <span class="flex items-center gap-2">
-              <LpIcon v-if="item.icon" :name="item.icon" :size="15" :class="ICON" />
-              {{ item.label }}
-            </span>
-            <kbd v-if="item.shortcut" class="text-xs text-muted">{{ item.shortcut }}</kbd>
-          </ContextMenuItem>
-        </template>
+        <ContextMenuItems :items="items" :panel="PANEL" />
       </ContextMenuContent>
     </ContextMenuPortal>
   </ContextMenuRoot>

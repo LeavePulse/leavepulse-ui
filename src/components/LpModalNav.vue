@@ -14,6 +14,7 @@
  * one the sections are simply unreachable on a phone.
  */
 import { computed, ref } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpModal from "./LpModal.vue"
@@ -62,7 +63,6 @@ const props = withDefaults(
     size: "2xl",
     navWidth: "13rem",
     mobileBreakpoint: "lg",
-    navLabel: "Sections",
     navSide: "start",
     glass: undefined,
   },
@@ -72,6 +72,9 @@ const emit = defineEmits<{
   (e: "update:open", value: boolean): void
   (e: "update:modelValue", value: string): void
 }>()
+
+const text = useLabels("modalNav", { nav: "Sections" })
+const navName = computed(() => props.navLabel ?? text.value.nav)
 
 const navOpen = ref(false)
 
@@ -187,7 +190,7 @@ const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
           variant="ghost"
           size="sm"
           square
-          :aria-label="navLabel"
+          :aria-label="navName"
           :class="triggerClass"
           @click="navOpen = true"
         >

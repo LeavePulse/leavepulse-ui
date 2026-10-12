@@ -18,8 +18,10 @@ import {
   activeShortcuts,
   appleModifierLabel,
   mergeShortcutGroups,
+  useAppleKeyboard,
   type ShortcutGroup,
 } from "../composables/useHotkeys"
+import { useLabels } from "../composables/useLpConfig"
 
 const props = withDefaults(
   defineProps<{
@@ -32,8 +34,11 @@ const props = withDefaults(
     /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
   }>(),
-  { open: false, groups: () => [], live: false, title: "Keyboard shortcuts", glass: undefined },
+  { open: false, groups: () => [], live: false, title: undefined, glass: undefined },
 )
+
+const text = useLabels("shortcuts", { title: "Keyboard shortcuts" })
+const apple = useAppleKeyboard()
 
 /*
  * One key per "+", except a "+" that is the key itself: "Ctrl++" is Ctrl and
@@ -53,7 +58,7 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
     :glass="props.glass"
     :open="props.open"
     size="lg"
-    :title="props.title"
+    :title="props.title ?? text.title"
     :description="props.description"
     @update:open="(value: boolean) => emit('update:open', value)"
   >
@@ -65,7 +70,7 @@ const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
             <dt>{{ entry.label }}</dt>
             <dd>
               <kbd v-for="(key, index) in keysOf(entry.combo)" :key="`${key}-${index}`">
-                {{ appleModifierLabel(key.trim()) }}
+                {{ appleModifierLabel(key.trim(), apple) }}
               </kbd>
             </dd>
           </div>

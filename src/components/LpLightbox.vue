@@ -22,10 +22,28 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import { useZoomPan } from "../composables/useZoomPan"
 import { fileNameOf, type LightboxItem } from "./lightbox"
 import LpIcon from "./LpIcon.vue"
 import { useModalLayer } from "./modalDepth"
+
+export type LightboxLabels = {
+  viewer: string
+  /** `{index}` and `{total}` are filled in. */
+  position: string
+  previous: string
+  next: string
+  zoomIn: string
+  zoomOut: string
+  rotate: string
+  copy: string
+  download: string
+  close: string
+  failed: string
+  spoiler: string
+  reveal: string
+}
 
 const props = withDefaults(
   defineProps<{
@@ -46,6 +64,7 @@ const props = withDefaults(
     loop?: boolean
     /** Largest zoom level. */
     maxZoom?: number
+    labels?: Partial<LightboxLabels>
   }>(),
   {
     open: false,
@@ -68,7 +87,31 @@ const emit = defineEmits<{
   (e: "copy", item: LightboxItem, ok: boolean): void
 }>()
 
-const { claim, release, layer } = useModalLayer()
+const text = useLabels<LightboxLabels>(
+  "lightbox",
+  {
+    viewer: "Image viewer",
+    position: "Image {index} of {total}",
+    previous: "Previous image",
+    next: "Next image",
+    zoomIn: "Zoom in (+)",
+    zoomOut: "Zoom out (−)",
+    rotate: "Rotate (R)",
+    copy: "Copy image",
+    download: "Download",
+    close: "Close (Esc)",
+    failed: "This image couldn't be loaded.",
+    spoiler: "Spoiler",
+    reveal: "Show image",
+  },
+  () => props.labels,
+)
+
+const position = (i: number) =>
+  text.value.position.replace("{index}", String(i + 1)).replace("{total}", String(props.items.length))
+
+const contentRef = ref<{ $el: HTMLElement } | null>(null)
+const { claim, release, layer } = useModalLayer({ element: () => contentRef.value?.$el })
 watch(() => props.open, (open) => (open ? claim() : release()), { immediate: true })
 onBeforeUnmount(release)
 
@@ -79,7 +122,7 @@ defineSlots<{
   actions(props: { item: LightboxItem; index: number }): unknown
 }>()
 
-const zoom = useZoomPan({ max: props.maxZoom })
+const zoom = useZoomPan({ max: () => props.maxZoom })
 
 // `zoom` is a plain object, so its refs don't unwrap in the template — surface
 // the two the chrome reads as computeds rather than writing `.value` in markup.
@@ -87,7 +130,11 @@ const scale = computed(() => zoom.scale.value)
 const isZoomed = computed(() => zoom.zoomed.value)
 const isPanning = computed(() => zoom.panning.value)
 
-const current = computed(() => Math.min(Math.max(props.index, 0), Math.max(props.items.length - 1, 0)))
+// Works with and without v-model:index: the prop seeds and steers it, paging
+// moves it locally and reports the move.
+const shown = ref(props.index)
+watch(() => props.index, (i) => (shown.value = i))
+const current = computed(() => Math.min(Math.max(shown.value, 0), Math.max(props.items.length - 1, 0)))
 const item = computed<LightboxItem | undefined>(() => props.items[current.value])
 const total = computed(() => props.items.length)
 const showStrip = computed(() => props.filmstrip ?? total.value > 1)
@@ -113,6 +160,7 @@ function go(next: number) {
   // Compare against the raw target, not the wrapped one: stepping past the last
   // image is still "forward" even though the index jumps back to 0.
   direction.value = next > current.value ? 1 : -1
+  shown.value = wrapped
   emit("update:index", wrapped)
   emit("change", wrapped, props.items[wrapped])
 }
@@ -193,6 +241,23 @@ function close() {
   emit("update:open", false)
 }
 
+/*
+ * A spoiler stays covered until it is asked for, here as in the gallery: the
+ * viewer is often opened straight from a link or a filmstrip, past whatever
+ * cover the grid had.
+ */
+const revealed = ref<Set<number>>(new Set())
+const covered = (i: number) => !!props.items[i]?.spoiler && !revealed.value.has(i)
+function reveal(i: number) {
+  revealed.value = new Set(revealed.value).add(i)
+}
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) revealed.value = new Set()
+  },
+)
+
 function onKeydown(e: KeyboardEvent) {
   switch (e.key) {
     case "ArrowRight":
@@ -270,19 +335,49 @@ function onViewportClick(e: MouseEvent) {
   close()
 }
 
+function sameOrigin(src: string): boolean {
+  try {
+    const url = new URL(src, window.location.href)
+    return url.protocol === "blob:" || url.protocol === "data:" || url.origin === window.location.origin
+  } catch {
+    return false
+  }
+}
+
+function save(href: string, name: string, newTab = false) {
+  const a = document.createElement("a")
+  a.href = href
+  if (newTab) {
+    a.target = "_blank"
+    a.rel = "noopener"
+  } else {
+    a.download = name
+  }
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+/*
+ * A cross-origin `download` attribute is ignored and the link just navigates,
+ * which unloaded the whole app in favour of the image. Such a source is fetched
+ * into a blob first; one that refuses CORS opens in a new tab instead.
+ */
 async function download() {
   const target = item.value
   if (!target) return
   emit("download", target)
-  const a = document.createElement("a")
-  a.href = target.src
-  a.download = fileNameOf(target)
-  // Cross-origin sources ignore `download` and just navigate, so open those in
-  // a new tab instead of replacing the app.
-  a.rel = "noopener"
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
+  const name = fileNameOf(target)
+  if (sameOrigin(target.src)) return save(target.src, name)
+  try {
+    const response = await fetch(target.src, { mode: "cors" })
+    if (!response.ok) throw new Error(String(response.status))
+    const url = URL.createObjectURL(await response.blob())
+    save(url, name)
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  } catch {
+    save(target.src, name, true)
+  }
 }
 
 async function copy() {
@@ -346,14 +441,15 @@ const ARROW =
         :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
+        ref="contentRef"
         class="fixed inset-0 flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
         :style="{ zIndex: layer.panel }"
         @keydown="onKeydown"
       >
         <!-- reka wants both for a labelled dialog; the caption is the title. -->
-        <DialogTitle class="sr-only">{{ item?.title ?? "Image viewer" }}</DialogTitle>
+        <DialogTitle class="sr-only">{{ item?.title ?? text.viewer }}</DialogTitle>
         <DialogDescription class="sr-only">
-          {{ item?.description ?? `Image ${current + 1} of ${total}` }}
+          {{ item?.description ?? position(current) }}
         </DialogDescription>
 
         <!-- Toolbar. Chrome drifts in from its own edge, slightly behind the
@@ -369,34 +465,34 @@ const ARROW =
           <div class="ml-auto flex items-center gap-1">
             <slot name="actions" :item="item!" :index="current" />
 
-            <button :class="BTN" type="button" title="Zoom out (−)" @click="zoom.zoomBy(1 / 1.3)">
+            <button :class="BTN" type="button" :title="text.zoomOut" @click="zoom.zoomBy(1 / 1.3)">
               <LpIcon name="lucide:zoom-out" :size="18" />
             </button>
-            <button :class="BTN" type="button" title="Zoom in (+)" @click="zoom.zoomBy(1.3)">
+            <button :class="BTN" type="button" :title="text.zoomIn" @click="zoom.zoomBy(1.3)">
               <LpIcon name="lucide:zoom-in" :size="18" />
             </button>
             <button
               v-if="rotatable"
               :class="BTN"
               type="button"
-              title="Rotate (R)"
+              :title="text.rotate"
               @click="rotate"
             >
               <LpIcon name="lucide:rotate-cw" :size="18" />
             </button>
-            <button v-if="copyable" :class="BTN" type="button" title="Copy image" @click="copy">
+            <button v-if="copyable" :class="BTN" type="button" :title="text.copy" @click="copy">
               <LpIcon name="lucide:copy" :size="18" />
             </button>
             <button
               v-if="downloadable"
               :class="BTN"
               type="button"
-              title="Download"
+              :title="text.download"
               @click="download"
             >
               <LpIcon name="lucide:download" :size="18" />
             </button>
-            <button :class="BTN" type="button" title="Close (Esc)" @click="close">
+            <button :class="BTN" type="button" :title="text.close" @click="close">
               <LpIcon name="lucide:x" :size="20" />
             </button>
           </div>
@@ -419,7 +515,7 @@ const ARROW =
             :class="[ARROW, 'left-4']"
             type="button"
             :disabled="!canPrev"
-            aria-label="Previous image"
+            :aria-label="text.previous"
             @click.stop="go(current - 1)"
           >
             <LpIcon name="lucide:chevron-left" :size="24" />
@@ -430,14 +526,28 @@ const ARROW =
             class="flex flex-col items-center gap-3 text-white/60"
           >
             <LpIcon name="lucide:image-off" :size="40" />
-            <p class="text-sm">This image couldn't be loaded.</p>
+            <p class="text-sm">{{ text.failed }}</p>
           </div>
-          <!-- Keyed on src so paging remounts the img and replays the slide;
-               without the key Vue patches it in place and the change is a hard
-               cut with no sense of direction. -->
+          <div
+            v-else-if="item && covered(current)"
+            class="flex flex-col items-center gap-3 text-white/70"
+          >
+            <LpIcon name="lucide:eye-off" :size="36" />
+            <p class="text-sm font-medium">{{ text.spoiler }}</p>
+            <button
+              type="button"
+              class="rounded-control bg-white/15 px-3 py-1.5 text-sm text-white outline-none transition-colors hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-ring"
+              @click.stop="reveal(current)"
+            >
+              {{ text.reveal }}
+            </button>
+          </div>
+          <!-- Keyed on position and src so paging remounts the img and replays
+               the slide, even between two items with the same source (whose
+               load event would otherwise never fire, leaving the spinner up). -->
           <img
             v-else-if="item"
-            :key="item.src"
+            :key="`${current}:${item.src}`"
             data-lightbox-image
             :src="item.src"
             :alt="item.title ?? ''"
@@ -449,7 +559,7 @@ const ARROW =
           />
 
           <LpIcon
-            v-if="loading && !failed"
+            v-if="loading && !failed && !covered(current)"
             name="lucide:loader-circle"
             :size="28"
             class="absolute animate-spin text-white/50"
@@ -459,7 +569,7 @@ const ARROW =
             :class="[ARROW, 'right-4']"
             type="button"
             :disabled="!canNext"
-            aria-label="Next image"
+            :aria-label="text.next"
             @click.stop="go(current + 1)"
           >
             <LpIcon name="lucide:chevron-right" :size="24" />
@@ -494,13 +604,14 @@ const ARROW =
               :style="{ '--thumb-delay': `${Math.min(i * 30, 240)}ms` }"
               class="size-14 shrink-0 overflow-hidden rounded-control outline-none ring-2 transition-[opacity,box-shadow,scale] duration-[var(--duration-fast)] hover:scale-105 focus-visible:ring-ring animate-[lightbox-chrome-in_var(--duration-medium)_var(--ease-emphasized)_both] [animation-delay:var(--thumb-delay)] motion-reduce:animate-none"
               :class="i === current ? 'opacity-100 ring-brand' : 'opacity-45 ring-transparent hover:opacity-80'"
-              :aria-label="entry.title ?? `Image ${i + 1}`"
+              :aria-label="entry.title ?? position(i)"
               @click="go(i)"
             >
               <img
                 :src="entry.thumb ?? entry.src"
                 :alt="entry.title ?? ''"
                 class="size-full object-cover"
+                :class="covered(i) ? 'scale-110 blur-md' : ''"
                 draggable="false"
               />
             </button>
