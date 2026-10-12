@@ -47,7 +47,7 @@
     "gen:names": "node scripts/gen-component-names.mjs",
     "build": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
-    "prepublishOnly": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts",
+    "prepublishOnly": "npm run build",
     "typecheck": "vue-tsc --noEmit",
     "test": "bun test",
     "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
