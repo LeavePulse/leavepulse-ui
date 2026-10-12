@@ -324,7 +324,7 @@ watch(
       </aside>
       <div
         ref="panelRef"
-        class="flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
+        class="relative flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
         :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >

@@ -564,6 +564,39 @@
   backdrop-filter: none;
 }
 
+/*
+ * The same glass where the blur does not composite but the app said what lies
+ * behind it (setGlassBackdrop): a blurred copy of that wallpaper, aligned to
+ * the viewport by the panel's offset, sits under a fill a little denser than
+ * the real glass, since only the wallpaper and not the page is softened.
+ */
+:root[data-lp-no-backdrop][data-lp-glass-backdrop] .lp-glass-overlay {
+  background: none;
+  isolation: isolate;
+  overflow: clip;
+}
+
+:root[data-lp-no-backdrop][data-lp-glass-backdrop] .lp-glass-overlay::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: calc(-1 * var(--lp-gx, 0px));
+  top: calc(-1 * var(--lp-gy, 0px));
+  width: 100vw;
+  height: 100vh;
+  /* The tint rides in the same layer: a negative z-index child paints over
+     its stacking context's own background, so a fill on the panel would sit
+     under the wallpaper and vanish. */
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--color-surface-raised) var(--glass-overlay-fallback-fill, 62%), transparent),
+      color-mix(in srgb, var(--color-surface-raised) var(--glass-overlay-fallback-fill, 62%), transparent)
+    ),
+    var(--lp-glass-backdrop);
+  filter: var(--lp-glass-backdrop-filter, blur(var(--glass-overlay-blur, 28px)) saturate(170%));
+  pointer-events: none;
+}
+
 /* The overlay gradient rides above the base fill but under the content. */
 .lp-skin-panel::before {
   content: "";

@@ -120,6 +120,29 @@ In Nuxt the module does it for you: `icons: "scan"` (default) registers every
 `lucide:*` literal found in the app's source, so they are in the SSR markup;
 `"all"` registers the whole set, `"kit"` only the kit's own, or pass a list.
 
+### Glass on WebKitGTK (Tauri on Linux)
+
+WebKitGTK reports `backdrop-filter` as supported and then draws nothing, and on
+some GPUs (NVIDIA with the proprietary driver) it runs without hardware
+acceleration at all. Call `detectBackdropFilter()` once at startup: glass
+panels then turn solid instead of showing the page unblurred.
+
+An app that paints its own wallpaper can keep the frosted look there: hand the
+kit the same `background` value and glass panels draw a blurred copy of it,
+aligned to the screen, under their tint.
+
+```ts
+import { detectBackdropFilter, setGlassBackdrop } from "@leavepulse/ui"
+
+detectBackdropFilter()
+setGlassBackdrop("url(/wallpaper.jpg) center / cover no-repeat, #0b0f14")
+// A wallpaper blurred ahead of time is cheaper on an engine that blurs on the CPU:
+// setGlassBackdrop("url(/wallpaper-blurred.jpg) center / cover", { filter: "none" })
+```
+
+Only the wallpaper is softened; live content under a panel stays sharp behind
+its tint. Nothing changes in engines where the real blur works.
+
 ### Native scrollbar skin (opt-in)
 
 `LpScrollArea` skins the scroll it owns. For everything it can't — the page
