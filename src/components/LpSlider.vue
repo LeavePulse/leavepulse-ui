@@ -9,6 +9,7 @@ export default { inheritAttrs: false }
 // Single-value slider (reka Slider). reka models value as an array; we expose
 // a plain number for the common single-thumb case. Themed via tokens.
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -38,6 +39,8 @@ function onCommit(v: number[] | undefined) {
   if (v && v.length) emit("change", v[0])
 }
 
+const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+
 // A slider is full-width by default; putting one in a toolbar means constraining it, and a fixed h-5 has to yield to a denser row.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55",
@@ -50,7 +53,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :min="min"
     :max="max"
     :step="step"
-    :disabled="disabled"
+    :disabled="field.disabled"
     :class="rootClass"
     v-bind="rest"
     @update:model-value="onUpdate"
@@ -60,7 +63,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <SliderRange class="absolute h-full rounded-pill bg-brand" />
     </SliderTrack>
     <SliderThumb
+      :id="field.id"
       :aria-label="ariaLabel"
+      :aria-labelledby="ariaLabel ? undefined : field.labelId"
+      :aria-describedby="field.describedBy"
       class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
     />
   </SliderRoot>

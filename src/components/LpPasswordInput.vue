@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 // Password field = LpInput + a show/hide toggle in its trailing slot.
 // No duplicated field styling — the shell lives in LpInput.
 import { ref } from "vue"
+import { useLabels } from "../composables/useLpConfig"
 import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 
@@ -23,6 +24,7 @@ defineProps<{
 }>()
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
+const text = useLabels("passwordInput", { show: "Show password", hide: "Hide password" })
 const visible = ref(false)
 const inner = ref<InstanceType<typeof LpInput> | null>(null)
 defineExpose({
@@ -35,6 +37,7 @@ defineExpose({
 <template>
   <LpInput
     ref="inner"
+    v-bind="$attrs"
     :model-value="modelValue"
     :type="visible ? 'text' : 'password'"
     :placeholder="placeholder"
@@ -51,7 +54,7 @@ defineExpose({
       <button
         type="button"
         class="group rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:text-ink"
-        :aria-label="visible ? 'Hide password' : 'Show password'"
+        :aria-label="visible ? text.hide : text.show"
         @click="visible = !visible"
       >
         <LpIcon

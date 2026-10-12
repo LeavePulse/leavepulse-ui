@@ -7,6 +7,7 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { RadioGroupIndicator, RadioGroupItem, RadioGroupRoot } from "reka-ui"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface RadioOption {
@@ -17,8 +18,10 @@ export interface RadioOption {
 // `options` renders simple {value,label} rows. For rich items (icons, badges,
 // multi-line) pass <LpRadio> children in the default slot instead — they share
 // the same RadioGroupRoot, so selection still flows through v-model.
-defineProps<{ modelValue?: string; options?: RadioOption[]; disabled?: boolean }>()
+const props = defineProps<{ modelValue?: string; options?: RadioOption[]; disabled?: boolean }>()
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
+
+const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
 
 // A radio group stacks with a fixed gap; a dense settings list needs it smaller, and a horizontal layout needs it gone.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -29,7 +32,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 <template>
   <RadioGroupRoot
     :model-value="modelValue"
-    :disabled="disabled"
+    :disabled="field.disabled"
+    :required="field.required"
+    :aria-labelledby="field.labelId"
+    :aria-describedby="field.describedBy"
+    :aria-invalid="field.invalid || undefined"
     :class="rootClass"
     v-bind="rest"
     @update:model-value="(v) => $emit('update:modelValue', v as string)"

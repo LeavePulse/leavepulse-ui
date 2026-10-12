@@ -1,3 +1,7 @@
+<script lang="ts">
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Date field + calendar popover. The model is an ISO date string ("YYYY-MM-DD",
@@ -14,7 +18,10 @@
  * the common case.
  */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
-import { computed, ref } from "vue"
+import { computed, ref, useAttrs } from "vue"
+import { useFieldControl } from "../composables/useField"
+import { useLabels } from "../composables/useLpConfig"
+import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
 import LpCalendar from "./LpCalendar.vue"
 import LpIcon from "./LpIcon.vue"
@@ -80,7 +87,11 @@ const shellSize = {
   lg: "h-(--size-control-lg) text-sm",
 }
 
-function onPick(v: string | undefined) {
+function onPick(picked: string | undefined) {
+  // Clicking the selected day again is the calendar's "deselect". Here it is
+  // someone confirming the date they already have, so it keeps the value and
+  // closes like any other pick; clearing has its own button.
+  const v = picked ?? (day.value || undefined)
   if (!props.time) {
     emit("update:modelValue", v)
     open.value = false
@@ -101,75 +112,95 @@ function onTime(at: string) {
 function clear() {
   emit("update:modelValue", undefined)
 }
+
+const attrs = useAttrs()
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: typeof attrs.id === "string" ? attrs.id : undefined,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
+const labels = useLabels("datePicker", { clear: "Clear" })
+const showClear = computed(() => props.clearable && !!props.modelValue && !field.value.disabled)
 </script>
 
 <template>
-  <PopoverRoot v-model:open="open">
-    <PopoverTrigger as-child>
-      <button
-        type="button"
-        :disabled="disabled"
-        class="group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
-        :class="[
-          shellSize[size],
-          invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',
-        ]"
-      >
-        <LpIcon name="lucide:calendar" :size="16" class="shrink-0 text-muted" />
-        <span class="min-w-0 flex-1 truncate" :class="display ? '' : 'text-muted'">
-          {{ display || placeholder }}
-        </span>
-        <span
-          v-if="clearable && modelValue && !disabled"
-          role="button"
-          tabindex="-1"
-          aria-label="Clear"
-          class="shrink-0 text-muted transition-colors hover:text-ink"
-          @click.stop="clear"
-          @keydown.enter.stop="clear"
+  <!-- The clear control sits beside the trigger, not inside it: a button
+       nested in a button is invalid, and the nested one was unreachable by
+       keyboard. -->
+  <div :class="mergeClass('relative w-full', attrs.class as string)" :style="attrs.style as never">
+    <PopoverRoot v-model:open="open">
+      <PopoverTrigger as-child>
+        <button
+          v-bind="{ ...attrs, class: undefined, style: undefined }"
+          :id="field.id"
+          type="button"
+          :disabled="field.disabled"
+          :aria-invalid="field.invalid || undefined"
+          :aria-describedby="field.describedBy"
+          class="group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
+          :class="[
+            shellSize[size],
+            field.invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',
+          ]"
         >
-          <LpIcon name="lucide:x" :size="15" />
-        </span>
-        <LpIcon
-          name="lucide:chevron-down"
-          :size="15"
-          class="shrink-0 text-muted transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[state=open]:rotate-180"
-        />
-      </button>
-    </PopoverTrigger>
-    <PopoverPortal>
-      <PopoverContent
-        :side-offset="6"
-        align="start"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) rounded-card p-0 outline-none']"
-      >
-        <LpCalendar
-          :model-value="day"
-          :min="min"
-          :max="max"
-          :is-disabled="isDisabled"
-          class="border-0 bg-transparent"
-          @update:model-value="onPick"
-        />
-        <div v-if="time" class="flex items-center gap-2 border-t border-line px-3 py-2">
-          <LpIcon name="lucide:clock" :size="15" class="shrink-0 text-muted" />
-          <LpTimeField
-            :model-value="minute || undefined"
-            :disabled="!day"
-            :icon="false"
-            size="sm"
-            class="flex-1"
-            @update:model-value="(at) => onTime(at || '')"
+          <LpIcon name="lucide:calendar" :size="16" class="shrink-0 text-muted" />
+          <span class="min-w-0 flex-1 truncate" :class="display ? '' : 'text-muted'">
+            {{ display || placeholder }}
+          </span>
+          <span v-if="showClear" class="w-[15px] shrink-0" aria-hidden="true" />
+          <LpIcon
+            name="lucide:chevron-down"
+            :size="15"
+            class="shrink-0 text-muted transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[state=open]:rotate-180"
           />
-          <button
-            type="button"
-            class="shrink-0 rounded-control px-2 py-1 text-xs text-muted transition-colors hover:text-ink"
-            @click="open = false"
-          >
-            {{ doneLabel }}
-          </button>
-        </div>
-      </PopoverContent>
-    </PopoverPortal>
-  </PopoverRoot>
+        </button>
+      </PopoverTrigger>
+      <PopoverPortal>
+        <PopoverContent
+          :side-offset="6"
+          align="start"
+          :class="[POPOVER_PANEL, 'z-(--z-popover) rounded-card p-0 outline-none']"
+        >
+          <LpCalendar
+            :model-value="day"
+            :min="min"
+            :max="max"
+            :is-disabled="isDisabled"
+            class="border-0 bg-transparent"
+            @update:model-value="onPick"
+          />
+          <div v-if="time" class="flex items-center gap-2 border-t border-line px-3 py-2">
+            <LpIcon name="lucide:clock" :size="15" class="shrink-0 text-muted" />
+            <LpTimeField
+              :model-value="minute || undefined"
+              :disabled="!day"
+              :icon="false"
+              size="sm"
+              class="flex-1"
+              @update:model-value="(at) => onTime(at || '')"
+            />
+            <button
+              type="button"
+              class="shrink-0 rounded-control px-2 py-1 text-xs text-muted transition-colors hover:text-ink"
+              @click="open = false"
+            >
+              {{ doneLabel }}
+            </button>
+          </div>
+        </PopoverContent>
+      </PopoverPortal>
+    </PopoverRoot>
+    <!-- Positioned over the spacer the trigger leaves for it, just before the
+         chevron (gap-2 + 15px chevron + px-3 from the right edge). -->
+    <button
+      v-if="showClear"
+      type="button"
+      :aria-label="labels.clear"
+      class="absolute top-1/2 right-[calc(0.75rem+15px+0.5rem)] flex -translate-y-1/2 items-center rounded-sm text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+      @click="clear"
+    >
+      <LpIcon name="lucide:x" :size="15" />
+    </button>
+  </div>
 </template>

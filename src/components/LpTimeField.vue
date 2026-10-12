@@ -13,6 +13,7 @@
 import { Time } from "@internationalized/date"
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui"
 import { computed } from "vue"
+import { useFieldControl } from "../composables/useField"
 import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
@@ -50,6 +51,12 @@ function onUpdate(next: unknown) {
   emit("update:modelValue", `${pad(next.hour)}:${pad(next.minute)}`)
 }
 
+const field = useFieldControl(() => ({
+  wrapped: false,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
+
 const shellSize = {
   sm: "h-(--size-control-sm) text-xs",
   md: "h-(--size-control-md) text-sm",
@@ -64,16 +71,20 @@ const shellSize = {
     :hour-cycle="hourCycle"
     :locale="locale"
     granularity="minute"
-    :disabled="disabled"
+    :disabled="field.disabled"
+    :aria-invalid="field.invalid || undefined"
+    :aria-describedby="field.describedBy"
     class="flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
     :class="[
       shellSize[size],
-      invalid ? 'border-danger focus-within:ring-danger-soft' : 'border-line focus-within:border-brand',
+      field.invalid ? 'border-danger focus-within:ring-danger-soft' : 'border-line focus-within:border-brand',
     ]"
     @update:model-value="onUpdate"
   >
     <LpIcon v-if="icon" name="lucide:clock" :size="15" class="mr-1.5 shrink-0 text-muted" />
-    <template v-for="item in segments" :key="item.part">
+    <!-- Indexed keys: in 12-hour mode the segments hold two "literal" parts
+         (the ":" and the space before AM/PM), which a key by part repeats. -->
+    <template v-for="(item, i) in segments" :key="i">
       <TimeFieldInput v-if="item.part === 'literal'" :part="item.part" class="text-muted">
         {{ item.value }}
       </TimeFieldInput>

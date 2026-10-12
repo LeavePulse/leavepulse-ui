@@ -16,18 +16,41 @@ export default { inheritAttrs: false }
  * eased box, so the thing being typed into never moves.
  */
 import { Label } from "reka-ui"
-import { useId } from "vue"
+import { computed, useId, useSlots } from "vue"
 import LpShift from "./LpShift.vue"
+import { fieldMessageId, provideField } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
-defineProps<{
+const props = defineProps<{
   label?: string
   hint?: string
   error?: string
   required?: boolean
+  /** Id of the control; generated when unset. The label points at it. */
+  id?: string
+  invalid?: boolean
+  disabled?: boolean
 }>()
 
-const id = useId()
+const generated = useId()
+const id = computed(() => props.id ?? generated)
+const messageId = computed(() => fieldMessageId(id.value))
+const slots = useSlots()
+const hasMessage = computed(() => !!props.error || !!props.hint || !!slots.hint)
+
+// The control inside reads its id, description and states from here, so the
+// label, the message line and aria-invalid stay tied to it without the
+// consumer threading ids by hand.
+provideField(
+  computed(() => ({
+    id: id.value,
+    labelId: props.label ? `${id.value}-label` : undefined,
+    describedBy: hasMessage.value ? messageId.value : undefined,
+    invalid: !!props.invalid || !!props.error,
+    required: !!props.required,
+    disabled: !!props.disabled,
+  })),
+)
 
 // The field stacks label and control with a fixed gap; a denser form needs that gap smaller.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -44,12 +67,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <div
     :class="rootClass"
     v-bind="rest">
-    <Label v-if="label" :for="id" class="text-sm font-medium text-ink">
+    <Label v-if="label" :id="`${id}-label`" :for="id" class="text-sm font-medium text-ink">
       {{ label }}
       <span v-if="required" class="text-danger">*</span>
     </Label>
 
-    <slot :id="id" />
+    <slot :id="id" :describedBy="hasMessage ? messageId : undefined" />
 
     <!-- Swapping hint→error changes the text but not the height, so the eased
          box only ever moves when a message appears or clears.
@@ -60,12 +83,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
          leave every message-less field a row taller than before — and would be
          a step the easing could not cover, since it exists even at height 0. -->
     <LpShift axis="height">
-      <p v-if="error" class="pt-1.5 text-xs text-danger">{{ error }}</p>
+      <p v-if="error" :id="messageId" class="pt-1.5 text-xs text-danger">{{ error }}</p>
       <!-- The hint is a slot as well as a prop: most are a sentence, but some
            carry a link or a unit in <code>, and a prop can only be text. Callers
            had been reaching for `#hint` on the assumption it existed — it
            rendered nothing, so the explanation silently went missing. -->
-      <p v-else-if="hint || $slots.hint" class="pt-1.5 text-xs text-muted">
+      <p v-else-if="hint || $slots.hint" :id="messageId" class="pt-1.5 text-xs text-muted">
         <slot name="hint">{{ hint }}</slot>
       </p>
     </LpShift>

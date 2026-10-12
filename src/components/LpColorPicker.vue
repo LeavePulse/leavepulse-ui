@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from "reka-ui"
 import { computed, ref, watch } from "vue"
+import { useFieldControl } from "../composables/useField"
 import {
   clampHsv,
   DEFAULT_SWATCHES,
@@ -271,7 +272,9 @@ function trackPointer(e: PointerEvent, onMove: (x: number, y: number) => void) {
 
 const onFieldPointer = (e: PointerEvent) =>
   trackPointer(e, (x, y) => set({ s: x, v: 1 - y }))
-const onHuePointer = (e: PointerEvent) => trackPointer(e, (x) => set({ h: x * 360 }))
+// 360° is 0° again, so the far edge of the rail would throw the thumb back to
+// the start; it stops just short instead, as End does.
+const onHuePointer = (e: PointerEvent) => trackPointer(e, (x) => set({ h: Math.min(x * 360, 359.9) }))
 const onAlphaPointer = (e: PointerEvent) => trackPointer(e, (x) => set({ a: x }))
 
 /* ── keyboard ─────────────────────────────────────
@@ -303,11 +306,13 @@ function step(e: KeyboardEvent, axis: "sv" | "h" | "a") {
 }
 
 /* ── text field ───────────────────────────────────
-   Typed text is parsed on every keystroke but only applied when it resolves to
-   a real colour, so a half-written "#3b8" never snaps the picker somewhere the
-   user is still on their way past. The field shows what is typed while it has
-   focus and the committed value once it doesn't. */
+   Typed text is parsed on every keystroke and previews as soon as it resolves
+   to a real colour, but is only committed (`change`) on Enter or when the field
+   loses focus: "#3b8" and "#3b82" are valid colours on the way to "#3b82f6",
+   and committing each one handed listeners three colours nobody chose. The
+   field shows what is typed while it has focus and the value once it doesn't. */
 const typed = ref<string | null>(null)
+let typedChange = false
 const inputValue = computed(() => typed.value ?? current.value)
 
 function onInput(e: Event) {
@@ -318,11 +323,19 @@ function onInput(e: Event) {
   const next = rgbToHsv(rgb)
   if (next.s === 0) next.h = hsv.value.h
   if (next.v === 0) next.s = hsv.value.s
-  set(props.alpha ? next : { ...next, a: 1 }, true)
+  set(props.alpha ? next : { ...next, a: 1 })
+  typedChange = true
+}
+
+function commitTyped() {
+  if (!typedChange) return
+  typedChange = false
+  emit("change", current.value)
 }
 
 function onInputBlur() {
   typed.value = null
+  commitTyped()
 }
 
 function pickSwatch(value: string) {
@@ -463,8 +476,12 @@ function remember(value: string) {
 // Remember on close rather than on every commit: the colour a person leaves the
 // popover on is the one they chose, while the ones they passed through on the
 // way are not history, they are the search for it.
+// Only a colour that changed while the popover was open: opening it to look,
+// or to copy the value out, is not a choice worth recording.
+let openedOn = ""
 watch(open, (isOpen, was) => {
-  if (was && !isOpen) remember(current.value)
+  if (isOpen) openedOn = current.value
+  else if (was && current.value !== openedOn) remember(current.value)
 })
 
 /**
@@ -573,6 +590,12 @@ const menuItems = computed<ContextMenuItemDef[]>(() => {
     : builtin
 })
 
+const field = useFieldControl(() => ({
+  wrapped: false,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
+
 defineExpose({ open })
 </script>
 
@@ -592,12 +615,15 @@ defineExpose({ open })
       <PopoverTrigger as-child>
         <button
           type="button"
-          :disabled="disabled"
+          :id="field.id"
+          :disabled="field.disabled"
           :aria-label="ariaLabel"
+          :aria-invalid="field.invalid || undefined"
+          :aria-describedby="field.describedBy"
           class="group inline-flex w-full items-center gap-2 rounded-control border bg-surface-soft px-2 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
           :class="[
             triggerSize[size],
-            invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',
+            field.invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',
           ]"
         >
           <!-- The swatch sits on the checkerboard so a transparent colour looks
@@ -645,6 +671,9 @@ defineExpose({ open })
               role="slider"
               :tabindex="disabled ? -1 : 0"
               :aria-label="l.saturation"
+              :aria-valuemin="0"
+              :aria-valuemax="100"
+              :aria-valuenow="Math.round(hsv.s * 100)"
               :aria-valuetext="fill(l.saturationValueText, { s: Math.round(hsv.s * 100), v: Math.round(hsv.v * 100) })"
               class="relative h-36 w-full cursor-crosshair touch-none overflow-hidden rounded-control outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               :style="fieldStyle"
@@ -728,6 +757,7 @@ defineExpose({ open })
                 :aria-label="l.value"
                 class="min-w-0 flex-1 select-text bg-transparent font-mono text-xs text-ink outline-none placeholder:text-muted"
                 @input="onInput"
+                @keydown.enter="commitTyped"
                 @blur="onInputBlur"
               />
             </div>

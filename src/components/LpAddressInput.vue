@@ -19,6 +19,7 @@ export default { inheritAttrs: false }
  * of every form that never shows a map.
  */
 import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
+import { useAsyncTask } from "../composables/useAsyncTask"
 import {
   type AddressField,
   type AddressLabels,
@@ -113,11 +114,32 @@ const geocoder = computed(() => props.provider ?? fallbackProvider)
 
 const value = computed<AddressValue>(() => props.modelValue ?? emptyAddress())
 
+// Patches build on the last value emitted, not on the prop: the prop only
+// catches up on the parent's next render, and two patches in one tick (the
+// text a suggestion fills in, then the parts it resolved) would otherwise each
+// start from the stale value and the second would undo the first.
+let latest: AddressValue | undefined
+watch(
+  () => props.modelValue,
+  () => (latest = undefined),
+)
 function patch(changes: Partial<AddressValue>) {
-  emit("update:modelValue", { ...value.value, ...changes })
+  latest = { ...(latest ?? value.value), ...changes }
+  emit("update:modelValue", latest)
 }
 
-const countries = ref<Country[]>([])
+// A part typed by hand describes a different place than the point a suggestion
+// or the map resolved, so the coordinates go with it: kept, they would pin the
+// stored address to somewhere else.
+function edit(changes: Partial<AddressValue>) {
+  patch({ ...changes, lat: undefined, lon: undefined })
+}
+
+const allCountries = ref<Country[]>([])
+const countries = computed(() => {
+  const only = props.only?.map((code) => code.toUpperCase())
+  return only?.length ? allCountries.value.filter((c) => only.includes(c.iso2)) : allCountries.value
+})
 const countryOptions = computed(() =>
   countries.value.map((country) => ({
     value: country.iso2,
@@ -126,9 +148,7 @@ const countryOptions = computed(() =>
 )
 
 onMounted(async () => {
-  const list = await loadCountries()
-  const only = props.only?.map((code) => code.toUpperCase())
-  countries.value = only?.length ? list.filter((c) => only.includes(c.iso2)) : list
+  allCountries.value = await loadCountries()
 })
 
 /*
@@ -138,37 +158,31 @@ onMounted(async () => {
  */
 function useSuggestions(field: AddressField) {
   const options = ref<AddressSuggestion[]>([])
-  const loading = ref(false)
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let controller: AbortController | undefined
+  const task = useAsyncTask<AddressSuggestion[]>()
 
   function query(term: string) {
-    if (timer) clearTimeout(timer)
-    controller?.abort()
     if (term.trim().length < props.minChars) {
+      task.cancel()
       options.value = []
-      loading.value = false
       return
     }
-    loading.value = true
-    timer = setTimeout(async () => {
-      controller = new AbortController()
-      try {
-        options.value = await geocoder.value.search(term.trim(), field, {
+    task.run(
+      (signal) =>
+        geocoder.value.search(term.trim(), field, {
           country: value.value.country || undefined,
           language: props.language,
-          signal: controller.signal,
-        })
-      } catch {
-        // Abort or network failure: leave the field usable as free text.
-        options.value = []
-      } finally {
-        loading.value = false
-      }
-    }, props.debounce)
+          signal,
+        }),
+      {
+        delay: props.debounce,
+        apply: (found) => (options.value = found),
+        // Network failure: leave the field usable as free text.
+        fail: () => (options.value = []),
+      },
+    )
   }
 
-  return { options, loading, query }
+  return { options, loading: task.pending, query }
 }
 
 const lineSuggestions = useSuggestions("line")
@@ -230,19 +244,21 @@ watch(mapOpen, (open) => {
   resolved.value = undefined
 })
 
-async function onPick(next: LatLon) {
+// Pins dropped in quick succession each start a lookup; only the latest one's
+// answer may describe the pin on screen.
+const reverse = useAsyncTask<AddressSuggestion | undefined>()
+watch(reverse.pending, (busy) => (resolving.value = busy))
+
+function onPick(next: LatLon) {
   point.value = next
-  resolving.value = true
   resolved.value = undefined
-  try {
-    resolved.value = await geocoder.value.reverse(next.lat, next.lon, {
-      language: props.language,
-    })
-  } catch {
-    resolved.value = undefined
-  } finally {
-    resolving.value = false
-  }
+  reverse.run(
+    () => geocoder.value.reverse(next.lat, next.lon, { language: props.language }),
+    {
+      apply: (found) => (resolved.value = found),
+      fail: () => (resolved.value = undefined),
+    },
+  )
 }
 
 /** Confirm the pin: fill in whatever came back and always keep the point. */
@@ -288,7 +304,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :empty-text="text.noSuggestions"
           :loading-text="text.searching"
           icon="lucide:map-pin"
-          @update:model-value="(next: string) => { patch({ line: next }); lineSuggestions.query(next) }"
+          @update:model-value="(next: string) => { edit({ line: next }); lineSuggestions.query(next) }"
           @select="onLineSelect"
         />
         <LpButton
@@ -330,7 +346,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :placeholder="text.cityPlaceholder"
           :empty-text="text.noSuggestions"
           :loading-text="text.searching"
-          @update:model-value="(next: string) => { patch({ city: next }); citySuggestions.query(next) }"
+          @update:model-value="(next: string) => { edit({ city: next }); citySuggestions.query(next) }"
           @select="onCitySelect"
         />
       </LpFormField>
@@ -342,7 +358,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :disabled="disabled"
         :size="size"
         autocomplete="postal-code"
-        @update:model-value="(next: string) => patch({ postalCode: next })"
+        @update:model-value="(next: string) => edit({ postalCode: next })"
       />
     </div>
 
@@ -355,7 +371,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :disabled="disabled"
         :size="size"
         searchable
-        @update:model-value="(next) => patch({ country: String(next ?? '') })"
+        @update:model-value="(next) => edit({ country: String(next ?? '') })"
       />
     </LpFormField>
 

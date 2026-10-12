@@ -16,8 +16,10 @@ export default { inheritAttrs: false }
  * is filled. Digits-only by default (TOTP); flip `alphanumeric` for backup codes.
  */
 import { PinInputInput, PinInputRoot } from "reka-ui"
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { joinCells, splitCode, type OtpCells } from "./otp"
 
 const props = withDefaults(
   defineProps<{
@@ -45,13 +47,44 @@ const emit = defineEmits<{
 
 // reka models the value as an array of per-cell strings; we bridge to a single
 // string at the boundary so callers never touch the array shape.
+//
+// The cells are kept here, positions and all, rather than re-split from the
+// string on every render: clearing a middle cell leaves a gap the string cannot
+// express, and re-splitting it shifted every later digit one cell left. The
+// cells are only rebuilt when the model changes from outside.
+const local = ref<string[]>(splitCode(props.modelValue, props.length))
+let emitted = props.modelValue ?? ""
+watch(
+  () => props.modelValue ?? "",
+  (value) => {
+    if (value === emitted) return
+    emitted = value
+    local.value = splitCode(value, props.length)
+  },
+)
+watch(
+  () => props.length,
+  (length) => {
+    local.value = local.value.slice(0, length)
+  },
+)
 const cells = computed<string[]>({
-  get: () => (props.modelValue ?? "").split("").slice(0, props.length),
-  set: (arr) => emit("update:modelValue", arr.join("")),
+  get: () => local.value,
+  set: (arr) => {
+    local.value = arr
+    emitted = joinCells(arr)
+    emit("update:modelValue", emitted)
+  },
 })
 
-function onComplete(arr: string[]) {
-  emit("complete", arr.join(""))
+const field = useFieldControl(() => ({
+  wrapped: false,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
+
+function onComplete(arr: OtpCells) {
+  emit("complete", joinCells(arr))
 }
 
 const cellSize = {
@@ -71,7 +104,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     v-model="cells"
     :type="alphanumeric ? 'text' : 'number'"
     :mask="mask"
-    :disabled="disabled"
+    :disabled="field.disabled"
     otp
     :class="rootClass"
     v-bind="rest"
@@ -81,14 +114,16 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       v-for="i in length"
       :key="i"
       :index="i - 1"
-      :aria-invalid="invalid || undefined"
+      :id="i === 1 ? field.id : undefined"
+      :aria-invalid="field.invalid || undefined"
+      :aria-describedby="field.describedBy"
       :class="[
         cellSize[size],
         'rounded-control border bg-surface-soft text-center font-semibold text-ink caret-brand',
         'outline-none transition-colors duration-[var(--duration-fast)]',
         'focus:border-brand focus:ring-2 focus:ring-ring',
         'disabled:cursor-not-allowed disabled:opacity-55',
-        invalid ? 'border-danger focus:border-danger focus:ring-danger-soft' : 'border-line',
+        field.invalid ? 'border-danger focus:border-danger focus:ring-danger-soft' : 'border-line',
       ]"
     />
   </PinInputRoot>

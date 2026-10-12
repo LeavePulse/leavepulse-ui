@@ -69,9 +69,16 @@ export interface UseFormDraftOptions<T> {
 }
 
 export interface UseFormDraft<T> {
-  /** A draft was found for this key, and has not been restored or discarded. */
+  /**
+   * A draft was found for this key, and has not been restored or discarded.
+   * Only a draft found on reading counts: the writes this composable makes as
+   * the user types never raise it. While it is up, automatic writes are held
+   * back, so the draft on offer cannot be overwritten by the form's own state
+   * (an async load of the record, or typing past the banner) before the user
+   * has answered.
+   */
   hasDraft: Ref<boolean>
-  /** When that draft was written, ISO-8601, or `null` when there is none. */
+  /** When the found draft was written, ISO-8601, or `null` when there is none. */
   savedAt: Ref<string | null>
   /**
    * The stored value, or `null`. Reading does not apply it — the caller decides
@@ -80,7 +87,7 @@ export interface UseFormDraft<T> {
   read: () => T | null
   /** Forget the draft. Call after applying it, and after a successful save. */
   discard: () => void
-  /** Write now, ignoring `dirty`. For "save and come back to this later". */
+  /** Write now, ignoring `dirty` and a pending draft. For "save and come back to this later". */
   save: () => void
 }
 
@@ -132,6 +139,17 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
     return String(toValue(options.key) || "").trim()
   }
 
+  // An envelope still worth offering, or null. No side effects: the key watcher
+  // only looks, and `read` decides what to clear.
+  function fresh(parsed: DraftEnvelope<T> | null): boolean {
+    if (!parsed || parsed.version !== ENVELOPE_VERSION) return false
+    if (maxAge <= 0) return true
+    // NaN when the stamp is unreadable, and NaN > maxAge is false — an
+    // unreadable stamp is treated as "no idea how old", which errs towards
+    // offering the draft rather than throwing away somebody's typing.
+    return !(Date.now() - Date.parse(parsed.savedAt) > maxAge)
+  }
+
   function read(): T | null {
     const store = storage()
     const key = currentKey()
@@ -145,19 +163,9 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
     if (!raw) return null
     try {
       const parsed = JSON.parse(raw) as DraftEnvelope<T>
-      if (!parsed || parsed.version !== ENVELOPE_VERSION) {
+      if (!fresh(parsed)) {
         discard()
         return null
-      }
-      if (maxAge > 0) {
-        const age = Date.now() - Date.parse(parsed.savedAt)
-        // NaN when the stamp is unreadable, and NaN > maxAge is false — an
-        // unreadable stamp is treated as "no idea how old", which errs towards
-        // offering the draft rather than throwing away somebody's typing.
-        if (age > maxAge) {
-          discard()
-          return null
-        }
       }
       return parsed.value
     } catch {
@@ -172,13 +180,12 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
     const store = storage()
     const key = currentKey()
     if (!store || !key) return
-    const stamp = new Date().toISOString()
     try {
       store.setItem(
         key,
         JSON.stringify({
           version: ENVELOPE_VERSION,
-          savedAt: stamp,
+          savedAt: new Date().toISOString(),
           value,
         } satisfies DraftEnvelope<T>),
       )
@@ -187,8 +194,6 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
       // unharmed; it simply has no safety net.
       return
     }
-    hasDraft.value = true
-    savedAt.value = stamp
   }
 
   function discard() {
@@ -226,7 +231,7 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
       if (!raw) return
       try {
         const parsed = JSON.parse(raw) as DraftEnvelope<T>
-        if (parsed?.version !== ENVELOPE_VERSION) return
+        if (!fresh(parsed)) return
         hasDraft.value = true
         savedAt.value = parsed.savedAt
       } catch {
@@ -240,7 +245,7 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
   watch(
     () => [toValue(options.value), toValue(options.dirty), toValue(options.disabled)],
     ([value, dirty, disabled]) => {
-      if (disabled) return
+      if (disabled || hasDraft.value) return
       // `dirty` unset means "every change is worth keeping"; the option exists
       // so a form that knows it is untouched leaves no trace.
       if (options.dirty !== undefined && !dirty) return

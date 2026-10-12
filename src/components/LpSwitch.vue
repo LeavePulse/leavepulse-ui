@@ -6,8 +6,9 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
-import { computed, useSlots } from "vue"
+import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -46,31 +47,53 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => {
     : "inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
 })
 
+// Whatever is not class (name, aria-*, @focus…) belongs to the switch itself,
+// labelled or not: on the label row it would land on the <label>.
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: typeof rest.value.id === "string" ? rest.value.id : undefined,
+  disabled: props.disabled,
+}))
+const descriptionId = `${useId()}-description`
+const describedBy = computed(
+  () => [props.description && labelled.value ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
+)
+
 function onUpdate(value: boolean) {
   emit("update:modelValue", value)
 }
 </script>
 
 <template>
-  <label v-if="labelled" :class="[rootClass, disabled && 'cursor-not-allowed']" v-bind="rest">
+  <label v-if="labelled" :class="[rootClass, field.disabled && 'cursor-not-allowed']">
     <span v-if="labelPosition === 'start'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
-      <span v-if="description" class="text-xs text-muted">{{ description }}</span>
+      <span v-if="description" :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
     </span>
-    <SwitchRoot :model-value="modelValue" :disabled="disabled" :class="TRACK" @update:model-value="onUpdate">
+    <SwitchRoot
+      v-bind="rest"
+      :id="field.id"
+      :model-value="modelValue"
+      :disabled="field.disabled"
+      :aria-describedby="describedBy"
+      :class="TRACK"
+      @update:model-value="onUpdate"
+    >
       <SwitchThumb :class="THUMB" />
     </SwitchRoot>
     <span v-if="labelPosition === 'end'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
-      <span v-if="description" class="text-xs text-muted">{{ description }}</span>
+      <span v-if="description" :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
     </span>
   </label>
   <SwitchRoot
     v-else
-    :model-value="modelValue"
-    :disabled="disabled"
-    :class="rootClass"
     v-bind="rest"
+    :id="field.id"
+    :model-value="modelValue"
+    :disabled="field.disabled"
+    :aria-describedby="describedBy"
+    :class="rootClass"
     @update:model-value="onUpdate"
   >
     <SwitchThumb :class="THUMB" />

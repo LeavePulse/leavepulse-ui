@@ -23,7 +23,7 @@ export default { inheritAttrs: false }
  * invisible to a keyboard: nothing focusable, nothing that Enter activates, and
  * the file dialog unreachable without a mouse.
  */
-import { onBeforeUnmount, onMounted, ref } from "vue"
+import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import LpIcon from "./LpIcon.vue"
@@ -168,17 +168,34 @@ function onPicked(event: Event) {
 }
 
 function windowPaste(event: ClipboardEvent) {
-  if (props.disabled) return
+  // Already taken by the zone itself, which the paste bubbled up from.
+  if (props.disabled || event.defaultPrevented) return
   const target = event.target as HTMLElement | null
   // A paste aimed at somewhere you can type belongs to that thing.
   if (target?.closest("input, textarea, [contenteditable]")) return
   onPaste(event)
 }
 
+let listening = false
+function listen(on: boolean) {
+  if (on === listening || typeof window === "undefined") return
+  listening = on
+  if (on) window.addEventListener("paste", windowPaste)
+  else window.removeEventListener("paste", windowPaste)
+}
+let mounted = false
 onMounted(() => {
-  if (props.pasteTarget) window.addEventListener("paste", windowPaste)
+  mounted = true
+  listen(props.pasteTarget)
 })
-onBeforeUnmount(() => window.removeEventListener("paste", windowPaste))
+watch(
+  () => props.pasteTarget,
+  (on) => mounted && listen(on),
+)
+onBeforeUnmount(() => {
+  mounted = false
+  listen(false)
+})
 
 defineExpose({ browse: () => input.value?.click() })
 

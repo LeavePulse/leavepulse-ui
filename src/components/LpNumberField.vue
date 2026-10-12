@@ -13,11 +13,12 @@ import {
   NumberFieldInput,
   NumberFieldRoot,
 } from "reka-ui"
-import { useId } from "vue"
+import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
-defineProps<{
+const props = defineProps<{
   // null = empty field (reka's native state); consumers that need a number
   // should default it themselves, the field doesn't invent a value.
   modelValue?: number | null
@@ -30,6 +31,7 @@ defineProps<{
   // "Depth", "Weight" tells the reader nothing about which one wants grams.
   // Not part of the value: it is never typed, selected, or submitted.
   unit?: string
+  invalid?: boolean
 }>()
 
 defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
@@ -39,9 +41,19 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
 // and leaves out the milliamps that make it mean anything.
 const unitId = useId()
 
+const field = useFieldControl(() => ({ wrapped: false, invalid: props.invalid, disabled: props.disabled }))
+const describedBy = computed(
+  () => [field.value.describedBy, props.unit ? unitId : undefined].filter(Boolean).join(" ") || undefined,
+)
+
 // The field is full-width with its own control frame — the two things a consumer laying out a compact numeric column needs to change.
-const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex h-(--size-control-md) w-full items-center rounded-control border border-line bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "flex h-(--size-control-md) w-full items-center rounded-control border bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    field.value.invalid
+      ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
+      : "border-line focus-within:border-brand focus-within:ring-ring",
+  ].join(" "),
 )
 </script>
 
@@ -51,7 +63,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :min="min"
     :max="max"
     :step="step"
-    :disabled="disabled"
+    :disabled="field.disabled"
+    :required="field.required"
     data-lp-ring-owner
     :class="rootClass"
     v-bind="rest"
@@ -67,7 +80,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       />
     </NumberFieldDecrement>
     <NumberFieldInput
-      :aria-describedby="unit ? unitId : undefined"
+      :id="field.id"
+      :aria-describedby="describedBy"
+      :aria-invalid="field.invalid || undefined"
       class="min-w-0 flex-1 bg-transparent text-center text-sm text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
     />
     <!-- The unit sits between the value and the increment button, so a long one

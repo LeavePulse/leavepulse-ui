@@ -50,7 +50,15 @@ export function clampHsv(c: Hsv): Hsv {
   }
 }
 
-export function hsvToRgb({ h, s, v, a }: Hsv): Rgb {
+// NaN and Infinity read as 0: one bad channel must not throw out of a public
+// conversion or poison the others.
+const finite = (n: number) => (Number.isFinite(n) ? n : 0)
+
+export function hsvToRgb(color: Hsv): Rgb {
+  const h = finite(color.h)
+  const s = clamp(finite(color.s), 0, 1)
+  const v = clamp(finite(color.v), 0, 1)
+  const a = Number.isFinite(color.a) ? color.a : 1
   const hue = normalizeHue(h) / 60
   const c = v * s
   const x = c * (1 - Math.abs((hue % 2) - 1))
@@ -99,10 +107,20 @@ export function rgbToHsv({ r, g, b, a }: Rgb): Hsv {
 
 const hex2 = (n: number) => clamp(Math.round(n), 0, 255).toString(16).padStart(2, "0")
 
+/**
+ * Alpha quantised to the one precision every format can carry, a byte, so hex,
+ * rgb and hsl agree on whether a colour is opaque: 0.996 used to print as an
+ * opaque rgb() and as "#…fe" in hex.
+ */
+function alphaByte(a: number): number {
+  return Math.round(clamp(a, 0, 1) * 255)
+}
+
 /** "#rrggbb", or "#rrggbbaa" when the colour is not fully opaque. */
 export function rgbToHex({ r, g, b, a }: Rgb): string {
   const base = `#${hex2(r)}${hex2(g)}${hex2(b)}`
-  return a >= 1 ? base : base + hex2(a * 255)
+  const byte = alphaByte(a)
+  return byte >= 255 ? base : base + hex2(byte)
 }
 
 /**
@@ -199,20 +217,23 @@ export function hsvToHsl({ h, s, v }: Hsv): { h: number; s: number; l: number } 
 /** The colour as a CSS string in the requested format. */
 export function formatColor(c: Hsv, format: ColorFormat): string {
   const rgb = hsvToRgb(c)
-  const a = Math.round(clamp(c.a, 0, 1) * 100) / 100
+  const byte = alphaByte(rgb.a)
+  const a = Math.round((byte / 255) * 1000) / 1000
 
   if (format === "hex") return rgbToHex(rgb)
   if (format === "rgb") {
-    return a >= 1
+    return byte >= 255
       ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
       : `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`
   }
 
-  const { h, s, l } = hsvToHsl(c)
-  const hh = Math.round(h)
-  const ss = Math.round(s * 100)
-  const ll = Math.round(l * 100)
-  return a >= 1 ? `hsl(${hh}, ${ss}%, ${ll}%)` : `hsla(${hh}, ${ss}%, ${ll}%, ${a})`
+  // One decimal: whole percentages drift up to 4 per channel on the way back.
+  const { h, s, l } = hsvToHsl({ ...c, h: finite(c.h), s: clamp(finite(c.s), 0, 1), v: clamp(finite(c.v), 0, 1) })
+  const dec = (n: number) => Math.round(n * 10) / 10
+  const hh = dec(h) % 360
+  const ss = dec(s * 100)
+  const ll = dec(l * 100)
+  return byte >= 255 ? `hsl(${hh}, ${ss}%, ${ll}%)` : `hsla(${hh}, ${ss}%, ${ll}%, ${a})`
 }
 
 /** Always opaque — for the swatch behind an alpha checkerboard, and for rails. */

@@ -16,6 +16,7 @@ export default { inheritAttrs: false }
 import { Motion } from "motion-v"
 import { ToggleGroupItem, ToggleGroupRoot } from "reka-ui"
 import { useId } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
@@ -25,6 +26,11 @@ export interface SegmentedOption {
   label?: string
   /** Optional iconify name shown before the label (or alone, icon-only). */
   icon?: string
+  /**
+   * Accessible name for an icon-only segment. Without it the raw `value` is
+   * announced, which is an identifier rather than words.
+   */
+  ariaLabel?: string
 }
 
 const props = withDefaults(
@@ -66,6 +72,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   ].join(" "),
 )
 
+const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+
 const pillId = `lp-segmented-${useId()}`
 const pillTransition = usePillTransition()
 </script>
@@ -74,7 +82,9 @@ const pillTransition = usePillTransition()
   <ToggleGroupRoot
     :model-value="modelValue"
     type="single"
-    :disabled="disabled"
+    :disabled="field.disabled"
+    :aria-labelledby="field.labelId"
+    :aria-describedby="field.describedBy"
     :rovingFocus="true"
     :class="rootClass"
     v-bind="rest"
@@ -84,7 +94,7 @@ const pillTransition = usePillTransition()
       v-for="opt in options"
       :key="opt.value"
       :value="opt.value"
-      :aria-label="opt.label ? undefined : opt.value"
+      :aria-label="opt.ariaLabel ?? (opt.label ? undefined : opt.value)"
       class="relative inline-flex h-full items-center justify-center gap-1.5 rounded-md px-3 font-medium outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] focus-visible:ring-2 focus-visible:ring-ring data-[state=on]:text-ink data-[state=off]:text-muted data-[state=off]:hover:text-ink disabled:cursor-not-allowed disabled:opacity-55"
       :class="block ? 'flex-1' : ''"
     >

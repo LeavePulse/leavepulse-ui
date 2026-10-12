@@ -1,3 +1,7 @@
+<script lang="ts">
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Free-text autocomplete — a text field that suggests as you type but never
@@ -21,8 +25,10 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, ref, watch } from "vue"
+import { computed, ref, useAttrs, watch } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
+import { useLabels } from "../composables/useLpConfig"
 import { CLOSE_ICON, OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
@@ -78,7 +84,7 @@ const emit = defineEmits<{
   (e: "select", value: string): void
 }>()
 
-const { isInvalid, onBeforeInput, onPaste } = useInputFilter({
+const { isInvalid, onBeforeInput, onInput: filterInput, onCompositionEnd, onPaste } = useInputFilter({
   pattern: () => props.pattern,
   restrict: () => props.restrict,
 })
@@ -88,7 +94,22 @@ const text = computed<string>({
   set: (v) => emit("update:modelValue", v),
 })
 
-const isInvalidState = computed(() => props.invalid || isInvalid(props.modelValue))
+// class/style lay out the whole control; every other attr (name, autocomplete,
+// @blur, @keydown…) belongs to the text <input>.
+const attrs = useAttrs()
+const inputAttrs = computed(() => {
+  const { class: _c, style: _s, ...rest } = attrs
+  return rest
+})
+
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: typeof attrs.id === "string" ? attrs.id : undefined,
+  invalid: props.invalid || isInvalid(props.modelValue),
+  disabled: props.disabled,
+}))
+const isInvalidState = computed(() => field.value.invalid)
+const labels = useLabels("autocomplete", { clear: "Clear" })
 
 // Normalise string|option to a stable shape.
 const items = computed<AutocompleteOption[]>(() =>
@@ -135,6 +156,13 @@ watch(canOpen, (can) => {
   if (focused.value && can) open.value = true
 })
 
+// reka opens the list on every keystroke; below `minChars` (or with nothing to
+// show) that only produced an empty "No suggestions" panel, so opening is
+// refused here. Closing is always allowed.
+function onOpenChange(next: boolean) {
+  open.value = next && canOpen.value
+}
+
 const hasValue = computed(() => (props.modelValue ?? "").length > 0)
 
 const anchorSize = {
@@ -144,6 +172,7 @@ const anchorSize = {
 }
 
 function onInput(event: Event) {
+  filterInput(event)
   typing.value = true
   text.value = (event.target as HTMLInputElement).value
 }
@@ -172,12 +201,14 @@ function clear() {
 
 <template>
   <ComboboxRoot
-    v-model:open="open"
+    :open="open"
     :ignore-filter="true"
     :reset-search-term-on-blur="false"
     :reset-search-term-on-select="false"
-    :disabled="disabled"
-    class="relative"
+    :disabled="field.disabled"
+    :class="['relative', attrs.class]"
+    :style="attrs.style as never"
+    @update:open="onOpenChange"
   >
     <ComboboxAnchor
       data-lp-ring-owner
@@ -198,14 +229,18 @@ function clear() {
         so `text` (and the reactive `open`) track the field exactly.
       -->
       <ComboboxInput
+        v-bind="inputAttrs"
+        :id="field.id"
         :model-value="text"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="field.disabled"
+        :required="field.required || undefined"
         :aria-invalid="isInvalidState || undefined"
-        auto-focus
+        :aria-describedby="field.describedBy"
         class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
         @beforeinput="onBeforeInput"
         @paste="onPaste"
+        @compositionend="onCompositionEnd"
         @input="onInput"
         @focus="onFocus"
         @blur="focused = false"
@@ -214,8 +249,9 @@ function clear() {
         v-if="clearable && hasValue"
         type="button"
         class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
-        aria-label="Clear"
-        @pointerdown.prevent="clear"
+        :aria-label="labels.clear"
+        @pointerdown.prevent
+        @click="clear"
       >
         <LpIcon
           name="lucide:x"

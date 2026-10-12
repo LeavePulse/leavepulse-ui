@@ -5,6 +5,7 @@ export default { inheritAttrs: false }
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { mergeClass } from "../composables/useMergedClass"
 import LpFormField from "./LpFormField.vue"
@@ -78,7 +79,7 @@ const props = withDefaults(
 
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
-const { isInvalid, onBeforeInput, onPaste } = useInputFilter({
+const { isInvalid, onBeforeInput, onInput: filterInput, onCompositionEnd, onPaste } = useInputFilter({
   pattern: () => props.pattern,
   restrict: () => props.restrict,
 })
@@ -93,9 +94,15 @@ const hasTrailing = computed(() => !!slots.trailing)
 const hasField = computed(
   () => !!props.label || !!props.hint || !!props.error,
 )
-const isInvalidState = computed(
-  () => props.invalid || !!props.error || patternInvalid.value,
-)
+const field = useFieldControl(() => ({
+  wrapped: hasField.value,
+  hasMessage: !!props.error || !!props.hint,
+  id: typeof attrs.id === "string" ? attrs.id : undefined,
+  invalid: props.invalid || !!props.error || patternInvalid.value,
+  required: props.required,
+  disabled: props.disabled,
+}))
+const isInvalidState = computed(() => field.value.invalid)
 const shellClass = computed(() =>
   shell({ size: props.size, invalid: isInvalidState.value }),
 )
@@ -126,6 +133,7 @@ defineExpose({
     :hint="hasField ? hint : undefined"
     :error="hasField ? error : undefined"
     :required="hasField ? required : undefined"
+    :id="hasField ? field.id : undefined"
     :class="hasField ? rootClass : undefined"
     :style="hasField ? rootStyle : undefined"
   >
@@ -140,12 +148,14 @@ defineExpose({
       <input
         ref="inputEl"
         v-bind="inputAttrs"
+        :id="field.id"
         :type="type"
         :value="modelValue"
         :placeholder="placeholder"
-        :disabled="disabled"
-        :required="required || undefined"
+        :disabled="field.disabled"
+        :required="field.required || undefined"
         :aria-invalid="isInvalidState || undefined"
+        :aria-describedby="field.describedBy"
         :class="[
           'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
           hasLeading ? 'pl-2' : padX[size ?? 'md'],
@@ -153,7 +163,8 @@ defineExpose({
         ]"
         @beforeinput="onBeforeInput"
         @paste="onPaste"
-        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+        @compositionend="onCompositionEnd"
+        @input="filterInput($event); $emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       />
       <slot name="trailing" />
     </div>

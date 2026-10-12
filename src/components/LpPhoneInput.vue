@@ -27,9 +27,11 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, useAttrs } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
-import { type Country, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
+import { useLabels } from "../composables/useLpConfig"
+import { type Country, filterCountries, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
 import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -74,7 +76,9 @@ const emit = defineEmits<{
 // Phone keys only: digits, "+", spaces and the usual separators. Free typing of
 // "+code" stays possible; letters and junk are blocked at the source.
 const PHONE_CHARS = /[\d+()\-\s]/
-const { onBeforeInput, onPaste } = useInputFilter({ restrict: () => PHONE_CHARS })
+const { onBeforeInput, onInput: filterInput, onCompositionEnd, onPaste } = useInputFilter({
+  restrict: () => PHONE_CHARS,
+})
 
 // The dial-code table is code-split; it's empty until the lazy chunk resolves.
 // Everything degrades gracefully meanwhile: digits still parse, the flag shows a
@@ -100,13 +104,7 @@ const activeCountry = computed<Country | undefined>(
 const open = ref(false)
 const query = ref("")
 
-const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  if (!q) return countries.value
-  return countries.value.filter(
-    (c) => c.name.toLowerCase().includes(q) || c.dial.includes(q.replace(/\D/g, "")),
-  )
-})
+const filtered = computed(() => filterCountries(countries.value, query.value))
 
 function parse(value: string): PhoneDetail {
   const country = matchCountryByValue(value, countries.value)
@@ -123,6 +121,7 @@ function setValue(value: string) {
 }
 
 function onInput(e: Event) {
+  filterInput(e)
   setValue((e.target as HTMLInputElement).value)
 }
 
@@ -139,15 +138,21 @@ function chooseCountry(c: Country) {
   query.value = ""
 }
 
-// Load the dial-code table on mount (lazy chunk), then seed the default
-// country's "+code" into an empty field so the user starts with the prefix in
-// place — but never clobber a value the consumer already provided.
 onMounted(async () => {
   allCountries.value = await loadCountries()
-  if (!props.modelValue && fallback.value) {
-    emit("update:modelValue", `+${fallback.value.dial} `)
-  }
 })
+
+// The default country's "+code" is put in place when the user enters an empty
+// field, and taken back out if they leave without typing a number. Seeding it
+// on mount instead made every untouched optional field submit "+380 ", pass
+// `required`, and read as edited.
+const seeded = computed(() => (fallback.value ? `+${fallback.value.dial} ` : ""))
+function onFocus() {
+  if (!props.modelValue && seeded.value) setValue(seeded.value)
+}
+function onBlur() {
+  if (seeded.value && props.modelValue?.trim() === seeded.value.trim()) setValue("")
+}
 
 const sizeClass = {
   sm: "h-(--size-control-sm) text-xs",
@@ -157,23 +162,37 @@ const sizeClass = {
 
 // The control is full-width with its own frame — the two things a consumer
 // placing it in a narrow column has to change, so `class="w-48"` must win.
+// style lays out the frame; every other attr (name, autocomplete, @blur…)
+// belongs to the number <input>.
+const attrs = useAttrs()
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: typeof attrs.id === "string" ? attrs.id : undefined,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
+const text = useLabels("phoneInput", { selectCountry: "Select country" })
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
     "flex w-full items-stretch rounded-control border bg-surface-soft text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring",
     sizeClass[props.size],
-    props.invalid
+    field.value.invalid
       ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
       : "border-line focus-within:border-brand",
-    props.disabled ? "cursor-not-allowed opacity-55" : "",
+    field.value.disabled ? "cursor-not-allowed opacity-55" : "",
   ].join(" "),
 )
+const inputAttrs = computed(() => {
+  const { style: _s, ...others } = rest.value
+  return others
+})
 </script>
 
 <template>
   <div
     data-lp-ring-owner
     :class="rootClass"
-    v-bind="rest"
+    :style="attrs.style as never"
   >
     <!-- reset-search-term-on-{select,blur}: as in LpSelect, the trigger shows
          the selection and the box only filters, so reka seeding the chosen value
@@ -184,15 +203,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       :ignore-filter="true"
       :reset-search-term-on-select="false"
       :reset-search-term-on-blur="false"
-      :disabled="disabled"
+      :disabled="field.disabled"
       class="flex"
     >
       <ComboboxAnchor as-child>
         <ComboboxTrigger
           type="button"
-          :disabled="disabled"
-          class="flex shrink-0 items-center gap-1 rounded-l-control border-r border-line px-2.5 outline-none hover:bg-white/[0.04] data-[state=open]:bg-white/[0.04]"
-          aria-label="Select country"
+          :disabled="field.disabled"
+          class="flex shrink-0 items-center gap-1 rounded-l-control border-r border-line px-2.5 outline-none hover:bg-ink/5 data-[state=open]:bg-ink/5"
+          :aria-label="text.selectCountry"
         >
           <span class="text-base leading-none">{{ activeCountry ? flagEmoji(activeCountry.iso2) : "🌐" }}</span>
           <LpIcon
@@ -247,17 +266,24 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     </ComboboxRoot>
 
     <input
-      :value="modelValue"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :aria-invalid="invalid || undefined"
       type="tel"
       inputmode="tel"
       autocomplete="tel"
+      v-bind="inputAttrs"
+      :id="field.id"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :disabled="field.disabled"
+      :required="field.required || undefined"
+      :aria-invalid="field.invalid || undefined"
+      :aria-describedby="field.describedBy"
       class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent px-3 outline-none placeholder:text-muted"
       @beforeinput="onBeforeInput"
       @paste="onPaste"
+      @compositionend="onCompositionEnd"
       @input="onInput"
+      @focus="onFocus"
+      @blur="onBlur"
     />
   </div>
 </template>

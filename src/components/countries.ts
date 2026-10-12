@@ -65,3 +65,15 @@ export function matchCountryByValue(
   }
   return best
 }
+
+/**
+ * Countries matching a search query: by name, or by dial code when the query
+ * carries digits ("+44", "44"). A query without digits must not match on the
+ * dial code at all, or every country would match the empty string.
+ */
+export function filterCountries(list: Country[], query: string): Country[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return list
+  const digits = q.replace(/\D/g, "")
+  return list.filter((c) => c.name.toLowerCase().includes(q) || (digits !== "" && c.dial.includes(digits)))
+}
