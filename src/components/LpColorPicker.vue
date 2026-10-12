@@ -36,7 +36,8 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui"
-import { computed, ref, watch } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
+import { prefersReducedMotion } from "../composables/easing"
 import { useFieldControl } from "../composables/useField"
 import {
   clampHsv,
@@ -53,6 +54,7 @@ import { useClipboard } from "../composables/useClipboard"
 import { POPOVER_PANEL } from "./dropdown"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
 
 /**
  * Every user-facing string the picker renders on its own — the menu items, the
@@ -554,9 +556,28 @@ async function pasteColor() {
  * emit the picker would display rgb() while the app still stored hex, and the
  * next thing to read that value would disagree with the screen.
  */
+/*
+ * A format switch rewrites the whole text in place ("#3b82f6" becomes
+ * "rgb(59 130 246)"), so the new value rolls in over the field the way the
+ * kit's other changing labels do. An <input> cannot animate its own text, so
+ * a rolling copy lies over it for the length of the roll; it only ever moves
+ * on a format switch, never while a colour is being dragged.
+ */
+const ROLL_MS = 320
+const rollText = ref(current.value)
+const rolling = ref(false)
+let rollTimer: ReturnType<typeof setTimeout> | undefined
+
 function setFormat(f: ColorFormat) {
   if (activeFormat.value === f) return
+  rollText.value = inputValue.value
   activeFormat.value = f
+  if (!prefersReducedMotion()) {
+    rolling.value = true
+    void nextTick(() => (rollText.value = current.value))
+    if (rollTimer) clearTimeout(rollTimer)
+    rollTimer = setTimeout(() => (rolling.value = false), ROLL_MS + 40)
+  }
   typed.value = null
   emit("update:modelValue", current.value)
   emit("change", current.value)
@@ -749,6 +770,15 @@ defineExpose({ open })
                 class="size-4 shrink-0 rounded-[5px] border border-line"
                 :style="{ backgroundColor: previewCss }"
               />
+              <span class="relative flex min-w-0 flex-1 items-center">
+              <LpRollingText
+                v-show="rolling"
+                :value="rollText"
+                :duration="ROLL_MS"
+                align="start"
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 font-mono text-xs text-ink"
+              />
               <input
                 :value="inputValue"
                 :disabled="disabled"
@@ -757,10 +787,12 @@ defineExpose({ open })
                 autocomplete="off"
                 :aria-label="l.value"
                 class="min-w-0 flex-1 select-text bg-transparent font-mono text-xs text-ink outline-none placeholder:text-muted"
+                :class="rolling ? 'text-transparent' : ''"
                 @input="onInput"
                 @keydown.enter="commitTyped"
                 @blur="onInputBlur"
               />
+              </span>
             </div>
 
             <!-- Recent sits ABOVE the presets because it is the row that
