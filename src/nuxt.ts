@@ -18,9 +18,17 @@
  *   link         false to skip providing NuxtLink as the kit's link component
  *   exclude      component names not to auto-register (e.g. ["LayoutCanvas"]
  *                when the app has its own component of that name)
+ *   icons        which lucide icons render in the server pass and ship in the
+ *                main bundle: "scan" (default) finds "lucide:*" literals in the
+ *                app's source, "all" registers the whole set, "kit" only the
+ *                kit's own, or a list of names. Anything else still renders,
+ *                from a lazily loaded chunk of the bundled collection.
  */
-import { addComponent, addPlugin, addTemplate, createResolver, defineNuxtModule } from "@nuxt/kit"
+import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { addComponent, addPlugin, addPluginTemplate, addTemplate, createResolver, defineNuxtModule } from "@nuxt/kit"
 import { COMPONENT_NAMES } from "./component-names"
+import { namesInDirs, subset } from "./iconSubset.mjs"
 
 export interface LeavepulseUiOptions {
   /** Register the SSR theme plugin. Disable to wire theming yourself. */
@@ -33,17 +41,28 @@ export interface LeavepulseUiOptions {
   link?: boolean
   /** Component names to leave unregistered. */
   exclude?: string[]
+  /** Lucide icons registered up front (default "scan"). */
+  icons?: "scan" | "all" | "kit" | string[]
+}
+
+function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string): string {
+  if (mode === "kit") return ""
+  if (mode === "all") return 'import "@leavepulse/ui/icons-all"\n'
+  const lucide = JSON.parse(readFileSync(createRequire(import.meta.url).resolve("@iconify-json/lucide/icons.json"), "utf8"))
+  const names = Array.isArray(mode) ? mode.map((n) => n.replace(/^lucide:/, "")) : namesInDirs([srcDir])
+  return `import { registerIconCollection } from "@leavepulse/ui"\nregisterIconCollection(${JSON.stringify(subset(lucide, names))})\n`
 }
 
 export default defineNuxtModule<LeavepulseUiOptions>({
   meta: { name: "@leavepulse/ui", configKey: "leavepulseUi" },
-  defaults: { theme: true, link: true },
+  defaults: { theme: true, link: true, icons: "scan" },
   setup(
     options: LeavepulseUiOptions,
     nuxt: {
       options: {
         runtimeConfig: { public: Record<string, unknown> }
         alias: Record<string, string>
+        srcDir: string
       }
       hook: (
         name: "prepare:types",
@@ -61,6 +80,15 @@ export default defineNuxtModule<LeavepulseUiOptions>({
         name,
         export: "default",
         filePath: `@leavepulse/ui/dist/components/${name}.vue.js`,
+      })
+    }
+
+    const icons = iconsPlugin(options.icons, nuxt.options.srcDir)
+    if (icons) {
+      addPluginTemplate({
+        filename: "leavepulse-ui-icons.mjs",
+        mode: "all",
+        getContents: () => `${icons}import { defineNuxtPlugin } from "#app"\nexport default defineNuxtPlugin(() => {})\n`,
       })
     }
 

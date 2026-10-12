@@ -22,6 +22,10 @@
       "style": "./src/index.css",
       "import": "./dist/index.js"
     },
+    "./icons-all": {
+      "types": "./dist/icons-all.d.ts",
+      "import": "./dist/icons-all.js"
+    },
     "./nuxt": "./src/nuxt.ts",
     "./css": "./src/index.css",
     "./tokens.css": "./src/tokens/tokens.css",
@@ -41,12 +45,15 @@
   "sideEffects": [
     "**/*.css",
     "**/icons.ts",
-    "**/chunks/LpIcon-*.js"
+    "**/icons-all.ts",
+    "**/icons-all.js",
+    "**/chunks/LpIcon-*.js",
+    "**/chunks/icons-*.js"
   ],
   "scripts": {
     "dev": "vite",
     "gen:names": "node scripts/gen-component-names.mjs",
-    "build": "node scripts/gen-component-names.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
+    "build": "node scripts/gen-component-names.mjs && node scripts/gen-kit-icons.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "vue-tsc --noEmit",
@@ -54,7 +61,8 @@
     "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags",
-    "check:pack": "node scripts/check-pack.mjs"
+    "check:pack": "node scripts/check-pack.mjs",
+    "gen:icons": "node scripts/gen-kit-icons.mjs"
   },
   "peerDependencies": {
     "@iconify-json/lucide": "^1.2.0",

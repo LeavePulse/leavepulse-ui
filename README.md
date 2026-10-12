@@ -97,6 +97,29 @@ The module registers every exported component, paints the saved theme during
 SSR (from the `lp-theme` cookie, no flash), and provides `NuxtLink` as the link
 component. `theme: false`, `link: false` and `exclude: ["Name"]` opt out.
 
+### Icons
+
+`<LpIcon name="lucide:check">` renders offline, never through the iconify API.
+The kit registers only the icons its own components use (about 20 KB instead of
+the whole ~540 KB lucide set). Any other lucide name still renders: the full
+collection loads as a separate chunk of your bundle the first time one is
+needed, and an empty box of the same size holds the place until then.
+
+Register icons up front when they must be in the server render or must not wait
+for a chunk:
+
+```ts
+import { registerIcons, registerIconCollection } from "@leavepulse/ui"
+
+await registerIcons(["lucide:rocket", "lucide:server"])  // from the bundled lucide set
+registerIconCollection(myIconsJson)                      // any iconify collection
+import "@leavepulse/ui/icons-all"                        // the whole lucide set, as before
+```
+
+In Nuxt the module does it for you: `icons: "scan"` (default) registers every
+`lucide:*` literal found in the app's source, so they are in the SSR markup;
+`"all"` registers the whole set, `"kit"` only the kit's own, or pass a list.
+
 ### Native scrollbar skin (opt-in)
 
 `LpScrollArea` skins the scroll it owns. For everything it can't — the page

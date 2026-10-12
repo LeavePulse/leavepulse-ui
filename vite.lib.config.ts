@@ -23,7 +23,10 @@ const isExternal = (id: string) =>
 // is the combination libInjectCss supports, so each chunk gets its scoped CSS
 // injected. Keys are dist-relative paths without extension → dist/<key>.js.
 function collectEntries() {
-  const entries: Record<string, string> = { index: resolve("./src/index.ts") }
+  const entries: Record<string, string> = {
+    index: resolve("./src/index.ts"),
+    "icons-all": resolve("./src/icons-all.ts"),
+  }
   for (const dir of ["components", "composables", "layout"]) {
     for (const file of readdirSync(resolve(`./src/${dir}`))) {
       if (!/\.(vue|ts)$/.test(file) || file.endsWith(".d.ts")) continue

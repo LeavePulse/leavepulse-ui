@@ -8,11 +8,13 @@
  * inline <svg> synchronously from getIcon() so the server and client produce
  * identical markup. The <Icon> component only resolves icons after mount, which
  * left empty SSR placeholders and caused hydration mismatches. We fall back to
- * <Icon> only for icons that aren't registered yet (e.g. fetched on demand).
+ * <Icon> only for non-lucide icons that aren't registered (fetched on demand).
+ * A lucide icon outside the kit's own set loads from the bundled collection
+ * (see icons.ts); until then an empty box of the same size holds its place.
  */
-import { computed } from "vue"
+import { computed, watchEffect } from "vue"
 import { Icon, getIcon } from "@iconify/vue"
-import "../icons" // registers the lucide collection offline
+import { iconsVersion, requestIcon } from "../icons"
 
 const props = defineProps<{
   /** iconify name, e.g. "lucide:check". Bare names assume the lucide set. */
@@ -25,7 +27,15 @@ function resolve(name: string): string {
 }
 
 const fullName = computed(() => resolve(props.name))
-const data = computed(() => getIcon(fullName.value))
+const data = computed(() => {
+  void iconsVersion.value
+  return getIcon(fullName.value)
+})
+const lucide = computed(() => fullName.value.startsWith("lucide:"))
+
+watchEffect(() => {
+  if (!data.value && lucide.value) requestIcon(fullName.value)
+})
 const dim = computed(() => props.size ?? "1em")
 </script>
 
@@ -38,6 +48,14 @@ const dim = computed(() => props.size ?? "1em")
     :viewBox="`0 0 ${data.width} ${data.height}`"
     aria-hidden="true"
     v-html="data.body"
+  />
+  <svg
+    v-else-if="lucide"
+    xmlns="http://www.w3.org/2000/svg"
+    :width="dim"
+    :height="dim"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
   />
   <Icon
     v-else
