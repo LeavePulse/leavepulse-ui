@@ -1129,15 +1129,23 @@ export const registry: ComponentEntry[] = [
     id: "phone",
     name: "PhoneInput",
     description:
-      "Phone field with a country picker (flag + dial code). Picking a country sets the +code prefix; you can also type the whole number yourself and the flag follows what you type. v-model is the full string; @change carries { country, dialCode, number }.",
-    components: { LpPhoneInput },
-    state: () => reactive({ value: "", detail: null }),
-    template: `<div class="w-80">
-  <LpPhoneInput v-model="value" default-country="UA" @change="detail = $event" />
-  <p class="mt-2 text-xs text-muted">Value: {{ value || "—" }}</p>
-  <p v-if="detail" class="text-xs text-muted">
-    {{ detail.country ? detail.country.name : "unknown" }} · code +{{ detail.dialCode || "?" }} · national {{ detail.number || "—" }}
-  </p>
+      "Phone field with a country picker (flag + dial code). Numbers are formatted as you type (+380 50 123 4567, +1 555 123 4567, +33 1 23 45 67 89) and the flag follows the code you type. Digits past the longest number the country allows are dropped with a note under the field, and a number that cannot be right is marked when you leave the field, with the reason. v-model is the formatted text; @change carries { country, dialCode, number, e164, possible, valid } — store `e164`. The formatter (libphonenumber-js) loads with the first phone field. With no placeholder the field shows an example number for its country.",
+    components: { LpPhoneInput, LpFormField },
+    state: () => reactive({ value: "", work: "", detail: null as null | { e164: string; valid: boolean; possible: boolean; country?: { name: string } } }),
+    template: `<div class="flex w-80 flex-col gap-4">
+  <div>
+    <LpFormField label="Phone" hint="Type, paste or pick a country">
+      <LpPhoneInput v-model="value" default-country="UA" @change="detail = $event" />
+    </LpFormField>
+    <p class="mt-2 text-xs text-muted">Shown: {{ value || "\u2014" }}</p>
+    <p v-if="detail" class="text-xs text-muted">
+      {{ detail.country ? detail.country.name : "unknown" }} · e164 {{ detail.e164 || "\u2014" }} ·
+      <span :class="detail.valid ? 'text-action' : ''">{{ detail.valid ? "valid" : detail.possible ? "possible" : "incomplete" }}</span>
+    </p>
+  </div>
+  <LpFormField label="Work phone" hint="Inside a field the notes float over the hint">
+    <LpPhoneInput v-model="work" default-country="US" />
+  </LpFormField>
 </div>`,
   },
   {
