@@ -11,6 +11,17 @@ const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: "update:modelValue", v: string): void }>()
 
 const html = ref("")
+const host = ref<HTMLElement | null>(null)
+
+/* The textarea is the only scroller; the highlight below follows it. With two
+   independent scrollers a long line scrolled the text and left the colours
+   behind, so the caret and selection sat over different code. */
+function follow(e: Event) {
+  const area = e.target as HTMLTextAreaElement
+  if (!host.value) return
+  host.value.scrollLeft = area.scrollLeft
+  host.value.scrollTop = area.scrollTop
+}
 const copied = ref(false)
 
 async function render(code: string) {
@@ -41,7 +52,7 @@ async function copy() {
     </button>
 
     <!-- highlighted layer -->
-    <div class="shiki-host overflow-auto p-4 text-[13px] leading-relaxed" v-html="html" />
+    <div ref="host" class="shiki-host overflow-hidden p-4 text-[13px] leading-relaxed" v-html="html" />
 
     <!-- transparent editable layer on top, perfectly aligned -->
     <textarea
@@ -49,6 +60,7 @@ async function copy() {
       spellcheck="false"
       class="absolute inset-0 resize-none overflow-auto whitespace-pre bg-transparent p-4 font-mono text-[13px] leading-relaxed text-transparent caret-white outline-none"
       @input="onInput"
+      @scroll="follow"
     />
   </div>
 </template>
@@ -59,6 +71,9 @@ async function copy() {
   background: transparent !important;
   font-family: var(--font-mono);
   white-space: pre;
+}
+textarea::selection {
+  background: rgb(255 255 255 / 0.18);
 }
 textarea {
   /* match shiki's font metrics so the overlay lines up */
