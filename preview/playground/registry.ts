@@ -2325,16 +2325,25 @@ export const registry: ComponentEntry[] = [
     id: "alert",
     name: "Alert",
     description:
-      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. Only `danger` interrupts a screen reader by default; `live=\"polite\"` announces one that appears later, `live=\"assertive\"` or `false` override either way.",
-    components: { LpAlert },
+      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. The difference between them that you cannot see is what a screen reader does: only `danger` interrupts it (role=\"alert\"), the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it. An alert that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does.",
+    components: { LpAlert, LpButton, LpShift },
     state: () => reactive({ saved: false }),
-    template: `<div class="flex flex-col gap-3">
+    template: `<div class="flex w-full max-w-lg flex-col gap-3">
   <LpAlert variant="info" title="Heads up">Your invoice is due in 3 days.</LpAlert>
+  <p class="-mt-1.5 text-xs text-muted">Screen reader: read in place, no interruption.</p>
   <LpAlert variant="success">Payment received — thank you.</LpAlert>
   <LpAlert variant="warning" title="Action needed">Verify your billing address to continue.</LpAlert>
   <LpAlert variant="danger" title="Payment failed">We couldn't charge your card.</LpAlert>
-  <LpAlert v-if="saved" variant="success" live="polite">Settings saved (announced politely).</LpAlert>
-  <button type="button" class="self-start text-xs text-action underline" @click="saved = !saved">Toggle a live success alert</button>
+  <p class="-mt-1.5 text-xs text-muted">Screen reader: interrupts and reads it at once (role="alert").</p>
+  <LpShift>
+    <Transition enter-from-class="opacity-0 -translate-y-1" leave-to-class="opacity-0 -translate-y-1" enter-active-class="transition duration-200" leave-active-class="transition duration-150">
+      <div v-if="saved" class="flex flex-col gap-1.5">
+        <LpAlert variant="success" live="polite">Settings saved.</LpAlert>
+        <p class="text-xs text-muted">Screen reader: announces "Settings saved" when it finishes what it is reading (live="polite").</p>
+      </div>
+    </Transition>
+  </LpShift>
+  <LpButton variant="outline" size="sm" class="self-start" @click="saved = !saved">{{ saved ? "Hide" : "Save settings" }}</LpButton>
 </div>`,
   },
   {
