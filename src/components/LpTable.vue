@@ -12,6 +12,7 @@ import LpIcon from "./LpIcon.vue"
 import LpPagination from "./LpPagination.vue"
 import LpPopover from "./LpPopover.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpTableFilter, { type TableFilterOption } from "./LpTableFilter.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
@@ -89,7 +90,6 @@ export interface TableLabels {
   pageSelected: string
   selectAllMatching: string
   allMatchingSelected: string
-  selectRow: string
 }
 
 export interface TableExportOptions extends CsvOptions {
@@ -266,7 +266,6 @@ const labelSet = useLabels<TableLabels>(
     pageSelected: "All {count} on this page are selected.",
     selectAllMatching: "Select all {total}",
     allMatchingSelected: "All {total} are selected.",
-    selectRow: "Select this row",
   },
   () => props.labels,
 )
@@ -871,6 +870,18 @@ const pageAllSelected = computed(
 watch(pageAllSelected, (all) => {
   if (!all && props.allMatching) emit("update:allMatching", false)
 })
+/*
+ * One status line that rolls between its states ("60 rows", "3 selected",
+ * "All 40 are selected") instead of swapping text in a frame; the controls
+ * beside it fade in and out, and the group eases its width so they slide.
+ */
+const statusText = computed(() => {
+  if (!(props.selectable && props.selected.length)) return countText.value
+  return props.allMatching
+    ? text.value.allMatchingSelected.replace("{total}", String(total.value))
+    : text.value.selectedCount.replace("{count}", String(props.selected.length))
+})
+
 const countText = computed(() => {
   const t = text.value
   if (props.load) return t.rowsTotal.replace("{total}", String(total.value))
@@ -989,8 +1000,8 @@ const barInsetTop = computed(() =>
   <!-- The gap below the bar lives inside the eased box (pb-3), cancelled
        outside it (-mb-3): an empty box must not leave the root's gap behind. -->
   <LpShift class="-mb-3">
-    <div v-if="showBar" class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2 pb-3 text-xs">
-      <div v-if="activeFilters.length" class="flex flex-wrap items-center gap-1.5">
+    <div v-if="showBar" class="flex min-h-8 items-center gap-x-3 pb-3 text-xs">
+      <div v-if="activeFilters.length" class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         <span
           v-for="f in activeFilters"
           :key="f.col.key"
@@ -1015,36 +1026,56 @@ const barInsetTop = computed(() =>
           {{ text.clearFilters }}
         </button>
       </div>
-      <div class="ml-auto flex flex-wrap items-center gap-2 text-muted">
-        <template v-if="selectable && selected.length">
-          <span class="font-medium text-ink" aria-live="polite">
-            {{
-              allMatching
-                ? text.allMatchingSelected.replace("{total}", String(total))
-                : text.selectedCount.replace("{count}", String(selected.length))
-            }}
-          </span>
-          <template v-if="load && pageAllSelected && !allMatching && total > pageKeys.length">
-            <span>{{ text.pageSelected.replace("{count}", String(pageKeys.length)) }}</span>
+      <!-- One line, always: the status and its controls never wrap, so the bar
+           keeps its height and the table under it stays put; the group eases
+           its width as controls come and go. -->
+      <LpShift axis="width" class="ml-auto shrink-0">
+      <div class="flex items-center gap-2 whitespace-nowrap text-muted">
+        <LpRollingText
+          :value="statusText"
+          align="end"
+          class="tabular-nums"
+          :class="selectable && selected.length ? 'font-medium text-ink' : ''"
+          aria-live="polite"
+        />
+        <Transition
+          enter-active-class="transition-opacity duration-fast motion-reduce:transition-none"
+          leave-active-class="transition-opacity duration-fast motion-reduce:transition-none"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+        >
+          <span v-if="selectable && selected.length" class="flex items-center gap-2">
+            <Transition
+              enter-active-class="transition-opacity duration-fast motion-reduce:transition-none"
+              leave-active-class="transition-opacity duration-fast motion-reduce:transition-none"
+              enter-from-class="opacity-0"
+              leave-to-class="opacity-0"
+            >
+            <span v-if="load && pageAllSelected && !allMatching && total > pageKeys.length" class="flex items-center gap-2">
+              <!-- The sentence is context, the button is the action: on a narrow
+                   screen only the action stays, so the line still fits. -->
+              <span class="hidden sm:inline">{{ text.pageSelected.replace("{count}", String(pageKeys.length)) }}</span>
+              <button
+                type="button"
+                class="rounded-control px-1.5 py-0.5 font-medium text-brand outline-none transition-colors duration-fast hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
+                @click="emit('update:allMatching', true)"
+              >
+                {{ text.selectAllMatching.replace("{total}", String(total)) }}
+              </button>
+            </span>
+            </Transition>
             <button
               type="button"
-              class="rounded-control px-1.5 py-0.5 font-medium text-brand outline-none transition-colors duration-fast hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
-              @click="emit('update:allMatching', true)"
+              class="rounded-control px-1.5 py-0.5 font-medium outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              @click="clearSelection"
             >
-              {{ text.selectAllMatching.replace("{total}", String(total)) }}
+              {{ text.clearSelection }}
             </button>
-          </template>
-          <button
-            type="button"
-            class="rounded-control px-1.5 py-0.5 font-medium outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            @click="clearSelection"
-          >
-            {{ text.clearSelection }}
-          </button>
-          <slot name="bulk" :selected="selected" :all-matching="allMatching" :clear="clearSelection" />
-        </template>
-        <span v-else class="tabular-nums">{{ countText }}</span>
+            <slot name="bulk" :selected="selected" :all-matching="allMatching" :clear="clearSelection" />
+          </span>
+        </Transition>
       </div>
+      </LpShift>
     </div>
   </LpShift>
   <LpScrollArea
@@ -1069,7 +1100,7 @@ const barInsetTop = computed(() =>
       >
         <tr class="border-b border-line bg-surface-soft">
           <th v-if="selectable" class="w-px p-0" :class="cellY">
-            <div class="lp-tick" :class="ticksShown ? 'lp-tick-open' : ''" :inert="!ticksShown">
+            <div class="lp-tick lp-tick-open" :class="ticksShown ? '' : 'lp-tick-hidden'" :inert="!ticksShown">
               <LpCheckbox
                 :model-value="allChecked"
                 :indeterminate="someChecked"
@@ -1203,7 +1234,7 @@ const barInsetTop = computed(() =>
             @click.stop
             @pointerdown.stop="paint.onPointerDown($event, keyFor(row, index))"
           >
-            <div class="lp-tick" :class="ticksShown ? 'lp-tick-open' : ''" :inert="!ticksShown">
+            <div class="lp-tick lp-tick-open" :class="ticksShown ? '' : 'lp-tick-cue'">
               <LpCheckbox
                 :model-value="selectedSet.has(keyFor(row, index))"
                 @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
@@ -1214,20 +1245,8 @@ const barInsetTop = computed(() =>
             v-for="(col, ci) in visibleColumns"
             :key="col.key"
             class="px-4 text-ink"
-            :class="[alignClass(col.align), cellY, holdMode && ci === 0 ? 'relative' : '']"
+            :class="[alignClass(col.align), cellY]"
           >
-            <!-- The hint that rows can be selected at all, while no tick column
-                 is showing: a box in the first cell's margin on hover. Clicking
-                 it selects the row like a long press would. -->
-            <button
-              v-if="holdMode && ci === 0 && !ticksShown"
-              type="button"
-              tabindex="-1"
-              class="lp-tick-cue absolute top-1/2 left-0.5 size-3.5 -translate-y-1/2 rounded-[4px] border border-line-strong bg-surface-soft opacity-0 transition-opacity duration-fast group-hover:opacity-100 hover:border-brand"
-              :aria-label="text.selectRow"
-              @pointerdown.stop
-              @click.stop="toggleRow(keyFor(row, index), true)"
-            />
             <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
               {{ row[col.key] }}
             </slot>
@@ -1299,9 +1318,11 @@ const barInsetTop = computed(() =>
  */
 
 /*
- * The tick column of a hold-to-select table, collapsed until a selection
- * exists. It eases its own width rather than a transform: the column's width
- * is what the other columns are laid out against, so they slide with it.
+ * The tick column of a hold-to-select table keeps its width and only hides its
+ * boxes until they mean something, which is the desktop pattern Material
+ * describes: a row's box shows while the row is hovered, and every box shows
+ * once anything is selected. An earlier version collapsed the column to nothing
+ * and floated the hover box over the first cell, where it sat on the text.
  */
 .lp-tick {
   display: flex;
@@ -1322,12 +1343,22 @@ const barInsetTop = computed(() =>
   opacity: 1;
 }
 
+.lp-tick-hidden,
+.lp-tick-cue {
+  opacity: 0;
+}
+
+tr:hover .lp-tick-cue,
+.lp-tick-cue:focus-within {
+  opacity: 1;
+}
+
 /* A filter that redraws the list is information, not decoration: with motion
    turned down the rows change without animating rather than not changing. */
 /* Only where there is a hover to reveal it; a finger long-presses instead. */
 @media (hover: none) {
-  .lp-tick-cue {
-    display: none;
+  tr:hover .lp-tick-cue {
+    opacity: 0;
   }
 }
 

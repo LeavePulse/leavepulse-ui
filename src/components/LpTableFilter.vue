@@ -29,6 +29,7 @@ import { computed, ref } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpInput from "./LpInput.vue"
 import LpShift from "./LpShift.vue"
+import { usePaintSelect } from "../composables/usePaintSelect"
 import { hideAllValues, invertHidden, matchesQuery, onlyValues, unhideValues } from "./tableFilter"
 
 const props = defineProps<{
@@ -58,6 +59,22 @@ function toggle(value: unknown) {
 }
 
 const list = ref<HTMLElement | null>(null)
+
+/*
+ * Press a value's tick and sweep down the list to tick or clear the run, the
+ * same way rows of the table are painted. The selection here is the values
+ * shown, so painting writes back the complement as the hidden set.
+ */
+const byKey = computed(() => new Map(props.options.map((o) => [String(o.value), o.value])))
+const paint = usePaintSelect<unknown>({
+  root: list,
+  selection: () => values.value.filter((v) => !props.hidden.has(v)),
+  set: (shownValues) => {
+    const keep = new Set(shownValues)
+    set(new Set(values.value.filter((v) => !keep.has(v))))
+  },
+  resolve: (raw) => (byKey.value.has(raw) ? byKey.value.get(raw) : undefined),
+})
 
 /* Up and down walk the ticks, so a long list is not a long run of Tab. */
 function onListKeydown(event: KeyboardEvent) {
@@ -131,11 +148,13 @@ const action =
         <div
           v-for="option in shown"
           :key="String(option.value)"
-          class="group/opt flex items-center gap-2 rounded-control px-1.5 py-1 transition-colors duration-fast hover:bg-surface-soft"
+          class="group/opt flex items-center gap-2 rounded-control px-1.5 py-1 transition-colors duration-fast select-none hover:bg-surface-soft"
+          :data-paint-key="String(option.value)"
         >
           <LpCheckbox
             :model-value="!hidden.has(option.value)"
             class="min-w-0 flex-1"
+            @pointerdown="paint.onPointerDown($event, option.value)"
             @update:model-value="toggle(option.value)"
           >
             <span class="truncate">{{ option.label }}</span>
