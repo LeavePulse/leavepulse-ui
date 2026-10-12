@@ -25,7 +25,7 @@ import {
 } from "./dateRange"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
-import LpRangeCalendar from "./LpRangeCalendar.vue"
+import LpRangeCalendar, { type RangeChange } from "./LpRangeCalendar.vue"
 
 export interface DateRangePickerLabels extends Record<string, string> {
   placeholder: string
@@ -90,9 +90,15 @@ const presetList = computed<DateRangePreset[]>(() => {
   return props.presets ?? defaultRangePresets(text.value)
 })
 
-function pick(range: DateRange) {
+/*
+ * A range picked on the calendar keeps the popover open: the field already
+ * shows it, and the user can still pull either end before clicking away.
+ * Closing on the second click left no moment to adjust. A preset is a whole
+ * answer, so it closes.
+ */
+function pick(range: DateRange, change?: RangeChange) {
   emit("update:modelValue", range)
-  open.value = false
+  if (!change) open.value = false
 }
 
 function pickPreset(preset: DateRangePreset) {

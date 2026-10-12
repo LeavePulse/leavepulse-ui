@@ -47,7 +47,7 @@ const Boundary = defineComponent({
         <component :is="Dynamic" />
       </Boundary>
     </div>
-    <p v-if="error" class="border-t border-danger/30 bg-danger-soft px-4 py-2 font-mono text-xs text-danger">
+    <p v-if="error" class="rounded-b-card border-t border-danger/30 bg-danger-soft px-4 py-2 font-mono text-xs text-danger">
       {{ error }}
     </p>
   </div>

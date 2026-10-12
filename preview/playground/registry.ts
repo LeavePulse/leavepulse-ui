@@ -1256,7 +1256,7 @@ export const registry: ComponentEntry[] = [
     id: "date-range",
     name: "DateRangePicker",
     description:
-      "Range field + popover (reka RangeCalendar). Model is `{ start, end }` of ISO days, both inclusive; presets on the side (Today, Last 7/30 days, this and last month, or your own `{ label, range }`), two months where there is room and one on a phone. A preset outside min/max is clipped to it, or disabled when nothing of it is left.",
+      "Range field + popover (reka RangeCalendar). Model is `{ start, end }` of ISO days, both inclusive; presets on the side (Today, Last 7/30 days, this and last month, or your own `{ label, range }`), two months where there is room and one on a phone. A preset outside min/max is clipped to it, or disabled when nothing of it is left. Like selecting text on a phone, a range can be pressed out by dragging across the days (a finger holds for a moment first, so a swipe still scrolls), and either end of a finished range can be grabbed and pulled; Shift+arrows move the focused end. The popover stays open after a pick, so the ends can still be adjusted before clicking away.",
     components: { LpDateRangePicker, LpRangeCalendar, LpFormField },
     state: () => reactive({ range: undefined, inline: { start: "2026-06-08", end: "2026-06-14" } }),
     template: `<div class="flex flex-wrap items-start gap-6">

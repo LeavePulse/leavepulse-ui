@@ -1,6 +1,6 @@
 import { CalendarDate } from "@internationalized/date"
 import { describe, expect, test } from "bun:test"
-import { clampRange, defaultRangePresets, formatRange, normalizeRange, sameRange } from "../src/components/dateRange"
+import { clampRange, defaultRangePresets, formatRange, normalizeRange, reshapeRange, sameRange } from "../src/components/dateRange"
 
 const labels = { today: "Today", last7: "7", last30: "30", thisMonth: "This", lastMonth: "Last" }
 
@@ -42,4 +42,17 @@ describe("range helpers", () => {
   test("formatRange collapses the shared month and year", () => {
     expect(formatRange({ start: "2026-06-03", end: "2026-06-18" }, "en-US")).toBe("Jun 3 – 18, 2026")
   })
+})
+
+test("reshapeRange follows the dragged end and flips past the anchor", () => {
+  expect(reshapeRange("2026-10-05", "2026-10-12")).toEqual({ start: "2026-10-05", end: "2026-10-12" })
+  expect(reshapeRange("2026-10-05", "2026-10-01")).toEqual({ start: "2026-10-01", end: "2026-10-05" })
+  expect(reshapeRange("2026-10-05", "2026-10-05")).toEqual({ start: "2026-10-05", end: "2026-10-05" })
+})
+
+test("reshapeRange refuses a day that breaks a rule", () => {
+  expect(reshapeRange("2026-10-05", "2026-10-20", { maximumDays: 7 })).toBeNull()
+  expect(reshapeRange("2026-10-05", "2026-10-11", { maximumDays: 7 })).not.toBeNull()
+  expect(reshapeRange("2026-10-05", "2026-10-10", { unavailable: (d) => d === "2026-10-08" })).toBeNull()
+  expect(reshapeRange("2026-10-05", "2026-10-10", { allowed: (d) => d < "2026-10-09" })).toBeNull()
 })

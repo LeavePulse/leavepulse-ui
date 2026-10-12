@@ -103,3 +103,32 @@ export function formatRange(
   const fmt = new Intl.DateTimeFormat(locale, { ...format, timeZone: zone })
   return fmt.formatRange(start.toDate(zone), end.toDate(zone))
 }
+
+export interface ReshapeRules {
+  /** Whether the moving end may land on this day (min, max, disabled). */
+  allowed?: (iso: string) => boolean
+  /** Days a range may not include. */
+  unavailable?: (iso: string) => boolean
+  /** Longest range, in days, counting both ends. */
+  maximumDays?: number
+}
+
+/**
+ * The range one end makes when it is dragged to `moving` while the other stays
+ * at `anchor`; passing the anchor flips which end is which. Null when the result
+ * would break a rule, so a drag simply does not follow onto that day.
+ */
+export function reshapeRange(anchor: string, moving: string, rules: ReshapeRules = {}): DateRange | null {
+  const a = parseIsoDay(anchor)
+  const m = parseIsoDay(moving)
+  if (!a || !m) return null
+  if (rules.allowed && !rules.allowed(m.toString())) return null
+  const [start, end] = a.compare(m) <= 0 ? [a, m] : [m, a]
+  if (rules.maximumDays && end.compare(start) + 1 > rules.maximumDays) return null
+  if (rules.unavailable) {
+    for (let d = start; d.compare(end) <= 0; d = d.add({ days: 1 })) {
+      if (rules.unavailable(d.toString())) return null
+    }
+  }
+  return { start: start.toString(), end: end.toString() }
+}
