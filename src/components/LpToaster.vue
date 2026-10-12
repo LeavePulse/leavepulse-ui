@@ -13,13 +13,14 @@ import {
 } from "reka-ui"
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
+import { useClipboard } from "../composables/useClipboard"
 import { useLabels } from "../composables/useLpConfig"
 import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 
-const props = defineProps<{ labels?: Partial<{ dismiss: string }> }>()
-const text = useLabels("toast", { dismiss: "Dismiss" }, () => props.labels)
+const props = defineProps<{ labels?: Partial<{ dismiss: string; copy: string; copied: string }> }>()
+const text = useLabels("toast", { dismiss: "Dismiss", copy: "Copy message", copied: "Copied" }, () => props.labels)
 
 const { queue, dismiss } = useToast()
 
@@ -211,8 +212,32 @@ async function settle(t: ToastItem, run: () => void | Promise<void>) {
   }
 }
 
+/*
+ * An error is something people need to pass on, so its text can be selected
+ * and copied. reka sets user-select: none on the toast and starts a swipe on
+ * any press, which made the message impossible to select: the description
+ * opts back into selection and keeps its presses from starting a swipe. A
+ * click that ends a selection is not a click on the toast.
+ */
+const { copy } = useClipboard()
+const copiedId = ref<string | null>(null)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+const copyable = (t: ToastItem) => t.variant === "error" || t.variant === "warning"
+
+async function copyToast(t: ToastItem) {
+  if (!(await copy([t.title, t.message].filter(Boolean).join("\n")))) return
+  copiedId.value = tag(t)
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => (copiedId.value = null), 1500)
+}
+onBeforeUnmount(() => clearTimeout(copiedTimer))
+
+function selecting(): boolean {
+  return Boolean(window.getSelection()?.toString())
+}
+
 function runClick(t: ToastItem) {
-  if (swiped === tag(t)) return
+  if (swiped === tag(t) || selecting()) return
   if (t.onClick) return settle(t, t.onClick)
 }
 
@@ -250,7 +275,10 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
           <ToastTitle v-if="t.title" class="text-sm font-semibold text-ink">
             {{ t.title }}
           </ToastTitle>
-          <ToastDescription class="break-words text-xs text-muted">
+          <ToastDescription
+            class="cursor-text select-text break-words text-xs text-muted"
+            @pointerdown.stop
+          >
             {{ t.message }}
           </ToastDescription>
 
@@ -274,6 +302,16 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
           </div>
         </div>
 
+        <button
+          v-if="copyable(t)"
+          type="button"
+          class="-mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          :aria-label="copiedId === tag(t) ? text.copied : text.copy"
+          :title="copiedId === tag(t) ? text.copied : text.copy"
+          @click.stop="copyToast(t)"
+        >
+          <LpIcon :name="copiedId === tag(t) ? 'lucide:check' : 'lucide:copy'" :size="15" />
+        </button>
         <button
           type="button"
           class="group -mr-1 -mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
