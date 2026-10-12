@@ -1047,11 +1047,18 @@ export const registry: ComponentEntry[] = [
     id: "input-mask",
     name: "Input mask",
     description:
-      "`mask` on LpInput formats as you type and keeps the caret where it was: `0` is a digit, `a` a letter, `A` a letter shown upper-case, `*` either, and a backslash makes the next character literal. A list picks the first mask the value fits, a function derives it from what was typed so far, and `mask-tokens` adds your own. Backspace skips over separators. v-model holds the formatted text; `@update:raw` the characters alone. The same engine is `useInputMask()` for your own input.",
+      "`mask` on LpInput formats as you type and keeps the caret where it was: `0` is a digit, `a` a letter, `A` a letter shown upper-case, `*` either, and a backslash makes the next character literal. A list picks the first mask the value fits, a function derives it from what was typed so far, and `mask-tokens` adds your own. Backspace skips over separators. v-model holds the formatted text; `@update:raw` the characters alone. The same engine is `useInputMask()` for your own input. The phone here picks its mask from the country code typed so far (+380, +1, +7, anything else grouped by three); for a full international field with a country list, use LpPhoneInput.",
     components: { LpInput },
     state: () => reactive({ phone: "", card: "", hex: "", raw: "" }),
     template: `<div class="flex w-80 flex-col gap-4">
-  <LpInput v-model="phone" label="Phone" mask="+1 (000) 000-0000" inputmode="tel" placeholder="+1 (555) 123-4567" @update:raw="raw = $event" />
+  <LpInput
+    v-model="phone"
+    label="Phone"
+    :mask="(raw) => raw.startsWith('380') ? '+000 (00) 000-00-00' : raw.startsWith('1') ? '+0 (000) 000-0000' : raw.startsWith('7') ? '+0 (000) 000-00-00' : '+000 000 000 0000'"
+    inputmode="tel"
+    placeholder="+380 (50) 123-45-67"
+    @update:raw="raw = $event"
+  />
   <LpInput v-model="card" label="Card" :mask="(raw) => /^3[47]/.test(raw) ? '0000 000000 00000' : '0000 0000 0000 0000'" inputmode="numeric" placeholder="4111 1111 1111 1111" />
   <LpInput v-model="hex" label="Colour" mask="#HHHHHH" :mask-tokens="{ H: /[0-9a-f]/i }" placeholder="#3b82f6" />
   <p class="text-xs text-muted">Phone raw: {{ raw || "\u2014" }}</p>
