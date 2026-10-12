@@ -22,6 +22,7 @@ import {
   appleModifierLabel,
   mergeShortcutGroups,
   useAppleKeyboard,
+  useHotkeys,
   type ShortcutGroup,
 } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
@@ -36,6 +37,12 @@ const props = withDefaults(
     description?: string
     /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
+    /**
+     * A key that toggles the reference, e.g. "F1". Bound only while the dialog
+     * is mounted, also inside inputs and over other overlays, and the browser's
+     * own use of the key (Chrome opens its help page on F1) is suppressed.
+     */
+    hotkey?: string
   }>(),
   { open: false, groups: () => [], live: false, title: undefined, glass: undefined },
 )
@@ -44,6 +51,7 @@ const text = useLabels("shortcuts", {
   title: "Keyboard shortcuts",
   then: "then",
   conflict: "Also bound elsewhere: only one of them runs",
+  group: "General",
 })
 const apple = useAppleKeyboard()
 
@@ -62,6 +70,21 @@ function stepsOf(combo: string): string[] {
 const shown = computed(() => (props.live ? mergeShortcutGroups(props.groups, activeShortcuts.value) : props.groups))
 
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
+
+useHotkeys(() =>
+  props.hotkey
+    ? [
+        {
+          key: props.hotkey,
+          allowInInput: true,
+          overLayers: true,
+          repeat: false,
+          help: { group: text.value.group, label: props.title ?? text.value.title },
+          handler: () => emit("update:open", !props.open),
+        },
+      ]
+    : [],
+)
 </script>
 
 <template>

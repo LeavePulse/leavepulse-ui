@@ -2061,7 +2061,7 @@ export const registry: ComponentEntry[] = [
     id: "shortcuts-dialog",
     name: "ShortcutsDialog",
     description:
-      "Keyboard reference, conventionally on F1. `groups` is the written list: keys that are not bindings (arrows in a list) and the ones worth knowing before their screen opens. `live` adds every mounted useHotkeys binding that carries `help`, so a screen documents its own keys while it is open: mount the editor below and its section appears. Same-titled groups merge and a combo is listed once. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards.",
+      "Keyboard reference, conventionally on F1: `hotkey=\"F1\"` binds it (and lists it). `groups` is the written list: keys that are not bindings (arrows in a list) and the ones worth knowing before their screen opens. `live` adds every mounted useHotkeys binding that carries `help`, so a screen documents its own keys while it is open: mount the editor below and its section appears. Same-titled groups merge and a combo is listed once. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards.",
     components: { LpShortcutsDialog, LpButton, LpSwitch, EditorKeys, SequenceKeys, SaveKeys, PendingKeys },
     state: () =>
       reactive({
@@ -2086,7 +2086,6 @@ export const registry: ComponentEntry[] = [
               { combo: "Ctrl++", label: "Zoom in" },
               { combo: "Ctrl+-", label: "Zoom out" },
               { combo: "←→↑↓", label: "Move selection" },
-              { combo: "F1", label: "This reference" },
             ],
           },
         ],
@@ -2102,7 +2101,7 @@ export const registry: ComponentEntry[] = [
   <EditorKeys v-if="editor" />
   <SequenceKeys v-if="sequences" @fired="(v) => (fired = v)" />
   <SaveKeys v-if="clash" @fired="(v) => (fired = v)" />
-  <LpShortcutsDialog v-model:open="open" :groups="groups" live description="Everything the keyboard can do here." />
+  <LpShortcutsDialog v-model:open="open" :groups="groups" live hotkey="F1" description="Everything the keyboard can do here." />
 </div>`,
   },
   {
