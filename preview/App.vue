@@ -4,6 +4,7 @@ import {
   type ContextMenuItemDef,
   LpButton,
   type Command,
+  LpCodeBlock,
   LpCommandPalette,
   LpConfirmHost,
   LpContextMenu,
@@ -150,6 +151,25 @@ const siteHotkey = computed(() => !(route.value.kind === "component" && route.va
  * own list and stays open while you try them, and G-then-key jumps.
  */
 const pageLink = (id: string) => href({ kind: "page", id })
+
+/*
+ * The preview pane for a component: its route, the first sentence as the lead,
+ * the rest of the description below it, and the start of its live example in
+ * a code block, so the palette answers "what is this and how is it used"
+ * before the page is even open.
+ */
+const PREVIEW_LINES = 12
+function componentPreview(id: string) {
+  const entry = registry.find((e) => e.id === id.replace(/^component\//, ""))
+  if (!entry) return null
+  const text = entry.description.trim()
+  const cut = text.search(/[.!?](\s|$)/)
+  const lead = cut > 0 ? text.slice(0, cut + 1) : text
+  const rest = cut > 0 ? text.slice(cut + 1).trim() : ""
+  const lines = entry.template.trim().split("\n")
+  const code = lines.slice(0, PREVIEW_LINES).join("\n") + (lines.length > PREVIEW_LINES ? "\n…" : "")
+  return { entry, lead, rest, code, path: `/component/${entry.id}` }
+}
 
 const commands = computed<Command[]>(() => [
   ...registry.map((entry) => ({
@@ -306,7 +326,36 @@ const on = "bg-surface-soft text-ink"
       preview-pane
       :group-limit="8"
       placeholder="Jump to a component, page or theme…"
-    />
+    >
+      <template #preview="{ command }">
+        <div v-if="componentPreview(command.id)" class="flex flex-col gap-4">
+          <template v-for="p in [componentPreview(command.id)!]" :key="p.entry.id">
+            <header class="pv-in flex flex-col gap-1.5">
+              <div class="flex items-center gap-2">
+                <span class="grid size-7 shrink-0 place-items-center rounded-control bg-brand-soft text-brand">
+                  <LpIcon name="lucide:box" :size="15" />
+                </span>
+                <h3 class="min-w-0 truncate text-base font-semibold text-ink">{{ p.entry.name }}</h3>
+              </div>
+              <code class="w-fit rounded-control bg-surface-soft px-1.5 py-0.5 font-mono text-[11px] text-muted">{{ p.path }}</code>
+            </header>
+            <p class="pv-in text-sm leading-relaxed text-ink" style="animation-delay: 45ms">{{ p.lead }}</p>
+            <p v-if="p.rest" class="pv-in text-xs leading-relaxed text-muted" style="animation-delay: 90ms">{{ p.rest }}</p>
+            <div class="pv-in flex flex-col gap-1.5" style="animation-delay: 135ms">
+              <span class="text-[11px] font-medium tracking-wide text-muted uppercase">Example</span>
+              <LpCodeBlock :model-value="p.code" lang="html" :copyable="false" class="text-[11px]" />
+            </div>
+          </template>
+        </div>
+        <template v-else>
+          <div class="flex items-center gap-2 text-ink">
+            <LpIcon v-if="command.icon" :name="command.icon" :size="16" class="shrink-0 text-muted" />
+            <h3 class="text-base font-semibold">{{ command.label }}</h3>
+          </div>
+          <p v-if="command.preview" class="mt-2 text-sm text-muted">{{ command.preview }}</p>
+        </template>
+      </template>
+    </LpCommandPalette>
     <LpShortcutsDialog
       v-model:open="shortcutsOpen"
       :hotkey="siteShortcutsKey"
@@ -319,3 +368,15 @@ const on = "bg-surface-soft text-ink"
     <LpConfirmHost />
   </div>
 </template>
+
+<style scoped>
+/* The pane's parts arrive one after another, as the kit's own pane does. */
+.pv-in {
+  animation: option-in var(--duration-medium) var(--ease-emphasized) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pv-in {
+    animation: none;
+  }
+}
+</style>
