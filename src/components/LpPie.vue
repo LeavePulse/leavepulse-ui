@@ -702,7 +702,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                  the callout labels widen the box well past the circle, and at a
                  fixed width they ran off the screen. -->
             <div
-              class="relative max-w-full shrink-0"
+              class="relative max-w-full shrink-0 max-sm:mx-auto"
               :style="{ width: `${canvasWidth}px`, aspectRatio: `${canvasWidth} / ${canvasHeight}` }"
             >
             <!-- Clicking the empty middle (or the gaps) clears, so a selection can

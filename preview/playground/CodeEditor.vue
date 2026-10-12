@@ -52,13 +52,13 @@ async function copy() {
     </button>
 
     <!-- highlighted layer -->
-    <div ref="host" class="shiki-host overflow-hidden p-4 text-[13px] leading-relaxed" v-html="html" />
+    <div ref="host" class="shiki-host overflow-hidden p-4 pt-12 text-[13px] leading-relaxed sm:pt-4" v-html="html" />
 
     <!-- transparent editable layer on top, perfectly aligned -->
     <textarea
       :value="modelValue"
       spellcheck="false"
-      class="absolute inset-0 resize-none overflow-auto whitespace-pre bg-transparent p-4 font-mono text-[13px] leading-relaxed text-transparent caret-white outline-none"
+      class="absolute inset-0 resize-none overflow-auto whitespace-pre bg-transparent p-4 pt-12 font-mono sm:pt-4 text-[13px] leading-relaxed text-transparent caret-white outline-none"
       @input="onInput"
       @scroll="follow"
     />

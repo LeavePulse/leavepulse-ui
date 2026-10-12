@@ -431,7 +431,9 @@ defineExpose({ fitView, setViewport: applyViewport })
     <Controls v-if="controls" />
 
     <!-- Edge-type legend: makes the colour/dash encoding self-explanatory. -->
-    <Panel v-if="legend" :position="legendPosition" :class="legendOffset">
+    <!-- On a phone the legend would sit on the graph itself; the edge styles
+         stay readable without it there. -->
+    <Panel v-if="legend" :position="legendPosition" :class="legendOffset" class="max-sm:hidden">
       <div
         class="flex flex-col gap-1.5 rounded-card border border-line bg-surface-overlay/90 px-3 py-2 text-[11px] backdrop-blur"
       >

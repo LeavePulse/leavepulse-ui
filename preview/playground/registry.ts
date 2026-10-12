@@ -719,7 +719,7 @@ export const registry: ComponentEntry[] = [
               ],
       }),
     template: `<div class="flex w-full max-w-3xl flex-col gap-10">
-  <div class="flex flex-wrap gap-10">
+  <div class="flex flex-wrap gap-10 max-sm:justify-center">
     <LpPie
       :slices="disk"
       title="Disk usage"
@@ -796,7 +796,7 @@ export const registry: ComponentEntry[] = [
       }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-8">
   <!-- In a stat tile: the delta says how much, the shape says how. -->
-  <div class="flex flex-wrap gap-10">
+  <div class="flex flex-wrap gap-10 max-sm:justify-center">
     <LpStat label="Revenue" :value="61200" prefix="€" compact :delta="12.5" delta-suffix="%">
       <template #trend>
         <LpSparkline :data="revenue" area show-last :width="96" />
@@ -2365,7 +2365,7 @@ export const registry: ComponentEntry[] = [
         sort: { key: "amount", dir: "desc" },
         selected: ["ORD-1041"],
         columns: [
-          { key: "id", label: "Order", width: "30%", sortable: true },
+          { key: "id", label: "Order", width: "30%", sortable: true, nowrap: true },
           { key: "amount", label: "Amount", align: "right", sortable: true },
           { key: "status", label: "Status", align: "center" },
         ],
@@ -2382,7 +2382,7 @@ export const registry: ComponentEntry[] = [
           status: (["paid", "pending", "failed"] as const)[i % 3],
         })),
         asyncColumns: [
-          { key: "id", label: "Order", width: "30%", sortable: true },
+          { key: "id", label: "Order", width: "30%", sortable: true, nowrap: true },
           { key: "amount", label: "Amount", align: "right", sortable: true },
           { key: "status", label: "Status", align: "center", filterable: true },
         ],
