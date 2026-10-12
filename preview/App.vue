@@ -5,6 +5,7 @@ import {
   LpButton,
   type Command,
   LpCommandPalette,
+  LpConfirmHost,
   LpContextMenu,
   LpEmptyState,
   LpIcon,
@@ -73,16 +74,19 @@ function goHome(e: MouseEvent) {
 }
 
 // Themes are JSON now — the switcher applies a TokenSet via the engine.
-const { apply, applyWithTransition } = useTheme()
-const theme = ref<PresetName>("dark")
+// The preview is a consumer like any app: it starts from the saved choice
+// (a theme, or "follow the OS"), falling back to Onyx on a first visit.
+const kitTheme = useTheme()
+kitTheme.init(presets.dark)
+const theme = computed<PresetName>(
+  () =>
+    (Object.keys(presets) as PresetName[]).find((k) => presets[k].name === kitTheme.currentName.value) ??
+    "dark",
+)
 
-function buildTheme(): TokenSet {
-  return presets[theme.value]
+function buildTheme(name: PresetName): TokenSet {
+  return presets[name]
 }
-
-// First paint: apply instantly. Theme swaps go through setTheme so they can
-// animate from the button.
-apply(buildTheme())
 
 // Theme switcher (LeaveHosting style): one icon button — left-click cycles to
 // the next theme, right-click opens the full picker. The circular reveal grows
@@ -109,9 +113,8 @@ function themeOrigin(): RevealOrigin | undefined {
 }
 
 function setTheme(name: PresetName) {
-  if (name === theme.value) return
-  theme.value = name
-  applyWithTransition(buildTheme(), themeOrigin())
+  if (name === theme.value && !kitTheme.system.value) return
+  kitTheme.setTheme(buildTheme(name), themeOrigin())
 }
 
 function cycleTheme() {
@@ -230,5 +233,6 @@ const on = "bg-surface-soft text-ink"
     />
 
     <LpToaster />
+    <LpConfirmHost />
   </div>
 </template>

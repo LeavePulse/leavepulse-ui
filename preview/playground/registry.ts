@@ -1,6 +1,11 @@
 import { defineComponent, reactive, type Component } from "vue"
 import {
   LpActionBar,
+  LpThemeProvider,
+  LpTooltipProvider,
+  confirm,
+  presets,
+  useTheme,
   LpAddressInput,
   LpAlert,
   LpAutocomplete,
@@ -73,12 +78,18 @@ import {
   LpTilt,
   LpTooltip,
   LpUptimeBar,
+  LpDateRangePicker,
+  LpRangeCalendar,
+  LpTagsInput,
+  pendingHotkey,
+  useForm,
   useHotkeys,
   useToast,
 } from "../../src"
 // A real image, so the avatar demos show the loaded state rather than only the
 // initials fallback, and so the skeleton demo can show what it stands in for.
 import avatarSample from "../assets/avatar-sample.png"
+import { ConfigScope, CustomSheet, LayerKeys, RatingControl } from "./demos"
 
 export interface ComponentEntry {
   id: string
@@ -103,6 +114,36 @@ const EditorKeys = defineComponent({
       { key: "z", code: "KeyZ", ctrl: true, shift: true, help: { group: "Editor", label: "Redo" }, handler: () => {} },
       { key: "a", code: "KeyA", ctrl: true, help: { group: "Editor", label: "Select all" }, handler: () => {} },
     ])
+    return () => null
+  },
+})
+
+// Sequences next to a single-key binding on their own first key: "g" alone
+// waits for the timeout, "g i" and "g s" run at once. The duplicate Ctrl+S
+// shows the conflict marker in the live reference.
+const SequenceKeys = defineComponent({
+  emits: ["fired"],
+  setup(_, { emit }) {
+    useHotkeys([
+      { sequence: [{ key: "g", code: "KeyG" }, { key: "i", code: "KeyI" }], help: { group: "Go to", label: "Inbox" }, handler: () => emit("fired", "Inbox") },
+      { sequence: [{ key: "g", code: "KeyG" }, { key: "s", code: "KeyS" }], help: { group: "Go to", label: "Settings" }, handler: () => emit("fired", "Settings") },
+      { key: "g", code: "KeyG", help: { group: "Go to", label: "Top of the page" }, handler: () => emit("fired", "Top") },
+      { key: "s", code: "KeyS", ctrl: true, help: { group: "Editor", label: "Save draft" }, handler: () => emit("fired", "Save draft") },
+    ])
+    return () => null
+  },
+})
+
+const PendingKeys = defineComponent({
+  setup() {
+    return () => (pendingHotkey.value.length ? `${pendingHotkey.value.join(" ")}…` : "")
+  },
+})
+
+const SaveKeys = defineComponent({
+  emits: ["fired"],
+  setup(_, { emit }) {
+    useHotkeys([{ key: "s", code: "KeyS", ctrl: true, help: { group: "Editor", label: "Save" }, handler: () => emit("fired", "Save") }])
     return () => null
   },
 })
@@ -342,7 +383,7 @@ export const registry: ComponentEntry[] = [
     id: "sidebar",
     name: "Sidebar",
     description:
-      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. `searchable` puts a filter above the items — matching label and any `keywords`, dropping sections that match nothing, and opening folded groups while a query is on (try `invoice`). Mirrors the cabinet/profile sidebars in the apps.",
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. `searchable` puts a filter above the items — matching label and any `keywords`, dropping sections that match nothing, and opening folded groups while a query is on (try `invoice`). Mirrors the cabinet/profile sidebars in the apps. An item with `to` renders the configured link component (\"Button docs\" in the panel example navigates through the preview's router).",
     components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () =>
       reactive({
@@ -356,6 +397,7 @@ export const registry: ComponentEntry[] = [
               { id: "server", label: "Server", icon: "lucide:server", badge: 2 },
               { id: "logs", label: "Logs", icon: "lucide:scroll-text" },
               { id: "economy", label: "Economy", icon: "lucide:coins", badge: 5 },
+              { id: "docs", label: "Button docs", icon: "lucide:book-open", to: "/component/button" },
             ],
           },
         ],
@@ -634,7 +676,7 @@ export const registry: ComponentEntry[] = [
     id: "pie",
     name: "Pie / Donut",
     description:
-      "Shares of a whole. Takes any number of slices: the tail folds into \"Other\" (which keeps its total and a count) so twenty categories stay readable without losing data. Hover lifts a slice; click pins a selection — Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu.",
+      "Shares of a whole. Takes any number of slices: the tail folds into \"Other\" (which keeps its total and a count) so twenty categories stay readable without losing data. Hover lifts a slice; click pins a selection — Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu. The legend works from the keyboard, and `data-table` (on Services) adds a visually hidden table for screen readers.",
     components: { LpPie },
     state: () =>
       reactive({
@@ -693,6 +735,7 @@ export const registry: ComponentEntry[] = [
       title="Services"
       :size="150"
       :max-slices="0"
+      data-table
     />
   </div>
 
@@ -818,8 +861,8 @@ export const registry: ComponentEntry[] = [
     id: "chart",
     name: "Chart",
     description:
-      "Line, area and bar off one data shape. Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series.",
-    components: { LpChart },
+      "Line, area and bar off one data shape. Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series. `thresholds` draws reference lines or bands (`to`), `markers` pins events to an x position. The plot is keyboard reachable (arrows, Home, End, Enter), reads out a generated summary, and `data-table` adds a visually hidden table of the values.",
+    components: { LpChart, LpButton },
     state: () =>
       reactive({
         hours: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`),
@@ -858,6 +901,14 @@ export const registry: ComponentEntry[] = [
           { name: "Net change", data: [18, -7, 24, -12, 9, 31, -4, 15] },
         ],
         weeks: ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"],
+        slo: [
+          { value: 60, label: "SLO 60 ms", color: "var(--color-danger)" },
+          { value: 40, to: 50, label: "Target band", color: "var(--color-action)" },
+        ],
+        releases: [
+          { at: "Mar", label: "v2.1" },
+          { at: "Aug", label: "Incident", color: "var(--color-danger)" },
+        ],
         picked: "right-click a point →",
         pointMenu: (point: { label: string; values: (number | null)[] }) => [
           { label: `Inspect ${point.label}`, icon: "lucide:search" },
@@ -880,8 +931,16 @@ export const registry: ComponentEntry[] = [
     right-unit=" err"
     :height="220"
     :menu-items="pointMenu"
+    ref="edge"
     @point-click="picked = 'clicked ' + $event.label"
-  />
+  >
+    <template #actions>
+      <div class="flex gap-1">
+        <LpButton size="xs" variant="ghost" @click="$refs.edge.exportCsv()">CSV</LpButton>
+        <LpButton size="xs" variant="ghost" @click="$refs.edge.exportPng()">PNG</LpButton>
+      </div>
+    </template>
+  </LpChart>
   <span class="-mt-6 text-xs text-muted">{{ picked }} · right-click the plot for a point menu</span>
 
   <LpChart
@@ -912,6 +971,23 @@ export const registry: ComponentEntry[] = [
     subtitle="Bars below the baseline round downward"
     unit=" GB"
     :height="180"
+  />
+
+  <!-- Reference lines and bands sit over the data; markers pin events to an x
+       label. Tab into the plot and use the arrow keys: the live readout is what
+       a screen reader hears. data-table adds a visually hidden table. -->
+  <LpChart
+    type="line"
+    :series="[latency[0]]"
+    :labels="months"
+    :thresholds="slo"
+    :markers="releases"
+    title="Thresholds and markers"
+    subtitle="Tab into the plot, then use the arrow keys, Home and End"
+    unit=" ms"
+    show-points
+    data-table
+    :height="200"
   />
 
   <LpChart
@@ -946,10 +1022,18 @@ export const registry: ComponentEntry[] = [
   {
     id: "breadcrumbs",
     name: "Breadcrumbs",
-    description: "Hierarchical navigation trail.",
+    description:
+      "Hierarchical navigation trail, an ordered list with the last crumb marked as the current page. A crumb with `to` (or an app-relative `href`) renders the link component from `provideLpConfig`, so it navigates client-side: here that is the preview's own router, standing in for RouterLink or NuxtLink.",
     components: { LpBreadcrumbs },
-    state: () => reactive({ items: [{ label: "Home", href: "#" }, { label: "Servers", href: "#" }, { label: "ger-01-p" }] }),
-    template: `<LpBreadcrumbs :items="items" />`,
+    state: () =>
+      reactive({
+        items: [{ label: "Home", href: "#" }, { label: "Servers", href: "#" }, { label: "ger-01-p" }],
+        routed: [{ label: "Components", to: "/" }, { label: "Button", to: "/component/button" }, { label: "Breadcrumbs" }],
+      }),
+    template: `<div class="flex flex-col gap-3">
+  <LpBreadcrumbs :items="items" />
+  <LpBreadcrumbs :items="routed" />
+</div>`,
   },
   {
     id: "password",
@@ -958,6 +1042,81 @@ export const registry: ComponentEntry[] = [
     components: { LpPasswordInput },
     state: () => reactive({ value: "" }),
     template: `<div class="w-72"><LpPasswordInput v-model="value" placeholder="••••••••" /></div>`,
+  },
+  {
+    id: "input-mask",
+    name: "Input mask",
+    description:
+      "`mask` on LpInput formats as you type and keeps the caret where it was: `0` is a digit, `a` a letter, `A` a letter shown upper-case, `*` either, and a backslash makes the next character literal. A list picks the first mask the value fits, a function derives it from what was typed so far, and `mask-tokens` adds your own. Backspace skips over separators. v-model holds the formatted text; `@update:raw` the characters alone. The same engine is `useInputMask()` for your own input.",
+    components: { LpInput },
+    state: () => reactive({ phone: "", card: "", hex: "", raw: "" }),
+    template: `<div class="flex w-80 flex-col gap-4">
+  <LpInput v-model="phone" label="Phone" mask="+1 (000) 000-0000" inputmode="tel" placeholder="+1 (555) 123-4567" @update:raw="raw = $event" />
+  <LpInput v-model="card" label="Card" :mask="(raw) => /^3[47]/.test(raw) ? '0000 000000 00000' : '0000 0000 0000 0000'" inputmode="numeric" placeholder="4111 1111 1111 1111" />
+  <LpInput v-model="hex" label="Colour" mask="#HHHHHH" :mask-tokens="{ H: /[0-9a-f]/i }" placeholder="#3b82f6" />
+  <p class="text-xs text-muted">Phone raw: {{ raw || "\u2014" }}</p>
+</div>`,
+  },
+  {
+    id: "tags-input",
+    name: "TagsInput",
+    description:
+      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` explains, `ignore` drops, `allow` keeps) stays in the field with the reason under it. Works inside LpFormField like any kit control.",
+    components: { LpTagsInput, LpFormField },
+    state: () => reactive({ emails: ["ada@example.com"], labels: [] as string[] }),
+    template: `<div class="flex w-96 flex-col gap-4">
+  <LpTagsInput
+    v-model="emails"
+    label="Invite"
+    hint="Up to 5 addresses; paste a list to add many"
+    placeholder="name@example.com"
+    :max="5"
+    :normalize="(t) => t.toLowerCase()"
+    :validate="(t) => /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(t) ? undefined : t + ' is not an email address'"
+  />
+  <LpFormField label="Labels" hint="Duplicates are dropped silently">
+    <LpTagsInput v-model="labels" duplicates="ignore" placeholder="Add a label" />
+  </LpFormField>
+</div>`,
+  },
+  {
+    id: "use-form",
+    name: "useForm",
+    description:
+      "Form state without the boilerplate: values, touched, `dirty` against what was loaded, sync and async rules per field plus form-level checks, server errors through `setErrors`, and `handleSubmit`, which touches every field, validates and refuses to run twice. Errors show once a field was blurred or a submit was tried. `form.field(name)` returns the props a kit control needs, and `dirty` plugs straight into useFormDraft.",
+    components: { LpInput, LpTagsInput, LpButton, LpBadge },
+    state: () => {
+      const taken = ["admin", "root"]
+      const form = useForm({
+        initial: { name: "", username: "", tags: [] as string[] },
+        rules: {
+          name: (v: string) => (v.trim() ? undefined : "Enter a name"),
+          username: async (v: string) => {
+            if (!v) return "Pick a username"
+            await new Promise((r) => setTimeout(r, 300))
+            return taken.includes(v) ? "That username is taken" : undefined
+          },
+        },
+        validate: (v) => (v.tags.length > 3 ? { tags: "At most three tags" } : undefined),
+      })
+      const s: any = reactive({ form, saved: "" })
+      s.submit = form.handleSubmit(async (values) => {
+        await new Promise((r) => setTimeout(r, 600))
+        s.saved = JSON.stringify(values)
+      })
+      return s
+    },
+    template: `<form class="flex w-80 flex-col gap-4" novalidate @submit="submit">
+  <LpInput v-bind="form.field('name')" label="Name" />
+  <LpInput v-bind="form.field('username')" label="Username" hint="Try admin" />
+  <LpTagsInput v-bind="form.field('tags')" label="Tags" placeholder="Add a tag" />
+  <div class="flex items-center gap-2">
+    <LpButton type="submit" :loading="form.submitting">Save</LpButton>
+    <LpButton type="button" variant="ghost" :disabled="!form.dirty" @click="form.reset()">Reset</LpButton>
+    <LpBadge :tone="form.dirty ? 'warning' : 'neutral'">{{ form.dirty ? "Unsaved" : "Saved" }}</LpBadge>
+  </div>
+  <p v-if="saved" class="text-xs text-muted">Submitted {{ saved }}</p>
+</form>`,
   },
   {
     id: "phone",
@@ -1084,6 +1243,23 @@ export const registry: ComponentEntry[] = [
     <LpDatePicker v-model="moment" time clearable placeholder="Date and time" />
     <p class="text-xs text-muted">with time: {{ moment || "—" }}</p>
   </div>
+</div>`,
+  },
+  {
+    id: "date-range",
+    name: "DateRangePicker",
+    description:
+      "Range field + popover (reka RangeCalendar). Model is `{ start, end }` of ISO days, both inclusive; presets on the side (Today, Last 7/30 days, this and last month, or your own `{ label, range }`), two months where there is room and one on a phone. A preset outside min/max is clipped to it, or disabled when nothing of it is left.",
+    components: { LpDateRangePicker, LpRangeCalendar, LpFormField },
+    state: () => reactive({ range: undefined, inline: { start: "2026-06-08", end: "2026-06-14" } }),
+    template: `<div class="flex flex-wrap items-start gap-6">
+  <div class="flex w-72 flex-col gap-2">
+    <LpFormField label="Report period" hint="Inclusive on both ends">
+      <LpDateRangePicker v-model="range" clearable />
+    </LpFormField>
+    <p class="text-xs text-muted">value: {{ range ? range.start + " .. " + range.end : "none" }}</p>
+  </div>
+  <LpRangeCalendar v-model="inline" />
 </div>`,
   },
   {
@@ -1574,6 +1750,8 @@ export const registry: ComponentEntry[] = [
     @filter="onFilter"
   />
   <p class="text-xs text-muted">Right-click a line → copy / filter by source·level / Open trace.</p>
+  <p class="text-xs text-muted">With <code>toolbar</code> and <code>max-lines="12"</code>: search (Enter / Shift+Enter / F3), level chips, newest 12 lines.</p>
+  <LpLogViewer :lines="lines" toolbar :max-lines="12" line-numbers height="14rem" />
 </div>`,
   },
   {
@@ -1604,7 +1782,7 @@ export const registry: ComponentEntry[] = [
     id: "toast",
     name: "Toast",
     description:
-      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist.",
+      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist. `toast.promise(task, { loading, success, error })` shows one toast that follows a promise, and a `key` makes a toast replace the one on screen with the same key instead of stacking.",
     components: { LpButton },
     state: () => {
       const toast = useToast()
@@ -1620,6 +1798,22 @@ export const registry: ComponentEntry[] = [
           }),
         persistent: () =>
           toast.warning("Deploy in progress — don't close the tab.", { duration: 0 }),
+        promised: () =>
+          toast.promise(
+            new Promise((resolve, reject) => setTimeout(() => (Math.random() < 0.7 ? resolve(42) : reject(new Error("timeout"))), 1500)),
+            {
+              loading: "Deploying ger-01-p...",
+              success: (n) => `Deployed in ${n} s`,
+              error: (e) => `Deploy failed: ${(e as Error).message}`,
+            },
+          ),
+        progress: (() => {
+          let step = 0
+          return () => {
+            step = (step % 4) + 1
+            toast.info(`Syncing backups: ${step} of 4`, { key: "backup-sync", title: "Keyed toast" })
+          }
+        })(),
         clearAll: () => toast.clear(),
       }
     },
@@ -1631,14 +1825,17 @@ export const registry: ComponentEntry[] = [
   <LpButton size="sm" variant="outline" @click="withAction">With action</LpButton>
   <LpButton size="sm" variant="outline" @click="persistent">Persistent</LpButton>
   <LpButton size="sm" variant="ghost" @click="clearAll">Clear all</LpButton>
+  <LpButton size="sm" variant="outline" @click="promised">toast.promise</LpButton>
+  <LpButton size="sm" variant="outline" @click="progress">Keyed (click again)</LpButton>
 </div>`,
   },
   {
     id: "formfield",
     name: "FormField",
-    description: "Label + control + hint/error wrapper.",
-    components: { LpFormField, LpInput },
-    state: () => reactive({ value: "" }),
+    description:
+      "Label + control + hint/error wrapper. The field hands its control the label's id, the id of the hint or error line and its invalid/required/disabled state, so kit controls need no wiring. A control of your own reads the same context with `useField()`, as the rating below does.",
+    components: { LpFormField, LpInput, RatingControl },
+    state: () => reactive({ value: "", rating: 0 }),
     template: `<div class="flex w-80 flex-col gap-4">
   <LpFormField label="Nickname" hint="Shown on your profile" required>
     <template #default="{ id }"><LpInput :id="id" v-model="value" placeholder="Steve" /></template>
@@ -1646,18 +1843,27 @@ export const registry: ComponentEntry[] = [
   <LpFormField label="Email" error="That doesn't look like an email">
     <template #default="{ id }"><LpInput :id="id" v-model="value" invalid /></template>
   </LpFormField>
+  <LpFormField label="Bare kit control" hint="No slot props: the field context wires it">
+    <LpInput v-model="value" />
+  </LpFormField>
+  <LpFormField label="Your own control" :error="rating === 0 ? 'Pick a rating' : undefined" required>
+    <RatingControl v-model="rating" />
+  </LpFormField>
 </div>`,
   },
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
-    components: { LpModal, LpButton },
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Without a title, `aria-label` names the dialog (Drawer and Popover take it too). A custom overlay joins the same stack with `useModalLayer()`, and page-level hotkeys stay quiet while a modal covers them unless they set `overLayers` — see the bottom of the example. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
+    components: { LpModal, LpButton, CustomSheet, LayerKeys },
     state: () => {
       const s = reactive({
         open: false,
         nested: false,
         frosted: false,
+        bare: false,
+        sheet: false,
+        fromSheet: false,
         lazy: false,
         loading: true,
         openLazy() {
@@ -1708,6 +1914,29 @@ export const registry: ComponentEntry[] = [
       <LpButton variant="ghost" @click="lazy = false">Close</LpButton>
     </template>
   </LpModal>
+
+  <LpButton variant="outline" @click="bare = true">No title (aria-label)</LpButton>
+  <LpModal v-model:open="bare" size="sm" aria-label="Image preview">
+    <p class="text-muted">No visible title: aria-label names the dialog instead.</p>
+  </LpModal>
+
+  <!-- Not a kit component: it joins the shared stack through useModalLayer. -->
+  <LpButton variant="outline" @click="sheet = true">Custom overlay</LpButton>
+  <CustomSheet v-model:open="sheet">
+    <p class="font-semibold text-ink">A sheet of your own</p>
+    <p class="text-sm text-muted">It claims a layer with useModalLayer. The kit modal opened from here lands above it, scrim included, and Escape closes the top one first.</p>
+    <div class="flex gap-2">
+      <LpButton variant="solid" @click="fromSheet = true">Open a kit modal</LpButton>
+      <LpButton variant="ghost" @click="sheet = false">Close</LpButton>
+    </div>
+  </CustomSheet>
+  <LpModal v-model:open="fromSheet" size="sm" title="Above the custom sheet">
+    <p class="text-muted">Opened from a non-kit overlay, stacked on top of it.</p>
+  </LpModal>
+
+  <div class="mt-4 w-full border-t border-line pt-4">
+    <LayerKeys />
+  </div>
 </div>`,
   },
   {
@@ -1764,13 +1993,53 @@ export const registry: ComponentEntry[] = [
   {
     id: "confirm",
     name: "ConfirmDialog",
-    description: "Confirm/cancel dialog over Modal. Set `loading` while an async confirm is in flight — the dialog stays open so a failure can be shown.",
+    description:
+      "Confirm/cancel dialog over Modal. Pass `action` and the dialog runs it: the button shows a loading state, a rejection keeps the dialog open with the error's message, and it closes only on success. For a one-off question there is `confirm()`: `if (await confirm({ title }))` with one LpConfirmHost mounted next to LpToaster.",
     components: { LpConfirmDialog, LpButton },
-    state: () => reactive({ open: false }),
-    template: `<div>
-  <LpButton variant="danger" @click="open = true">Delete server</LpButton>
+    state: () => {
+      const s = reactive({
+        open: false,
+        withAction: false,
+        answer: "not asked yet",
+        fail: true,
+        restart() {
+          return new Promise<void>((resolve, reject) =>
+            setTimeout(() => {
+              const failing = s.fail
+              s.fail = !s.fail
+              failing ? reject(new Error("The host did not answer. Try again.")) : resolve()
+            }, 1200),
+          )
+        },
+        async ask() {
+          const ok = await confirm({
+            title: "Discard changes?",
+            description: "Your edits to this server will be lost.",
+            confirmLabel: "Discard",
+            danger: true,
+          })
+          s.answer = ok ? "discarded" : "kept"
+        },
+        async askWithAction() {
+          const ok = await confirm({ title: "Rotate the API key?", confirmLabel: "Rotate", action: () => s.restart() })
+          s.answer = ok ? "rotated" : "cancelled"
+        },
+      })
+      return s
+    },
+    template: `<div class="flex flex-col items-start gap-3">
+  <div class="flex flex-wrap gap-2">
+    <LpButton variant="danger" @click="open = true">Delete server</LpButton>
+    <LpButton variant="outline" @click="withAction = true">Restart (with action)</LpButton>
+    <LpButton variant="outline" @click="ask">await confirm()</LpButton>
+    <LpButton variant="outline" @click="askWithAction">confirm() with action</LpButton>
+  </div>
+  <p class="text-xs text-muted">Answer: {{ answer }} · the first run of an action fails, the next one succeeds</p>
   <LpConfirmDialog v-model:open="open" danger title="Delete server?" description="This cannot be undone." confirmLabel="Delete">
     The server and its data will be permanently removed.
+  </LpConfirmDialog>
+  <LpConfirmDialog v-model:open="withAction" title="Restart ger-01-p?" confirmLabel="Restart" :action="restart">
+    Players are disconnected for about a minute.
   </LpConfirmDialog>
 </div>`,
   },
@@ -1779,11 +2048,14 @@ export const registry: ComponentEntry[] = [
     name: "ShortcutsDialog",
     description:
       "Keyboard reference, conventionally on F1. `groups` is the written list: keys that are not bindings (arrows in a list) and the ones worth knowing before their screen opens. `live` adds every mounted useHotkeys binding that carries `help`, so a screen documents its own keys while it is open: mount the editor below and its section appears. Same-titled groups merge and a combo is listed once. Combos split on \"+\" into one <kbd> each, and Ctrl/Alt print as ⌘/⌥ on Apple keyboards.",
-    components: { LpShortcutsDialog, LpButton, LpSwitch, EditorKeys },
+    components: { LpShortcutsDialog, LpButton, LpSwitch, EditorKeys, SequenceKeys, SaveKeys, PendingKeys },
     state: () =>
       reactive({
         open: false,
         editor: false,
+        sequences: false,
+        clash: false,
+        fired: "",
         groups: [
           {
             title: "Navigation",
@@ -1809,8 +2081,13 @@ export const registry: ComponentEntry[] = [
   <div class="flex flex-wrap items-center gap-4">
     <LpButton variant="outline" @click="open = true">Show shortcuts</LpButton>
     <LpSwitch v-model="editor" label="Editor mounted" />
+    <LpSwitch v-model="sequences" label="Sequences (g i, g s)" />
+    <LpSwitch v-model="clash" label="Second Ctrl+S" />
   </div>
+  <p class="mt-3 text-sm text-muted">Pending: <PendingKeys /> · Last: {{ fired || "none" }}</p>
   <EditorKeys v-if="editor" />
+  <SequenceKeys v-if="sequences" @fired="(v) => (fired = v)" />
+  <SaveKeys v-if="clash" @fired="(v) => (fired = v)" />
   <LpShortcutsDialog v-model:open="open" :groups="groups" live description="Everything the keyboard can do here." />
 </div>`,
   },
@@ -1820,7 +2097,7 @@ export const registry: ComponentEntry[] = [
     description:
       "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground. Interactive controls inside are auto-excluded from the drag (noDragControls, on by default) so you can select text / use inputs; noDragContent makes the whole body non-draggable (handle/header only).",
     components: { LpDrawer, LpButton, LpInput },
-    state: () => reactive({ side: false, sheet: false, snap: false, q: "", note: "" }),
+    state: () => reactive({ side: false, sheet: false, snap: false, bare: false, q: "", note: "" }),
     template: `<div class="flex flex-wrap gap-2">
   <LpButton variant="outline" @click="side = true">Side panel</LpButton>
   <LpButton variant="outline" @click="sheet = true">Bottom sheet</LpButton>
@@ -1833,6 +2110,12 @@ export const registry: ComponentEntry[] = [
       <textarea v-model="note" rows="3" class="rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" placeholder="A textarea you can drag-select in" />
       <p class="text-sm text-muted">The drawer still drags from blank space and the header.</p>
     </div>
+  </LpDrawer>
+
+  <!-- Headerless: aria-label names it for screen readers. -->
+  <LpButton variant="outline" @click="bare = true">No header</LpButton>
+  <LpDrawer v-model:open="bare" direction="left" size="sm" aria-label="Quick actions">
+    <p class="text-sm text-muted">No title bar: aria-label names this drawer.</p>
   </LpDrawer>
 
   <!-- Mobile-style bottom sheet with a handle. -->
@@ -1859,8 +2142,8 @@ export const registry: ComponentEntry[] = [
     id: "tooltip",
     name: "Tooltip",
     description:
-      "Themed replacement for the native `title` attribute, which the OS draws (so it looks different on every platform), delays about a second, cannot wrap, and is read inconsistently by screen readers. Opens on keyboard focus as well as hover and closes on Escape. Use `label` when the tip IS the control's name — an icon button — and it becomes the accessible name; leave it off when the control already has a name and the tip only adds to it. `side`, `delay` and `side-offset` tune placement and timing.",
-    components: { LpTooltip, LpButton, LpIcon },
+      "Themed replacement for the native `title` attribute, which the OS draws (so it looks different on every platform), delays about a second, cannot wrap, and is read inconsistently by screen readers. Opens on keyboard focus as well as hover and closes on Escape. Use `label` when the tip IS the control's name — an icon button — and it becomes the accessible name; leave it off when the control already has a name and the tip only adds to it. `side`, `delay` and `side-offset` tune placement and timing. Wrap a group in LpTooltipProvider and neighbouring tips open without a second delay.",
+    components: { LpTooltip, LpTooltipProvider, LpButton, LpIcon },
     state: () => reactive({}),
     template: `<div class="flex flex-wrap items-center gap-3">
   <!-- Names the button: it has no visible text of its own. -->
@@ -1884,6 +2167,15 @@ export const registry: ComponentEntry[] = [
   <LpTooltip content="A longer explanation that wraps onto several lines instead of running off the edge of the screen the way a native title would.">
     <LpButton variant="ghost">Long text</LpButton>
   </LpTooltip>
+
+  <!-- One provider for a toolbar: after the first tip, moving to a neighbour opens its tip at once. -->
+  <LpTooltipProvider :delay="400">
+    <div class="flex gap-1 rounded-control border border-line p-1">
+      <LpTooltip content="Bold" label><LpButton variant="ghost" size="sm"><LpIcon name="lucide:bold" :size="16" /></LpButton></LpTooltip>
+      <LpTooltip content="Italic" label><LpButton variant="ghost" size="sm"><LpIcon name="lucide:italic" :size="16" /></LpButton></LpTooltip>
+      <LpTooltip content="Underline" label><LpButton variant="ghost" size="sm"><LpIcon name="lucide:underline" :size="16" /></LpButton></LpTooltip>
+    </div>
+  </LpTooltipProvider>
 </div>`,
   },
   {
@@ -1911,6 +2203,11 @@ export const registry: ComponentEntry[] = [
     </template>
     <p class="font-semibold text-ink">v-model:open</p>
     <p class="mt-1 text-muted">The trigger label tracks the open state via v-model.</p>
+  </LpPopover>
+  <!-- No heading inside: aria-label names the dialog for screen readers. -->
+  <LpPopover aria-label="Quick filters">
+    <template #trigger><LpButton variant="ghost">Unlabelled panel</LpButton></template>
+    <p class="text-muted">Announced as "Quick filters".</p>
   </LpPopover>
 </div>`,
   },
@@ -2015,20 +2312,23 @@ export const registry: ComponentEntry[] = [
     id: "alert",
     name: "Alert",
     description:
-      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title.",
+      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. Only `danger` interrupts a screen reader by default; `live=\"polite\"` announces one that appears later, `live=\"assertive\"` or `false` override either way.",
     components: { LpAlert },
+    state: () => reactive({ saved: false }),
     template: `<div class="flex flex-col gap-3">
   <LpAlert variant="info" title="Heads up">Your invoice is due in 3 days.</LpAlert>
   <LpAlert variant="success">Payment received — thank you.</LpAlert>
   <LpAlert variant="warning" title="Action needed">Verify your billing address to continue.</LpAlert>
   <LpAlert variant="danger" title="Payment failed">We couldn't charge your card.</LpAlert>
+  <LpAlert v-if="saved" variant="success" live="polite">Settings saved (announced politely).</LpAlert>
+  <button type="button" class="self-start text-xs text-action underline" @click="saved = !saved">Toggle a live success alert</button>
 </div>`,
   },
   {
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable).",
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely.",
     components: { LpTable, LpBadge },
     state: () => {
       const s = reactive({
@@ -2075,6 +2375,31 @@ export const registry: ComponentEntry[] = [
             facets: { status: [...new Set(all.map((r) => r.status))] },
           }
         },
+        // Custom ordering: priority by rank, not alphabet; version by its numbers.
+        ticketColumns: [
+          { key: "title", label: "Ticket", width: "40%" },
+          {
+            key: "priority",
+            label: "Priority",
+            sortable: true,
+            sortValue: (row: { priority: string }) => ["low", "medium", "high", "urgent"].indexOf(row.priority),
+          },
+          {
+            key: "version",
+            label: "Fixed in",
+            align: "right",
+            sortable: true,
+            compare: (a: { version: string }, b: { version: string }) =>
+              a.version.localeCompare(b.version, undefined, { numeric: true }),
+          },
+        ],
+        tickets: [
+          { title: "Login loops", priority: "urgent", version: "2.10.0" },
+          { title: "Typo in footer", priority: "low", version: "2.9.1" },
+          { title: "Slow search", priority: "high", version: "2.10.2" },
+          { title: "Dark mode glitch", priority: "medium", version: "2.2.0" },
+        ],
+        ticketSort: { key: "priority", dir: "desc" },
         // Per-row menu: returns items for the right-clicked row.
         rowMenu(row: { id: string; status: string }) {
           return [
@@ -2103,6 +2428,8 @@ export const registry: ComponentEntry[] = [
     :rows="rows"
     row-key="id"
     selectable
+    exportable
+    export-filename="orders"
     :row-menu="rowMenu"
     v-model:selected="selected"
     v-model:sort="sort"
@@ -2117,6 +2444,9 @@ export const registry: ComponentEntry[] = [
   <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row</p>
 
   <!-- Fixed height + stickyHeader: scrolls via LpScrollArea, header pins to top. -->
+  <p class="mt-2 text-xs font-medium text-muted">sortValue and compare — Priority sorts by rank, Fixed in by version number:</p>
+  <LpTable :columns="ticketColumns" :rows="tickets" row-key="title" v-model:sort="ticketSort" />
+
   <p class="mt-2 text-xs font-medium text-muted">stickyHeader — scroll the table, the header stays:</p>
   <LpTable
     :columns="columns"
@@ -2148,12 +2478,34 @@ export const registry: ComponentEntry[] = [
     id: "pagination",
     name: "Pagination",
     description:
-      "Windowed page navigator (prev/next + ellipses). v-model:page (1-based); size it via total+pageSize or pageCount. Pairs with Table.",
-    components: { LpPagination },
-    state: () => reactive({ page: 4 }),
-    template: `<div class="flex flex-col items-center gap-3">
+      "Windowed page navigator (prev/next + ellipses). v-model:page (1-based); size it via total+pageSize or pageCount. Pairs with Table. Below it: every built-in string in the kit comes from a label scope, so `provideLpConfig({ labels })` at the app root translates them all at once; a component's own `labels` prop still wins.",
+    components: { LpPagination, LpTable, LpConfirmDialog, LpButton, LpSwitch, ConfigScope },
+    state: () =>
+      reactive({
+        page: 4,
+        german: true,
+        ask: false,
+        germanLabels: {
+          table: { empty: "Noch nichts hier" },
+          confirm: { confirm: "Best\u00e4tigen", cancel: "Abbrechen" },
+          pagination: { previous: "Zur\u00fcck", next: "Weiter", nav: "Seiten" },
+        },
+        columns: [{ key: "name", label: "Name" }],
+      }),
+    template: `<div class="flex w-full max-w-md flex-col items-center gap-3">
   <LpPagination v-model:page="page" :total="240" :page-size="10" />
   <p class="text-xs text-muted">Page {{ page }} of 24</p>
+
+  <div class="mt-4 flex w-full flex-col gap-3 border-t border-line pt-4">
+    <LpSwitch v-model="german" label="German labels via provideLpConfig" />
+    <ConfigScope :labels="german ? germanLabels : undefined">
+      <div class="flex flex-col gap-3">
+        <LpTable :columns="columns" :rows="[]" />
+        <LpButton class="self-start" variant="outline" @click="ask = true">Open a confirm dialog</LpButton>
+        <LpConfirmDialog v-model:open="ask" title="Publish the page?" />
+      </div>
+    </ConfigScope>
+  </div>
 </div>`,
   },
   {
@@ -2284,12 +2636,37 @@ export const registry: ComponentEntry[] = [
     id: "theme-switcher",
     name: "ThemeSwitcher",
     description:
-      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads.",
-    components: { LpThemeSwitcher },
-    template: `<div class="flex items-center gap-6">
-  <LpThemeSwitcher variant="swatch" />
-  <LpThemeSwitcher variant="icon" />
-  <LpThemeSwitcher variant="pill" />
+      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads. `system` adds a \"System\" entry that follows the OS colour scheme with a light/dark pair (`useTheme().setSystem({ light, dark })` does the same in code). LpThemeProvider paints one subtree in another theme, derived tokens included.",
+    components: { LpThemeSwitcher, LpThemeProvider, LpButton, LpBadge },
+    state: () => {
+      const theme = useTheme()
+      return {
+        theme,
+        light: presets.light,
+        rose: presets.rose,
+        followSystem: () => theme.setSystem({ light: presets.light, dark: presets.dark }),
+      }
+    },
+    template: `<div class="flex w-full max-w-2xl flex-col gap-6">
+  <div class="flex flex-wrap items-center gap-6">
+    <LpThemeSwitcher variant="swatch" />
+    <LpThemeSwitcher variant="icon" />
+    <LpThemeSwitcher variant="pill" :system="{ light: 'Light', dark: 'Onyx' }" />
+    <LpButton size="sm" variant="outline" @click="followSystem">Follow the OS</LpButton>
+    <span class="text-xs text-muted">{{ theme.system ? 'Following the OS' : 'Fixed theme' }}</span>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <LpThemeProvider :theme="light" class="flex flex-col gap-3 rounded-card border border-line p-4">
+      <p class="text-sm font-medium">Always Light</p>
+      <p class="text-xs text-muted">This panel keeps its theme whatever the page uses.</p>
+      <div class="flex gap-2"><LpButton size="sm" variant="action">Save</LpButton><LpBadge tone="success">online</LpBadge></div>
+    </LpThemeProvider>
+    <LpThemeProvider :theme="rose" class="flex flex-col gap-3 rounded-card border border-line p-4">
+      <p class="text-sm font-medium">Always Rose</p>
+      <p class="text-xs text-muted">Previews, embedded widgets, a branded section.</p>
+      <div class="flex gap-2"><LpButton size="sm" variant="action">Save</LpButton><LpBadge tone="danger">failed</LpBadge></div>
+    </LpThemeProvider>
+  </div>
 </div>`,
   },
   {
