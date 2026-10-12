@@ -35,7 +35,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
-import { Fragment, onBeforeUnmount, ref, watch } from "vue"
+import { onBeforeUnmount, ref, watch, type FunctionalComponent } from "vue"
 import {
   springSettled,
   springStep,
@@ -108,6 +108,13 @@ const props = withDefaults(
  * shared one (LpTooltipProvider at the root) the next tip opens at once.
  */
 const shared = injectTooltipProviderContext(null)
+/*
+ * Under a shared provider the tip renders straight into it. `Fragment` cannot
+ * stand in for the wrapper: given through `<component :is>` it takes slots,
+ * not children, and rendered nothing at all, so every tip inside an
+ * LpTooltipProvider vanished together with its trigger.
+ */
+const PassThrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 
 const reducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -221,7 +228,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <component :is="shared ? Fragment : TooltipProvider" v-bind="shared ? {} : { delayDuration: delay ?? 200 }">
+  <component :is="shared ? PassThrough : TooltipProvider" v-bind="shared ? {} : { delayDuration: delay ?? 200 }">
     <!--
       `disable-closing-trigger` in follow mode: reka dismisses a tip when its
       trigger is clicked, which is right for a button (the tip explained the
