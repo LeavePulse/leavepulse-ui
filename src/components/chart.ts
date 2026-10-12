@@ -157,10 +157,12 @@ export const niceScale = (
 ): { min: number; max: number; step: number } => {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 1, step: 1 }
   if (min === max) {
-    // A flat series still needs a band to sit in.
+    // A flat series still needs a band to sit in, but the band must not cross
+    // zero: an all-zero count would otherwise read as dipping to -0.5.
     const pad = Math.abs(min) || 1
-    min -= pad / 2
-    max += pad / 2
+    min = min >= 0 ? Math.max(0, min - pad / 2) : min - pad / 2
+    max = max <= 0 ? Math.min(0, max + pad / 2) : max + pad / 2
+    if (min === max) max = min + pad
   }
   const raw = (max - min) / Math.max(1, ticks)
   const mag = 10 ** Math.floor(Math.log10(raw))
