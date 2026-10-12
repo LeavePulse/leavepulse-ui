@@ -12,6 +12,7 @@ export default { inheritAttrs: false }
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
 import { computed, onBeforeUnmount, onMounted, ref, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
+import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import {
@@ -85,7 +86,8 @@ const text = useLabels<DateRangePickerLabels>(
 
 const open = ref(false)
 const value = computed(() => normalizeRange(props.modelValue))
-const display = computed(() => (value.value ? formatRange(value.value, props.locale, props.format) : ""))
+const locale = useLocale(() => props.locale)
+const display = computed(() => (value.value ? formatRange(value.value, locale.value, props.format) : ""))
 
 const presetList = computed<DateRangePreset[]>(() => {
   return props.presets ?? defaultRangePresets(text.value)

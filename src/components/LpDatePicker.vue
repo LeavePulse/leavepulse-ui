@@ -20,6 +20,7 @@ export default { inheritAttrs: false }
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
 import { computed, ref, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
+import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
@@ -73,12 +74,13 @@ const minute = computed(() => {
   return /^\d{2}:\d{2}$/.test(at) ? at : ""
 })
 
+const locale = useLocale()
 const display = computed(() => {
   if (!props.modelValue) return ""
   // Parse as local midnight so the formatted day can't drift across a timezone.
   const [y, m, d] = day.value.split("-").map(Number)
   if (!y || !m || !d) return props.modelValue
-  const shown = new Intl.DateTimeFormat(undefined, props.format).format(new Date(y, m - 1, d))
+  const shown = new Intl.DateTimeFormat(locale.value, props.format).format(new Date(y, m - 1, d))
   return props.time && minute.value ? `${shown}, ${minute.value}` : shown
 })
 
