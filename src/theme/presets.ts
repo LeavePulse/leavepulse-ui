@@ -14,12 +14,12 @@ const interFont = {
 }
 
 /*
- * NOTE on naming: the exported CONST names are frozen for compatibility (apps
- * import `dark` directly), while the display `name` of this near-black neutral
- * is "Onyx".
+ * The kit's dark theme, a near-black neutral. It was displayed as "Onyx" while
+ * the LeavePulse site theme held the "Dark" label; with that theme gone the
+ * label is back here.
  */
 export const dark: TokenSet = {
-  name: "Onyx",
+  name: "Dark",
   mode: "dark",
   colors: {
     surface: "#080b0d",

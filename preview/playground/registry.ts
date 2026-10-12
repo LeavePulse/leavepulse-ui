@@ -2733,7 +2733,7 @@ export const registry: ComponentEntry[] = [
   <div class="flex flex-wrap items-center gap-6">
     <LpThemeSwitcher variant="swatch" />
     <LpThemeSwitcher variant="icon" />
-    <LpThemeSwitcher variant="pill" :system="{ light: 'Light', dark: 'Onyx' }" />
+    <LpThemeSwitcher variant="pill" :system="{ light: 'Light', dark: 'Dark' }" />
     <LpButton size="sm" variant="outline" @click="followSystem">Follow the OS</LpButton>
     <span class="text-xs text-muted">{{ theme.system ? 'Following the OS' : 'Fixed theme' }}</span>
   </div>

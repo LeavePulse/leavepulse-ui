@@ -79,7 +79,7 @@ function goHome(e: MouseEvent) {
 
 // Themes are JSON now — the switcher applies a TokenSet via the engine.
 // The preview is a consumer like any app: it starts from the saved choice
-// (a theme, or "follow the OS"), falling back to Onyx on a first visit.
+// (a theme, or "follow the OS"), falling back to Dark on a first visit.
 const kitTheme = useTheme()
 kitTheme.init(presets.dark)
 const theme = computed<PresetName>(

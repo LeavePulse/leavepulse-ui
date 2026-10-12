@@ -33,7 +33,7 @@ import { namesInDirs, subset } from "./iconSubset.mjs"
 export interface LeavepulseUiOptions {
   /** Register the SSR theme plugin. Disable to wire theming yourself. */
   theme?: boolean
-  /** Theme name to fall back to when nothing is saved (default "Onyx"). */
+  /** Theme name to fall back to when nothing is saved (default "Dark"). */
   defaultTheme?: string
   /** Module path whose default export is the app's TokenSet[]. */
   themes?: string
