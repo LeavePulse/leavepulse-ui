@@ -142,6 +142,8 @@ function matches(event: KeyboardEvent, binding: HotkeyBinding): boolean {
  * formality.
  */
 export interface UseHotkeysOptions {
+  enabled?: MaybeRefOrGetter<boolean>
+  priority?: MaybeRefOrGetter<number>
   /**
    * Only act while the focus is inside this element.
    *
@@ -157,51 +159,69 @@ export interface UseHotkeysOptions {
   scope?: MaybeRefOrGetter<HTMLElement | null | undefined>
 }
 
-export function useHotkeys(
-  bindings: MaybeRefOrGetter<HotkeyBinding[]>,
-  options: UseHotkeysOptions = {},
-) {
-  function inScope(target: EventTarget | null): boolean {
-    const el = toValue(options.scope)
-    if (!el) return true
-    const node = target instanceof Node ? target : null
-    // The element itself counts: a focusable canvas holds the focus without
-    // containing anything that could.
-    return !!node && (el === node || el.contains(node))
-  }
+interface MountedHotkeys {
+  read: () => HotkeyBinding[]
+  scope: MaybeRefOrGetter<HTMLElement | null | undefined> | undefined
+  enabled: MaybeRefOrGetter<boolean> | undefined
+  priority: MaybeRefOrGetter<number> | undefined
+  order: number
+}
 
-  function onKeydown(event: KeyboardEvent) {
-    if (event.isComposing) return
-    if (!inScope(event.target)) return
-    const inTextEntry = isTextEntry(event.target)
-    for (const binding of toValue(bindings)) {
+const mounted = shallowReactive(new Set<MountedHotkeys>())
+let mountOrder = 0
+let listening = false
+
+function inScope(target: EventTarget | null, scope: MountedHotkeys["scope"]): boolean {
+  const el = toValue(scope)
+  if (!el) return true
+  const node = target instanceof Node ? target : null
+  return !!node && (el === node || el.contains(node))
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  const inTextEntry = isTextEntry(event.target)
+  const entries = [...mounted].sort(
+    (a, b) => Number(toValue(b.priority) || 0) - Number(toValue(a.priority) || 0) || b.order - a.order,
+  )
+  for (const entry of entries) {
+    if (toValue(entry.enabled) === false || !inScope(event.target, entry.scope)) continue
+    for (const binding of entry.read()) {
       if (inTextEntry && !binding.allowInInput) continue
       if (!matches(event, binding)) continue
-      // Claimed only once the handler has run and not declined, so a binding
-      // that stands down leaves the key untouched for whoever handles it next.
       if (binding.handler(event) === false) continue
       event.preventDefault()
       return
     }
   }
-
-  const read = () => toValue(bindings)
-  onMounted(() => {
-    window.addEventListener("keydown", onKeydown)
-    mounted.add(read)
-  })
-  onBeforeUnmount(() => {
-    window.removeEventListener("keydown", onKeydown)
-    mounted.delete(read)
-  })
 }
 
-/*
- * Every mounted binding list, in mount order. The lists are getters, so the
- * reference below follows the state behind them too: a binding that only
- * exists while a mode is on shows up and goes away with that mode.
- */
-const mounted = shallowReactive(new Set<() => HotkeyBinding[]>())
+export function useHotkeys(
+  bindings: MaybeRefOrGetter<HotkeyBinding[]>,
+  options: UseHotkeysOptions = {},
+) {
+  const entry: MountedHotkeys = {
+    read: () => toValue(bindings),
+    scope: options.scope,
+    enabled: options.enabled,
+    priority: options.priority,
+    order: ++mountOrder,
+  }
+  onMounted(() => {
+    mounted.add(entry)
+    if (!listening) {
+      window.addEventListener("keydown", onKeydown)
+      listening = true
+    }
+  })
+  onBeforeUnmount(() => {
+    mounted.delete(entry)
+    if (!mounted.size && listening) {
+      window.removeEventListener("keydown", onKeydown)
+      listening = false
+    }
+  })
+}
 
 const KEY_NAMES: Record<string, string> = {
   escape: "Esc",
@@ -230,8 +250,9 @@ function comboOf(binding: HotkeyBinding): string {
  */
 export const activeShortcuts = computed<ShortcutGroup[]>(() => {
   const groups = new Map<string, ShortcutEntry[]>()
-  for (const read of mounted) {
-    for (const binding of read()) {
+  for (const entry of mounted) {
+    if (toValue(entry.enabled) === false) continue
+    for (const binding of entry.read()) {
       if (!binding.help) continue
       const combo = binding.help.combo ?? comboOf(binding)
       const entries = groups.get(binding.help.group) ?? []
