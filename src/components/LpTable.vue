@@ -5,19 +5,24 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useAttrs, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, watch } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpPagination from "./LpPagination.vue"
+import LpPopover from "./LpPopover.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpShift from "./LpShift.vue"
+import LpTableFilter, { type TableFilterOption } from "./LpTableFilter.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
+import { useHotkeys } from "../composables/useHotkeys"
 import { usePaintSelect } from "../composables/usePaintSelect"
 import { useRovingFocus } from "../composables/useRovingFocus"
 import { useLabels } from "../composables/useLpConfig"
 import { compareValues } from "./tableSort"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
+import { countValues, parseTableState, serializeTableState, summarizeShown } from "./tableFilter"
 
 export interface TableColumn<Row> {
   key: string
@@ -63,6 +68,28 @@ export interface TableLabels {
   exportCsv: string
   selectAll: string
   shortcutsGroup: string
+  filterColumn: string
+  filterSearch: string
+  filterAll: string
+  filterNone: string
+  filterInvert: string
+  filterOnly: string
+  filterOnlyShown: string
+  filterAddShown: string
+  filterNoValues: string
+  filterNothingShown: string
+  clearFilter: string
+  clearFilters: string
+  noMatches: string
+  resetFilters: string
+  rowCount: string
+  rowsTotal: string
+  selectedCount: string
+  clearSelection: string
+  pageSelected: string
+  selectAllMatching: string
+  allMatchingSelected: string
+  selectRow: string
 }
 
 export interface TableExportOptions extends CsvOptions {
@@ -134,8 +161,15 @@ const props = withDefaults(
     rowKey?: keyof T | ((row: T) => RowKey)
     emptyLabel?: string
     emptyIcon?: string
-    /** Render a leading checkbox column; selection binds via v-model:selected. */
-    selectable?: boolean
+    /**
+     * Rows can be selected (v-model:selected). `true` shows a tick column,
+     * where pressing a tick and sweeping ticks the run. `"hold"` keeps the
+     * column out of sight until it is needed: a long press on a row selects it
+     * (and the same press goes on selecting the rows it is dragged across), the
+     * column slides in, and while anything is selected a click on a row toggles
+     * it. Emptying the selection, or Escape, slides the column away again.
+     */
+    selectable?: boolean | "hold"
     /** Selected row keys (v-model:selected). */
     selected?: RowKey[]
     /** Active sort (v-model:sort). When set, the parent owns ordering (server
@@ -161,6 +195,24 @@ const props = withDefaults(
     exportFilename?: string
     /** All of the wording above in one object, and the config-level scope "table". */
     labels?: Partial<TableLabels>
+    /** Row height: `compact` for dense data, `comfortable` (default) otherwise. */
+    density?: "comfortable" | "compact"
+    /**
+     * Always show the bar above the table with the row count. It shows on its
+     * own while filters are active or rows are selected.
+     */
+    summary?: boolean
+    /**
+     * Remember sort, value filters and hidden columns across visits under this
+     * key (localStorage). Only plain filter values (text, numbers) are kept.
+     */
+    persist?: string
+    /**
+     * With `load`: the user chose "select all N" beyond the loaded page
+     * (v-model:allMatching). The keys in `selected` are then only the loaded
+     * ones; acting on everything that matches is the consumer's to do.
+     */
+    allMatching?: boolean
   }>(),
   {
     rows: () => [],
@@ -169,6 +221,9 @@ const props = withDefaults(
     emptyIcon: "lucide:inbox",
     selectable: false,
     selected: () => [],
+    density: "comfortable",
+    summary: false,
+    allMatching: false,
     // undefined, not null: null is a parent saying "unsorted", undefined is no
     // parent at all, and only the latter lets the table keep its own sort.
     sort: undefined,
@@ -190,6 +245,28 @@ const labelSet = useLabels<TableLabels>(
     exportCsv: "Export CSV",
     selectAll: "Select every row",
     shortcutsGroup: "Table",
+    filterColumn: "Filter {column}",
+    filterSearch: "Search values",
+    filterAll: "All",
+    filterNone: "None",
+    filterInvert: "Invert",
+    filterOnly: "Only",
+    filterOnlyShown: "Only these {count}",
+    filterAddShown: "Add these {count}",
+    filterNoValues: "No values match",
+    filterNothingShown: "none",
+    clearFilter: "Clear the {column} filter",
+    clearFilters: "Clear all",
+    noMatches: "No rows match the filters",
+    resetFilters: "Reset filters",
+    rowCount: "{shown} of {total}",
+    rowsTotal: "{total} rows",
+    selectedCount: "{count} selected",
+    clearSelection: "Clear selection",
+    pageSelected: "All {count} on this page are selected.",
+    selectAllMatching: "Select all {total}",
+    allMatchingSelected: "All {total} are selected.",
+    selectRow: "Select this row",
   },
   () => props.labels,
 )
@@ -224,6 +301,7 @@ const scrollAttrs = computed(() => {
 const emit = defineEmits<{
   (e: "update:selected", value: RowKey[]): void
   (e: "update:sort", value: SortState | null): void
+  (e: "update:allMatching", value: boolean): void
   (e: "rowClick", row: T): void
 }>()
 
@@ -268,6 +346,8 @@ function onRowContextMenu(row: T) {
 // Row items first — they are what the pointer is actually on — then the
 // table-wide ones under a rule, when the row has any of its own.
 const contextMenu = computed<ContextMenuItemDef[]>(() => {
+  // A finger's long press opens this menu too; while it is selecting rows, no.
+  if (paint.painting.value) return []
   const table = tableMenu()
   const row = menuRow.value ? (props.rowMenu?.(menuRow.value) ?? []) : []
   if (!row.length) return table
@@ -377,6 +457,60 @@ function applyToggle(key: string, value: unknown) {
 
 function showAllValues(key: string) {
   withMotion(() => (hiddenValues.value = { ...hiddenValues.value, [key]: new Set() }))
+}
+
+function setHidden(key: string, next: Set<unknown>) {
+  withMotion(() => (hiddenValues.value = { ...hiddenValues.value, [key]: next }))
+}
+
+function labelOf(col: TableColumn<T>, value: unknown): string {
+  return col.valueLabel?.(value) ?? String(value ?? "—")
+}
+
+/*
+ * What the filter of one column offers. Counts follow the OTHER filters, the
+ * way a faceted search does: with "Status: open" set, the "Owner" filter
+ * counts open rows, which is what the user is about to narrow further.
+ */
+function filterOptions(col: TableColumn<T>): TableFilterOption[] {
+  let counts: Map<unknown, number> | undefined
+  if (!props.load) {
+    const others = Object.entries(hiddenValues.value).filter(([key, set]) => key !== col.key && set.size)
+    const rows = others.length
+      ? props.rows.filter((row) => others.every(([key, hidden]) => !hidden.has(row[key])))
+      : props.rows
+    counts = countValues(rows, col.key)
+  }
+  return valuesOf(col).map((value) => ({ value, label: labelOf(col, value), count: counts?.get(value) ?? (counts ? 0 : undefined) }))
+}
+
+/** Every column with something hidden, summarised for the chips above the table. */
+const activeFilters = computed(() =>
+  props.columns
+    .filter((col) => col.filterable && hiddenValues.value[col.key]?.size)
+    .map((col) => {
+      const hidden = hiddenValues.value[col.key]!
+      const shown = valuesOf(col).filter((v) => !hidden.has(v)).map((v) => labelOf(col, v))
+      return { col, text: shown.length ? summarizeShown(shown) : text.value.filterNothingShown }
+    }),
+)
+
+function clearAllFilters() {
+  withMotion(() => (hiddenValues.value = {}))
+}
+
+function filterLabels() {
+  const t = text.value
+  return {
+    search: t.filterSearch,
+    all: t.filterAll,
+    none: t.filterNone,
+    invert: t.filterInvert,
+    only: t.filterOnly,
+    onlyShown: t.filterOnlyShown,
+    addShown: t.filterAddShown,
+    noValues: t.filterNoValues,
+  }
 }
 
 function toggleColumn(key: string) {
@@ -571,6 +705,44 @@ watch([activeSort, hiddenValues], () => {
   else fetchPage(props.debounce)
 })
 watch(page, () => fetchPage())
+
+// ── remembered state ─────────────────────────────────────────
+// Read after mount, not during setup: a server render knows nothing of this
+// browser's storage, and restoring earlier would make the first client render
+// disagree with it.
+const storageKey = computed(() => (props.persist ? `lp-table:${props.persist}` : ""))
+const restored = ref(false)
+onMounted(() => {
+  if (storageKey.value) {
+    let raw: string | null = null
+    try {
+      raw = localStorage.getItem(storageKey.value)
+    } catch {}
+    const state = parseTableState(raw, props.columns.map((c) => c.key))
+    if (state) {
+      if (state.sort !== undefined) {
+        ownSort.value = state.sort
+        emit("update:sort", state.sort)
+      }
+      if (state.hidden) {
+        hiddenValues.value = Object.fromEntries(Object.entries(state.hidden).map(([k, v]) => [k, new Set(v)]))
+      }
+      if (state.columns) hiddenColumns.value = new Set(state.columns)
+    }
+  }
+  restored.value = true
+})
+watch([activeSort, hiddenValues, hiddenColumns], () => {
+  if (!storageKey.value || !restored.value) return
+  const state = serializeTableState({
+    sort: activeSort.value,
+    hidden: Object.fromEntries(Object.entries(hiddenValues.value).map(([k, v]) => [k, [...v]])),
+    columns: [...hiddenColumns.value],
+  })
+  try {
+    localStorage.setItem(storageKey.value, state)
+  } catch {}
+})
 watch(() => props.load, () => fetchPage(), { immediate: true })
 
 // ── export ───────────────────────────────────────────────────
@@ -633,13 +805,90 @@ const keyByText = computed(
 )
 const paint = usePaintSelect<RowKey>({
   root: frameEl,
-  enabled: () => props.selectable,
+  enabled: () => !!props.selectable,
   selection: () => props.selected,
   set: (keys) => emit("update:selected", keys),
   resolve: (raw) => keyByText.value.get(raw),
   selectAll: () => [...new Set([...props.selected, ...allKeys.value])],
   help: () => ({ group: text.value.shortcutsGroup, label: text.value.selectAll }),
 })
+
+const holdMode = computed(() => props.selectable === "hold")
+/*
+ * In hold mode the tick column is there all along, collapsed to nothing, and
+ * opens by easing its width: the other columns then slide over instead of
+ * jumping when it appears.
+ */
+const ticksShown = computed(
+  () => props.selectable === true || props.selected.length > 0 || paint.painting.value,
+)
+
+function clearSelection() {
+  emit("update:selected", [])
+  if (props.allMatching) emit("update:allMatching", false)
+}
+
+/*
+ * A long press on a row starts selection in hold mode. Presses that begin on
+ * something the row holds that answers clicks of its own (a link, a button, a
+ * field) are left to it.
+ */
+const OWN_CLICKS = "a,button,input,select,textarea,label,[role=button],[role=checkbox],[contenteditable=true]"
+function onRowPointerDown(event: PointerEvent, key: RowKey) {
+  if (!holdMode.value) return
+  if ((event.target as Element | null)?.closest(OWN_CLICKS)) return
+  paint.onPointerDown(event, key, { hold: 420 })
+}
+
+// Once something is selected, a click on a row adds or removes it, as in a
+// phone's selection mode; with nothing selected it is the row's click again.
+function onRowClick(row: T, key: RowKey) {
+  if (holdMode.value && props.selected.length) toggleRow(key, !selectedSet.value.has(key))
+  else emit("rowClick", row)
+}
+
+useHotkeys(
+  () =>
+    props.selectable && props.selected.length
+      ? [
+          {
+            key: "escape",
+            help: { group: text.value.shortcutsGroup, label: text.value.clearSelection },
+            handler: () => clearSelection(),
+          },
+        ]
+      : [],
+  { scope: frameEl },
+)
+
+// ── the bar above the table ──────────────────────────────────
+const pageKeys = computed(() => displayRows.value.map((row, i) => keyFor(row, i)))
+const pageAllSelected = computed(
+  () => pageKeys.value.length > 0 && pageKeys.value.every((k) => selectedSet.value.has(k)),
+)
+// "Select all" beyond the page is a separate, explicit step: the header tick
+// only ever means the rows the user can see.
+watch(pageAllSelected, (all) => {
+  if (!all && props.allMatching) emit("update:allMatching", false)
+})
+const countText = computed(() => {
+  const t = text.value
+  if (props.load) return t.rowsTotal.replace("{total}", String(total.value))
+  if (displayRows.value.length !== props.rows.length) {
+    return t.rowCount.replace("{shown}", String(displayRows.value.length)).replace("{total}", String(props.rows.length))
+  }
+  return t.rowsTotal.replace("{total}", String(props.rows.length))
+})
+// A selectable table keeps the bar at all times (the row count until something
+// is selected): ticking the first row must not push the table down.
+const showBar = computed(() => props.summary || !!props.selectable || activeFilters.value.length > 0)
+const filteredOut = computed(() => {
+  if (loading.value || failed.value || displayRows.value.length) return false
+  if (props.load) return Object.values(hiddenValues.value).some((set) => set.size)
+  return props.rows.length > 0
+})
+
+const cellY = computed(() => (props.density === "compact" ? "py-1.5" : "py-3"))
 
 const colSpan = computed(() => visibleColumns.value.length + (props.selectable ? 1 : 0))
 
@@ -733,6 +982,71 @@ const barInsetTop = computed(() =>
       {{ text.exportCsv }}
     </LpButton>
   </div>
+  <!-- What the table is showing right now: the filters in force, each one
+       a chip that clears it, the row count, and what is selected with room
+       for the consumer's bulk actions. Eased in and out (LpShift), so the
+       table below glides rather than jumps when the first filter is set. -->
+  <!-- The gap below the bar lives inside the eased box (pb-3), cancelled
+       outside it (-mb-3): an empty box must not leave the root's gap behind. -->
+  <LpShift class="-mb-3">
+    <div v-if="showBar" class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2 pb-3 text-xs">
+      <div v-if="activeFilters.length" class="flex flex-wrap items-center gap-1.5">
+        <span
+          v-for="f in activeFilters"
+          :key="f.col.key"
+          class="inline-flex max-w-72 animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] items-center gap-1 rounded-pill bg-brand-soft py-0.5 pr-1 pl-2.5 text-ink motion-reduce:animate-none"
+        >
+          <span class="truncate"><span class="text-muted">{{ f.col.label }}:</span> {{ f.text }}</span>
+          <button
+            type="button"
+            class="grid size-4 shrink-0 place-items-center rounded-pill text-muted outline-none transition-colors duration-fast hover:bg-ink/10 hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            :aria-label="text.clearFilter.replace('{column}', f.col.label)"
+            @click="showAllValues(f.col.key)"
+          >
+            <LpIcon name="lucide:x" :size="12" />
+          </button>
+        </span>
+        <button
+          v-if="activeFilters.length > 1"
+          type="button"
+          class="rounded-control px-1.5 py-0.5 font-medium text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          @click="clearAllFilters"
+        >
+          {{ text.clearFilters }}
+        </button>
+      </div>
+      <div class="ml-auto flex flex-wrap items-center gap-2 text-muted">
+        <template v-if="selectable && selected.length">
+          <span class="font-medium text-ink" aria-live="polite">
+            {{
+              allMatching
+                ? text.allMatchingSelected.replace("{total}", String(total))
+                : text.selectedCount.replace("{count}", String(selected.length))
+            }}
+          </span>
+          <template v-if="load && pageAllSelected && !allMatching && total > pageKeys.length">
+            <span>{{ text.pageSelected.replace("{count}", String(pageKeys.length)) }}</span>
+            <button
+              type="button"
+              class="rounded-control px-1.5 py-0.5 font-medium text-brand outline-none transition-colors duration-fast hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
+              @click="emit('update:allMatching', true)"
+            >
+              {{ text.selectAllMatching.replace("{total}", String(total)) }}
+            </button>
+          </template>
+          <button
+            type="button"
+            class="rounded-control px-1.5 py-0.5 font-medium outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            @click="clearSelection"
+          >
+            {{ text.clearSelection }}
+          </button>
+          <slot name="bulk" :selected="selected" :all-matching="allMatching" :clear="clearSelection" />
+        </template>
+        <span v-else class="tabular-nums">{{ countText }}</span>
+      </div>
+    </div>
+  </LpShift>
   <LpScrollArea
     v-bind="scrollAttrs"
     :fade="false"
@@ -754,19 +1068,21 @@ const barInsetTop = computed(() =>
         :class="stickyHeader ? 'sticky top-0 z-10 bg-surface-soft' : ''"
       >
         <tr class="border-b border-line bg-surface-soft">
-          <th v-if="selectable" class="w-px px-4 py-3">
-            <LpCheckbox
-              :model-value="allChecked"
-              :indeterminate="someChecked"
-              @update:model-value="toggleAll"
-            />
+          <th v-if="selectable" class="w-px p-0" :class="cellY">
+            <div class="lp-tick" :class="ticksShown ? 'lp-tick-open' : ''" :inert="!ticksShown">
+              <LpCheckbox
+                :model-value="allChecked"
+                :indeterminate="someChecked"
+                @update:model-value="toggleAll"
+              />
+            </div>
           </th>
           <th
             v-for="col in visibleColumns"
             :key="col.key"
             :style="col.width ? { width: col.width } : undefined"
-            class="px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
-            :class="alignClass(col.align)"
+            class="px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+            :class="[alignClass(col.align), cellY]"
             :aria-sort="
               activeSort?.key === col.key
                 ? activeSort.dir === 'asc'
@@ -794,14 +1110,7 @@ const barInsetTop = computed(() =>
             >
               {{ col.label }}
               <LpIcon
-                v-if="!col.sortable"
-                name="lucide:filter"
-                :size="12"
-                class="shrink-0"
-                :class="hiddenValues[col.key]?.size ? 'text-brand opacity-100' : 'opacity-40 group-hover/sort:opacity-70'"
-              />
-              <LpIcon
-                v-else
+                v-if="col.sortable"
                 :name="sortIcon(col)"
                 :size="13"
                 class="shrink-0 transition-[transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]"
@@ -814,6 +1123,29 @@ const barInsetTop = computed(() =>
             </button>
             </LpContextMenu>
             <template v-else>{{ col.label }}</template>
+            <LpPopover
+              v-if="col.filterable"
+              align="start"
+              panel-class="w-72"
+              :aria-label="text.filterColumn.replace('{column}', col.label)"
+            >
+              <template #trigger>
+                <button
+                  type="button"
+                  class="ml-0.5 inline-grid size-5 place-items-center rounded align-middle outline-none transition-colors duration-fast hover:bg-surface-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="hiddenValues[col.key]?.size ? 'text-brand' : 'opacity-60'"
+                  :aria-label="text.filterColumn.replace('{column}', col.label)"
+                >
+                  <LpIcon :name="hiddenValues[col.key]?.size ? 'lucide:filter-x' : 'lucide:filter'" :size="12" />
+                </button>
+              </template>
+              <LpTableFilter
+                :options="filterOptions(col)"
+                :hidden="hiddenValues[col.key] ?? new Set()"
+                :labels="filterLabels()"
+                @update:hidden="(next) => setHidden(col.key, next)"
+              />
+            </LpPopover>
           </th>
         </tr>
       </thead>
@@ -838,12 +1170,15 @@ const barInsetTop = computed(() =>
         <tr v-if="displayRows.length === 0" key="lp-table-empty" class="lp-row-empty">
           <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
             <LpIcon
-              :name="loading ? 'lucide:loader-circle' : failed ? 'lucide:circle-alert' : emptyIcon"
+              :name="loading ? 'lucide:loader-circle' : failed ? 'lucide:circle-alert' : filteredOut ? 'lucide:filter-x' : emptyIcon"
               :size="22"
               class="mx-auto mb-2 opacity-60"
               :class="loading ? 'animate-spin' : ''"
             />
-            <div>{{ loading ? text.loading : failed ? text.error : text.empty }}</div>
+            <div>{{ loading ? text.loading : failed ? text.error : filteredOut ? text.noMatches : text.empty }}</div>
+            <LpButton v-if="filteredOut" variant="outline" size="sm" class="mt-3" @click="clearAllFilters">
+              {{ text.resetFilters }}
+            </LpButton>
           </td>
         </tr>
         <!-- A plain <tr>, because TransitionGroup animates element children and
@@ -856,27 +1191,43 @@ const barInsetTop = computed(() =>
           class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
           :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
           v-bind="roving.itemProps(String(keyFor(row, index)))"
-          @click="emit('rowClick', row)"
+          :data-paint-key="selectable ? String(keyFor(row, index)) : undefined"
+          @click="onRowClick(row, keyFor(row, index))"
+          @pointerdown="onRowPointerDown($event, keyFor(row, index))"
           @keydown="onRowKeydown"
         >
           <td
             v-if="selectable"
-            class="w-px cursor-pointer px-4 py-3 select-none"
-            :data-paint-key="String(keyFor(row, index))"
+            class="w-px cursor-pointer p-0 select-none"
+            :class="cellY"
             @click.stop
-            @pointerdown="paint.onPointerDown($event, keyFor(row, index))"
+            @pointerdown.stop="paint.onPointerDown($event, keyFor(row, index))"
           >
-            <LpCheckbox
-              :model-value="selectedSet.has(keyFor(row, index))"
-              @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
-            />
+            <div class="lp-tick" :class="ticksShown ? 'lp-tick-open' : ''" :inert="!ticksShown">
+              <LpCheckbox
+                :model-value="selectedSet.has(keyFor(row, index))"
+                @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
+              />
+            </div>
           </td>
           <td
-            v-for="col in visibleColumns"
+            v-for="(col, ci) in visibleColumns"
             :key="col.key"
-            class="px-4 py-3 text-ink"
-            :class="alignClass(col.align)"
+            class="px-4 text-ink"
+            :class="[alignClass(col.align), cellY, holdMode && ci === 0 ? 'relative' : '']"
           >
+            <!-- The hint that rows can be selected at all, while no tick column
+                 is showing: a box in the first cell's margin on hover. Clicking
+                 it selects the row like a long press would. -->
+            <button
+              v-if="holdMode && ci === 0 && !ticksShown"
+              type="button"
+              tabindex="-1"
+              class="lp-tick-cue absolute top-1/2 left-0.5 size-3.5 -translate-y-1/2 rounded-[4px] border border-line-strong bg-surface-soft opacity-0 transition-opacity duration-fast group-hover:opacity-100 hover:border-brand"
+              :aria-label="text.selectRow"
+              @pointerdown.stop
+              @click.stop="toggleRow(keyFor(row, index), true)"
+            />
             <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
               {{ row[col.key] }}
             </slot>
@@ -947,12 +1298,44 @@ const barInsetTop = computed(() =>
  * which is a moment slower and stays a table the whole time.
  */
 
+/*
+ * The tick column of a hold-to-select table, collapsed until a selection
+ * exists. It eases its own width rather than a transform: the column's width
+ * is what the other columns are laid out against, so they slide with it.
+ */
+.lp-tick {
+  display: flex;
+  align-items: center;
+  max-width: 0;
+  padding-inline: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-width var(--duration-medium) var(--ease-emphasized),
+    padding var(--duration-medium) var(--ease-emphasized),
+    opacity var(--duration-fast) ease;
+}
+
+.lp-tick-open {
+  max-width: 3.25rem;
+  padding-inline: 1rem;
+  opacity: 1;
+}
+
 /* A filter that redraws the list is information, not decoration: with motion
    turned down the rows change without animating rather than not changing. */
+/* Only where there is a hover to reveal it; a finger long-presses instead. */
+@media (hover: none) {
+  .lp-tick-cue {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lp-row-enter-active,
   .lp-row-leave-active,
-  .lp-row-move {
+  .lp-row-move,
+  .lp-tick {
     transition: none;
   }
 }

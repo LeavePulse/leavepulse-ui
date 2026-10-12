@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, toValue, type MaybeRefOrGetter, type Ref } from "vue"
+import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
 import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
 
 /*
@@ -17,6 +17,11 @@ import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
  * The press itself ticks the first item, so the click the browser sends after
  * the stroke is swallowed before the item's own handler sees it; otherwise the
  * first item would toggle back.
+ *
+ * `onPointerDown(event, key, { hold })` makes any pointer hold first. That is
+ * how a list without visible ticks enters selection: a quick click on the row
+ * stays the row's click, a long press selects it and the same press goes on
+ * painting.
  */
 export interface UsePaintSelectOptions<K> {
   /** The element that holds the items. */
@@ -62,6 +67,8 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
   let pending: { key: K; pointerId: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null
   let swallowClick = false
   let frame = 0
+  /** True while a stroke is painting, for UI that reacts to it (a tick column revealing). */
+  const painting = ref(false)
 
   const enabled = () => toValue(options.enabled) ?? true
 
@@ -116,6 +123,11 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     if (anchor < 0) return
     const before = new Set(options.selection())
     stroke = { keys, anchor, paint: !before.has(key), before, x, y, scroller: scrollParent(options.root.value) }
+    painting.value = true
+    // A sweep over text would otherwise select it, and a hold that started
+    // before the stroke may already have.
+    window.getSelection()?.removeAllRanges()
+    if (options.root.value) options.root.value.style.userSelect = "none"
     extend()
     if (!frame) frame = requestAnimationFrame(tick)
   }
@@ -126,10 +138,10 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
   }
 
   /** Bind to `pointerdown` on the item's tick (or the whole item). */
-  function onPointerDown(event: PointerEvent, key: K) {
+  function onPointerDown(event: PointerEvent, key: K, behaviour: { hold?: number } = {}) {
     if (!enabled() || event.button !== 0) return
     cancelPending()
-    if (event.pointerType !== "touch") {
+    if (behaviour.hold === undefined && event.pointerType !== "touch") {
       // Keeps the press from starting a text selection or moving focus mid-stroke.
       event.preventDefault()
       begin(key, event.clientX, event.clientY)
@@ -145,7 +157,7 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
         pending = null
         begin(key, x, y)
         navigator.vibrate?.(8)
-      }, HOLD_MS),
+      }, behaviour.hold ?? HOLD_MS),
     }
   }
 
@@ -164,6 +176,8 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     cancelPending()
     if (!stroke) return
     stroke = null
+    painting.value = false
+    if (options.root.value) options.root.value.style.userSelect = ""
     if (frame) cancelAnimationFrame(frame)
     frame = 0
     swallowClick = true
@@ -175,6 +189,14 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     swallowClick = false
     event.stopPropagation()
     event.preventDefault()
+  }
+
+  // A long press is also how a finger asks for the context menu; once it has
+  // turned into painting, that menu would open over the stroke.
+  function onContextMenu(event: Event) {
+    if (!stroke && !swallowClick) return
+    event.preventDefault()
+    event.stopPropagation()
   }
 
   // A finger that has started painting must not scroll the page under it.
@@ -203,6 +225,7 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     window.addEventListener("pointerup", onUp)
     window.addEventListener("pointercancel", onUp)
     window.addEventListener("click", onClickCapture, true)
+    window.addEventListener("contextmenu", onContextMenu, true)
     options.root.value?.addEventListener("touchmove", onTouchMove, { passive: false })
   })
   onBeforeUnmount(() => {
@@ -212,8 +235,9 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     window.removeEventListener("pointerup", onUp)
     window.removeEventListener("pointercancel", onUp)
     window.removeEventListener("click", onClickCapture, true)
+    window.removeEventListener("contextmenu", onContextMenu, true)
     options.root.value?.removeEventListener("touchmove", onTouchMove)
   })
 
-  return { onPointerDown }
+  return { onPointerDown, painting: readonly(painting) }
 }

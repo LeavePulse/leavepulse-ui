@@ -33,6 +33,7 @@ describe("addTags", () => {
     expect(addTags(["a"], ["A"], { duplicates: "ignore", normalize: (t) => t.toLowerCase() })).toEqual({
       tags: ["a"],
       rejected: [],
+      ignored: ["a"],
     })
     expect(addTags(["a"], ["a"], { duplicates: "allow" }).tags).toEqual(["a", "a"])
   })

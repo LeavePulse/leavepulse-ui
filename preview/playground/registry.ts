@@ -2341,8 +2341,8 @@ export const registry: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected, a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely.",
-    components: { LpTable, LpBadge },
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off.",
+    components: { LpTable, LpBadge, LpButton },
     state: () => {
       const s = reactive({
         sort: { key: "amount", dir: "desc" },
@@ -2388,6 +2388,27 @@ export const registry: ComponentEntry[] = [
             facets: { status: [...new Set(all.map((r) => r.status))] },
           }
         },
+        // Many values per column, for the filter popover and hold-to-select.
+        issueColumns: [
+          { key: "title", label: "Issue", width: "40%", sortable: true },
+          { key: "status", label: "Status", filterable: true },
+          { key: "owner", label: "Owner", filterable: true, sortable: true },
+          { key: "points", label: "Points", align: "right", sortable: true },
+        ],
+        issues: Array.from({ length: 60 }, (_, i) => ({
+          id: i + 1,
+          title: ["Login loops", "Slow search", "Broken export", "Typo in footer", "Flaky test", "Memory leak"][i % 6] + " #" + (i + 1),
+          status: ["Open", "Triaged", "In progress", "In review", "Blocked", "QA", "Ready", "Released", "Reopened", "Won't fix", "Duplicate", "Closed"][(i * 7) % 12],
+          owner: ["Ada", "Grace", "Linus", "Margaret", "Ken", "Barbara"][(i * 5) % 6],
+          points: [1, 2, 3, 5, 8, 13][(i * 3) % 6],
+        })),
+        issueSelection: [] as number[],
+        closeSelected() {
+          for (const issue of s.issues) if (s.issueSelection.includes(issue.id)) issue.status = "Closed"
+          s.issueSelection = []
+        },
+        serverSelection: [] as string[],
+        allMatching: false,
         // Custom ordering: priority by rank, not alphabet; version by its numbers.
         ticketColumns: [
           { key: "title", label: "Ticket", width: "40%" },
@@ -2457,6 +2478,24 @@ export const registry: ComponentEntry[] = [
   <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row</p>
 
   <!-- Fixed height + stickyHeader: scrolls via LpScrollArea, header pins to top. -->
+  <p class="mt-2 text-xs font-medium text-muted">Many values — open the funnel on Status or Owner. To select: hover a row and click the box at its left edge, or press and hold a row, then keep holding and drag over others; once rows are selected a click adds or removes one, Escape clears:</p>
+  <LpTable
+    :columns="issueColumns"
+    :rows="issues"
+    row-key="id"
+    selectable="hold"
+    sticky-header
+    density="compact"
+    summary
+    persist="preview-issues"
+    v-model:selected="issueSelection"
+    class="h-80"
+  >
+    <template #bulk>
+      <LpButton size="sm" variant="outline" @click="closeSelected">Close selected</LpButton>
+    </template>
+  </LpTable>
+
   <p class="mt-2 text-xs font-medium text-muted">sortValue and compare — Priority sorts by rank, Fixed in by version number:</p>
   <LpTable :columns="ticketColumns" :rows="tickets" row-key="title" v-model:sort="ticketSort" />
 
@@ -2476,8 +2515,16 @@ export const registry: ComponentEntry[] = [
     </template>
   </LpTable>
 
-  <p class="mt-2 text-xs font-medium text-muted">load — the server pages, sorts and filters (right-click Status to filter):</p>
-  <LpTable :columns="asyncColumns" :load="loadOrders" :page-size="8" row-key="id">
+  <p class="mt-2 text-xs font-medium text-muted">load — the server pages, sorts and filters; tick the header box, then "Select all" goes past the page:</p>
+  <LpTable
+    :columns="asyncColumns"
+    :load="loadOrders"
+    :page-size="8"
+    row-key="id"
+    selectable
+    v-model:selected="serverSelection"
+    v-model:all-matching="allMatching"
+  >
     <template #cell-amount="{ value }">€{{ value.toFixed(2) }}</template>
     <template #cell-status="{ value }">
       <LpBadge :tone="value === 'paid' ? 'success' : value === 'pending' ? 'neutral' : 'danger'">

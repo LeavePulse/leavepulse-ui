@@ -87,6 +87,13 @@ export function useShift(
   /** Where the box last settled, so a retune has a size to ease FROM. */
   let lastHeight = 0
   let lastWidth = 0
+  /**
+   * Whether the last measurement was of a box actually laid out. An empty box
+   * in the flow measures 0 and is a real size to grow from (a bar or message
+   * appearing in it); a box under `display: none` also measures 0 but has no
+   * layout yet, and growing from that would animate content in from nothing.
+   */
+  let laidOut = false
   /** True while a tween owns the size, so observers don't cancel it midway. */
   let inFlight = false
   /** When the in-flight tween started, to tell a duplicate from a follow-up. */
@@ -192,6 +199,8 @@ export function useShift(
     restoreScroll(tops)
     lastHeight = toHeight
     lastWidth = toWidth
+    const wasLaidOut = laidOut
+    laidOut = node.getClientRects().length > 0
 
     // Nothing moved on either axis, so there is nothing to ease — and leaving
     // the size unset keeps the box free to size itself.
@@ -203,8 +212,8 @@ export function useShift(
     // different thing it was meant to catch: the box was not in the layout yet,
     // so there is no size to ease out of.
     const movesHeight =
-      wantsHeight() && fromHeight !== 0 && toHeight !== fromHeight
-    const movesWidth = wantsWidth() && fromWidth !== 0 && toWidth !== fromWidth
+      wantsHeight() && (fromHeight !== 0 || wasLaidOut) && toHeight !== fromHeight
+    const movesWidth = wantsWidth() && (fromWidth !== 0 || wasLaidOut) && toWidth !== fromWidth
     if (!movesHeight && !movesWidth) return
 
     if (movesHeight) node.style.height = `${fromHeight}px`
@@ -250,6 +259,7 @@ export function useShift(
     resizing.value = false
     lastHeight = 0
     lastWidth = 0
+    laidOut = false
     inFlight = false
   }
 
@@ -263,6 +273,7 @@ export function useShift(
 
       lastHeight = node.offsetHeight
       lastWidth = node.offsetWidth
+      laidOut = node.getClientRects().length > 0
       scrollHost = node
       node.addEventListener("scroll", rememberScroll, { capture: true, passive: true })
       if (wantsHeight()) node.style.height = `${lastHeight}px`
