@@ -15,6 +15,8 @@ import { useAsyncTask } from "../composables/useAsyncTask"
 import { useRovingFocus } from "../composables/useRovingFocus"
 import { useLabels } from "../composables/useLpConfig"
 import { compareValues } from "./tableSort"
+import LpButton from "./LpButton.vue"
+import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
 
 export interface TableColumn<Row> {
   key: string
@@ -39,6 +41,8 @@ export interface TableColumn<Row> {
    * vocabulary; the menu should say what the column itself says.
    */
   valueLabel?: (value: unknown) => string
+  /** The value a CSV export writes for this column; the raw cell by default. */
+  exportValue?: (row: Row) => unknown
   /** Keep this column out of the show/hide list — an actions column has no
    *  name to offer and nothing to gain from being hidden. */
   alwaysVisible?: boolean
@@ -55,6 +59,19 @@ export interface TableLabels {
   filter: string
   showAll: string
   columns: string
+  exportCsv: string
+}
+
+export interface TableExportOptions extends CsvOptions {
+  /**
+   * Which rows: every row in the current order, the rows the header filters
+   * leave, or the selected ones. With `load` only the loaded page is known.
+   */
+  scope?: "all" | "filtered" | "selected"
+  /** File name without extension. */
+  filename?: string
+  /** Return the CSV without offering a download. */
+  download?: boolean
 }
 
 export interface SortState {
@@ -135,6 +152,10 @@ const props = withDefaults(
     filterLabel?: string
     showAllLabel?: string
     columnsLabel?: string
+    /** Offer a CSV download in a toolbar above the table and in its menu. */
+    exportable?: boolean
+    /** File name for that download, without extension. */
+    exportFilename?: string
     /** All of the wording above in one object, and the config-level scope "table". */
     labels?: Partial<TableLabels>
   }>(),
@@ -163,6 +184,7 @@ const labelSet = useLabels<TableLabels>(
     filter: "Show only",
     showAll: "Show all",
     columns: "Columns",
+    exportCsv: "Export CSV",
   },
   () => props.labels,
 )
@@ -365,18 +387,18 @@ const filteredRows = computed<T[]>(() => {
 })
 
 // We compare by raw cell value with a stable-ish coerce.
-const displayRows = computed<T[]>(() => {
+function sortRows(rows: T[]): T[] {
   const s = activeSort.value
-  if (!s || props.load) return filteredRows.value
+  if (!s || props.load) return rows
   const col = props.columns.find((c) => c.key === s.key)
-  if (!col?.sortable) return filteredRows.value
+  if (!col?.sortable) return rows
   const factor = s.dir === "asc" ? 1 : -1
   const own = col.compare
   const value = col.sortValue ?? ((row: T) => row[s.key])
-  return [...filteredRows.value].sort(
-    (a, b) => (own ? own(a, b) : compareValues(value(a), value(b))) * factor,
-  )
-})
+  return [...rows].sort((a, b) => (own ? own(a, b) : compareValues(value(a), value(b))) * factor)
+}
+
+const displayRows = computed<T[]>(() => sortRows(filteredRows.value))
 
 function toggleSort(col: TableColumn<T>) {
   if (!col.sortable) return
@@ -478,8 +500,12 @@ function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
  */
 function tableMenu(): ContextMenuItemDef[] {
   const offered = props.columns.filter((c) => !c.alwaysVisible && c.label)
-  if (!offered.length) return []
+  const exportItem: ContextMenuItemDef[] = props.exportable
+    ? [{ label: text.value.exportCsv, icon: "lucide:download", onSelect: () => exportCsv() }]
+    : []
+  if (!offered.length) return exportItem
   return [
+    ...exportItem,
     {
       label: text.value.columns,
       icon: "lucide:columns-3",
@@ -537,7 +563,31 @@ watch([activeSort, hiddenValues], () => {
 watch(page, () => fetchPage())
 watch(() => props.load, () => fetchPage(), { immediate: true })
 
-defineExpose({ reload: () => fetchPage() })
+// ── export ───────────────────────────────────────────────────
+// The columns on screen, minus the unnamed ones (actions), in the order shown.
+function exportCsv(options: TableExportOptions = {}): string {
+  const scope = options.scope ?? "filtered"
+  let rows: T[]
+  if (scope === "all") rows = sortRows(sourceRows.value)
+  else if (scope === "selected") {
+    const keys = new Set(props.selected)
+    rows = sortRows(sourceRows.value).filter((row, i) => keys.has(keyFor(row, i)))
+  } else rows = displayRows.value
+  const columns = visibleColumns.value
+    .filter((col) => col.label)
+    .map((col) => ({
+      key: col.key,
+      label: col.label,
+      value: col.exportValue ?? ((row: T) => row[col.key]),
+    }))
+  const csv = toCsv(rows, columns, options)
+  if (options.download !== false) {
+    downloadFile(`${fileStem(options.filename ?? props.exportFilename, "table")}.csv`, csv, "text/csv;charset=utf-8")
+  }
+  return csv
+}
+
+defineExpose({ reload: () => fetchPage(), exportCsv })
 
 // ── selection ────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selected))
@@ -652,6 +702,12 @@ const barInsetTop = computed(() =>
   <!-- No top fade: a sticky header sits in the masked band and would be dimmed
        by it. The bottom edge is left crisp with it for symmetry. -->
   <div class="flex flex-col gap-3" :class="rootClass">
+  <div v-if="exportable" class="flex justify-end">
+    <LpButton variant="ghost" size="sm" @click="exportCsv()">
+      <LpIcon name="lucide:download" :size="14" />
+      {{ text.exportCsv }}
+    </LpButton>
+  </div>
   <LpScrollArea
     v-bind="scrollAttrs"
     :fade="false"

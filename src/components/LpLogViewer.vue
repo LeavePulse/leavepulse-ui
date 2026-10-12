@@ -32,6 +32,7 @@ import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
+import { countLevels, matchPositions, ringWindow, stepMatch } from "./logSearch"
 
 export interface LogViewerLabels {
   [key: string]: string
@@ -50,6 +51,14 @@ export interface LogViewerLabels {
   /** `{n}` is replaced by the count. */
   identical: string
   jump: string
+  search: string
+  clearSearch: string
+  previousMatch: string
+  nextMatch: string
+  /** `{current}` and `{total}` are replaced. */
+  matchCount: string
+  noMatches: string
+  levels: string
 }
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "success"
@@ -123,6 +132,18 @@ const props = withDefaults(
      * so a duplicate level word / timestamp doesn't repeat in the message body.
      */
     parse?: boolean
+    /**
+     * Keep only the newest N lines on screen. The consumer can keep pushing
+     * into the same array (or hand over a longer one) and the viewer shows the
+     * tail; trimming the source itself is still the cheaper way to cap memory.
+     */
+    maxLines?: number
+    /**
+     * A bar above the stream with a search box (Enter / Shift+Enter or F3 step
+     * through matches) and level chips. The term binds via `v-model:search`,
+     * the chosen levels via `v-model:levels`.
+     */
+    toolbar?: boolean
     labels?: Partial<LogViewerLabels>
   }>(),
   {
@@ -148,6 +169,12 @@ const emit = defineEmits<{
   (e: "reach-top"): void
 }>()
 
+/** The toolbar's search term. Without the toolbar, `highlight` is the term. */
+const query = defineModel<string>("search", { default: "" })
+/** Levels to show. Empty shows every level. */
+const levels = defineModel<LogLevel[]>("levels", { default: () => [] })
+const term = computed(() => (props.toolbar && query.value ? query.value : (props.highlight ?? "")).trim())
+
 const text = useLabels<LogViewerLabels>(
   "logViewer",
   {
@@ -163,6 +190,13 @@ const text = useLabels<LogViewerLabels>(
     filterLevel: "Filter by {level}",
     identical: "{n} identical lines",
     jump: "Jump to latest",
+    search: "Search logs",
+    clearSearch: "Clear search",
+    previousMatch: "Previous match",
+    nextMatch: "Next match",
+    matchCount: "{current} / {total}",
+    noMatches: "No matches",
+    levels: "Levels",
   },
   () => props.labels,
 )
@@ -280,7 +314,10 @@ const root = ref<HTMLElement | null>(null)
 const frozen = ref(false)
 const frozenLines = shallowRef<LogLine[] | null>(null)
 
-const sourceLines = computed<LogLine[]>(() => frozenLines.value ?? props.lines)
+const windowed = computed(() => ringWindow(frozenLines.value ?? props.lines, props.maxLines))
+const sourceLines = computed<LogLine[]>(() => windowed.value.lines as LogLine[])
+// Line numbers keep counting from the start of the stream after the cap trims it.
+const lineOffset = computed(() => windowed.value.offset)
 
 function freeze(): boolean {
   // Declining unless the stream is being looked at: `false` hands Ctrl back
@@ -291,7 +328,9 @@ function freeze(): boolean {
   // Snapshotted by reference, not copied: the array the consumer hands over is
   // replaced wholesale on every update, so holding the old one is enough — and
   // a copy of ten thousand lines on every keypress is not.
-  frozenLines.value = props.lines
+  // A capped stream is usually one array pushed into in place, which a
+  // reference would not hold still; its window is small enough to copy.
+  frozenLines.value = props.maxLines ? props.lines.slice(-props.maxLines) : props.lines
   frozen.value = true
   return true
 }
@@ -317,9 +356,13 @@ function focusWithin() {
   return !!el && el.contains(document.activeElement)
 }
 
+// `when` rather than a bare decline: several viewers on one page all bind these
+// keys, and only the one being looked at should claim them.
+const lookedAt = () => hovered.value || focusWithin()
+
 useHotkeys(() => [
-  { key: "control", allowInInput: true, handler: freeze },
-  { key: "meta", allowInInput: true, handler: freeze },
+  { key: "control", allowInInput: true, when: lookedAt, handler: freeze },
+  { key: "meta", allowInInput: true, when: lookedAt, handler: freeze },
 ])
 
 // Released on keyup anywhere, and on blur: a window that loses focus mid-hold
@@ -347,10 +390,12 @@ const parsedLines = computed<LogLine[]>(() =>
 // With filterMatches + a search term, keep only lines whose message contains it
 // (case-insensitive); otherwise pass everything.
 const visibleLines = computed<{ line: LogLine; n: number; count: number }[]>(() => {
-  const term = props.filterMatches ? props.highlight?.trim().toLowerCase() : ""
+  const needle = props.filterMatches ? term.value.toLowerCase() : ""
+  const shown = levels.value.length ? new Set<LogLevel>(levels.value) : null
   const filtered = parsedLines.value
     .map((line, n) => ({ line, n }))
-    .filter(({ line }) => !term || line.message.toLowerCase().includes(term))
+    .filter(({ line }) => !shown || shown.has(line.level ?? "info"))
+    .filter(({ line }) => !needle || matchPositions([line], needle).length > 0)
 
   if (!props.compact) return filtered.map((row) => ({ ...row, count: 1 }))
 
@@ -391,6 +436,88 @@ function lineKey(n: number): number {
   }
   return id
 }
+
+// ── toolbar: level chips and match navigation ───────────────────────
+const LEVEL_ORDER: LogLevel[] = ["trace", "debug", "info", "success", "warn", "error", "fatal"]
+const levelCounts = computed(() => countLevels<LogLevel>(parsedLines.value, "info"))
+const presentLevels = computed(() => LEVEL_ORDER.filter((l) => levelCounts.value.has(l)))
+
+function toggleLevel(level: LogLevel) {
+  levels.value = levels.value.includes(level)
+    ? levels.value.filter((l) => l !== level)
+    : [...levels.value, level]
+}
+
+const matches = computed(() => matchPositions(visibleLines.value.map((r) => r.line), term.value))
+const current = ref(-1)
+const currentRow = computed(() => {
+  const pos = matches.value[current.value]
+  return pos === undefined ? -1 : (visibleLines.value[pos]?.n ?? -1)
+})
+watch(term, () => {
+  current.value = -1
+})
+watch(matches, (list) => {
+  if (current.value >= list.length) current.value = list.length - 1
+})
+
+const matchLabel = computed(() => {
+  if (!term.value) return ""
+  const total = matches.value.length
+  if (!total) return text.value.noMatches
+  return text.value.matchCount
+    .replace("{current}", current.value >= 0 ? String(current.value + 1) : "–")
+    .replace("{total}", String(total))
+})
+
+function step(direction: 1 | -1) {
+  const next = stepMatch(current.value, matches.value.length, direction)
+  if (next < 0) return
+  current.value = next
+  pinned.value = false
+  nextTick(() => revealMatch(matches.value[next]))
+}
+
+// Brings the match to the middle of the viewport. A virtualised row may not be
+// in the DOM yet, so the offset is computed from the fixed row height instead.
+function revealMatch(position: number | undefined) {
+  const el = viewport()
+  if (!el || position === undefined) return
+  const behavior: ScrollBehavior = prefersReducedMotion() ? "auto" : "smooth"
+  if (virtualise.value) {
+    el.scrollTo({ top: Math.max(0, position * ROW_HEIGHT - el.clientHeight / 2), behavior })
+    return
+  }
+  const n = visibleLines.value[position]?.n
+  el.querySelector<HTMLElement>(`[data-log-row="${n}"]`)?.scrollIntoView({ block: "center", behavior })
+}
+
+const searchEl = ref<HTMLInputElement | null>(null)
+
+function onSearchKeydown(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (event.key === "Enter") {
+    event.preventDefault()
+    step(event.shiftKey ? -1 : 1)
+  } else if (event.key === "Escape" && query.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    query.value = ""
+  }
+}
+
+const searching = () => !!term.value && lookedAt()
+
+useHotkeys(() => [
+  { key: "f3", allowInInput: true, when: searching, handler: () => step(1) },
+  { key: "f3", shift: true, allowInInput: true, when: searching, handler: () => step(-1) },
+])
+
+defineExpose({
+  next: () => step(1),
+  previous: () => step(-1),
+  focusSearch: () => searchEl.value?.focus(),
+})
 
 // True when filtering has emptied an otherwise non-empty stream.
 const filteredEmpty = computed(
@@ -473,7 +600,10 @@ function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
       label: text.value.filterLevel.replace("{level}", line.level),
       icon: "lucide:filter",
       separatorBefore: !line.source,
-      onSelect: () => emit("filter", { level: line.level }),
+      onSelect: () => {
+        if (props.toolbar && line.level) levels.value = [line.level]
+        emit("filter", { level: line.level })
+      },
     })
   }
   const extra = props.extraRowItems?.(line, index) ?? []
@@ -488,11 +618,10 @@ interface Part {
   hit: boolean
 }
 function splitHighlight(message: string): Part[] {
-  const term = props.highlight?.trim()
-  if (!term) return [{ text: message, hit: false }]
+  if (!term.value) return [{ text: message, hit: false }]
   const parts: Part[] = []
   const lower = message.toLowerCase()
-  const needle = term.toLowerCase()
+  const needle = term.value.toLowerCase()
   let i = 0
   while (i < message.length) {
     const at = lower.indexOf(needle, i)
@@ -625,6 +754,7 @@ function rideToBottom(smooth = true, force = false) {
 }
 
 function scrollToBottom() {
+  current.value = -1
   rideToBottom(true, true)
   pinned.value = true
 }
@@ -653,7 +783,7 @@ watch(
   linesSignal,
   async () => {
     await nextTick()
-    if (props.tail && pinned.value) {
+    if (props.tail && pinned.value && current.value < 0) {
       requestAnimationFrame(() => rideToBottom(true))
     } else {
       restoreScrollAnchor()
@@ -740,6 +870,78 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       </div>
     </Transition>
 
+    <div
+      v-if="toolbar"
+      class="flex flex-wrap items-center gap-2 border-b border-line px-2 py-1.5 font-sans"
+    >
+      <div class="flex min-w-48 flex-1 items-center gap-1.5 rounded-control bg-surface-soft px-2 focus-within:ring-2 focus-within:ring-ring">
+        <LpIcon name="lucide:search" :size="14" class="shrink-0 text-muted" />
+        <input
+          ref="searchEl"
+          v-model="query"
+          type="search"
+          :aria-label="text.search"
+          :placeholder="text.search"
+          class="h-7 min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
+          @keydown="onSearchKeydown"
+        />
+        <span
+          v-if="term"
+          class="shrink-0 text-[11px] tabular-nums text-muted"
+          aria-live="polite"
+        >{{ matchLabel }}</span>
+        <button
+          v-if="query"
+          type="button"
+          class="rounded-xs p-0.5 text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          :aria-label="text.clearSearch"
+          @click="query = ''; searchEl?.focus()"
+        >
+          <LpIcon name="lucide:x" :size="12" />
+        </button>
+      </div>
+      <div class="flex items-center">
+        <button
+          type="button"
+          class="rounded-xs p-1 text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+          :aria-label="text.previousMatch"
+          :disabled="!matches.length"
+          @click="step(-1)"
+        >
+          <LpIcon name="lucide:chevron-up" :size="14" />
+        </button>
+        <button
+          type="button"
+          class="rounded-xs p-1 text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+          :aria-label="text.nextMatch"
+          :disabled="!matches.length"
+          @click="step(1)"
+        >
+          <LpIcon name="lucide:chevron-down" :size="14" />
+        </button>
+      </div>
+      <div
+        v-if="presentLevels.length > 1"
+        role="group"
+        :aria-label="text.levels"
+        class="flex flex-wrap items-center gap-1"
+      >
+        <button
+          v-for="level in presentLevels"
+          :key="level"
+          type="button"
+          class="flex items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+          :class="levels.includes(level) ? 'border-line-strong bg-surface-soft text-ink' : 'border-line text-muted hover:text-ink'"
+          :aria-pressed="levels.includes(level)"
+          @click="toggleLevel(level)"
+        >
+          <span class="size-1.5 rounded-full" :class="metaFor(level).rail" aria-hidden="true" />
+          {{ level }}
+          <span class="font-normal tabular-nums text-muted">{{ levelCounts.get(level) }}</span>
+        </button>
+      </div>
+    </div>
+
     <!-- `instant`: this viewer decides for itself when a jump animates (see
          rideToBottom) and restores scrollTop directly after prepending older
          lines. A CSS smooth scroll would override both. -->
@@ -755,7 +957,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
         class="flex h-full flex-col items-center justify-center gap-1 px-4 py-10 text-center"
       >
         <span class="text-muted">{{ filteredEmpty ? text.noMatch : (emptyLabel ?? text.empty) }}</span>
-        <span v-if="filteredEmpty" class="text-muted/70">“{{ highlight }}”</span>
+        <span v-if="filteredEmpty && term" class="text-muted/70">“{{ term }}”</span>
       </div>
 
       <template v-else>
@@ -804,7 +1006,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           :key="lineKey(n)"
           :data-log-row="n"
           class="group relative flex items-start gap-0 px-0 leading-5 transition-colors hover:bg-surface-soft/60"
-          :class="metaFor(line.level).sel"
+          :class="[metaFor(line.level).sel, n === currentRow ? 'bg-accent/15' : '']"
+          :aria-current="n === currentRow ? 'true' : undefined"
         >
           <!-- level rail -->
           <!-- Level rail: absolutely positioned so it spans the FULL row height
@@ -822,7 +1025,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           <span
             v-if="lineNumbers"
             class="mr-3 w-10 shrink-0 select-none text-right tabular-nums text-muted/70"
-          >{{ n + 1 }}</span>
+          >{{ n + lineOffset + 1 }}</span>
 
           <!-- timestamp -->
           <span

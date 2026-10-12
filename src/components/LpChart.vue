@@ -49,6 +49,7 @@ import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpShift from "./LpShift.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { backgroundOf, downloadFile, fileStem, resolveCssColor, svgToPng, toCsv, type CsvOptions } from "./exportData"
 
 export interface ChartText {
   [key: string]: string
@@ -56,6 +57,15 @@ export interface ChartText {
   rightAxis: string
   /** Prefix of the keyboard readout, before the point's label. */
   point: string
+  /** Header of the label column in a CSV export. */
+  xColumn: string
+}
+
+export interface ChartExportOptions {
+  /** File name without extension. Defaults to the title. */
+  filename?: string
+  /** Return the data without offering a download. */
+  download?: boolean
 }
 
 /** What was under the pointer when a point was clicked or right-clicked. */
@@ -144,7 +154,7 @@ const props = withDefaults(
 
 const strings = useLabels<ChartText>(
   "chart",
-  { empty: "No data", rightAxis: "Measured on the right axis", point: "Point" },
+  { empty: "No data", rightAxis: "Measured on the right axis", point: "Point", xColumn: "Label" },
   () => props.text,
 )
 
@@ -1012,6 +1022,74 @@ const readout = computed(() =>
     : "",
 )
 
+// ── export ─────────────────────────────────────
+// Every series, hidden ones included: what a reader toggled off for a closer
+// look is still part of the data they asked to take away.
+const svgEl = ref<SVGSVGElement | null>(null)
+
+function exportCsv(options: ChartExportOptions & CsvOptions = {}): string {
+  const rows = labels.value.map((label, i) => ({ label, i }))
+  const csv = toCsv(rows, [
+    { key: "label", label: strings.value.xColumn },
+    ...allSeries.value.map((s) => ({ key: s.id, label: s.name, value: (r: { i: number }) => s.values[r.i] })),
+  ], options)
+  if (options.download !== false) {
+    downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.csv`, csv, "text/csv;charset=utf-8")
+  }
+  return csv
+}
+
+/*
+ * The plot as a picture, in the theme it is shown in. The legend and title are
+ * HTML, so they are painted onto the canvas separately, in the page's font; the
+ * SVG travels with its computed colours inlined, because an SVG drawn as an
+ * image cannot see the page's custom properties.
+ */
+async function exportPng(options: ChartExportOptions & { scale?: number; background?: string } = {}): Promise<Blob | null> {
+  const svg = svgEl.value
+  if (!svg || typeof document === "undefined") return null
+  const style = getComputedStyle(root.value ?? svg)
+  const font = style.fontFamily
+  const ink = style.getPropertyValue("--color-ink").trim() || style.color
+  const muted = style.getPropertyValue("--color-muted-strong").trim() || style.color
+  const legend = props.showLegend && allSeries.value.length > 1 ? visible.value : []
+  const blob = await svgToPng(svg, {
+    scale: options.scale,
+    padding: 16,
+    background: options.background ?? backgroundOf(root.value),
+    header: (ctx) => {
+      let y = 0
+      if (props.title) {
+        ctx.font = `500 14px ${font}`
+        ctx.fillStyle = ink
+        ctx.textBaseline = "top"
+        ctx.fillText(props.title, 0, y)
+        y += 22
+      }
+      if (legend.length) {
+        ctx.font = `12px ${font}`
+        ctx.textBaseline = "middle"
+        let x = 0
+        for (const s of legend) {
+          ctx.fillStyle = resolveCssColor(s.color, root.value ?? svg)
+          ctx.beginPath()
+          ctx.arc(x + 4, y + 8, 4, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = muted
+          ctx.fillText(s.name, x + 14, y + 8)
+          x += 14 + ctx.measureText(s.name).width + 16
+        }
+        y += 24
+      }
+      return y ? y + 8 : 0
+    },
+  })
+  if (options.download !== false) downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.png`, blob)
+  return blob
+}
+
+defineExpose({ exportCsv, exportPng })
+
 // The chart fills its container's width and sets its own gap between plot and legend — both are layout decisions the page makes, not the chart.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex w-full flex-col gap-3",
@@ -1083,6 +1161,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
         <svg
           v-else-if="width > 0"
+          ref="svgEl"
           :width="width"
           :height="height"
           class="overflow-visible touch-none select-none"
