@@ -3,6 +3,7 @@ import { anchorPattern, stripDisallowed } from "../src/composables/useInputFilte
 import { formatColor, hsvToRgb, parseColor, rgbToHex, rgbToHsv } from "../src/components/color"
 import { filterCountries, type Country } from "../src/components/countries"
 import { joinCells } from "../src/components/otp"
+import { addTags } from "../src/components/tags"
 
 const countries: Country[] = [
   { iso2: "UA", name: "Ukraine", dial: "380" },
@@ -59,4 +60,11 @@ test("hex and rgb agree on whether a colour is opaque", () => {
 
 test("hsv conversion survives a non-finite hue", () => {
   expect(hsvToRgb({ h: Number.NaN, s: 1, v: 1, a: 1 })).toEqual({ r: 255, g: 0, b: 0, a: 1 })
+})
+
+test("addTags reports an ignored repeat so the UI can point at the original", () => {
+  const result = addTags(["vue"], ["Vue", "react"], { duplicates: "ignore", normalize: (t) => t.toLowerCase() })
+  expect(result.tags).toEqual(["vue", "react"])
+  expect(result.rejected).toEqual([])
+  expect(result.ignored).toEqual(["vue"])
 })

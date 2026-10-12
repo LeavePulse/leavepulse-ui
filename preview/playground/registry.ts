@@ -1068,7 +1068,7 @@ export const registry: ComponentEntry[] = [
     id: "tags-input",
     name: "TagsInput",
     description:
-      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` explains, `ignore` drops, `allow` keeps) stays in the field with the reason under it. Works inside LpFormField like any kit control.",
+      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` keeps it typed, `ignore` drops it, `allow` keeps the repeat) gets a note that floats under the field without moving anything below, and the tag it repeats pulses. Works inside LpFormField like any kit control.",
     components: { LpTagsInput, LpFormField },
     state: () => reactive({ emails: ["ada@example.com"], labels: [] as string[] }),
     template: `<div class="flex w-96 flex-col gap-4">
@@ -1081,7 +1081,7 @@ export const registry: ComponentEntry[] = [
     :normalize="(t) => t.toLowerCase()"
     :validate="(t) => /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(t) ? undefined : t + ' is not an email address'"
   />
-  <LpFormField label="Labels" hint="Duplicates are dropped silently">
+  <LpFormField label="Labels" hint="A repeat is dropped with a passing note">
     <LpTagsInput v-model="labels" duplicates="ignore" placeholder="Add a label" />
   </LpFormField>
 </div>`,
@@ -1840,8 +1840,8 @@ export const registry: ComponentEntry[] = [
     id: "formfield",
     name: "FormField",
     description:
-      "Label + control + hint/error wrapper. The field hands its control the label's id, the id of the hint or error line and its invalid/required/disabled state, so kit controls need no wiring. A control of your own reads the same context with `useField()`, as the rating below does.",
-    components: { LpFormField, LpInput, RatingControl },
+      "Label + control + hint/error wrapper. The field hands its control the label's id, the id of the hint or error line and its invalid/required/disabled state, so kit controls need no wiring. A control of your own reads the same context with `useField()`, as the rating below does. For a passing remark rather than a validation error, `notify(text, { tone, duration })` (on the field's ref, or on `useField()` from a control inside) floats a note under the control and fades the hint out under it, so nothing below moves; `useFieldNotice()` with `LpFieldNotice` does the same for a control outside any field.",
+    components: { LpFormField, LpInput, LpButton, RatingControl },
     state: () => reactive({ value: "", rating: 0 }),
     template: `<div class="flex w-80 flex-col gap-4">
   <LpFormField label="Nickname" hint="Shown on your profile" required>
@@ -1855,6 +1855,13 @@ export const registry: ComponentEntry[] = [
   </LpFormField>
   <LpFormField label="Your own control" :error="rating === 0 ? 'Pick a rating' : undefined" required>
     <RatingControl v-model="rating" />
+  </LpFormField>
+  <LpFormField ref="slug" label="Slug" hint="Part of the page address">
+    <div class="flex gap-2">
+      <LpInput v-model="value" placeholder="my-page" class="min-w-0 flex-1" />
+      <LpButton size="sm" variant="outline" @click="$refs.slug.notify('Copied to the clipboard')">Copy</LpButton>
+      <LpButton size="sm" variant="outline" @click="$refs.slug.notify('That slug is taken', { tone: 'danger' })">Check</LpButton>
+    </div>
   </LpFormField>
 </div>`,
   },

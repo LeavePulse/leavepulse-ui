@@ -19,7 +19,9 @@ export type TagsInputLabels = {
  *
  * Adding is the kit's own (see tags.ts) rather than reka's, so a tag that
  * fails `validate`, the limit or the duplicate policy stays in the field for
- * fixing, with the reason under it, instead of vanishing.
+ * fixing instead of vanishing. The reason floats under the field
+ * (LpFieldNotice) rather than taking a line, so a refused paste never moves
+ * the form, and a repeat makes the tag it repeats pulse.
  */
 import {
   TagsInputInput,
@@ -29,13 +31,15 @@ import {
   TagsInputRoot,
 } from "reka-ui"
 import { computed, ref, useAttrs, useId } from "vue"
-import { fieldMessageId, useFieldControl } from "../composables/useField"
+import { fieldMessageId, useField, useFieldControl } from "../composables/useField"
+import { prefersReducedMotion } from "../composables/easing"
+import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
 import { useShift } from "../composables/useShift"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
+import LpFieldNotice from "./LpFieldNotice.vue"
 import LpFormField from "./LpFormField.vue"
 import LpIcon from "./LpIcon.vue"
-import LpShift from "./LpShift.vue"
 import { addTags, splitTags, type TagDuplicates, type TagRejection, type TagValidator } from "./tags"
 
 const props = withDefaults(
@@ -46,7 +50,10 @@ const props = withDefaults(
     delimiter?: string | readonly string[] | RegExp
     /** At most this many tags. */
     max?: number
-    /** "reject" explains a repeat, "ignore" drops it silently, "allow" keeps it. */
+    /**
+     * "reject" keeps a repeat typed with a note, "ignore" drops it with a passing
+     * note, "allow" keeps it. Either way the tag it repeats pulses.
+     */
     duplicates?: TagDuplicates
     /** Return an error message to refuse a tag. */
     validate?: TagValidator
@@ -85,21 +92,53 @@ const text = useLabels<TagsInputLabels>(
 
 const attrs = useAttrs()
 const hasField = computed(() => !!props.label || !!props.hint || !!props.error)
-const problem = ref("")
+/*
+ * Notes go to the field that frames the control, which fades its own hint out
+ * under them: this component's own LpFormField when it has a label or hint,
+ * the one around it otherwise, and a notice of its own only when it stands
+ * alone.
+ */
+const notice = useFieldNotice()
+const outerField = useField()
+type FieldHandle = { notify: (text: string, options?: FieldNoticeOptions) => void; clearNotice: () => void }
+const ownField = ref<FieldHandle | null>(null)
+function bindField(c: unknown): void {
+  ownField.value = hasField.value && c ? (c as FieldHandle) : null
+}
+const standalone = computed(() => !hasField.value && !outerField?.value.notify)
+function say(message: string, options?: FieldNoticeOptions): void {
+  if (hasField.value) ownField.value?.notify(message, options)
+  else if (outerField?.value.notify) outerField.value.notify(message, options)
+  else notice.show(message, options)
+}
+function unsay(): void {
+  if (hasField.value) ownField.value?.clearNotice()
+  else if (outerField?.value.clearNotice) outerField.value.clearNotice()
+  else notice.clear()
+}
+/** A refusal the user still has to act on: the text stays typed and the field reads invalid. */
+const stuck = ref(false)
 const announcement = ref("")
-const problemId = `${useId()}-problem`
+const noticeId = `${useId()}-notice`
 
 const field = useFieldControl(() => ({
   wrapped: hasField.value,
   hasMessage: !!props.error || !!props.hint,
   id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid || !!props.error || !!problem.value,
+  invalid: props.invalid || !!props.error || stuck.value,
   required: props.required,
   disabled: props.disabled,
 }))
 
 const describedBy = computed(
-  () => [field.value.describedBy, problem.value ? problemId : undefined].filter(Boolean).join(" ") || undefined,
+  () =>
+    [
+      field.value.describedBy,
+      hasField.value && field.value.id ? `${field.value.id}-notice` : undefined,
+      standalone.value && notice.message.value ? noticeId : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined,
 )
 
 const rootAttrs = computed(() => {
@@ -135,11 +174,25 @@ const keyed = computed(() => {
   })
 })
 
+/** Draw the eye to a tag that was just typed again. */
+function pulse(tag: string): void {
+  if (prefersReducedMotion()) return
+  const chip = boxEl.value?.querySelector<HTMLElement>(`[data-tag-key="${CSS.escape(`0:${tag}`)}"]`)
+  chip?.animate(
+    [
+      { transform: "scale(1)", boxShadow: "0 0 0 0 transparent" },
+      { transform: "scale(1.08)", boxShadow: "0 0 0 2px var(--color-ring)" },
+      { transform: "scale(1)", boxShadow: "0 0 0 0 transparent" },
+    ],
+    { duration: 420, easing: "ease-out" },
+  )
+}
+
 /** Add whatever `raw` splits into; returns the text that should stay typed. */
 function add(raw: string): string {
   const parts = splitTags(raw, props.delimiter)
   if (!parts.length) return ""
-  const { tags, rejected } = addTags(props.modelValue, parts, {
+  const { tags, rejected, ignored } = addTags(props.modelValue, parts, {
     max: props.max,
     duplicates: props.duplicates,
     validate: props.validate,
@@ -150,8 +203,18 @@ function add(raw: string): string {
     announcement.value = added.map((t) => text.value.added.replace("{tag}", t)).join(", ")
     emit("update:modelValue", tags)
   }
-  problem.value = rejected.length ? explain(rejected[0]!) : ""
-  if (rejected.length) emit("reject", rejected)
+  stuck.value = rejected.length > 0
+  const first = rejected[0]
+  if (first) {
+    say(explain(first), { tone: first.reason === "invalid" ? "danger" : "info", duration: 0 })
+    emit("reject", rejected)
+  } else if (ignored.length) {
+    say(text.value.duplicate.replace("{tag}", ignored[0]!))
+  } else {
+    unsay()
+  }
+  for (const r of rejected) if (r.reason === "duplicate") pulse(props.normalize ? props.normalize(r.value) : r.value)
+  for (const tag of ignored) pulse(tag)
   return rejected.map((r) => r.value).join(joiner.value)
 }
 
@@ -190,7 +253,9 @@ function onBeforeInput(event: InputEvent): void {
 }
 
 function onInput(): void {
-  if (problem.value) problem.value = ""
+  if (!stuck.value) return
+  stuck.value = false
+  unsay()
 }
 
 function onPaste(event: ClipboardEvent): void {
@@ -212,7 +277,8 @@ function onModel(value: (string | Record<string, unknown>)[] | null): void {
   const next = (value ?? []).map(String)
   const removed = props.modelValue.filter((t) => !next.includes(t))
   if (removed.length) announcement.value = removed.map((t) => text.value.removed.replace("{tag}", t)).join(", ")
-  problem.value = ""
+  stuck.value = false
+  unsay()
   emit("update:modelValue", next)
 }
 
@@ -222,6 +288,7 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
 <template>
   <component
     :is="hasField ? LpFormField : 'div'"
+    :ref="bindField"
     :label="hasField ? label : undefined"
     :hint="hasField ? hint : undefined"
     :error="hasField ? error : undefined"
@@ -230,60 +297,61 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
     :class="hasField ? attrs.class : 'contents'"
     :style="hasField ? attrs.style : undefined"
   >
-    <TagsInputRoot
-      v-bind="rootAttrs"
-      :model-value="modelValue"
-      :disabled="field.disabled"
-      :required="field.required"
-      :id="field.id"
-      :delimiter="/(?!)/"
-      data-lp-ring-owner
-      :ref="(c) => (boxEl = (c as { $el?: HTMLElement } | null)?.$el ?? null)"
-      :class="
-        mergeClass(
-          'flex min-h-(--size-control-md) w-full flex-wrap items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2 py-1.5 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55',
-          field.invalid ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft' : '',
-          hasField ? '' : (attrs.class as string),
-          tweening
-            ? 'transition-[height,border-color,box-shadow] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none'
-            : '',
-          resizing ? 'overflow-hidden' : '',
-        )
-      "
-      :style="hasField ? undefined : attrs.style"
-      @update:model-value="onModel"
-    >
-      <TagsInputItem
-        v-for="{ tag, key } in keyed"
-        :key="key"
-        :value="tag"
-        class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+    <div class="relative">
+      <TagsInputRoot
+        v-bind="rootAttrs"
+        :model-value="modelValue"
+        :disabled="field.disabled"
+        :required="field.required"
+        :id="field.id"
+        :delimiter="/(?!)/"
+        data-lp-ring-owner
+        :ref="(c) => (boxEl = (c as { $el?: HTMLElement } | null)?.$el ?? null)"
+        :class="
+          mergeClass(
+            'flex min-h-(--size-control-md) w-full flex-wrap items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2 py-1.5 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55',
+            field.invalid ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft' : '',
+            hasField ? '' : (attrs.class as string),
+            tweening
+              ? 'transition-[height,border-color,box-shadow] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none'
+              : '',
+            resizing ? 'overflow-hidden' : '',
+          )
+        "
+        :style="hasField ? undefined : attrs.style"
+        @update:model-value="onModel"
       >
-        <TagsInputItemText class="truncate" />
-        <TagsInputItemDelete
-          :aria-labelledby="undefined"
-          :aria-label="text.remove.replace('{tag}', tag)"
-          class="grid size-4 shrink-0 place-items-center rounded-pill text-muted transition-colors hover:bg-ink/10 hover:text-ink"
+        <TagsInputItem
+          v-for="{ tag, key } in keyed"
+          :key="key"
+          :data-tag-key="key"
+          :value="tag"
+          class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
         >
-          <LpIcon name="lucide:x" :size="12" />
-        </TagsInputItemDelete>
-      </TagsInputItem>
-      <TagsInputInput
-        :ref="(c) => (inputEl = (c as { $el?: HTMLInputElement } | null)?.$el ?? null)"
-        :placeholder="modelValue.length ? undefined : placeholder"
-        :aria-invalid="field.invalid || undefined"
-        :aria-describedby="describedBy"
-        class="min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted"
-        @keydown="onKeydown"
-        @beforeinput="onBeforeInput"
-        @input="onInput"
-        @paste="onPaste"
-        @blur="onBlur"
-      />
-    </TagsInputRoot>
-    <LpShift>
-      <p v-if="problem" :id="problemId" class="pt-1.5 text-xs text-danger">{{ problem }}</p>
-    </LpShift>
+          <TagsInputItemText class="truncate" />
+          <TagsInputItemDelete
+            :aria-labelledby="undefined"
+            :aria-label="text.remove.replace('{tag}', tag)"
+            class="grid size-4 shrink-0 place-items-center rounded-pill text-muted transition-colors hover:bg-ink/10 hover:text-ink"
+          >
+            <LpIcon name="lucide:x" :size="12" />
+          </TagsInputItemDelete>
+        </TagsInputItem>
+        <TagsInputInput
+          :ref="(c) => (inputEl = (c as { $el?: HTMLInputElement } | null)?.$el ?? null)"
+          :placeholder="modelValue.length ? undefined : placeholder"
+          :aria-invalid="field.invalid || undefined"
+          :aria-describedby="describedBy"
+          class="min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted"
+          @keydown="onKeydown"
+          @beforeinput="onBeforeInput"
+          @input="onInput"
+          @paste="onPaste"
+          @blur="onBlur"
+        />
+      </TagsInputRoot>
+      <LpFieldNotice v-if="standalone" :notice="notice" :id="noticeId" />
+    </div>
     <span class="sr-only" aria-live="polite">{{ announcement }}</span>
   </component>
 </template>

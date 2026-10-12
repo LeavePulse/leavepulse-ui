@@ -111,6 +111,7 @@ export {
   subtreeIds,
   subtreeSize,
 } from "./components/fileTree"
+export { default as LpFieldNotice } from "./components/LpFieldNotice.vue"
 export { default as LpFormField } from "./components/LpFormField.vue"
 export { default as LpIcon } from "./components/LpIcon.vue"
 export { iconsVersion, registerAllIcons, registerIconCollection, registerIcons } from "./icons"
@@ -286,6 +287,8 @@ export type { LabelScope, LpConfig } from "./composables/useLpConfig"
 export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMergedClass"
 export { anchorPattern, stripDisallowed, useInputFilter } from "./composables/useInputFilter"
 export { LP_FIELD, fieldMessageId, provideField, useField, useFieldControl } from "./composables/useField"
+export { FIELD_NOTICE_MS, useFieldNotice } from "./composables/useFieldNotice"
+export type { FieldNotice, FieldNoticeOptions, FieldNoticeTone } from "./composables/useFieldNotice"
 export type { FieldContext, FieldControlState } from "./composables/useField"
 export type { UseInputFilterOptions } from "./composables/useInputFilter"
 export { easeOut, easeTravel, easingToken, prefersReducedMotion } from "./composables/easing"

@@ -1,4 +1,5 @@
 import { computed, inject, provide, useId, type ComputedRef, type InjectionKey } from "vue"
+import type { FieldNoticeOptions } from "./useFieldNotice"
 
 /*
  * What a form field tells the control inside it: the id its label points at,
@@ -14,6 +15,9 @@ export interface FieldContext {
   invalid: boolean
   required: boolean
   disabled: boolean
+  /** Float a short note under the control without moving the layout (see useFieldNotice). */
+  notify?: (text: string, options?: FieldNoticeOptions) => void
+  clearNotice?: () => void
 }
 
 export const LP_FIELD: InjectionKey<ComputedRef<FieldContext>> = Symbol.for("lp-field")

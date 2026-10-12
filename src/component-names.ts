@@ -30,6 +30,7 @@ export const COMPONENT_NAMES = [
   "LpDropdownMenu",
   "LpDropzone",
   "LpEmptyState",
+  "LpFieldNotice",
   "LpFileTree",
   "LpFormField",
   "LpIcon",

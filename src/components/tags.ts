@@ -33,15 +33,18 @@ export function addTags(
   current: readonly string[],
   candidates: readonly string[],
   options: AddTagsOptions = {},
-): { tags: string[]; rejected: TagRejection[] } {
+): { tags: string[]; rejected: TagRejection[]; ignored: string[] } {
   const tags = [...current]
   const rejected: TagRejection[] = []
+  /** Repeats dropped under the "ignore" policy, as stored, so the UI can point at the original. */
+  const ignored: string[] = []
   const duplicates = options.duplicates ?? "reject"
   for (const candidate of candidates) {
     const value = options.normalize ? options.normalize(candidate) : candidate
     if (!value) continue
     if (tags.includes(value) && duplicates !== "allow") {
       if (duplicates === "reject") rejected.push({ value: candidate, reason: "duplicate" })
+      else ignored.push(value)
       continue
     }
     if (options.max && tags.length >= options.max) {
@@ -55,5 +58,5 @@ export function addTags(
     }
     tags.push(value)
   }
-  return { tags, rejected }
+  return { tags, rejected, ignored }
 }
