@@ -13,7 +13,9 @@ import { useToast } from "./useToast"
  *
  * Why every call is allowed to fail: the Clipboard API needs a secure context
  * and, in some browsers, a permission. It is absent over plain http, rejects
- * outside a user gesture, and is missing entirely in a non-DOM test runner. A
+ * outside a user gesture, and is missing entirely in a non-DOM test runner.
+ * Where it is missing or refuses, the old copy command is tried before
+ * giving up (see `writeLegacy`). A
  * copy that cannot happen is a disappointment, not an exception, and a rejected
  * promise reaching a component means an unhandled rejection in the console of
  * an app that did nothing wrong.
@@ -22,6 +24,51 @@ import { useToast } from "./useToast"
  * button itself: a tick that replaces the copy icon for a moment reads faster
  * than any message, and the two are complementary rather than alternatives.
  */
+
+/** The Clipboard API, where there is one and it agrees. */
+async function writeAsync(text: string): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard) return false
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/*
+ * The old copy command, for where the Clipboard API is missing or refuses.
+ * Embedded Chromium (CEF in a Tauri or Electron-like shell) rejects
+ * `writeText` when the host answers no permission requests, and plain http
+ * has no API at all, while a copy command run inside the click still works
+ * there. It copies the selection, so a throwaway text field holds the text
+ * and the page's own selection and focus are put back afterwards.
+ */
+function writeLegacy(text: string): boolean {
+  if (typeof document === "undefined") return false
+  const active = document.activeElement as HTMLElement | null
+  const selection = document.getSelection()
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i)) : []
+  const field = document.createElement("textarea")
+  field.value = text
+  field.setAttribute("readonly", "")
+  field.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none"
+  document.body.appendChild(field)
+  field.select()
+  let ok = false
+  try {
+    ok = document.execCommand("copy")
+  } catch {
+    ok = false
+  }
+  field.remove()
+  if (selection) {
+    selection.removeAllRanges()
+    for (const range of ranges) selection.addRange(range)
+  }
+  active?.focus?.({ preventScroll: true })
+  return ok
+}
 
 /** How long `copied` stays true — long enough to read, short enough to not linger. */
 const COPIED_MS = 1400
@@ -81,12 +128,7 @@ export function useClipboard(): UseClipboard {
   async function copy(text: string, options: CopyOptions = {}): Promise<boolean> {
     const { toast = false, errorToast = false } = options
     try {
-      // Optional-chained: `navigator.clipboard` is undefined, not throwing, on
-      // an insecure origin, and that should take the same path as a rejection.
-      await navigator.clipboard?.writeText(text)
-      // A missing API resolves `undefined` rather than rejecting, so confirm
-      // the write was actually possible before claiming it happened.
-      if (!navigator.clipboard) throw new Error("clipboard unavailable")
+      if (!(await writeAsync(text)) && !writeLegacy(text)) throw new Error("clipboard unavailable")
 
       copied.value = true
       clearTimeout(timer)
