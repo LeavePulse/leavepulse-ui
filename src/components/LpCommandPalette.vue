@@ -47,6 +47,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import { parseCommandQuery, rankCommandItems } from "./commandSearch"
+import { commandHasPreview } from "./commandPalette"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -141,6 +142,12 @@ export interface Command {
    * breaks are kept. Without it the pane shows the `excerpt`.
    */
   preview?: string
+  /**
+   * This row has nothing for the pane, even with a `#preview` slot: the pane
+   * folds away while it is highlighted instead of the slot having to draw a
+   * placeholder. For a whole class of rows, `hasPreview` says it once.
+   */
+  noPreview?: boolean
   onSelect?: () => void
 }
 
@@ -230,8 +237,10 @@ const props = withDefaults(
      * `preview` text, or the `preview` slot. For palettes that search
      * content rather than commands: the excerpt says why a row matched, the
      * pane lets it be read without leaving the page. It opens only for a row
-     * with `preview` or `excerpt` (any row, with the slot): the dialog eases
-     * wider, the pane slides in, and the text arrives paragraph by paragraph.
+     * with `preview` or `excerpt` (any row, with the slot, unless `hasPreview`
+     * or the row's `noPreview` says otherwise): the dialog eases wider, the
+     * pane slides in, and the text arrives paragraph by paragraph. A slot
+     * that renders nothing for a row falls back to that built-in text.
      * Hidden below the md breakpoint, where there is no room beside the list.
      *
      * The width is an inline style rather than a pair of classes: a base
@@ -239,6 +248,14 @@ const props = withDefaults(
      * build in an order where the base won, and the pane opened squeezed.
      */
     previewPane?: boolean
+    /**
+     * Which rows the pane opens for. With a `#preview` slot every row would
+     * otherwise qualify, and an app whose previews cover only some kinds of
+     * row had to draw a placeholder for the rest. Return false and the pane
+     * folds away for that row, as it does for a row without text. A row's
+     * own `noPreview` wins over this.
+     */
+    hasPreview?: (command: Command) => boolean
     /**
      * Frosted glass instead of a solid panel: the page shows through,
      * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
@@ -659,16 +676,50 @@ const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
  * beside a list of commands is a column of dead space. With the slot the app
  * decides what to show, so any highlighted row opens it.
  */
-const paneOpen = computed(
-  () => props.previewPane && !!active.value && (!!slots.preview || !!(active.value.preview || active.value.excerpt)),
+const previewable = computed(() =>
+  props.previewPane && commandHasPreview(active.value, { slot: !!slots.preview, hasPreview: props.hasPreview }),
 )
+
+/*
+ * The row the pane shows. It follows the highlight while the highlight has a
+ * preview, and lingers for a moment when it lands on a row without one:
+ * arrowing through a list where every other row has a preview would
+ * otherwise widen and narrow the dialog on every keystroke. Only when the
+ * highlight stays on such rows does the pane fold.
+ */
+const PANE_LINGER_MS = 160
+const paneCommand = shallowRef<Command | undefined>()
+let lingerTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  [active, previewable],
+  ([command, show]) => {
+    clearTimeout(lingerTimer)
+    if (show) {
+      paneCommand.value = command
+      return
+    }
+    if (!paneCommand.value) return
+    lingerTimer = setTimeout(() => (paneCommand.value = undefined), PANE_LINGER_MS)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => clearTimeout(lingerTimer))
+
+const paneOpen = computed(() => props.previewPane && !!paneCommand.value)
+
+// What the pane draws: the last row it showed, kept while the pane slides out
+// so it leaves with its content instead of emptying first.
+const paneBody = shallowRef<Command | undefined>()
+watch(paneCommand, (command) => {
+  if (command) paneBody.value = command
+})
 
 /*
  * The text in paragraphs, so they can arrive one after another. A blank line
  * separates them, as in the `preview` the consumer wrote.
  */
 const paragraphs = computed(() =>
-  (active.value?.preview ?? active.value?.excerpt ?? "")
+  (paneBody.value?.preview ?? paneBody.value?.excerpt ?? "")
     .split(/\n{2,}/)
     .map((part) => part.trim())
     .filter(Boolean),
@@ -680,7 +731,7 @@ const paragraphs = computed(() =>
  * would otherwise print the same sentences twice, once small and once large.
  */
 const paneDescription = computed(() => {
-  const description = active.value?.description?.trim()
+  const description = paneBody.value?.description?.trim()
   if (!description) return undefined
   const body = paragraphs.value.join(" ")
   return body.startsWith(description) ? undefined : description
@@ -696,7 +747,7 @@ const STAGGER_MAX = 10
  * from the top rather than wherever the previous result was scrolled to.
  */
 watch(
-  () => active.value?.id,
+  () => paneCommand.value?.id,
   async () => {
     if (!paneOpen.value) return
     await nextTick()
@@ -1171,22 +1222,22 @@ useHotkeys(() =>
               <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
                 <!-- Keyed by the row, so moving the highlight replays the
                      entrance rather than swapping text in place. -->
-                <div v-if="active" :key="active.id">
-                  <slot name="preview" :command="active">
+                <div v-if="paneBody" :key="paneBody.id">
+                  <slot name="preview" :command="paneBody">
                     <div class="lp-cmd-para flex items-center gap-2 text-ink">
                       <LpAvatar
-                        v-if="imageOf(active)"
-                        :src="imageOf(active)!.src ?? undefined"
-                        :alt="imageOf(active)!.alt ?? ''"
-                        :fallback="imageOf(active)!.fallback"
-                        :icon="imageOf(active)!.icon"
-                        :shape="imageOf(active)!.shape ?? 'soft'"
+                        v-if="imageOf(paneBody)"
+                        :src="imageOf(paneBody)!.src ?? undefined"
+                        :alt="imageOf(paneBody)!.alt ?? ''"
+                        :fallback="imageOf(paneBody)!.fallback"
+                        :icon="imageOf(paneBody)!.icon"
+                        :shape="imageOf(paneBody)!.shape ?? 'soft'"
                         :pixel-size="28"
                         class="shrink-0"
-                        :class="IMAGE_RADIUS[imageOf(active)!.shape ?? 'soft']"
+                        :class="IMAGE_RADIUS[imageOf(paneBody)!.shape ?? 'soft']"
                       />
-                      <LpIcon v-else-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
-                      <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
+                      <LpIcon v-else-if="paneBody.icon" :name="paneBody.icon" :size="16" class="shrink-0 text-muted" />
+                      <h3 class="min-w-0 text-base font-semibold">{{ paneBody.label }}</h3>
                     </div>
                     <p v-if="paneDescription" class="lp-cmd-para mt-0.5 text-xs text-muted">
                       {{ paneDescription }}
@@ -1197,7 +1248,7 @@ useHotkeys(() =>
                       class="lp-cmd-para mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
                       :style="{ animationDelay: `${Math.min(i + 1, STAGGER_MAX) * STAGGER_MS}ms` }"
                     >
-                      <template v-for="(p, pi) in highlight(para, active.highlight)" :key="`p${pi}`">
+                      <template v-for="(p, pi) in highlight(para, paneBody.highlight)" :key="`p${pi}`">
                         <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
                         <template v-else>{{ p.text }}</template>
                       </template>

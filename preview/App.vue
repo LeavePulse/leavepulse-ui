@@ -145,7 +145,8 @@ const siteHotkey = computed(() => !(route.value.kind === "component" && route.va
 
 /*
  * The palette the way an app would use it: a history it keeps itself, the
- * description in the preview pane, every row a real link (so Tab offers "open
+ * description in the preview pane (which folds away for pages and themes,
+ * the rows `hasPreview` turns down), every row a real link (so Tab offers "open
  * in new tab" and "copy link"), themes behind one row that drills into its
  * own list and stays open while you try them, and G-then-key jumps.
  */
@@ -323,6 +324,7 @@ const on = "bg-surface-soft text-ink"
       :commands="commands"
       recent-key="lp-preview-palette-recent"
       preview-pane
+      :has-preview="(c) => !!componentPreview(c.id)"
       :group-limit="8"
       placeholder="Jump to a component, page or theme…"
     >
@@ -346,13 +348,6 @@ const on = "bg-surface-soft text-ink"
             </div>
           </template>
         </div>
-        <template v-else>
-          <div class="flex items-center gap-2 text-ink">
-            <LpIcon v-if="command.icon" :name="command.icon" :size="16" class="shrink-0 text-muted" />
-            <h3 class="text-base font-semibold">{{ command.label }}</h3>
-          </div>
-          <p v-if="command.preview" class="mt-2 text-sm text-muted">{{ command.preview }}</p>
-        </template>
       </template>
     </LpCommandPalette>
     <LpShortcutsDialog
