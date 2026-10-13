@@ -50,3 +50,31 @@ export interface PaletteStat {
   suffix?: string
   format?: (value: number) => string
 }
+
+/** The fields of a command that let typing enter its mode. */
+export interface PrefixedCommand {
+  prefix?: string
+  children?: unknown
+  disabled?: boolean
+}
+
+/**
+ * The mode a query opens by its prefix, and the query left after it. Only a
+ * command with `children` and a non-empty `prefix` qualifies; letters match
+ * in any case, and the longest prefix wins, so "mr " and "m" can live side by
+ * side. Leading spaces are ignored: they are never what someone meant.
+ */
+export function matchModePrefix<T extends PrefixedCommand>(
+  query: string,
+  commands: readonly T[],
+): { command: T; rest: string } | null {
+  const typed = query.trimStart().toLowerCase()
+  let best: T | null = null
+  for (const command of commands) {
+    const prefix = command.prefix?.toLowerCase()
+    if (!prefix || !command.children || command.disabled || !typed.startsWith(prefix)) continue
+    if (!best || prefix.length > (best.prefix?.length ?? 0)) best = command
+  }
+  if (!best) return null
+  return { command: best, rest: query.trimStart().slice(best.prefix!.length) }
+}

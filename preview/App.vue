@@ -215,6 +215,7 @@ const commands = computed<Command[]>(() => [
     group: "Preferences",
     keywords: ["theme", "dark", "light", ...THEMES],
     childPlaceholder: "Pick a theme…",
+    prefix: "t:",
     children: THEMES.map((name) => ({
       id: `theme/${name}`,
       label: presets[name].name,

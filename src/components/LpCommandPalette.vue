@@ -47,7 +47,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import { parseCommandQuery, rankCommandItems } from "./commandSearch"
-import { commandHasPreview } from "./commandPalette"
+import { commandHasPreview, matchModePrefix } from "./commandPalette"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -115,6 +115,16 @@ export interface Command {
   children?: Command[] | ((query: string, signal: AbortSignal) => Command[] | Promise<Command[]>)
   /** Placeholder while inside this command's mode. */
   childPlaceholder?: string
+  /**
+   * Typed at the start of the box, enters this command's mode directly, and
+   * whatever follows the prefix becomes the query inside it: ">" for
+   * commands, "mr " for a mod search. Only for a command with `children`,
+   * matched against the list on screen (the root, or the open mode's own
+   * static children), longest prefix first, letters in any case. Entering
+   * this way does not run `onSelect`. The row shows the prefix as its hint
+   * when it has no `shortcut`.
+   */
+  prefix?: string
   /**
    * Keep the palette open after this runs. For a command that toggles
    * something the user may want to toggle again (a theme, a filter) without
@@ -422,8 +432,8 @@ watch(
   },
 )
 
-function enter(c: Command) {
-  trailState.value = [...trailState.value, { query: query.value, selectedId: selectedId.value }]
+function enter(c: Command, parentQuery = query.value) {
+  trailState.value = [...trailState.value, { query: parentQuery, selectedId: selectedId.value }]
   trail.value = [...trail.value, c]
   query.value = ""
   select(0)
@@ -818,10 +828,25 @@ function imageOf(c: Command): CommandImage | null {
 }
 
 // ── selection + keyboard ─────────────────────────────────────
-watch(query, () => {
+watch(query, (value) => {
+  if (enterByPrefix(value)) return
   select(0)
   refresh()
 })
+
+/*
+ * A prefix typed (or pasted) at the start of the box opens its mode with the
+ * rest of the text as the query there. The list it leaves is remembered with
+ * an empty query: Backspace out of the mode should land on the plain list,
+ * not on the prefix, which would open the mode again on the spot.
+ */
+function enterByPrefix(value: string): boolean {
+  const hit = matchModePrefix(value, source.value)
+  if (!hit) return false
+  enter(hit.command, "")
+  query.value = hit.rest
+  return true
+}
 watch([query, trail, () => props.open], () => {
   expanded.value = new Set()
 })
@@ -1182,6 +1207,12 @@ useHotkeys(() =>
                     </span>
                   </span>
                   <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
+                  <!-- The prefix that opens this mode from the box, so the
+                       shortcut is learned by seeing it rather than reading docs. -->
+                  <kbd
+                    v-else-if="c.prefix && c.children"
+                    class="shrink-0 rounded border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted"
+                  >{{ c.prefix }}</kbd>
                   <!-- Drills in rather than runs: worth saying before the click,
                        since the two look identical otherwise. -->
                   <LpIcon
