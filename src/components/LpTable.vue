@@ -1098,7 +1098,7 @@ const barInsetTop = computed(() =>
   <LpScrollArea
     v-bind="scrollAttrs"
     :fade="false"
-    class="min-h-0 flex-1 rounded-card border border-line"
+    class="min-h-0 flex-1 rounded-card border border-line bg-surface"
     :style="load && floor ? { minHeight: `${floor + 2}px` } : undefined"
     :bar-inset-top="barInsetTop"
   >
