@@ -23,7 +23,7 @@ export default { inheritAttrs: false }
  * invisible to a keyboard: nothing focusable, nothing that Enter activates, and
  * the file dialog unreachable without a mouse.
  */
-import { onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import LpIcon from "./LpIcon.vue"
@@ -35,6 +35,13 @@ const props = withDefaults(
     /** Take more than one at a time. */
     multiple?: boolean
     disabled?: boolean
+    /**
+     * A drag the page itself cannot see is over the zone. Desktop shells
+     * (Tauri, Electron) often take file drags natively, and the page then gets
+     * no dragenter or dragover at all, only the shell's own events; the app
+     * hit-tests those and passes the answer here so the zone lights up the same.
+     */
+    dragOver?: boolean
     /**
      * Also accept a paste anywhere on the page, not only while focused.
      * Off by default: two zones both listening would each take the same
@@ -95,11 +102,12 @@ const input = ref<HTMLInputElement | null>(null)
  * may not — one stuck increment and the zone stays lit after the drag is long
  * gone, which is exactly what it did.
  */
-const over = ref(false)
+const pointerOver = ref(false)
+const over = computed(() => pointerOver.value || (props.dragOver && !props.disabled))
 
 function onDragOver(event: DragEvent) {
   if (props.disabled) return
-  over.value = true
+  pointerOver.value = true
   if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
 }
 
@@ -108,7 +116,7 @@ function onDragLeave(event: DragEvent) {
   // drag merely crossed a child, and the highlight stays.
   const to = event.relatedTarget as Node | null
   if (to && (event.currentTarget as HTMLElement).contains(to)) return
-  over.value = false
+  pointerOver.value = false
 }
 
 /** Does the file match `accept`? Mirrors the input's own matching so a drop
@@ -146,7 +154,7 @@ function take(list: FileList | File[] | null | undefined) {
 }
 
 function onDrop(event: DragEvent) {
-  over.value = false
+  pointerOver.value = false
   take(event.dataTransfer?.files)
 }
 
