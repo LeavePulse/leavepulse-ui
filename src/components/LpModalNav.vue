@@ -211,6 +211,10 @@ const railPanel = computed(() => [
       </div>
     </template>
 
+    <template v-if="$slots.actions" #actions>
+      <slot name="actions" />
+    </template>
+
     <slot />
 
     <template v-if="$slots.footer" #footer>

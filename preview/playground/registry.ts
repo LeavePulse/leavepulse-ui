@@ -1975,13 +1975,18 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal-nav",
     name: "ModalNav",
-    description: "A dialog whose sections stand beside it: settings, a profile, a wizard you can skip around in. Takes LpSidebar's `items` or grouped `sections`; `navSide` moves the rail to the other side. Below `mobileBreakpoint` (default lg) it folds into a drawer the header's button opens.",
-    components: { LpModalNav, LpButton },
+    description: "A dialog whose sections stand beside it: settings, a profile, a wizard you can skip around in. Takes LpSidebar's `items` or grouped `sections`; `navSide` moves the rail to the other side. Below `mobileBreakpoint` (default lg) it folds into a drawer the header's button opens. The `actions` slot (also on LpModal) puts controls for the whole dialog, such as a period, beside the close button.",
+    components: { LpModalNav, LpButton, LpSegmented },
     state: () => {
       const s = reactive({
         open: false,
         glass: false,
         section: "activity",
+        period: "week",
+        periods: [
+          { value: "week", label: "Week" },
+          { value: "month", label: "Month" },
+        ],
         sections: [
           {
             title: "Work",
@@ -2020,7 +2025,10 @@ export const registry: ComponentEntry[] = [
     title="Staff member"
     description="Sections stay in view while you read one."
   >
-    <p>Section: <strong>{{ section }}</strong>.</p>
+    <template #actions>
+      <LpSegmented v-model="period" :options="periods" size="sm" aria-label="Period" />
+    </template>
+    <p>Section: <strong>{{ section }}</strong>, period: <strong>{{ period }}</strong>.</p>
     <p class="text-muted">The list stands outside the dialog, in the same centring row — it takes none of the body's width. Narrow the window past lg and it folds into a drawer.</p>
     <template #footer>
       <LpButton variant="ghost" @click="open = false">Close</LpButton>

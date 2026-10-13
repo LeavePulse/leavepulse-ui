@@ -332,13 +332,19 @@ watch(
           {{ ariaLabel }}
         </DialogTitle>
         <header v-if="title || $slots.title" class="flex shrink-0 items-start justify-between gap-4 p-5 pb-3">
-          <div class="flex flex-col gap-1">
+          <div class="flex min-w-0 flex-1 flex-col gap-1">
             <DialogTitle class="text-base font-semibold text-ink">
               <slot name="title">{{ title }}</slot>
             </DialogTitle>
             <DialogDescription v-if="description" class="text-sm text-muted">
               {{ description }}
             </DialogDescription>
+          </div>
+          <!-- Controls that act on the whole dialog (a period, a filter) sit
+               beside the close button, not inside the title: the title is a
+               heading, and a button in it would be read out as part of it. -->
+          <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <slot name="actions" />
           </div>
           <!-- Marked so the auto-focus pass skips it: it is first in the DOM
                and last in usefulness. Still reachable by Tab and Escape. -->
