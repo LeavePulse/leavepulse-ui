@@ -59,6 +59,7 @@ import {
   commandHasPreview,
   fallbackRows,
   matchModePrefix,
+  modeChipLabel,
   pushRecent,
   readRecent,
   recentVisible,
@@ -136,6 +137,12 @@ export interface Command {
   children?: Command[] | CommandFetcher
   /** Placeholder while inside this command's mode. */
   childPlaceholder?: string
+  /**
+   * The mode's name in the chip beside the box, when the row's label is a
+   * sentence: "Mods" for a row reading `Search mods for "{query}"`. Without
+   * it a `{query}` placeholder and its quotes are dropped from the label.
+   */
+  modeLabel?: string
   /**
    * Typed at the start of the box, enters this command's mode directly, and
    * whatever follows the prefix becomes the query inside it: ">" for
@@ -1237,7 +1244,7 @@ useHotkeys(() =>
             @click="popTo(i)"
           >
             <LpIcon v-if="step.icon" :name="step.icon" :size="13" />
-            {{ step.label }}
+            {{ modeChipLabel(step) }}
             <LpIcon name="lucide:x" :size="12" class="opacity-60" />
           </button>
 

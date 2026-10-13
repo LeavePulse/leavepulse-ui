@@ -1326,6 +1326,7 @@ export const registry: ComponentEntry[] = [
           {
             id: "catalogue",
             label: 'Search the package catalogue for "{query}"',
+            modeLabel: "Packages",
             icon: "lucide:package-search",
             group: "Elsewhere",
             fallback: true,
@@ -1336,9 +1337,7 @@ export const registry: ComponentEntry[] = [
               if (signal.aborted) return []
               const all = ["vue-router", "vitest", "vite-plugin-pwa", "pinia", "date-fns", "zod", "valibot", "unocss", "nuxt", "tanstack-query"]
               const text = q.toLowerCase()
-              return all
-                .filter((name) => name.includes(text))
-                .map((name, i) => ({ id: `pkg:${name}`, label: name, description: `${(i + 3) * 1170} weekly downloads`, icon: "lucide:package" }))
+              return all.filter((name) => name.includes(text)).map((name) => s.pkg(name))
             },
           },
           { id: "logs", label: "View logs", description: "Tail the live log stream", icon: "lucide:scroll-text", shortcut: "⌘L", group: "Navigate" },
@@ -1373,8 +1372,21 @@ export const registry: ComponentEntry[] = [
             { id: `user:${n}:mention`, label: "Copy @mention", icon: "lucide:at-sign" },
           ],
         }),
-        resolvePerson: (entry: RecentEntry) =>
-          entry.data && typeof entry.data === "object" && "name" in entry.data ? s.person(String(entry.data.name)) : null,
+        // A package fetched by the catalogue mode. `recentData` comes back to
+        // resolveRecent, which is how a picked package returns under Recent.
+        pkg: (name: string) => ({
+          id: `pkg:${name}`,
+          label: name,
+          description: `${name.length * 1170} weekly downloads`,
+          icon: "lucide:package",
+          recentData: { pkg: name },
+        }),
+        resolveFetched: (entry: RecentEntry) => {
+          const data = entry.data as { name?: string; pkg?: string } | undefined
+          if (data?.name) return s.person(data.name)
+          if (data?.pkg) return s.pkg(data.pkg)
+          return null
+        },
         // A docs search answers with the passage it matched, not just a title:
         // `excerpt` wraps over a few lines, `highlight` marks the word forms the
         // server matched ("deploys", "deployed") next to the typed query. Each
@@ -1435,7 +1447,7 @@ export const registry: ComponentEntry[] = [
     preview-pane
     :has-preview="(c) => c.id.startsWith('user:') || !!c.preview"
     glass
-    :resolve-recent="resolvePerson"
+    :resolve-recent="resolveFetched"
     @remember="onRemember"
   >
     <!-- People get a pane built from the preview blocks. Docs hits render

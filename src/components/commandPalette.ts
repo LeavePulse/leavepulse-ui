@@ -247,3 +247,18 @@ export function recentVisible(command: SearchableCommand, terms: CommandSearchTe
     [command.group, recentLabel].some((group) => group?.toLowerCase().includes(term)),
   )
 }
+
+/**
+ * The name a mode's chip shows. `modeLabel` when given; otherwise the label,
+ * with a `{query}` placeholder and the quotes around it taken out, since the
+ * words it stood for are in the box now ("Search mods for "{query}"" reads
+ * "Search mods").
+ */
+export function modeChipLabel(command: { label: string; modeLabel?: string }): string {
+  if (command.modeLabel) return command.modeLabel
+  if (!command.label.includes("{query}")) return command.label
+  return command.label
+    .replace(/\s*["'“”«»]?\{query\}["'“”«»]?/g, "")
+    .replace(/\s+(for|in|on|:)$/i, "")
+    .trim()
+}

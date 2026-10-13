@@ -3,6 +3,7 @@ import {
   commandHasPreview,
   fallbackRows,
   matchModePrefix,
+  modeChipLabel,
   pushRecent,
   readRecent,
   recentVisible,
@@ -153,4 +154,11 @@ test("recent rows obey exclusions, and in: matches their group or the Recent hea
   expect(recentVisible(deploy, parseCommandQuery("in:recent"), "Recent")).toBe(true)
   expect(recentVisible(deploy, parseCommandQuery("in:actions"), "Recent")).toBe(true)
   expect(recentVisible(deploy, parseCommandQuery("in:settings"), "Recent")).toBe(false)
+})
+
+test("a mode chip names the mode without the query placeholder", () => {
+  expect(modeChipLabel({ label: 'Search mods for "{query}"' })).toBe("Search mods")
+  expect(modeChipLabel({ label: "Find {query} on the server" })).toBe("Find on the server")
+  expect(modeChipLabel({ label: "Theme" })).toBe("Theme")
+  expect(modeChipLabel({ label: 'Search "{query}"', modeLabel: "Catalogue" })).toBe("Catalogue")
 })
