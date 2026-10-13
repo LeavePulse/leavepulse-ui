@@ -1,4 +1,4 @@
-import { applyQueryFilters, parsePaletteQuery, type SearchableCommand } from "./commandSearch"
+import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type SearchableCommand } from "./commandSearch"
 
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so
@@ -105,4 +105,144 @@ export function fallbackRows<T extends FallbackCommand>(
     items.filter((c) => c.fallback),
     parsed,
   ).map((command) => ({ command, label: command.label.split("{query}").join(parsed.text) }))
+}
+
+/**
+ * A remembered pick that is not a root command: one chosen inside a mode, or
+ * a result a search fetched. It keeps what the row needs to be drawn again
+ * and where it was found, so the palette can find the live command next time
+ * (`path` through static children, or the app's `resolveRecent`), and fall
+ * back to its `href` when neither can.
+ */
+export interface RecentEntry {
+  id: string
+  label: string
+  description?: string
+  icon?: string
+  image?: string | { src?: string | null; alt?: string; fallback?: string; icon?: string; shape?: "circle" | "soft" | "square" }
+  href?: string
+  /** Ids of the modes it was picked in, outermost first. */
+  path: string[]
+  /** The command's `recentData`, kept as given for `resolveRecent`. */
+  data?: unknown
+}
+
+/** A stored history item: a root command id (the old format), or an entry. */
+export type RecentItem = string | RecentEntry
+
+/** The fields of a command a history entry is built from and resolved to. */
+export interface RecentSource {
+  id: string
+  label: string
+  description?: string
+  icon?: string
+  image?: RecentEntry["image"]
+  href?: string
+  recentData?: unknown
+  disabled?: boolean
+  children?: unknown
+}
+
+function isEntry(value: unknown): value is RecentEntry {
+  if (!value || typeof value !== "object") return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === "string"
+    && typeof v.label === "string"
+    && Array.isArray(v.path)
+    && v.path.every((step) => typeof step === "string")
+  )
+}
+
+/** Stored history, with anything malformed dropped rather than trusted. */
+export function readRecent(stored: unknown): RecentItem[] {
+  if (!Array.isArray(stored)) return []
+  return stored.filter((v): v is RecentItem => typeof v === "string" || isEntry(v))
+}
+
+function recentKey(item: RecentItem): string {
+  return typeof item === "string" ? item : [...item.path, item.id].join("\u0000")
+}
+
+/**
+ * The history item for a pick. A root pick stays a bare id, the format older
+ * versions wrote and still read; anything deeper becomes an entry with only
+ * the fields that survive JSON.
+ */
+export function toRecentItem(command: RecentSource, path: readonly string[]): RecentItem {
+  if (!path.length) return command.id
+  const entry: RecentEntry = { id: command.id, label: command.label, path: [...path] }
+  if (command.description) entry.description = command.description
+  if (command.icon) entry.icon = command.icon
+  if (typeof command.image === "string") entry.image = command.image
+  else if (command.image) {
+    const { src, alt, fallback, icon, shape } = command.image
+    entry.image = { src, alt, fallback, icon, shape }
+  }
+  if (command.href) entry.href = command.href
+  if (command.recentData !== undefined) entry.data = command.recentData
+  return entry
+}
+
+/** The history with `item` first and any earlier copy of it dropped. */
+export function pushRecent(list: readonly RecentItem[], item: RecentItem, keep: number): RecentItem[] {
+  const key = recentKey(item)
+  return [item, ...list.filter((v) => recentKey(v) !== key)].slice(0, keep)
+}
+
+/**
+ * The live commands a history stands for, newest first. A bare id is looked
+ * up among the root commands; an entry is followed down its path through
+ * static children, then offered to `resolve` (for results a fetcher found),
+ * and last rebuilt from its own fields when it has an `href` to follow.
+ * Whatever none of these can find is skipped, so a stored history never
+ * resurrects something that cannot run.
+ */
+export function resolveRecentItems<T extends RecentSource>(
+  items: readonly RecentItem[],
+  commands: readonly T[],
+  options: { limit: number; resolve?: (entry: RecentEntry) => T | null | undefined; fromEntry: (entry: RecentEntry) => T },
+): { command: T; path: string[] }[] {
+  const out: { command: T; path: string[] }[] = []
+  const seen = new Set<string>()
+  for (const item of items) {
+    if (out.length >= options.limit) break
+    const key = recentKey(item)
+    if (seen.has(key)) continue
+    const found = typeof item === "string" ? commands.find((c) => c.id === item) : findEntry(item, commands, options)
+    if (!found || found.disabled || found.children) continue
+    seen.add(key)
+    out.push({ command: found, path: typeof item === "string" ? [] : [...item.path] })
+  }
+  return out
+}
+
+function findEntry<T extends RecentSource>(
+  entry: RecentEntry,
+  commands: readonly T[],
+  options: { resolve?: (entry: RecentEntry) => T | null | undefined; fromEntry: (entry: RecentEntry) => T },
+): T | undefined {
+  let level: readonly T[] | null = commands
+  for (const step of entry.path) {
+    const mode: T | undefined = level?.find((c) => c.id === step)
+    level = mode && Array.isArray(mode.children) ? (mode.children as T[]) : null
+  }
+  const live = level?.find((c) => c.id === entry.id)
+  if (live) return live
+  const resolved = options.resolve?.(entry)
+  if (resolved) return resolved
+  return entry.href ? options.fromEntry(entry) : undefined
+}
+
+/**
+ * Whether a recent row survives the operators typed so far. Recent rows show
+ * while no positive words are typed, so "-theme" or "in:recent" filters them
+ * like any other row; an `in:` scope matches the row's own group or the
+ * Recent heading it sits under.
+ */
+export function recentVisible(command: SearchableCommand, terms: CommandSearchTerms, recentLabel: string): boolean {
+  if (!applyQueryFilters([{ ...command, group: undefined }], { ...terms, groups: [] }).length) return false
+  return terms.groups.every((term) =>
+    [command.group, recentLabel].some((group) => group?.toLowerCase().includes(term)),
+  )
 }

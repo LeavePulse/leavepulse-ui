@@ -27,6 +27,9 @@ import {
   LpCodeBlock,
   LpColorPicker,
   LpCommandPalette,
+  pushRecent,
+  type RecentEntry,
+  type RecentItem,
   LpKeys,
   LpPaletteFacts,
   LpPaletteHeader,
@@ -1293,7 +1296,7 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; a `fallback` row (\"Search the catalogue for ...\") shows only while something is typed, labelled with the typed words, and with `carryQuery` its mode opens already searching them; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; a `fallback` row (\"Search the catalogue for ...\") shows only while something is typed, labelled with the typed words, and with `carryQuery` its mode opens already searching them; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top, including picks made inside a mode or among search results (`remember` hands over what to store, `resolveRecent` rebuilds a fetched result from its `recentData`).",
     components: { LpCommandPalette, LpButton, LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpKeys },
     state: () => {
       const s: any = reactive({
@@ -1348,22 +1351,28 @@ export const registry: ComponentEntry[] = [
           await new Promise((r) => setTimeout(r, 250))
           return ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra", "Barbara Liskov", "Donald Knuth"]
             .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
-            .map((n, i) => ({
-              id: `user:${n}`,
-              label: n,
-              description: "Open profile",
-              icon: "lucide:user",
-              // A picture in the icon's place. Every third one points nowhere,
-              // to show the initials holding the slot when a picture fails.
-              image: { src: i % 3 === 2 ? "/missing-avatar.png" : avatarSample, fallback: n.split(" ").map((w) => w[0]).join(""), shape: "circle" },
-              group: "People",
-              // Tab on a person lists these instead of opening the profile.
-              actions: [
-                { id: `user:${n}:message`, label: "Send a message", icon: "lucide:message-circle" },
-                { id: `user:${n}:mention`, label: "Copy @mention", icon: "lucide:at-sign" },
-              ],
-            }))
+            .map((n) => s.person(n))
         },
+        // One builder for a fetched person, used by the search and again by
+        // resolveRecent, which gets back the `recentData` stored with a pick.
+        person: (n: string) => ({
+          id: `user:${n}`,
+          recentData: { name: n },
+          label: n,
+          description: "Open profile",
+          icon: "lucide:user",
+          // A picture in the icon's place. Some point nowhere, to show the
+          // initials holding the slot when a picture fails.
+          image: { src: n.length % 3 === 2 ? "/missing-avatar.png" : avatarSample, fallback: n.split(" ").map((w) => w[0]).join(""), shape: "circle" },
+          group: "People",
+          // Tab on a person lists these instead of opening the profile.
+          actions: [
+            { id: `user:${n}:message`, label: "Send a message", icon: "lucide:message-circle" },
+            { id: `user:${n}:mention`, label: "Copy @mention", icon: "lucide:at-sign" },
+          ],
+        }),
+        resolvePerson: (entry: RecentEntry) =>
+          entry.data && typeof entry.data === "object" && "name" in entry.data ? s.person(String(entry.data.name)) : null,
         // A docs search answers with the passage it matched, not just a title:
         // `excerpt` wraps over a few lines, `highlight` marks the word forms the
         // server matched ("deploys", "deployed") next to the typed query. Each
@@ -1403,9 +1412,12 @@ export const registry: ComponentEntry[] = [
           return [...found, ...docs]
         },
         // Recency is the app's to keep — here in memory, in a real app in
-        // storage. The palette only reads it back.
-        onRun: (id: string) => {
-          s.recent = [id, ...s.recent.filter((r: string) => r !== id)].slice(0, 5)
+        // storage. The palette hands over what to store with `remember`: a
+        // bare id for a root command, an entry for a service picked inside
+        // "Restart service" or a person a search found, so those come back
+        // under Recent too.
+        onRemember: (item: RecentItem) => {
+          s.recent = pushRecent(s.recent, item, 5)
         },
       })
       return s
@@ -1421,7 +1433,8 @@ export const registry: ComponentEntry[] = [
     preview-pane
     :has-preview="(c) => c.id.startsWith('user:') || !!c.preview"
     glass
-    @run="onRun"
+    :resolve-recent="resolvePerson"
+    @remember="onRemember"
   >
     <!-- People get a pane built from the preview blocks. Docs hits render
          nothing here, so the pane falls back to their own preview text;

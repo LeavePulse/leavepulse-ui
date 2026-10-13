@@ -47,7 +47,18 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import { applyQueryFilters, parseCommandQuery, parsePaletteQuery, rankCommandItems, type PaletteQuery } from "./commandSearch"
-import { commandHasPreview, fallbackRows, matchModePrefix } from "./commandPalette"
+import {
+  commandHasPreview,
+  fallbackRows,
+  matchModePrefix,
+  pushRecent,
+  readRecent,
+  recentVisible,
+  resolveRecentItems,
+  toRecentItem,
+  type RecentEntry,
+  type RecentItem,
+} from "./commandPalette"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -142,6 +153,20 @@ export interface Command {
    * group. Usually a mode with `carryQuery`, so picking it runs the search.
    */
   fallback?: boolean
+  /**
+   * Keep this out of the recent history. Picks are remembered wherever they
+   * are made, inside modes and among fetched results too; a pick that is a
+   * setting rather than a destination (a language, a zoom step) can opt out.
+   * Rows offered by Tab (`actions`) are never remembered.
+   */
+  remember?: boolean
+  /**
+   * A JSON-safe value stored with this command in the recent history and
+   * handed back to `resolveRecent`: what an app needs to rebuild a result
+   * that a search fetched (a project id, a hit), since the command's
+   * functions cannot be stored.
+   */
+  recentData?: unknown
   /**
    * Keep the palette open after this runs. For a command that toggles
    * something the user may want to toggle again (a theme, a filter) without
@@ -251,18 +276,32 @@ const props = withDefaults(
     /** Shortest query `search` runs for, counted on its positive words. */
     minChars?: number
     /**
-     * Ids of recently picked commands, newest first — bind it to storage and
-     * the palette opens on what this person actually uses. It only reorders
-     * commands already in the list; an id that no longer resolves is skipped,
-     * so a stored history never resurrects a command that has gone away.
+     * Recently picked commands, newest first — bind it to storage and the
+     * palette opens on what this person actually uses. An item is a root
+     * command's id, or a RecentEntry for a pick made inside a mode or among
+     * fetched results (the `remember` event hands over exactly what to
+     * store; `pushRecent` adds it to a list). A root id only reorders
+     * commands already in the list. An entry is found again down its path
+     * of static children, then through `resolveRecent`, then from its own
+     * `href`; what none of them finds is skipped, so a stored history never
+     * resurrects a command that has gone away.
      */
-    recent?: string[]
+    recent?: RecentItem[]
     /**
      * Let the palette keep the history itself, in localStorage under this key:
-     * every top-level command run is remembered, newest first. Ignored while
-     * `recent` is bound, which stays the way to store it somewhere else.
+     * every pick is remembered, newest first, root ones as bare ids as before
+     * and deeper ones as entries. Ignored while `recent` is bound, which
+     * stays the way to store it somewhere else.
      */
     recentKey?: string
+    /**
+     * Finds the live command for a remembered pick the palette cannot find
+     * itself: a result a fetcher returned, or one inside a mode whose
+     * children are fetched. Gets the stored entry, with the command's
+     * `recentData` as `data`; returns the command to show and run, or
+     * nothing to drop it.
+     */
+    resolveRecent?: (entry: RecentEntry) => Command | null | undefined
     /** How many recent commands to surface. */
     recentLimit?: number
     /** Headings the palette adds itself. */
@@ -360,6 +399,13 @@ const emit = defineEmits<{
    * navigation, not a pick.
    */
   (e: "run", id: string, command: Command): void
+  /**
+   * A pick the recent history keeps, as the item to store: a bare id for a
+   * root command, a RecentEntry for anything deeper. For apps that bind
+   * `recent` and keep the history themselves: `recent = pushRecent(recent,
+   * item, 20)`.
+   */
+  (e: "remember", item: RecentItem, command: Command): void
 }>()
 
 const query = ref("")
@@ -440,7 +486,9 @@ function onTab(event: KeyboardEvent) {
   if (!c || !actions.length) return
   event.preventDefault()
   event.stopPropagation()
-  enter({ id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions })
+  const actionsMode: Command = { id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions }
+  syntheticModes.add(actionsMode)
+  enter(actionsMode)
 }
 
 /*
@@ -633,37 +681,65 @@ const fallbacks = computed<Command[]>(() =>
  * relevance is the better order and a duplicated row is just noise.
  */
 const RECENT_KEEP = 20
-const ownRecent = ref<string[]>([])
+const ownRecent = ref<RecentItem[]>([])
 watch(
   () => props.recentKey,
   (key) => {
     if (!key || typeof localStorage === "undefined") return
     try {
-      const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]")
-      ownRecent.value = Array.isArray(stored) ? stored.filter((v): v is string => typeof v === "string") : []
+      ownRecent.value = readRecent(JSON.parse(localStorage.getItem(key) ?? "[]"))
     } catch {
       ownRecent.value = []
     }
   },
   { immediate: true },
 )
-function remember(id: string) {
+
+/*
+ * Where each recent row was found, so running it again remembers it under
+ * the same path rather than as a root pick. Modes the palette makes up
+ * itself (Tab's actions) are not destinations, and nothing picked in them
+ * is remembered.
+ */
+const recentPath = new WeakMap<Command, string[]>()
+const syntheticModes = new WeakSet<Command>()
+
+function remember(c: Command) {
+  if (c.remember === false || trail.value.some((step) => syntheticModes.has(step))) return
+  const path = recentPath.get(c) ?? trail.value.map((step) => step.id)
+  const item = toRecentItem(c, path)
+  emit("remember", item, c)
   const key = props.recentKey
   if (!key || props.recent) return
-  ownRecent.value = [id, ...ownRecent.value.filter((v) => v !== id)].slice(0, RECENT_KEEP)
+  ownRecent.value = pushRecent(ownRecent.value, item, RECENT_KEEP)
   try {
     localStorage.setItem(key, JSON.stringify(ownRecent.value))
   } catch {}
 }
-const recentIds = computed(() => props.recent ?? (props.recentKey ? ownRecent.value : []))
+const recentList = computed(() => props.recent ?? (props.recentKey ? ownRecent.value : []))
 
+function fromEntry(entry: RecentEntry): Command {
+  return { id: entry.id, label: entry.label, description: entry.description, icon: entry.icon, image: entry.image, href: entry.href }
+}
+
+/*
+ * Shown while no words are typed: at an empty box, and under operators
+ * alone, which filter them like any row ("-theme", "in:recent").
+ */
 const recentItems = computed<Command[]>(() => {
-  if (mode.value || query.value.trim() || !recentIds.value.length) return []
-  const byId = new Map(props.commands.map((c) => [c.id, c]))
+  if (mode.value || !recentList.value.length) return []
+  const terms = parseCommandQuery(query.value)
+  if (terms.include.length) return []
+  const found = resolveRecentItems(recentList.value, props.commands, {
+    limit: Number.POSITIVE_INFINITY,
+    resolve: props.resolveRecent,
+    fromEntry,
+  })
   const out: Command[] = []
-  for (const id of recentIds.value) {
-    const c = byId.get(id)
-    if (c && !c.disabled && !out.includes(c)) out.push(c)
+  for (const { command, path } of found) {
+    if (out.includes(command) || !recentVisible(command, terms, props.recentLabel)) continue
+    recentPath.set(command, path)
+    out.push(command)
     if (out.length >= props.recentLimit) break
   }
   return out
@@ -986,6 +1062,7 @@ function openInNewTab(c: Command) {
   if (!c.href) return
   window.open(c.href, "_blank", "noopener")
   emit("run", c.id, c)
+  remember(c)
   emit("update:open", false)
 }
 
@@ -1024,7 +1101,7 @@ function run(row: Command | undefined) {
     return
   }
   emit("run", c.id, c)
-  if (!mode.value) remember(c.id)
+  remember(c)
   if (c.keepOpen) {
     // Back to the top of a fresh list: the query that found this command is
     // spent, and leaving it would hide whatever the action just changed.

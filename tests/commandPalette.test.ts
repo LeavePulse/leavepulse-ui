@@ -1,5 +1,17 @@
 import { expect, test } from "bun:test"
-import { commandHasPreview, fallbackRows, matchModePrefix } from "../src/components/commandPalette"
+import {
+  commandHasPreview,
+  fallbackRows,
+  matchModePrefix,
+  pushRecent,
+  readRecent,
+  recentVisible,
+  resolveRecentItems,
+  toRecentItem,
+  type RecentEntry,
+  type RecentItem,
+} from "../src/components/commandPalette"
+import { parseCommandQuery } from "../src/components/commandSearch"
 import { comboSteps } from "../src/components/keys"
 
 test("a row with text of its own opens the pane, a bare row does not", () => {
@@ -73,4 +85,72 @@ test("fallback rows show only while positive words are typed, labelled with them
 test("fallback rows obey exclusions and scopes", () => {
   expect(fallbackRows(elsewhere, "sodium -pack").map((r) => r.command.id)).toEqual(["mods", "servers"])
   expect(fallbackRows(elsewhere, "sodium in:modrinth").map((r) => r.command.id)).toEqual(["mods", "packs"])
+})
+
+const root = [
+  { id: "deploy", label: "Deploy", group: "Actions" },
+  {
+    id: "theme",
+    label: "Theme",
+    children: [
+      { id: "theme/dark", label: "Dark", icon: "lucide:moon" },
+      { id: "theme/light", label: "Light", icon: "lucide:sun" },
+    ],
+  },
+  { id: "mods", label: "Search mods", children: () => [] },
+]
+const fromEntry = (e: RecentEntry) => ({ id: e.id, label: e.label, href: e.href })
+
+test("a root pick is stored as a bare id, a deeper one as an entry", () => {
+  expect(toRecentItem(root[0], [])).toBe("deploy")
+  const hit = { id: "mod:sodium", label: "Sodium", image: { src: "https://x/icon.png", fallback: "So" }, recentData: { project: "AANobbMI" } }
+  expect(toRecentItem(hit, ["mods"])).toEqual({
+    id: "mod:sodium",
+    label: "Sodium",
+    path: ["mods"],
+    image: { src: "https://x/icon.png", alt: undefined, fallback: "So", icon: undefined, shape: undefined },
+    data: { project: "AANobbMI" },
+  })
+})
+
+test("stored history survives JSON and drops what it cannot trust", () => {
+  const list = pushRecent(pushRecent(["deploy"], toRecentItem(root[1].children![0], ["theme"]), 20), "deploy", 20)
+  const back = readRecent(JSON.parse(JSON.stringify([...list, 42, { id: "x" }, null])))
+  expect(back).toEqual(list)
+  expect(back[0]).toBe("deploy")
+  expect(readRecent("nope")).toEqual([])
+  expect(readRecent(["a", "b"])).toEqual(["a", "b"])
+})
+
+test("pushRecent moves a repeat pick to the front and caps the list", () => {
+  const dark = toRecentItem(root[1].children![0], ["theme"])
+  const list = pushRecent(["a", dark, "b"], { ...(dark as RecentEntry) }, 2)
+  expect(list).toEqual([dark, "a"])
+})
+
+test("history resolves through static paths, the app's resolver, then href", () => {
+  const items: RecentItem[] = [
+    { id: "theme/dark", label: "Dark (stale)", path: ["theme"] },
+    { id: "mod:sodium", label: "Sodium", path: ["mods"], data: { project: "AANobbMI" } },
+    { id: "doc:1", label: "Rollback", path: ["mods"], href: "/docs/rollback" },
+    { id: "gone", label: "Gone", path: ["mods"] },
+    "deploy",
+    "missing",
+    "theme",
+  ]
+  const resolve = (e: RecentEntry) => (e.data ? { id: e.id, label: `${e.label} (live)` } : undefined)
+  const out = resolveRecentItems(items, root, { limit: 10, resolve, fromEntry })
+  expect(out.map((r) => r.command.label)).toEqual(["Dark", "Sodium (live)", "Rollback", "Deploy"])
+  expect(out[0].command).toBe(root[1].children![0])
+  expect(out[0].path).toEqual(["theme"])
+  expect(resolveRecentItems(items, root, { limit: 2, resolve, fromEntry }).length).toBe(2)
+})
+
+test("recent rows obey exclusions, and in: matches their group or the Recent heading", () => {
+  const deploy = { label: "Deploy", group: "Actions" }
+  expect(recentVisible(deploy, parseCommandQuery("-deploy"), "Recent")).toBe(false)
+  expect(recentVisible(deploy, parseCommandQuery("-theme"), "Recent")).toBe(true)
+  expect(recentVisible(deploy, parseCommandQuery("in:recent"), "Recent")).toBe(true)
+  expect(recentVisible(deploy, parseCommandQuery("in:actions"), "Recent")).toBe(true)
+  expect(recentVisible(deploy, parseCommandQuery("in:settings"), "Recent")).toBe(false)
 })
