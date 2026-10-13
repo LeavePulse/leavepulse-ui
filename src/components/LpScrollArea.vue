@@ -13,6 +13,7 @@ import {
   ScrollAreaThumb,
   ScrollAreaViewport,
 } from "reka-ui"
+import { prefersReducedMotion } from "../composables/easing"
 
 // `fade` softens whichever of the top/bottom edges currently has content beyond
 // it, so a clipped list reads as continuing rather than as cut off. On by
@@ -182,6 +183,29 @@ watch(
 
 onBeforeUnmount(stopEdgeWatch)
 
+/*
+ * A press on the bar beside the thumb. reka treats any press on the track as
+ * "put the thumb's middle under the pointer" and sets the scroll in one go,
+ * so a press that just missed the narrow thumb yanked the content by half a
+ * thumb, and a press further away teleported it. Like a native bar, a press
+ * off the thumb now pages one viewport towards the pointer, smoothly; the
+ * thumb itself has a hit area as wide as the bar (see its `before:`), so a
+ * press that meant to grab it does.
+ */
+function onTrackPointerDown(event: PointerEvent, axis: "x" | "y") {
+  const el = viewportEl.value
+  const bar = event.currentTarget as HTMLElement
+  const thumb = bar.querySelector<HTMLElement>("[data-lp-thumb]")
+  if (!el || !thumb || event.button !== 0 || thumb.contains(event.target as Node)) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  const rect = thumb.getBoundingClientRect()
+  const before = axis === "y" ? event.clientY < rect.top : event.clientX < rect.left
+  const step = (axis === "y" ? el.clientHeight : el.clientWidth) * 0.85 * (before ? -1 : 1)
+  const behavior = prefersReducedMotion() ? "auto" : "smooth"
+  el.scrollBy(axis === "y" ? { top: step, behavior } : { left: step, behavior })
+}
+
 function onThumbPointerDown() {
   dragging.value = true
   const stop = () => {
@@ -230,6 +254,7 @@ function onThumbPointerDown() {
       class="group z-1 flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
       :class="barFade"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
+      @pointerdown.capture="onTrackPointerDown($event, 'y')"
     >
       <!-- Sized with min-width, not width: reka sets an inline
            `width: var(--reka-scroll-area-thumb-width)` on the thumb, and for a
@@ -238,7 +263,8 @@ function onThumbPointerDown() {
            leaving an invisible thumb. A minimum wins over that without fighting
            the positioning reka owns. -->
       <ScrollAreaThumb
-        class="min-w-1 rounded-l-pill bg-brand/40 transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
+        data-lp-thumb
+        class="relative min-w-1 rounded-l-pill bg-brand/40 before:absolute before:inset-y-0 before:right-0 before:-left-2.5 before:content-[''] transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>
@@ -247,9 +273,11 @@ function onThumbPointerDown() {
       orientation="horizontal"
       class="group z-1 flex h-3.5 flex-col touch-none select-none justify-end px-px pb-px pt-2.5"
       :class="barFade"
+      @pointerdown.capture="onTrackPointerDown($event, 'x')"
     >
       <ScrollAreaThumb
-        class="min-h-1 rounded-t-pill bg-brand/40 transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
+        data-lp-thumb
+        class="relative min-h-1 rounded-t-pill bg-brand/40 before:absolute before:inset-x-0 before:bottom-0 before:-top-2.5 before:content-[''] transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>
