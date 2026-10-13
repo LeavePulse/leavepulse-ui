@@ -23,3 +23,30 @@ export function commandHasPreview<T extends PreviewableCommand>(
   if (options.hasPreview) return options.hasPreview(command)
   return options.slot || !!(command.preview || command.excerpt)
 }
+
+/** One line of LpPaletteFacts: what it is, and what it is set to now. */
+export interface PaletteFact {
+  label: string
+  /** Right-aligned value; a change rolls in rather than swapping. */
+  value?: string | number
+  /** A second, quieter line under the label. */
+  hint?: string
+  icon?: string
+  /** A colour dot in place of the icon: a role colour, a status. */
+  color?: string
+  /** Marks the row that is in effect now: the current theme, the open tab. */
+  current?: boolean
+  /** Draw the value in the monospace face: ids, paths, versions. */
+  mono?: boolean
+}
+
+/** One tile of LpPaletteStats. */
+export interface PaletteStat {
+  label: string
+  /** A number counts to its new value; text rolls. */
+  value: number | string
+  /** Abbreviate a number: 1.2k, 3.4M. */
+  compact?: boolean
+  suffix?: string
+  format?: (value: number) => string
+}

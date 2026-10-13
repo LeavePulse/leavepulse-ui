@@ -27,6 +27,12 @@ import {
   LpCodeBlock,
   LpColorPicker,
   LpCommandPalette,
+  LpKeys,
+  LpPaletteFacts,
+  LpPaletteHeader,
+  LpPalettePreview,
+  LpPaletteStats,
+  LpPaletteSwatches,
   LpContextMenu,
   LpDatePicker,
   LpDropdownMenu,
@@ -1288,7 +1294,7 @@ export const registry: ComponentEntry[] = [
     name: "CommandPalette",
     description:
       "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
-    components: { LpCommandPalette, LpButton },
+    components: { LpCommandPalette, LpButton, LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpKeys },
     state: () => {
       const s: any = reactive({
         open: false,
@@ -1390,9 +1396,79 @@ export const registry: ComponentEntry[] = [
     :recent="recent"
     :group-limit="3"
     preview-pane
+    :has-preview="(c) => c.id.startsWith('user:') || !!c.preview"
     glass
     @run="onRun"
-  />
+  >
+    <!-- People get a pane built from the preview blocks. Docs hits render
+         nothing here, so the pane falls back to their own preview text;
+         every other row folds the pane away (hasPreview). -->
+    <template #preview="{ command }">
+      <LpPalettePreview v-if="command.id.startsWith('user:')">
+        <LpPaletteHeader eyebrow="Person" :title="command.label" :image="command.image" subtitle="Engineering" />
+        <LpPaletteStats :items="[{ label: 'Commits', value: 1280, compact: true }, { label: 'Reviews', value: 342 }]" />
+        <LpPaletteFacts
+          title="Now"
+          :items="[
+            { icon: 'lucide:map-pin', label: 'Office', value: 'Remote' },
+            { icon: 'lucide:at-sign', label: 'Handle', value: command.label.split(' ')[0].toLowerCase(), mono: true },
+          ]"
+        />
+        <LpKeys combo="Tab" label="message or mention" />
+      </LpPalettePreview>
+    </template>
+  </LpCommandPalette>
+</div>`,
+  },
+  {
+    id: "palettepreview",
+    name: "PalettePreview",
+    description:
+      "Blocks for CommandPalette's `#preview` slot, so an app's previews match the kit and each other without restyling the same eyebrow, title and rows. `LpPalettePreview` spaces its children and brings them in one after another; `LpPaletteHeader` is the eyebrow, title, subtitle and lead with a picture (falls back like Avatar) or an icon; `LpPaletteFacts` lists label and value rows with an icon or colour dot, `current` marking the one in effect; `LpPaletteStats` shows figures as tiles that count (NumberFlow) or roll (RollingText) when they change; `LpPaletteSwatches` shows a theme's colours on its own surface; `LpKeys` draws a combo as keycaps. They work outside the palette too. Press the button to see values change in place.",
+    components: { LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpPaletteSwatches, LpKeys, LpButton, LpBadge },
+    state: () => {
+      const s: any = reactive({
+        downloads: 1250000,
+        follows: 8400,
+        version: "2.4.1",
+        enabled: true,
+        bump: () => {
+          s.downloads += 13500
+          s.follows += 37
+          s.version = s.version === "2.4.1" ? "2.5.0" : "2.4.1"
+          s.enabled = !s.enabled
+        },
+      })
+      return s
+    },
+    template: `<div class="flex flex-col gap-4">
+  <div class="w-full max-w-sm rounded-card border border-line bg-surface-raised p-5">
+    <LpPalettePreview>
+      <LpPaletteHeader
+        eyebrow="Modrinth"
+        title="Sodium"
+        subtitle="by CaffeineMC"
+        :image="{ src: '/missing-icon.png', fallback: 'So' }"
+        lead="A modern rendering engine that greatly improves frame rates and stutter."
+      >
+        <LpBadge tone="neutral">Optimization</LpBadge>
+        <LpBadge :tone="enabled ? 'success' : 'warning'" dot>{{ enabled ? "Enabled" : "Disabled" }}</LpBadge>
+      </LpPaletteHeader>
+      <LpPaletteStats :items="[{ label: 'Downloads', value: downloads, compact: true }, { label: 'Follows', value: follows }]" />
+      <LpPaletteFacts
+        title="Details"
+        :items="[
+          { icon: 'lucide:tag', label: 'Latest', value: version, mono: true },
+          { icon: 'lucide:box', label: 'Instance', value: 'Survival', current: true },
+          { color: '#5865f2', label: 'Accent', value: '#5865F2', mono: true },
+        ]"
+      />
+      <LpPaletteSwatches label="Onyx" background="#0b0d10" :colors="['#151a20', '#eef2f5', '#8a96a3', '#00bcff', '#39e58c', '#f0b35a']" />
+      <LpKeys combo="Ctrl+Shift+M" label="from anywhere" />
+      <LpKeys combo="G I" label="go to instances" size="sm" />
+    </LpPalettePreview>
+  </div>
+  <LpButton variant="outline" class="w-fit" @click="bump">Change the values</LpButton>
 </div>`,
   },
   {

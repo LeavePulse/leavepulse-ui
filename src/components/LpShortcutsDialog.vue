@@ -16,12 +16,11 @@
  * look for keys rather than only in the console.
  */
 import { computed } from "vue"
+import LpKeys from "./LpKeys.vue"
 import LpModal from "./LpModal.vue"
 import {
   activeShortcuts,
-  appleModifierLabel,
   mergeShortcutGroups,
-  useAppleKeyboard,
   useHotkeys,
   type ShortcutGroup,
 } from "../composables/useHotkeys"
@@ -49,23 +48,9 @@ const props = withDefaults(
 
 const text = useLabels("shortcuts", {
   title: "Keyboard shortcuts",
-  then: "then",
   conflict: "Also bound elsewhere: only one of them runs",
   group: "General",
 })
-const apple = useAppleKeyboard()
-
-/*
- * One key per "+", except a "+" that is the key itself: "Ctrl++" is Ctrl and
- * plus, not Ctrl and two blanks.
- */
-function keysOf(chord: string): string[] {
-  return chord.split(/\+(?!$)/)
-}
-
-function stepsOf(combo: string): string[] {
-  return combo.trim().split(/\s+/)
-}
 
 const shown = computed(() => (props.live ? mergeShortcutGroups(props.groups, activeShortcuts.value) : props.groups))
 
@@ -112,12 +97,7 @@ useHotkeys(() =>
               >!</span>
             </dt>
             <dd>
-              <template v-for="(step, stepIndex) in stepsOf(entry.combo)" :key="`${step}-${stepIndex}`">
-                <span v-if="stepIndex" class="shortcut-then">{{ text.then }}</span>
-                <kbd v-for="(key, index) in keysOf(step)" :key="`${key}-${index}`">
-                  {{ appleModifierLabel(key.trim(), apple) }}
-                </kbd>
-              </template>
+              <LpKeys :combo="entry.combo" />
             </dd>
           </div>
         </dl>
@@ -181,33 +161,10 @@ useHotkeys(() =>
   cursor: help;
 }
 
-.shortcut-then {
-  align-self: center;
-  padding: 0 2px;
-  color: var(--color-muted);
-  font-size: 0.68rem;
-}
-
 .shortcut-row dd {
   display: flex;
   flex-shrink: 0;
   gap: 3px;
   margin: 0;
-}
-
-kbd {
-  display: inline-flex;
-  min-width: 20px;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 6px;
-  border: 1px solid var(--color-line-strong);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
-  color: var(--color-muted-strong);
-  font-family: inherit;
-  font-size: 0.7rem;
-  line-height: 1.5;
 }
 </style>

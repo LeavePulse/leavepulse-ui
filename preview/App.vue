@@ -10,6 +10,12 @@ import {
   LpContextMenu,
   LpEmptyState,
   LpIcon,
+  LpKeys,
+  LpPaletteFacts,
+  LpPaletteHeader,
+  LpPalettePreview,
+  LpPaletteStats,
+  LpPaletteSwatches,
   LpScrollArea,
   LpShortcutsDialog,
   LpToaster,
@@ -145,8 +151,9 @@ const siteHotkey = computed(() => !(route.value.kind === "component" && route.va
 
 /*
  * The palette the way an app would use it: a history it keeps itself, the
- * description in the preview pane (which folds away for pages and themes,
- * the rows `hasPreview` turns down), every row a real link (so Tab offers "open
+ * description in the preview pane, built from the kit's preview blocks and
+ * folding away for the rows `hasPreview` turns down (the theme root and the
+ * shortcuts row), every row a real link (so Tab offers "open
  * in new tab" and "copy link"), themes behind one row that drills into its
  * own list and stays open while you try them, and G-then-key jumps.
  */
@@ -159,6 +166,11 @@ const pageLink = (id: string) => href({ kind: "page", id })
  * before the page is even open.
  */
 const PREVIEW_LINES = 12
+function themePreview(id: string) {
+  const name = id.replace(/^theme\//, "") as PresetName
+  return id.startsWith("theme/") && name in presets ? { name, preset: presets[name] } : null
+}
+
 function componentPreview(id: string) {
   const entry = registry.find((e) => e.id === id.replace(/^component\//, ""))
   if (!entry) return null
@@ -324,30 +336,52 @@ const on = "bg-surface-soft text-ink"
       :commands="commands"
       recent-key="lp-preview-palette-recent"
       preview-pane
-      :has-preview="(c) => !!componentPreview(c.id)"
+      :has-preview="(c) => !c.children && c.id !== 'shortcuts'"
       :group-limit="8"
       placeholder="Jump to a component, page or theme…"
     >
       <template #preview="{ command }">
-        <div v-if="componentPreview(command.id)" class="flex flex-col gap-4">
+        <!-- Built from the kit's preview blocks: the same header, facts,
+             swatches and keycaps an app would use, staggered in by
+             LpPalettePreview. -->
+        <LpPalettePreview v-if="componentPreview(command.id)">
           <template v-for="p in [componentPreview(command.id)!]" :key="p.entry.id">
-            <header class="pv-in flex flex-col gap-1.5">
-              <div class="flex items-center gap-2">
-                <span class="grid size-7 shrink-0 place-items-center rounded-control bg-brand-soft text-brand">
-                  <LpIcon name="lucide:box" :size="15" />
-                </span>
-                <h3 class="min-w-0 truncate text-base font-semibold text-ink">{{ p.entry.name }}</h3>
-              </div>
-              <code class="w-fit rounded-control bg-surface-soft px-1.5 py-0.5 font-mono text-[11px] text-muted">{{ p.path }}</code>
-            </header>
-            <p class="pv-in text-sm leading-relaxed text-ink" style="animation-delay: 45ms">{{ p.lead }}</p>
-            <p v-if="p.rest" class="pv-in text-xs leading-relaxed text-muted" style="animation-delay: 90ms">{{ p.rest }}</p>
-            <div class="pv-in flex flex-col gap-1.5" style="animation-delay: 135ms">
+            <LpPaletteHeader eyebrow="Component" :title="p.entry.name" icon="lucide:box" :subtitle="p.path" :lead="p.lead" />
+            <p v-if="p.rest" class="text-xs leading-relaxed text-muted">{{ p.rest }}</p>
+            <div class="flex flex-col gap-1.5">
               <span class="text-[11px] font-medium tracking-wide text-muted uppercase">Example</span>
               <LpCodeBlock :model-value="p.code" lang="html" :copyable="false" class="text-[11px]" />
             </div>
           </template>
-        </div>
+        </LpPalettePreview>
+        <LpPalettePreview v-else-if="themePreview(command.id)">
+          <template v-for="t in [themePreview(command.id)!]" :key="t.name">
+            <LpPaletteHeader eyebrow="Theme" :title="t.preset.name" :icon="THEME_ICON[t.name]" :subtitle="t.preset.mode === 'dark' ? 'Dark mode' : 'Light mode'" />
+            <LpPaletteSwatches
+              :label="t.preset.name"
+              :background="t.preset.colors.surface"
+              :colors="[t.preset.colors.surfaceSoft, t.preset.colors.ink, t.preset.colors.muted, t.preset.colors.brand, t.preset.colors.action, t.preset.colors.accent]"
+            />
+            <LpPaletteFacts
+              :items="[
+                { color: t.preset.colors.brand, label: 'Brand', value: t.preset.colors.brand, mono: true },
+                { color: t.preset.colors.action, label: 'Action', value: t.preset.colors.action, mono: true },
+                { icon: 'lucide:check', label: 'In use', value: theme === t.name ? 'yes' : 'no', current: theme === t.name },
+              ]"
+            />
+            <LpKeys combo="Enter" :label="theme === t.name ? 'keeps it' : 'tries it, the palette stays open'" />
+          </template>
+        </LpPalettePreview>
+        <LpPalettePreview v-else-if="command.id.startsWith('page/')">
+          <LpPaletteHeader eyebrow="Page" :title="command.label" :icon="command.icon" />
+          <LpPaletteStats
+            :items="[
+              { label: 'Components', value: registry.length },
+              { label: 'Themes', value: THEMES.length },
+            ]"
+          />
+          <LpKeys v-if="command.shortcut" :combo="command.shortcut" label="from anywhere on the site" />
+        </LpPalettePreview>
       </template>
     </LpCommandPalette>
     <LpShortcutsDialog
@@ -363,14 +397,3 @@ const on = "bg-surface-soft text-ink"
   </div>
 </template>
 
-<style scoped>
-/* The pane's parts arrive one after another, as the kit's own pane does. */
-.pv-in {
-  animation: option-in var(--duration-medium) var(--ease-emphasized) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .pv-in {
-    animation: none;
-  }
-}
-</style>
