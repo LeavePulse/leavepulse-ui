@@ -117,3 +117,44 @@ export function applyQueryFilters<T extends SearchableCommand>(items: T[], terms
     return !terms.exclude.some((term) => matches(command, term)) && terms.groups.every((term) => group.includes(term))
   })
 }
+
+/** A run of text, and whether it matched the query. */
+export interface HighlightPart {
+  text: string
+  hit: boolean
+}
+
+/**
+ * Text split around the terms that matched, for <mark> without v-html. Terms
+ * shorter than two characters are skipped (one letter would mark half the
+ * text), longer ones win where two start at the same place, and case is
+ * ignored. Pass positive terms only: an excluded word is never a match.
+ */
+export function highlightParts(value: string, terms: readonly string[]): HighlightPart[] {
+  const sorted = [...new Set(terms.map((t) => t.toLowerCase()).filter((t) => t.length >= 2))].sort(
+    (a, b) => b.length - a.length,
+  )
+  if (!value || sorted.length === 0) return value ? [{ text: value, hit: false }] : []
+  const lower = value.toLowerCase()
+  const parts: HighlightPart[] = []
+  let i = 0
+  while (i < value.length) {
+    let at = -1
+    let term = ""
+    for (const t of sorted) {
+      const found = lower.indexOf(t, i)
+      if (found !== -1 && (at === -1 || found < at || (found === at && t.length > term.length))) {
+        at = found
+        term = t
+      }
+    }
+    if (at === -1) {
+      parts.push({ text: value.slice(i), hit: false })
+      break
+    }
+    if (at > i) parts.push({ text: value.slice(i, at), hit: false })
+    parts.push({ text: value.slice(at, at + term.length), hit: true })
+    i = at + term.length
+  }
+  return parts
+}

@@ -1441,9 +1441,9 @@ export const registry: ComponentEntry[] = [
     <!-- People get a pane built from the preview blocks. Docs hits render
          nothing here, so the pane falls back to their own preview text;
          every other row folds the pane away (hasPreview). -->
-    <template #preview="{ command }">
+    <template #preview="{ command, highlight }">
       <LpPalettePreview v-if="command.id.startsWith('user:')">
-        <LpPaletteHeader eyebrow="Person" :title="command.label" :image="command.image" subtitle="Engineering" />
+        <LpPaletteHeader eyebrow="Person" :title="highlight(command.label)" :image="command.image" subtitle="Engineering" />
         <LpPaletteStats :items="[{ label: 'Commits', value: 1280, compact: true }, { label: 'Reviews', value: 342 }]" />
         <LpPaletteFacts
           title="Now"
@@ -1462,7 +1462,7 @@ export const registry: ComponentEntry[] = [
     id: "palettepreview",
     name: "PalettePreview",
     description:
-      "Blocks for CommandPalette's `#preview` slot, so an app's previews match the kit and each other without restyling the same eyebrow, title and rows. `LpPalettePreview` spaces its children and brings them in one after another; `LpPaletteHeader` is the eyebrow, title, subtitle and lead with a picture (falls back like Avatar) or an icon; `LpPaletteFacts` lists label and value rows with an icon or colour dot, `current` marking the one in effect; `LpPaletteStats` shows figures as tiles that count (NumberFlow) or roll (RollingText) when they change; `LpPaletteSwatches` shows a theme's colours on its own surface; `LpKeys` draws a combo as keycaps. They work outside the palette too. Press the button to see values change in place.",
+      "Blocks for CommandPalette's `#preview` slot, so an app's previews match the kit and each other without restyling the same eyebrow, title and rows. `LpPalettePreview` spaces its children and brings them in one after another; `LpPaletteHeader` is the eyebrow, title, subtitle and lead with a picture (falls back like Avatar) or an icon; `LpPaletteFacts` lists label and value rows with an icon or colour dot, `current` marking the one in effect; `LpPaletteStats` shows figures as tiles that count (NumberFlow) or roll (RollingText) when they change; `LpPaletteSwatches` shows a theme's colours on its own surface; `LpKeys` draws a combo as keycaps. Inside the palette, the slot's `highlight(text)` marks the typed words (positive terms only) and the blocks take its result wherever they take text. They work outside the palette too. Press the button to see values change in place.",
     components: { LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpPaletteSwatches, LpKeys, LpButton, LpBadge },
     state: () => {
       const s: any = reactive({

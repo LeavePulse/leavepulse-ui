@@ -46,7 +46,15 @@ import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
-import { applyQueryFilters, parseCommandQuery, parsePaletteQuery, rankCommandItems, type PaletteQuery } from "./commandSearch"
+import {
+  applyQueryFilters,
+  highlightParts,
+  parseCommandQuery,
+  parsePaletteQuery,
+  rankCommandItems,
+  type HighlightPart,
+  type PaletteQuery,
+} from "./commandSearch"
 import {
   commandHasPreview,
   fallbackRows,
@@ -824,8 +832,14 @@ function folded(name: string, items: Command[]): Command[] {
 const flat = computed(() => grouped.value.flatMap((g) => g.items))
 
 const slots = defineSlots<{
-  /** Body of the preview pane for the highlighted command. */
-  preview?: (props: { command: Command }) => unknown
+  /**
+   * Body of the preview pane for the highlighted command. `highlight(text)`
+   * splits any text around the words typed (positive terms only, plus the
+   * command's own `highlight` words), the same matching the rows use; the
+   * LpPalette* blocks take its result wherever they take text, and
+   * `query` is the parsed box for anything else.
+   */
+  preview?: (props: { command: Command; highlight: (text: string) => HighlightPart[]; query: PaletteQuery }) => unknown
 }>()
 
 const active = computed<Command | undefined>(() => {
@@ -869,6 +883,11 @@ watch(
 onBeforeUnmount(() => clearTimeout(lingerTimer))
 
 const paneOpen = computed(() => props.previewPane && !!paneCommand.value)
+
+function paneHighlight(text: string): HighlightPart[] {
+  return highlight(text, paneBody.value?.highlight)
+}
+const paneQuery = computed(() => parsePaletteQuery(query.value.trim()))
 
 // What the pane draws: the last row it showed, kept while the pane slides out
 // so it leaves with its content instead of emptying first.
@@ -929,39 +948,10 @@ function flatIndexOf(c: Command): number {
 }
 
 // ── highlight ────────────────────────────────────────────────
-// Split text around query terms (≥2 chars, longest-first) for <mark> wrapping,
-// without v-html. Multi-word queries highlight each term.
-interface Part {
-  text: string
-  hit: boolean
-}
-function highlight(value: string, extra: string[] = []): Part[] {
-  const terms = [...new Set([...local.value.terms, ...extra.map((t) => t.toLowerCase())].filter((t) => t.length >= 2))].sort(
-    (a, b) => b.length - a.length,
-  )
-  if (!value || terms.length === 0) return value ? [{ text: value, hit: false }] : []
-  const lower = value.toLowerCase()
-  const parts: Part[] = []
-  let i = 0
-  while (i < value.length) {
-    let at = -1
-    let term = ""
-    for (const t of terms) {
-      const found = lower.indexOf(t, i)
-      if (found !== -1 && (at === -1 || found < at || (found === at && t.length > term.length))) {
-        at = found
-        term = t
-      }
-    }
-    if (at === -1) {
-      parts.push({ text: value.slice(i), hit: false })
-      break
-    }
-    if (at > i) parts.push({ text: value.slice(i, at), hit: false })
-    parts.push({ text: value.slice(at, at + term.length), hit: true })
-    i = at + term.length
-  }
-  return parts
+// Split text around the positive query terms (and a row's own `highlight`
+// words) for <mark> wrapping, without v-html. Exclusions are never marked.
+function highlight(value: string, extra: string[] = []): HighlightPart[] {
+  return highlightParts(value, [...local.value.terms, ...extra])
 }
 
 // ── row picture ──────────────────────────────────────────────
@@ -1411,7 +1401,7 @@ useHotkeys(() =>
                 <!-- Keyed by the row, so moving the highlight replays the
                      entrance rather than swapping text in place. -->
                 <div v-if="paneBody" :key="paneBody.id">
-                  <slot name="preview" :command="paneBody">
+                  <slot name="preview" :command="paneBody" :highlight="paneHighlight" :query="paneQuery">
                     <div class="lp-cmd-para flex items-center gap-2 text-ink">
                       <LpAvatar
                         v-if="imageOf(paneBody)"

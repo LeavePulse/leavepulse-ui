@@ -17,6 +17,7 @@
  * with keepOpen, a count that refreshed), through LpRollingText. The `value`
  * slot draws a value of the app's own (chips, a switch) instead.
  */
+import HighlightText from "./HighlightText.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
 import type { PaletteFact } from "./commandPalette"
@@ -43,7 +44,7 @@ defineSlots<{
     <ul class="lp-palette-facts__list">
       <li
         v-for="(item, index) in items"
-        :key="`${item.label}-${index}`"
+        :key="index"
         class="lp-palette-facts__row"
         :class="{ 'is-current': item.current }"
         :aria-current="item.current || undefined"
@@ -51,8 +52,8 @@ defineSlots<{
         <span v-if="item.color" class="lp-palette-facts__dot" :style="{ background: item.color }" />
         <LpIcon v-else-if="item.icon" :name="item.icon" :size="15" class="lp-palette-facts__icon" />
         <span class="lp-palette-facts__label">
-          <span class="lp-palette-facts__name">{{ item.label }}</span>
-          <span v-if="item.hint" class="lp-palette-facts__hint">{{ item.hint }}</span>
+          <span class="lp-palette-facts__name"><HighlightText :text="item.label" /></span>
+          <span v-if="item.hint?.length" class="lp-palette-facts__hint"><HighlightText :text="item.hint" /></span>
         </span>
         <span
           v-if="item.value !== undefined && item.value !== '' || $slots.value"

@@ -15,19 +15,27 @@
  *     <LpBadge>{{ hit.version }}</LpBadge>
  *   </LpPaletteHeader>
  *
+ * Title, subtitle and lead take the preview slot's `highlight(text)` as well
+ * as a string, to mark what was typed:
+ *
+ *   <LpPaletteHeader :title="highlight(command.label)" />
+ *
  * The picture goes through LpAvatar: it fades in once loaded and falls back
  * to the initials or the icon when the link is dead.
  */
 import { computed } from "vue"
 import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
+import HighlightText from "./HighlightText.vue"
+import type { HighlightPart } from "./commandSearch"
 import type { CommandImage } from "./LpCommandPalette.vue"
 
 const props = defineProps<{
   eyebrow?: string
-  title?: string
-  subtitle?: string
-  lead?: string
+  /** Text, or the preview slot's `highlight(text)` to mark the query. */
+  title?: string | HighlightPart[]
+  subtitle?: string | HighlightPart[]
+  lead?: string | HighlightPart[]
   /** Icon beside the title, on a soft tile. */
   icon?: string
   /** Picture beside the title; wins over `icon`, which becomes its fallback. */
@@ -61,15 +69,15 @@ const picture = computed<CommandImage | null>(() => {
       </slot>
       <div class="lp-palette-header__text">
         <p v-if="eyebrow" class="lp-palette-header__eyebrow">{{ eyebrow }}</p>
-        <h3 v-if="title || $slots.title" class="lp-palette-header__title">
-          <slot name="title">{{ title }}</slot>
+        <h3 v-if="title?.length || $slots.title" class="lp-palette-header__title">
+          <slot name="title"><HighlightText v-if="title" :text="title" /></slot>
         </h3>
-        <p v-if="subtitle" class="lp-palette-header__subtitle">{{ subtitle }}</p>
+        <p v-if="subtitle?.length" class="lp-palette-header__subtitle"><HighlightText :text="subtitle" /></p>
       </div>
     </div>
     <div v-if="$slots.default" class="lp-palette-header__extra"><slot /></div>
-    <p v-if="lead || $slots.lead" class="lp-palette-header__lead">
-      <slot name="lead">{{ lead }}</slot>
+    <p v-if="lead?.length || $slots.lead" class="lp-palette-header__lead">
+      <slot name="lead"><HighlightText v-if="lead" :text="lead" /></slot>
     </p>
   </header>
 </template>

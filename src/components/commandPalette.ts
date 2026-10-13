@@ -1,4 +1,4 @@
-import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type SearchableCommand } from "./commandSearch"
+import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type HighlightPart, type SearchableCommand } from "./commandSearch"
 
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so
@@ -28,11 +28,12 @@ export function commandHasPreview<T extends PreviewableCommand>(
 
 /** One line of LpPaletteFacts: what it is, and what it is set to now. */
 export interface PaletteFact {
-  label: string
+  /** Text, or the preview slot's `highlight(text)` to mark the query. */
+  label: string | HighlightPart[]
   /** Right-aligned value; a change rolls in rather than swapping. */
   value?: string | number
   /** A second, quieter line under the label. */
-  hint?: string
+  hint?: string | HighlightPart[]
   icon?: string
   /** A colour dot in place of the icon: a role colour, a status. */
   color?: string

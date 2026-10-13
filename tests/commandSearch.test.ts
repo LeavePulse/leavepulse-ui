@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { applyQueryFilters, parseCommandQuery, parsePaletteQuery, rankCommandItems } from "../src/components/commandSearch"
+import { applyQueryFilters, highlightParts, parseCommandQuery, parsePaletteQuery, rankCommandItems } from "../src/components/commandSearch"
 
 const items = [
   { id: "logs", label: "Logs", group: "Server", keywords: ["audit"] },
@@ -47,4 +47,20 @@ test("fetched results still obey exclusions and scopes", () => {
   ]
   expect(applyQueryFilters(hits, parsePaletteQuery("sodium -forge in:mod")).map((h) => h.id)).toEqual(["a"])
   expect(applyQueryFilters(hits, parsePaletteQuery("anything")).length).toBe(4)
+})
+
+test("highlight marks positive terms only, longest first, in any case", () => {
+  const q = parsePaletteQuery("deploy -prod roll")
+  expect(highlightParts("Rollback a Deploy to prod", q.include)).toEqual([
+    { text: "Roll", hit: true },
+    { text: "back a ", hit: false },
+    { text: "Deploy", hit: true },
+    { text: " to prod", hit: false },
+  ])
+  expect(highlightParts("deployment", ["de", "deploy"])).toEqual([
+    { text: "deploy", hit: true },
+    { text: "ment", hit: false },
+  ])
+  expect(highlightParts("a b", ["a"])).toEqual([{ text: "a b", hit: false }])
+  expect(highlightParts("", ["x"])).toEqual([])
 })

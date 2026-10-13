@@ -341,13 +341,14 @@ const on = "bg-surface-soft text-ink"
       :group-limit="8"
       placeholder="Jump to a component, page or theme…"
     >
-      <template #preview="{ command }">
+      <template #preview="{ command, highlight }">
         <!-- Built from the kit's preview blocks: the same header, facts,
              swatches and keycaps an app would use, staggered in by
-             LpPalettePreview. -->
+             LpPalettePreview. `highlight` marks the typed words the same
+             way the rows do. -->
         <LpPalettePreview v-if="componentPreview(command.id)">
           <template v-for="p in [componentPreview(command.id)!]" :key="p.entry.id">
-            <LpPaletteHeader eyebrow="Component" :title="p.entry.name" icon="lucide:box" :subtitle="p.path" :lead="p.lead" />
+            <LpPaletteHeader eyebrow="Component" :title="highlight(p.entry.name)" icon="lucide:box" :subtitle="p.path" :lead="highlight(p.lead)" />
             <p v-if="p.rest" class="text-xs leading-relaxed text-muted">{{ p.rest }}</p>
             <div class="flex flex-col gap-1.5">
               <span class="text-[11px] font-medium tracking-wide text-muted uppercase">Example</span>
@@ -374,7 +375,7 @@ const on = "bg-surface-soft text-ink"
           </template>
         </LpPalettePreview>
         <LpPalettePreview v-else-if="command.id.startsWith('page/')">
-          <LpPaletteHeader eyebrow="Page" :title="command.label" :icon="command.icon" />
+          <LpPaletteHeader eyebrow="Page" :title="highlight(command.label)" :icon="command.icon" />
           <LpPaletteStats
             :items="[
               { label: 'Components', value: registry.length },
