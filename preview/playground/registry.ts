@@ -1293,7 +1293,7 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; a `fallback` row (\"Search the catalogue for ...\") shows only while something is typed, labelled with the typed words, and with `carryQuery` its mode opens already searching them; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
     components: { LpCommandPalette, LpButton, LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpKeys },
     state: () => {
       const s: any = reactive({
@@ -1317,6 +1317,26 @@ export const registry: ComponentEntry[] = [
               { id: "restart:worker", label: "worker", icon: "lucide:server" },
               { id: "restart:web", label: "web", icon: "lucide:server" },
             ],
+          },
+          // Listed only while something is typed, for any words, at the end
+          // of the list: Enter opens the catalogue already searching them.
+          {
+            id: "catalogue",
+            label: 'Search the package catalogue for "{query}"',
+            icon: "lucide:package-search",
+            group: "Elsewhere",
+            fallback: true,
+            carryQuery: true,
+            childPlaceholder: "Search packages…",
+            children: async (q: string, signal: AbortSignal) => {
+              await new Promise((r) => setTimeout(r, 300))
+              if (signal.aborted) return []
+              const all = ["vue-router", "vitest", "vite-plugin-pwa", "pinia", "date-fns", "zod", "valibot", "unocss", "nuxt", "tanstack-query"]
+              const text = q.toLowerCase()
+              return all
+                .filter((name) => name.includes(text))
+                .map((name, i) => ({ id: `pkg:${name}`, label: name, description: `${(i + 3) * 1170} weekly downloads`, icon: "lucide:package" }))
+            },
           },
           { id: "logs", label: "View logs", description: "Tail the live log stream", icon: "lucide:scroll-text", shortcut: "⌘L", group: "Navigate" },
           { id: "metrics", label: "Open metrics", icon: "lucide:activity", group: "Navigate" },

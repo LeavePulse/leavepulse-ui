@@ -1,3 +1,5 @@
+import { applyQueryFilters, parsePaletteQuery, type SearchableCommand } from "./commandSearch"
+
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so
  * they can be tested without mounting a dialog.
@@ -77,4 +79,30 @@ export function matchModePrefix<T extends PrefixedCommand>(
   }
   if (!best) return null
   return { command: best, rest: query.trimStart().slice(best.prefix!.length) }
+}
+
+/** The fields of a command that make it a "search elsewhere" row. */
+export interface FallbackCommand extends SearchableCommand {
+  fallback?: boolean
+  hidden?: boolean
+}
+
+/**
+ * The fallback rows to show for a query, with their labels filled in. They
+ * appear only while positive words are typed, whatever those words are: the
+ * row offers to search somewhere else for them, so matching it against them
+ * would hide it exactly when it is needed. Exclusions and `in:` scopes still
+ * apply, to the row's own label, keywords and group. `{query}` in the label
+ * becomes the positive words, without the operators.
+ */
+export function fallbackRows<T extends FallbackCommand>(
+  items: readonly T[],
+  raw: string,
+): { command: T; label: string }[] {
+  const parsed = parsePaletteQuery(raw.trim())
+  if (!parsed.text) return []
+  return applyQueryFilters(
+    items.filter((c) => c.fallback),
+    parsed,
+  ).map((command) => ({ command, label: command.label.split("{query}").join(parsed.text) }))
 }

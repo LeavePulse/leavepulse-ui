@@ -47,7 +47,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import { applyQueryFilters, parseCommandQuery, parsePaletteQuery, rankCommandItems, type PaletteQuery } from "./commandSearch"
-import { commandHasPreview, matchModePrefix } from "./commandPalette"
+import { commandHasPreview, fallbackRows, matchModePrefix } from "./commandPalette"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -125,6 +125,23 @@ export interface Command {
    * when it has no `shortcut`.
    */
   prefix?: string
+  /**
+   * Opening this mode takes the query typed so far along, operators and
+   * all, so typing "sodium", arrowing to "Search mods" and pressing Enter
+   * opens the mod search already searching for sodium instead of starting
+   * it empty. Backspace out of the mode restores the query as it was.
+   */
+  carryQuery?: boolean
+  /**
+   * A "search somewhere else" row: listed only while words are typed, for
+   * any words (it is not matched against them), after local and fetched
+   * results: at the end of the list, or of its group when that group is
+   * already listed. `{query}` in the label becomes the
+   * typed words without the operators, `Search Modrinth for "{query}"`;
+   * `-word` and `in:group` still apply to the row's own label, keywords and
+   * group. Usually a mode with `carryQuery`, so picking it runs the search.
+   */
+  fallback?: boolean
   /**
    * Keep the palette open after this runs. For a command that toggles
    * something the user may want to toggle again (a theme, a filter) without
@@ -568,9 +585,10 @@ const source = computed<Command[]>(() => (mode.value ? modeItems.value : props.c
  */
 const local = computed<{ items: Command[]; terms: string[] }>(() => {
   const terms = parseCommandQuery(query.value)
+  // Fallback rows are not matched against the query; they get their own pass.
   const filtered = query.value.trim()
-    ? source.value
-    : source.value.filter((c) => !c.hidden)
+    ? source.value.filter((c) => !c.fallback)
+    : source.value.filter((c) => !c.hidden && !c.fallback)
   // Empty query: show everything EXCEPT hidden commands (they only surface once
   // typed). With a query, hidden commands rank like any other.
   if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
@@ -594,6 +612,20 @@ const fetched = computed<Command[]>(() => {
     .map((c) => (c.group ? c : { ...c, group: props.resultsLabel }))
   return applyQueryFilters(rows, parseCommandQuery(query.value))
 })
+
+/*
+ * "Search elsewhere" rows for the typed words, labelled with them. The row
+ * on screen is a copy with the label filled in; the command it stands for
+ * is what runs and what a mode chip names.
+ */
+const fallbackOf = new WeakMap<Command, Command>()
+const fallbacks = computed<Command[]>(() =>
+  fallbackRows(source.value, query.value).map(({ command, label }) => {
+    const row = { ...command, label }
+    fallbackOf.set(row, command)
+    return row
+  }),
+)
 
 /*
  * Recent picks, newest first, lifted out of the list they already belong to.
@@ -656,6 +688,17 @@ const grouped = computed<{ name: string; items: Command[] }[]>(() => {
   // the same row on screen twice with nothing to tell them apart.
   for (const c of ranked.value) if (!recent.includes(c)) push(c, c.group ?? "")
   for (const c of fetched.value) push(c, c.group ?? "")
+  // Last, whatever their group: they are the way out when nothing above is it.
+  const tail = new Map<string, Command[]>()
+  for (const c of fallbacks.value) {
+    const group = c.group ?? ""
+    if (map.has(group)) map.get(group)!.push(c)
+    else tail.set(group, [...(tail.get(group) ?? []), c])
+  }
+  for (const [group, items] of tail) {
+    map.set(group, items)
+    order.push(group)
+  }
   return order.map((name) => ({ name, items: folded(name, map.get(name)!) }))
 })
 
@@ -957,13 +1000,14 @@ function onRowClick(event: MouseEvent, c: Command) {
   run(c)
 }
 
-function run(c: Command | undefined) {
-  if (!c || c.disabled) return
+function run(row: Command | undefined) {
+  if (!row || row.disabled) return
+  const c = fallbackOf.get(row) ?? row
   // The highlight stays on the same index, which is now the first row that
   // was hidden: the arrows carry on from where the fold was.
-  const group = moreOf.get(c)
+  const group = moreOf.get(row)
   if (group !== undefined) {
-    selectedId.value = firstHidden.get(c) ?? null
+    selectedId.value = firstHidden.get(row) ?? null
     expanded.value = new Set([...expanded.value, group])
     inputRef.value?.focus()
     return
@@ -974,7 +1018,9 @@ function run(c: Command | undefined) {
   // A command with children drills in instead of closing, and is navigation
   // rather than a pick — so it stays out of the recency history.
   if (c.children) {
+    const carried = query.value
     enter(c)
+    if (c.carryQuery) query.value = carried
     return
   }
   emit("run", c.id, c)

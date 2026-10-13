@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { commandHasPreview, matchModePrefix } from "../src/components/commandPalette"
+import { commandHasPreview, fallbackRows, matchModePrefix } from "../src/components/commandPalette"
 import { comboSteps } from "../src/components/keys"
 
 test("a row with text of its own opens the pane, a bare row does not", () => {
@@ -53,4 +53,24 @@ test("the longest prefix wins and only modes qualify", () => {
 
 test("the prefix carries the query language along unchanged", () => {
   expect(matchModePrefix('>deploy -prod in:ops "two words"', modes)?.rest).toBe('deploy -prod in:ops "two words"')
+})
+
+const elsewhere = [
+  { id: "mods", label: 'Search mods for "{query}"', group: "Modrinth", fallback: true },
+  { id: "packs", label: 'Search modpacks for "{query}"', group: "Modrinth", keywords: ["pack"], fallback: true },
+  { id: "servers", label: "Search servers", group: "LeavePulse", fallback: true },
+  { id: "local", label: "Settings" },
+]
+
+test("fallback rows show only while positive words are typed, labelled with them", () => {
+  expect(fallbackRows(elsewhere, "")).toEqual([])
+  expect(fallbackRows(elsewhere, "-forge")).toEqual([])
+  const rows = fallbackRows(elsewhere, 'Sodium "fast render" -forge')
+  expect(rows.map((r) => r.command.id)).toEqual(["mods", "packs", "servers"])
+  expect(rows[0].label).toBe('Search mods for "Sodium fast render"')
+})
+
+test("fallback rows obey exclusions and scopes", () => {
+  expect(fallbackRows(elsewhere, "sodium -pack").map((r) => r.command.id)).toEqual(["mods", "servers"])
+  expect(fallbackRows(elsewhere, "sodium in:modrinth").map((r) => r.command.id)).toEqual(["mods", "packs"])
 })
