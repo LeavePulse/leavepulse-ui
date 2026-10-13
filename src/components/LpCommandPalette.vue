@@ -46,7 +46,7 @@ import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
-import { parseCommandQuery, rankCommandItems } from "./commandSearch"
+import { applyQueryFilters, parseCommandQuery, parsePaletteQuery, rankCommandItems, type PaletteQuery } from "./commandSearch"
 import { commandHasPreview, matchModePrefix } from "./commandPalette"
 
 /**
@@ -112,7 +112,7 @@ export interface Command {
    * `onSelect` still runs when the mode opens, so a command can both act and
    * drill in.
    */
-  children?: Command[] | ((query: string, signal: AbortSignal) => Command[] | Promise<Command[]>)
+  children?: Command[] | CommandFetcher
   /** Placeholder while inside this command's mode. */
   childPlaceholder?: string
   /**
@@ -161,6 +161,23 @@ export interface Command {
   onSelect?: () => void
 }
 
+/**
+ * Commands fetched for a query: `search` at the root, a function `children`
+ * inside a mode.
+ *
+ * `query` is the box's positive words only, in the case they were typed:
+ * `sodium -forge in:mods` arrives as "sodium", because a server would treat
+ * the operators as words to find. They come in `parsed` instead (a
+ * PaletteQuery: `raw`, `text`, lowercased `include`, `exclude` and `groups`)
+ * for a provider that can scope or exclude on its side; either way the
+ * palette drops returned rows that match an exclusion or miss an `in:` scope.
+ */
+export type CommandFetcher = (
+  query: string,
+  signal: AbortSignal,
+  parsed: PaletteQuery,
+) => Command[] | Promise<Command[]>
+
 /** Footer hints and the mode chip, spelled out so an app can translate them. */
 export type PaletteLabels = {
   navigate: string
@@ -205,14 +222,16 @@ const props = withDefaults(
      * (or too remote) to hand over as a list: people, files, tickets. Called
      * debounced, never for a query shorter than `minChars`, and only its
      * newest call counts: an earlier one that lands late is dropped, so a slow
-     * response can't overwrite a fresher list.
+     * response can't overwrite a fresher list. See CommandFetcher for what
+     * `query` and `parsed` hold: the operators are stripped from the first,
+     * and the palette applies them to the results itself.
      *
      * Results join the static commands, so a palette can do both.
      */
-    search?: (query: string, signal: AbortSignal) => Command[] | Promise<Command[]>
+    search?: CommandFetcher
     /** Wait after the last keystroke before `search` runs. */
     debounce?: number
-    /** Shortest query `search` runs for. */
+    /** Shortest query `search` runs for, counted on its positive words. */
     minChars?: number
     /**
      * Ids of recently picked commands, newest first — bind it to storage and
@@ -481,7 +500,7 @@ const found = shallowRef<Command[]>([])
 const task = useAsyncTask<Command[]>()
 const searching = task.pending
 
-function fetcher(): ((q: string, signal: AbortSignal) => Command[] | Promise<Command[]>) | null {
+function fetcher(): CommandFetcher | null {
   const current = mode.value
   if (current) {
     return typeof current.children === "function"
@@ -509,7 +528,8 @@ function refresh() {
   failed.value = false
   const run = fetcher()
   if (!run) return
-  const q = query.value.trim()
+  const parsed = parsePaletteQuery(query.value.trim())
+  const q = parsed.text
   // A fetching mode runs on an empty query too: opening it should show the
   // first page, not an empty screen waiting for a keystroke. Root search does
   // not — ⌘K would fire a request at every open.
@@ -517,7 +537,7 @@ function refresh() {
   if (!inMode && q.length < Math.max(1, props.minChars)) return
   // A failing provider: the static commands still stand, with a line saying
   // that the rest could not be fetched.
-  task.run((signal) => run(q, signal), {
+  task.run((signal) => run(q, signal, parsed), {
     delay: props.debounce,
     apply: (hits) => (found.value = hits),
     fail: () => {
@@ -569,9 +589,10 @@ const ranked = computed<Command[]>(() => local.value.items)
 const fetched = computed<Command[]>(() => {
   if (!found.value.length) return []
   const seen = new Set(ranked.value.map((c) => c.id))
-  return found.value
+  const rows = found.value
     .filter((c) => !seen.has(c.id))
     .map((c) => (c.group ? c : { ...c, group: props.resultsLabel }))
+  return applyQueryFilters(rows, parseCommandQuery(query.value))
 })
 
 /*
