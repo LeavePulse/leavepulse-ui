@@ -10,6 +10,7 @@ import { AvatarFallback, AvatarImage, AvatarRoot } from "reka-ui"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, onMounted, ref } from "vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const avatar = tv({
@@ -41,6 +42,12 @@ const props = withDefaults(
     src?: string
     alt?: string
     fallback?: string
+    /**
+     * An icon shown while there is no picture, instead of initials. For things
+     * that have no name worth abbreviating (a world, a mod, a file), where two
+     * letters read as noise. `fallback` text still wins when both are given.
+     */
+    icon?: string
     size?: AvatarVariants["size"]
     /** Explicit pixel size, wins over `size` — for avatars keyed to a layout. */
     pixelSize?: number
@@ -52,6 +59,12 @@ const props = withDefaults(
     menuItems?: ContextMenuItemDef[]
   }>(),
   { size: "md", shape: "circle", ring: false },
+)
+
+// The icon follows the box the way the initials do: about half of it.
+const ICON_SIZE = { xs: 11, sm: 14, md: 18, lg: 24, xl: 30 } as const
+const iconSize = computed(() =>
+  props.pixelSize ? Math.max(10, Math.round(props.pixelSize * 0.55)) : ICON_SIZE[props.size ?? "md"],
 )
 
 // A pixel size drives both box and glyph, so the initials keep their
@@ -99,11 +112,17 @@ onMounted(() => {
   <LpContextMenu v-if="menuItems?.length" :items="menuItems">
     <AvatarRoot :class="rootClass" :style="sizeStyle" v-bind="rest">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
-      <AvatarFallback>{{ initials }}</AvatarFallback>
+      <AvatarFallback>
+        <LpIcon v-if="icon && !fallback" :name="icon" :size="iconSize" />
+        <template v-else>{{ initials }}</template>
+      </AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
   <AvatarRoot v-else :class="rootClass" :style="sizeStyle" v-bind="rest">
     <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
-    <AvatarFallback>{{ initials }}</AvatarFallback>
+    <AvatarFallback>
+      <LpIcon v-if="icon && !fallback" :name="icon" :size="iconSize" />
+      <template v-else>{{ initials }}</template>
+    </AvatarFallback>
   </AvatarRoot>
 </template>

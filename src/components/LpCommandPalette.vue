@@ -37,6 +37,7 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
+import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
@@ -46,6 +47,22 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import { parseCommandQuery, rankCommandItems } from "./commandSearch"
+
+/**
+ * A picture in a row's icon slot: an avatar, a project logo, a world's
+ * thumbnail. While it loads, and for good if it fails, the row shows
+ * `fallback` (initials) or else `icon`, so a dead link never leaves a hole.
+ */
+export interface CommandImage {
+  src?: string | null
+  alt?: string
+  /** Text shown while there is no picture, usually initials. */
+  fallback?: string
+  /** Icon shown while there is no picture; the command's `icon` when unset. */
+  icon?: string
+  /** circle for people, soft or square for things. Defaults to soft. */
+  shape?: "circle" | "soft" | "square"
+}
 
 export interface Command {
   id: string
@@ -66,6 +83,12 @@ export interface Command {
    */
   highlight?: string[]
   icon?: string
+  /**
+   * A picture in place of the icon: a URL, or a `CommandImage` with a
+   * fallback. Sized like the icon and faded in once loaded; until then, and
+   * when it fails, the fallback (or `icon`) holds the slot.
+   */
+  image?: string | CommandImage
   /** Right-aligned hint, e.g. "⌘P". */
   shortcut?: string
   /** Extra search terms not shown but matched against the query. */
@@ -727,6 +750,22 @@ function highlight(value: string, extra: string[] = []): Part[] {
   return parts
 }
 
+// ── row picture ──────────────────────────────────────────────
+/*
+ * A string is shorthand for the src. A picture with nothing to fall back on
+ * borrows the command's icon, so a row that had an icon keeps one while the
+ * picture loads or after it fails.
+ */
+// The avatar's own radii are drawn for 36px and up; at the icon's size a card
+// radius rounds a square into a blob. Whole literals so Tailwind sees them.
+const IMAGE_RADIUS = { circle: "rounded-pill", soft: "rounded-[6px]", square: "rounded-[3px]" } as const
+
+function imageOf(c: Command): CommandImage | null {
+  if (!c.image) return null
+  const image = typeof c.image === "string" ? { src: c.image } : c.image
+  return { ...image, icon: image.icon ?? c.icon }
+}
+
 // ── selection + keyboard ─────────────────────────────────────
 watch(query, () => {
   select(0)
@@ -1048,7 +1087,21 @@ useHotkeys(() =>
                   @click="onRowClick($event, c)"
                   @pointerenter="onPointerEnter(c)"
                 >
-                  <LpIcon v-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
+                  <!-- A picture takes the icon's slot at the icon's footprint, with
+                       a negative margin so a 20px avatar does not make its row
+                       taller than its neighbours. -->
+                  <LpAvatar
+                    v-if="imageOf(c)"
+                    :src="imageOf(c)!.src ?? undefined"
+                    :alt="imageOf(c)!.alt ?? ''"
+                    :fallback="imageOf(c)!.fallback"
+                    :icon="imageOf(c)!.icon"
+                    :shape="imageOf(c)!.shape ?? 'soft'"
+                    :pixel-size="20"
+                    class="-my-0.5 -ml-0.5 shrink-0 text-[9px]"
+                    :class="IMAGE_RADIUS[imageOf(c)!.shape ?? 'soft']"
+                  />
+                  <LpIcon v-else-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
                   <span class="min-w-0 flex-1">
                     <span class="block truncate font-medium">
                       <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
@@ -1121,7 +1174,18 @@ useHotkeys(() =>
                 <div v-if="active" :key="active.id">
                   <slot name="preview" :command="active">
                     <div class="lp-cmd-para flex items-center gap-2 text-ink">
-                      <LpIcon v-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
+                      <LpAvatar
+                        v-if="imageOf(active)"
+                        :src="imageOf(active)!.src ?? undefined"
+                        :alt="imageOf(active)!.alt ?? ''"
+                        :fallback="imageOf(active)!.fallback"
+                        :icon="imageOf(active)!.icon"
+                        :shape="imageOf(active)!.shape ?? 'soft'"
+                        :pixel-size="28"
+                        class="shrink-0"
+                        :class="IMAGE_RADIUS[imageOf(active)!.shape ?? 'soft']"
+                      />
+                      <LpIcon v-else-if="active.icon" :name="active.icon" :size="16" class="shrink-0 text-muted" />
                       <h3 class="min-w-0 text-base font-semibold">{{ active.label }}</h3>
                     </div>
                     <p v-if="paneDescription" class="lp-cmd-para mt-0.5 text-xs text-muted">

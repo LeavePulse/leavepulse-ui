@@ -538,7 +538,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "avatar",
     name: "Avatar",
-    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. Pass `menuItems` for a right-click account menu.",
+    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. `icon` replaces the initials for things with no name worth abbreviating. Pass `menuItems` for a right-click account menu.",
     components: { LpAvatar },
     state: () =>
       reactive({
@@ -557,6 +557,7 @@ export const registry: ComponentEntry[] = [
   <LpAvatar size="md" :src="avatarSample" alt="THEROER" shape="square" />
   <!-- No src: the initials carry it. -->
   <LpAvatar size="md" fallback="LP" />
+  <LpAvatar size="md" icon="lucide:globe" shape="soft" />
   <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" />
   <span class="text-sm text-muted">right-click the last one →</span>
 </div>`,
@@ -1286,7 +1287,7 @@ export const registry: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons, shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it); `search` adds results from an API alongside the static ones, and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top.",
     components: { LpCommandPalette, LpButton },
     state: () => {
       const s: any = reactive({
@@ -1318,11 +1319,14 @@ export const registry: ComponentEntry[] = [
           await new Promise((r) => setTimeout(r, 250))
           return ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra", "Barbara Liskov", "Donald Knuth"]
             .filter((n) => n.toLowerCase().includes(q.toLowerCase()))
-            .map((n) => ({
+            .map((n, i) => ({
               id: `user:${n}`,
               label: n,
               description: "Open profile",
               icon: "lucide:user",
+              // A picture in the icon's place. Every third one points nowhere,
+              // to show the initials holding the slot when a picture fails.
+              image: { src: i % 3 === 2 ? "/missing-avatar.png" : avatarSample, fallback: n.split(" ").map((w) => w[0]).join(""), shape: "circle" },
               group: "People",
               // Tab on a person lists these instead of opening the profile.
               actions: [
