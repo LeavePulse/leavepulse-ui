@@ -121,7 +121,9 @@ export interface Command {
    * and what lets the second step search a list too big to enumerate.
    *
    * `onSelect` still runs when the mode opens, so a command can both act and
-   * drill in.
+   * drill in. A fetcher is called like `search` (see CommandFetcher): its
+   * abort signal may never reach the transport, and an answer that lands
+   * after the query moved on or the mode was left is discarded.
    */
   children?: Command[] | CommandFetcher
   /** Placeholder while inside this command's mode. */
@@ -213,6 +215,15 @@ export interface Command {
  * PaletteQuery: `raw`, `text`, lowercased `include`, `exclude` and `groups`)
  * for a provider that can scope or exclude on its side; either way the
  * palette drops returned rows that match an exclusion or miss an `in:` scope.
+ *
+ * `signal` aborts when the query moves on, the mode is left or the palette
+ * closes. It is a courtesy, not a guarantee: hand it to `fetch` and the
+ * request is cancelled, but a transport that cannot be cancelled (a Tauri
+ * `invoke`, a worker message, most SDKs) never sees it and runs to the end.
+ * That is safe: an answer that lands after a newer request was made, or
+ * after the palette closed, is discarded and never reaches the list, so a
+ * fetcher does not need to check the signal itself. Checking it before an
+ * expensive step is only a saving.
  */
 export type CommandFetcher = (
   query: string,
@@ -264,7 +275,9 @@ const props = withDefaults(
      * (or too remote) to hand over as a list: people, files, tickets. Called
      * debounced, never for a query shorter than `minChars`, and only its
      * newest call counts: an earlier one that lands late is dropped, so a slow
-     * response can't overwrite a fresher list. See CommandFetcher for what
+     * response can't overwrite a fresher list. The abort signal may never
+     * reach the transport (a Tauri invoke cannot be cancelled); the late
+     * answer is discarded all the same. See CommandFetcher for what
      * `query` and `parsed` hold: the operators are stripped from the first,
      * and the palette applies them to the results itself.
      *

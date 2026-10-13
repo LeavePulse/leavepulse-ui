@@ -1347,6 +1347,8 @@ export const registry: ComponentEntry[] = [
         ],
         // Stands in for an API: everything remote behaves like this from the
         // palette's side — a query in, commands out, late answers discarded.
+        // It ignores its abort signal, as a Tauri invoke must: the palette
+        // drops an answer that lands after the query moved on regardless.
         people: async (q: string) => {
           await new Promise((r) => setTimeout(r, 250))
           return ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra", "Barbara Liskov", "Donald Knuth"]
