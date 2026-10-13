@@ -594,6 +594,10 @@ const grouped = computed<{ name: string; items: Command[] }[]>(() => {
  */
 const expanded = ref(new Set<string>())
 const moreOf = new WeakMap<Command, string>()
+// The first row each "Show more" hides. Unfolding removes the "Show more" row
+// itself, so the highlight has to be handed to this one: an id that is gone
+// from the list sends the selection back to the top, and the list with it.
+const firstHidden = new WeakMap<Command, string>()
 
 /*
  * Folding hides at least two rows: a "Show 1 more" row takes the same space
@@ -609,6 +613,7 @@ function folded(name: string, items: Command[]): Command[] {
     keepOpen: true,
   }
   moreOf.set(more, name)
+  firstHidden.set(more, items[limit].id)
   return [...items.slice(0, limit), more]
 }
 
@@ -822,6 +827,7 @@ function run(c: Command | undefined) {
   // was hidden: the arrows carry on from where the fold was.
   const group = moreOf.get(c)
   if (group !== undefined) {
+    selectedId.value = firstHidden.get(c) ?? null
     expanded.value = new Set([...expanded.value, group])
     inputRef.value?.focus()
     return
