@@ -9,6 +9,7 @@
 import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from "reka-ui"
 import { computed } from "vue"
 import ContextMenuItems from "./ContextMenuItems.vue"
+import MenuTitle from "./MenuTitle.vue"
 import { POPOVER_PANEL } from "./dropdown"
 
 export interface ContextMenuItemDef {
@@ -40,6 +41,17 @@ const props = defineProps<{
    * native-menu mode on that first click and swallow it.
    */
   always?: boolean
+  /**
+   * What the menu acts on, shown as a heading above the items: the row's name
+   * in a list of similar rows, so the user sees which one the right-click hit.
+   * Also names the menu for assistive tech.
+   */
+  title?: string
+  /** A muted second line under `title`, e.g. a version or a path. */
+  subtitle?: string
+  /** An icon beside the title, or `titleImage` for a picture (an avatar, a logo). */
+  titleIcon?: string
+  titleImage?: string
 }>()
 
 // With no items the trigger is disabled, so the element keeps the browser's
@@ -87,7 +99,13 @@ function returnFocus(event: Event) {
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal v-if="items.length">
-      <ContextMenuContent :collision-padding="8" :class="PANEL" @close-auto-focus="returnFocus">
+      <ContextMenuContent
+        :collision-padding="8"
+        :class="PANEL"
+        :aria-label="title"
+        @close-auto-focus="returnFocus"
+      >
+        <MenuTitle v-if="title" :title="title" :subtitle="subtitle" :icon="titleIcon" :image="titleImage" />
         <ContextMenuItems :items="items" :panel="PANEL" />
       </ContextMenuContent>
     </ContextMenuPortal>

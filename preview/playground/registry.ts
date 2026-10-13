@@ -1225,7 +1225,7 @@ export const registry: ComponentEntry[] = [
         { label: "Delete", icon: "lucide:trash-2", danger: true, separatorBefore: true },
       ],
     }),
-    template: `<LpDropdownMenu :items="items">
+    template: `<LpDropdownMenu :items="items" title="Quarterly report.pdf" subtitle="2.4 MB" title-icon="lucide:file-text">
   <template #trigger><LpButton variant="outline">Actions ▾</LpButton></template>
 </LpDropdownMenu>`,
   },
@@ -1395,7 +1395,7 @@ export const registry: ComponentEntry[] = [
     id: "contextmenu",
     name: "ContextMenu",
     description:
-      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element.",
+      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus, and an optional \`title\` heading naming what the menu acts on. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element.",
     components: { LpContextMenu },
     state: () =>
       reactive({
@@ -1413,7 +1413,7 @@ export const registry: ComponentEntry[] = [
           { label: "Delete", icon: "lucide:trash-2", shortcut: "⌫", danger: true, separatorBefore: true },
         ],
       }),
-    template: `<LpContextMenu :items="items">
+    template: `<LpContextMenu :items="items" title="api-gateway" subtitle="Production \u00b7 3 replicas" title-icon="lucide:server">
   <div class="grid h-32 w-full place-items-center rounded-card border border-dashed border-line text-sm text-muted">
     Right-click here
   </div>
