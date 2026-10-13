@@ -909,7 +909,12 @@ const countText = computed(() => {
 })
 // A selectable table keeps the bar at all times (the row count until something
 // is selected): ticking the first row must not push the table down.
-const showBar = computed(() => props.summary || !!props.selectable || activeFilters.value.length > 0)
+// As documented on `summary`: the bar shows on its own while filters are
+// active or rows are selected, not merely because rows can be selected, which
+// left a lone "75 rows" over every selectable table.
+const showBar = computed(
+  () => props.summary || (!!props.selectable && props.selected.length > 0) || activeFilters.value.length > 0,
+)
 const filteredOut = computed(() => {
   if (loading.value || failed.value || displayRows.value.length) return false
   if (props.load) return Object.values(hiddenValues.value).some((set) => set.size)
