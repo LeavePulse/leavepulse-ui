@@ -252,8 +252,12 @@ function layerStyle(index: 0 | 1) {
   }
 }
 
+// `isolate`: the element fading in at the seam is raised over the one going
+// out with a z-index, and without a stacking context of its own here that
+// z-index lifted it over the page's content too, so text laid on the backdrop
+// faded away at every seam.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "pointer-events-none absolute inset-0 overflow-hidden",
+  "pointer-events-none absolute inset-0 isolate overflow-hidden",
 )
 </script>
 
