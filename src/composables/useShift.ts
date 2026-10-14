@@ -233,9 +233,12 @@ export function useShift(
       resizing.value = false
       // Released once the box has arrived. A size left pinned in pixels stops
       // being a starting point and becomes a cap: content that grows afterwards
-      // is clipped, and `max-*` can no longer size the element itself.
-      node.style.height = ""
-      node.style.width = ""
+      // is clipped, and `max-*` can no longer size the element itself. Only
+      // the axes this composable sizes: the other may carry the host's own
+      // inline size (a dialog's `width` beside a height-only tween), and
+      // clearing it let the box spread to the window's edges.
+      if (wantsHeight()) node.style.height = ""
+      if (wantsWidth()) node.style.width = ""
       // Re-read rather than trusting the target: a `max-*` may have clamped the
       // box short of it, and the next tween has to start from where it sits.
       lastHeight = node.offsetHeight
@@ -284,8 +287,8 @@ export function useShift(
       // from, and holding it would cap the box at its opening size.
       raf = requestAnimationFrame(() => {
         tweening.value = true
-        node.style.height = ""
-        node.style.width = ""
+        if (wantsHeight()) node.style.height = ""
+        if (wantsWidth()) node.style.width = ""
       })
 
       // Two triggers, since either can move the size alone: the resize observer
