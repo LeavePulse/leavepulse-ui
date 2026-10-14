@@ -92,5 +92,6 @@ export const COMPONENT_NAMES = [
   "LpTooltip",
   "LpTooltipProvider",
   "LpTopologyCanvas",
-  "LpUptimeBar"
+  "LpUptimeBar",
+  "LpVideoBackdrop"
 ] as const

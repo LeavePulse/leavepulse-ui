@@ -74,6 +74,7 @@ import {
   LpSkeleton,
   LpSlider,
   LpRangeSlider,
+  LpVideoBackdrop,
   formatClipTime,
   LpSparkline,
   LpStat,
@@ -100,6 +101,7 @@ import {
 // A real image, so the avatar demos show the loaded state rather than only the
 // initials fallback, and so the skeleton demo can show what it stands in for.
 import avatarSample from "../assets/avatar-sample.png"
+import videoBackdropSample from "../assets/video-backdrop-sample.webm"
 import { ConfigScope, CustomSheet, LayerKeys, RatingControl } from "./demos"
 
 export interface ComponentEntry {
@@ -2449,6 +2451,48 @@ export const registry: ComponentEntry[] = [
     <LpRangeSlider v-model="clip" :min="0" :max="12" :step="0.1" :min-gap="0.5" :format="(v) => formatClipTime(v, true)" />
     <p class="mt-2 text-xs text-muted">loop: {{ formatClipTime(clip[0], true) }} to {{ formatClipTime(clip[1], true) }}</p>
   </div>
+</div>`,
+  },
+  {
+    id: "video-backdrop",
+    name: "VideoBackdrop",
+    description:
+      "A muted looping video behind something, filling the positioned box it sits in. Loops a stretch of the clip (start, end), blends the seam so a clip whose last frame does not match its first loops without a jump (crossfade), plays faster or slower (rate) and darkens under text (dim). Pauses on paused, in a hidden tab and under reduced motion, where it shows the stretch's first frame. The sample clip jumps from its last frame to its first: set crossfade to 0 to see the cut it hides.",
+    components: { LpVideoBackdrop, LpRangeSlider, LpSlider, LpSwitch },
+    state: () =>
+      reactive({
+        src: videoBackdropSample,
+        duration: 6,
+        clip: [0, 6] as [number, number],
+        crossfade: 0.8,
+        rate: 1,
+        dim: 0.25,
+        paused: false,
+        formatClipTime,
+      }),
+    template: `<div class="flex w-[28rem] flex-col gap-4">
+  <div class="relative aspect-video overflow-hidden rounded-card border border-line">
+    <LpVideoBackdrop
+      :src="src"
+      :start="clip[0]"
+      :end="clip[1]"
+      :crossfade="crossfade"
+      :rate="rate"
+      :dim="dim"
+      :paused="paused"
+      @loaded="(info) => { duration = info.duration; clip = [0, info.duration] }"
+    />
+    <div class="relative flex h-full items-end p-4 text-lg font-semibold text-white">Text over the backdrop</div>
+  </div>
+  <label class="text-xs text-muted">Loop {{ formatClipTime(clip[0], true) }} to {{ formatClipTime(clip[1], true) }}</label>
+  <LpRangeSlider v-model="clip" :min="0" :max="duration" :step="0.1" :min-gap="0.5" :format="(v) => formatClipTime(v, true)" />
+  <label class="text-xs text-muted">Crossfade {{ crossfade.toFixed(1) }} s</label>
+  <LpSlider :model-value="crossfade * 10" :min="0" :max="20" @update:model-value="(v) => (crossfade = v / 10)" />
+  <label class="text-xs text-muted">Speed {{ rate }}×</label>
+  <LpSlider :model-value="rate * 100" :min="25" :max="200" :step="5" @update:model-value="(v) => (rate = v / 100)" />
+  <label class="text-xs text-muted">Dim {{ Math.round(dim * 100) }}%</label>
+  <LpSlider :model-value="dim * 100" :min="0" :max="80" @update:model-value="(v) => (dim = v / 100)" />
+  <div class="flex items-center gap-2 text-sm"><LpSwitch v-model="paused" /> Paused</div>
 </div>`,
   },
   {
