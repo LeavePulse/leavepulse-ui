@@ -24,13 +24,16 @@ export default { inheritAttrs: false }
  * - Pausing where motion is unwanted: `paused`, a hidden tab, and the
  *   system's reduced-motion setting, which shows the first frame of the
  *   stretch instead (`playWithReducedMotion` overrides it).
+ * - Easing in and out of a pause (`easePlayback`): the picture slows to a
+ *   standstill and gathers speed again instead of freezing and lurching. A
+ *   hidden tab and reduced motion still stop at once.
  *
  * The second element exists only while there is a seam to blend, so a plain
  * loop decodes one stream. Both play the same `src`: a URL the media element
  * fetches by range, or an object URL of a file already in memory.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { prefersReducedMotion } from "../composables/easing"
+import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { isNativeLoop, planLoop, seamProgress, seamReached } from "./videoBackdrop"
 
@@ -53,8 +56,19 @@ const props = withDefaults(
     paused?: boolean
     /** Keep playing when the system asks for reduced motion (it shows a still otherwise). */
     playWithReducedMotion?: boolean
+    /** Milliseconds over which a pause slows the picture to a halt and a resume brings it back up; 0 stops dead. */
+    easePlayback?: number
   }>(),
-  { start: 0, crossfade: 0, rate: 1, dim: 0, fit: "cover", paused: false, playWithReducedMotion: false },
+  {
+    start: 0,
+    crossfade: 0,
+    rate: 1,
+    dim: 0,
+    fit: "cover",
+    paused: false,
+    playWithReducedMotion: false,
+    easePlayback: 600,
+  },
 )
 
 const emit = defineEmits<{
@@ -73,6 +87,18 @@ const active = ref<0 | 1>(0)
 /** The element fading in over it at the seam, and how far it has come. */
 const incoming = ref<0 | 1 | null>(null)
 const incomingOpacity = ref(0)
+
+/** The elements are playing, which includes slowing down into a pause. */
+const running = ref(false)
+/** Share of `rate` played at, 0 to 1: below 1 while easing into or out of a pause. */
+const throttle = ref(1)
+
+/**
+ * The slowest rate a pause eases down to before the element is paused.
+ * Chromium refuses a rate below a sixteenth; past that point the picture is
+ * all but still anyway.
+ */
+const SLOWEST_RATE = 1 / 16
 
 const reducedMotion = ref(prefersReducedMotion())
 const pageHidden = ref(typeof document !== "undefined" && document.hidden)
@@ -93,7 +119,39 @@ function setRate(video: HTMLVideoElement | null) {
   if (!video) return
   // `defaultPlaybackRate` too: a reload of the source resets the rate to it.
   video.defaultPlaybackRate = props.rate
-  video.playbackRate = props.rate
+  video.playbackRate = Math.max(SLOWEST_RATE, props.rate * throttle.value)
+}
+
+function applyRate() {
+  setRate(first.value)
+  setRate(second.value)
+}
+
+let ramp = 0
+/** Move `throttle` to `target` over `ms`, eased, then call `done`. */
+function rampTo(target: number, ms: number, done?: () => void) {
+  if (ramp) cancelAnimationFrame(ramp)
+  ramp = 0
+  const from = throttle.value
+  const span = ms * Math.abs(target - from)
+  if (span <= 0) {
+    throttle.value = target
+    applyRate()
+    done?.()
+    return
+  }
+  const began = performance.now()
+  const step = (now: number) => {
+    const k = Math.min(1, (now - began) / span)
+    throttle.value = from + (target - from) * easeTravel(k)
+    applyRate()
+    if (k < 1) ramp = requestAnimationFrame(step)
+    else {
+      ramp = 0
+      done?.()
+    }
+  }
+  ramp = requestAnimationFrame(step)
 }
 
 function onMetadata(event: Event) {
@@ -140,7 +198,7 @@ function finishSeam() {
 let frame = 0
 function watchFrames() {
   frame = 0
-  if (!playing.value) return
+  if (!running.value) return
   const current = element(active.value)
   const loop = plan.value
   if (current && !native.value) {
@@ -167,28 +225,47 @@ function watchFrames() {
   frame = requestAnimationFrame(watchFrames)
 }
 
-function sync() {
-  const current = element(active.value)
-  const other = element(active.value === 0 ? 1 : 0)
-  if (playing.value) {
-    void current?.play().catch(() => {})
-    if (incoming.value !== null) void other?.play().catch(() => {})
-    if (!frame) frame = requestAnimationFrame(watchFrames)
-    return
-  }
-  current?.pause()
-  other?.pause()
+function startElements() {
+  running.value = true
+  applyRate()
+  void element(active.value)?.play().catch(() => {})
+  if (incoming.value !== null) void element(incoming.value)?.play().catch(() => {})
+  if (!frame) frame = requestAnimationFrame(watchFrames)
+}
+
+function stopElements() {
+  running.value = false
+  first.value?.pause()
+  second.value?.pause()
   if (frame) cancelAnimationFrame(frame)
   frame = 0
   // A still shows the stretch's first frame, not wherever the clip stopped.
+  const current = element(active.value)
   if (still.value && current && ready.value) current.currentTime = plan.value.from
 }
 
+function sync() {
+  const easing = props.easePlayback > 0 && !prefersReducedMotion() ? props.easePlayback : 0
+  if (playing.value) {
+    // A resume from a standstill gathers speed from the slowest rate.
+    if (!running.value) throttle.value = easing ? 0 : 1
+    startElements()
+    rampTo(1, easing)
+    return
+  }
+  // Nobody sees a hidden tab, and a still is asked for outright: both stop at once.
+  if (!running.value || pageHidden.value || still.value || !easing) {
+    rampTo(throttle.value, 0)
+    stopElements()
+    return
+  }
+  rampTo(0, easing, () => {
+    if (!playing.value) stopElements()
+  })
+}
+
 watch(playing, sync, { flush: "post" })
-watch(() => props.rate, () => {
-  setRate(first.value)
-  setRate(second.value)
-})
+watch(() => props.rate, applyRate)
 watch(
   () => props.src,
   () => {
@@ -230,8 +307,7 @@ function onVisibility() {
 let motionQuery: MediaQueryList | null = null
 
 onMounted(() => {
-  setRate(first.value)
-  setRate(second.value)
+  applyRate()
   motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
   motionQuery.addEventListener("change", onMotionChange)
   document.addEventListener("visibilitychange", onVisibility)
@@ -239,6 +315,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   if (frame) cancelAnimationFrame(frame)
+  if (ramp) cancelAnimationFrame(ramp)
   motionQuery?.removeEventListener("change", onMotionChange)
   document.removeEventListener("visibilitychange", onVisibility)
 })
