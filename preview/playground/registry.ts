@@ -73,6 +73,8 @@ import {
   LpShift,
   LpSkeleton,
   LpSlider,
+  LpRangeSlider,
+  formatClipTime,
   LpSparkline,
   LpStat,
   LpStepper,
@@ -2429,6 +2431,24 @@ export const registry: ComponentEntry[] = [
     template: `<div class="w-72">
   <LpSlider v-model="value" :min="0" :max="100" />
   <p class="mt-2 text-xs text-muted">value: {{ value }}</p>
+</div>`,
+  },
+  {
+    id: "range-slider",
+    name: "RangeSlider",
+    description:
+      "Two thumbs on one track for a range rather than a value: a price from-to, a stretch of a clip, a span of years. The thumbs cannot cross, minGap keeps them apart, and format puts a label over a thumb while it is hovered, focused or dragged.",
+    components: { LpRangeSlider },
+    state: () => reactive({ price: [20, 80] as [number, number], clip: [2, 9] as [number, number], formatClipTime }),
+    template: `<div class="flex w-80 flex-col gap-6 pt-6">
+  <div>
+    <LpRangeSlider v-model="price" :min="0" :max="100" :aria-labels="['Lowest price', 'Highest price']" :format="(v) => '$' + v" />
+    <p class="mt-2 text-xs text-muted">price: {{ price[0] }} to {{ price[1] }}</p>
+  </div>
+  <div>
+    <LpRangeSlider v-model="clip" :min="0" :max="12" :step="0.1" :min-gap="0.5" :format="(v) => formatClipTime(v, true)" />
+    <p class="mt-2 text-xs text-muted">loop: {{ formatClipTime(clip[0], true) }} to {{ formatClipTime(clip[1], true) }}</p>
+  </div>
 </div>`,
   },
   {
