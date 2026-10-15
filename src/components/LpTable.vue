@@ -1413,6 +1413,15 @@ tr:hover .lp-tick-cue,
   tr:hover .lp-tick-cue {
     opacity: 0;
   }
+
+  /* Nor is there anything for the column's width to hold until then: on a
+     touch screen it stays closed until a long press starts selecting, and
+     eases open like the rest of the column. */
+  .lp-tick-hidden,
+  .lp-tick-cue {
+    max-width: 0;
+    padding-inline: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
