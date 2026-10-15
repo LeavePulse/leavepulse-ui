@@ -95,6 +95,7 @@ import {
   LpTagsInput,
   pendingHotkey,
   useForm,
+  useGamepadNav,
   useHotkeys,
   useToast,
 } from "../../src"
@@ -144,6 +145,23 @@ const SequenceKeys = defineComponent({
       { key: "s", code: "KeyS", ctrl: true, help: { group: "Editor", label: "Save draft" }, handler: () => emit("fired", "Save draft") },
     ])
     return () => null
+  },
+})
+
+/*
+ * Turns controller navigation on while it is mounted and says whether a pad
+ * is connected; B with nothing open, and the bumpers, report what they did.
+ */
+const GamepadNav = defineComponent({
+  emits: ["fired"],
+  setup(_, { emit }) {
+    const { connected } = useGamepadNav({
+      onBack: () => emit("fired", "Back"),
+      onPrevious: () => emit("fired", "Previous section"),
+      onNext: () => emit("fired", "Next section"),
+      onMenu: () => emit("fired", "Menu"),
+    })
+    return () => (connected.value ? "Controller connected" : "No controller: connect one and press a button")
   },
 })
 
@@ -2225,6 +2243,28 @@ export const registry: ComponentEntry[] = [
   <LpConfirmDialog v-model:open="withAction" title="Restart ger-01-p?" confirmLabel="Restart" :action="restart">
     Players are disconnected for about a minute.
   </LpConfirmDialog>
+</div>`,
+  },
+  {
+    id: "gamepad-nav",
+    name: "Gamepad navigation",
+    description:
+      "useGamepadNav: a game controller drives the page. The D-pad or left stick moves focus to the nearest control in that direction (spatialNav's nextInDirection, inside the open dialog when there is one), A presses it, B closes the open dialog or calls onBack, the bumpers call onPrevious/onNext and Start onMenu, and the right stick scrolls. While a controller is in use the root carries data-input=\"gamepad\" and focus gets a thicker ring.",
+    components: { GamepadNav, LpButton, LpModal },
+    state: () => reactive({ open: false, last: "" }),
+    template: `<div class="flex flex-col items-center gap-4">
+  <p class="text-sm text-muted"><GamepadNav @fired="(what) => (last = what)" /></p>
+  <div class="grid grid-cols-3 gap-2">
+    <LpButton v-for="n in 9" :key="n" variant="soft" @click="last = 'Button ' + n">Button {{ n }}</LpButton>
+  </div>
+  <LpButton variant="action" @click="open = true">Open a dialog</LpButton>
+  <p class="text-sm text-muted">Last: {{ last || "nothing yet" }}</p>
+  <LpModal v-model:open="open" title="A dialog" size="sm">
+    <div class="flex gap-2">
+      <LpButton variant="soft" @click="last = 'Dialog: first'">First</LpButton>
+      <LpButton variant="soft" @click="last = 'Dialog: second'">Second</LpButton>
+    </div>
+  </LpModal>
 </div>`,
   },
   {

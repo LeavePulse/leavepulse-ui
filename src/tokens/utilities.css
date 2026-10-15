@@ -38,6 +38,17 @@
 }
 
 /*
+ * Driven by a controller (useGamepadNav), focus is the only cursor there is,
+ * often seen from a sofa: the ring is thicker and stands off the control.
+ */
+:root[data-input="gamepad"] [data-lp-focus-ring],
+:root[data-input="gamepad"] :focus-visible {
+  outline: 3px solid var(--color-ring);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/*
  * Autofilled fields, in the kit's own palette.
  *
  * A browser paints its own background on an autofilled control and it beats any
