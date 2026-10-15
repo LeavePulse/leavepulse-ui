@@ -59,6 +59,13 @@ export interface TableColumn<Row> {
   /** Keep this column out of the show/hide list — an actions column has no
    *  name to offer and nothing to gain from being hidden. */
   alwaysVisible?: boolean
+  /**
+   * Leave the column out while the table is narrower than this many pixels
+   * (a phone, a narrow card), so the columns that matter keep their room
+   * instead of the whole table scrolling sideways. Wider than that, the
+   * user's own show/hide applies as usual.
+   */
+  hideBelow?: number
 }
 
 export interface TableLabels {
@@ -430,8 +437,30 @@ function withMotion(change: () => void) {
 }
 const hiddenColumns = ref<Set<string>>(new Set())
 
+// The table's own width, for `hideBelow`: what decides is the room the table
+// has, not the window, which a sidebar or a card can take most of.
+// Measured on the scroll viewport around the table: that is the room it has,
+// while the table itself widens with whatever it overflows by.
+const tableEl = ref<HTMLElement | null>(null)
+const tableWidth = ref(Number.POSITIVE_INFINITY)
+let widthObserver: ResizeObserver | undefined
+watch(
+  tableEl,
+  (table) => {
+    widthObserver?.disconnect()
+    const el = table?.closest<HTMLElement>("[data-reka-scroll-area-viewport]") ?? table?.parentElement
+    if (!el || typeof ResizeObserver === "undefined") return
+    widthObserver = new ResizeObserver(() => (tableWidth.value = el.clientWidth))
+    widthObserver.observe(el)
+    tableWidth.value = el.clientWidth
+  },
+  { flush: "post" },
+)
+
 const visibleColumns = computed(() =>
-  props.columns.filter((c) => !hiddenColumns.value.has(c.key)),
+  props.columns.filter(
+    (c) => !hiddenColumns.value.has(c.key) && !(c.hideBelow && tableWidth.value < c.hideBelow),
+  ),
 )
 
 /** The distinct values a filterable column holds, in first-seen order. */
@@ -997,6 +1026,7 @@ watch(
 )
 onBeforeUnmount(() => {
   ro?.disconnect()
+  widthObserver?.disconnect()
   if (motionTimer) clearTimeout(motionTimer)
 })
 
@@ -1111,7 +1141,7 @@ const barInsetTop = computed(() =>
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
     <LpContextMenu :items="contextMenu" always>
-    <table class="w-full border-collapse text-sm">
+    <table ref="tableEl" class="w-full border-collapse text-sm">
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
            rows show through that seam — a band of body text rides across the
