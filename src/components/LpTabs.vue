@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Motion, useReducedMotion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { computed, ref, useId, watch } from "vue"
+import { computed, nextTick, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 
@@ -44,6 +44,23 @@ watch(
     if (value !== undefined) current.value = value
   },
 )
+
+// A row wider than its container scrolls sideways (a phone, a narrow card)
+// instead of wrapping each label onto two lines; the active tab is brought
+// into view whenever it changes, including from outside.
+const list = ref<{ $el: HTMLElement } | null>(null)
+watch(current, () => {
+  void nextTick(() => {
+    const row = list.value?.$el
+    const active = row?.querySelector<HTMLElement>('[data-state="active"]')
+    if (!row || !active || row.scrollWidth <= row.clientWidth) return
+    const start = active.offsetLeft - row.offsetLeft
+    const end = start + active.offsetWidth
+    if (start >= row.scrollLeft && end <= row.scrollLeft + row.clientWidth) return
+    const left = start < row.scrollLeft ? start : end - row.clientWidth
+    row.scrollTo({ left, behavior: reduceMotion.value ? "auto" : "smooth" })
+  })
+})
 
 function select(value: string) {
   if (props.modelValue === undefined) current.value = value
@@ -101,7 +118,8 @@ function releaseFocusAfterPointer(event: PointerEvent) {
     @update:model-value="(v) => select(v as string)"
   >
     <TabsList
-      class="gap-1"
+      ref="list"
+      class="max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       :class="[
         block ? 'flex w-full' : 'inline-flex',
         variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
@@ -113,7 +131,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="relative inline-flex items-center justify-center gap-1.5 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="relative inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
         :class="[
           block ? 'flex-1' : '',
           variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : 'rounded-md px-3 py-1.5',

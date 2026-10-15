@@ -382,11 +382,15 @@ export const registry: ComponentEntry[] = [
   {
     id: "tabs",
     name: "Tabs",
-    description: "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows.",
+    description:
+      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below).",
     components: { LpTabs },
     state: () => reactive({ tab: "a", items: tabItems }),
     template: `<div class="flex flex-col gap-3">
   <LpTabs v-model="tab" :items="items" />
+  <div class="w-[180px] rounded-control border border-dashed border-line p-2">
+    <LpTabs v-model="tab" :items="items" />
+  </div>
   <LpTabs v-model="tab" :items="items" block />
   <LpTabs v-model="tab" :items="items" variant="plain" />
   <LpTabs v-model="tab" :items="items" variant="plain" accent />
