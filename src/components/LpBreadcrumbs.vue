@@ -53,43 +53,47 @@ const crumbs = computed(() =>
 
 // The trail sets its own gap, which a dense header bar needs to reduce.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex items-center gap-1.5 text-sm",
+  "flex min-w-0 items-center gap-1.5 text-sm",
 )
 </script>
 
 <template>
-  <nav :aria-label="text.nav" v-bind="rest">
+  <!-- One line however long the labels: the earlier crumbs keep their size
+       and the current one gives way with an ellipsis. Wrapping, a long name
+       pushed the trail onto three lines over whatever bar held it. -->
+  <nav :aria-label="text.nav" class="min-w-0" v-bind="rest">
     <ol :class="rootClass">
       <li
         v-for="({ item, last, link }, i) in crumbs"
         :key="i"
-        class="inline-flex items-center gap-1.5"
+        class="inline-flex min-w-0 items-center gap-1.5"
+        :class="last ? 'shrink' : 'shrink-0'"
       >
         <LpIcon
           v-if="i > 0"
           name="lucide:chevron-right"
           :size="14"
-          class="text-muted"
+          class="shrink-0 text-muted"
           aria-hidden="true"
         />
         <component
           :is="link.is"
           v-if="link"
           v-bind="link.props"
-          class="inline-flex items-center gap-1.5 rounded-xs text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="inline-flex min-w-0 items-center gap-1.5 rounded-xs text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           @click="$emit('navigate', item, i)"
         >
           <LpIcon v-if="item.icon" :name="item.icon" :size="14" />
-          {{ item.label }}
+          <span class="truncate">{{ item.label }}</span>
         </component>
         <span
           v-else
-          class="inline-flex items-center gap-1.5"
+          class="inline-flex min-w-0 items-center gap-1.5"
           :class="last ? 'text-ink' : 'text-muted'"
           :aria-current="last ? 'page' : undefined"
         >
           <LpIcon v-if="item.icon" :name="item.icon" :size="14" />
-          {{ item.label }}
+          <span class="truncate">{{ item.label }}</span>
         </span>
       </li>
     </ol>
