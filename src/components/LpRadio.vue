@@ -18,7 +18,7 @@ const props = defineProps<{ value: string; label?: string; disabled?: boolean }>
 // options needs to close up — `class="gap-1"` should win over the default.
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
-    "group inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
+    "group/radio inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
     props.disabled ? "cursor-not-allowed opacity-55" : "",
   ].join(" "),
 )
@@ -32,7 +32,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     <RadioGroupItem
       :value="value"
       :disabled="disabled"
-      class="flex size-[18px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface-soft outline-none transition-[color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:group-hover:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
+      class="flex size-[18px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface-soft outline-none transition-[color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:group-hover/radio:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
     >
       <RadioGroupIndicator
         class="flex data-[state=checked]:animate-[indicator-in_140ms_var(--ease-emphasized)]"

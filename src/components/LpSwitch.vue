@@ -33,9 +33,9 @@ const slots = useSlots()
 const labelled = computed(() => Boolean(props.label || props.description || slots.default))
 
 const TRACK =
-  "group inline-flex h-5 w-9 shrink-0 items-center rounded-pill border border-line bg-surface-soft px-0.5 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
+  "group/switch inline-flex h-5 w-9 shrink-0 items-center rounded-pill border border-line bg-surface-soft px-0.5 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
 const THUMB =
-  "h-3.5 w-3.5 rounded-full bg-ink shadow transition-[translate,width,background-color] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:w-5 group-data-[state=checked]:translate-x-4 group-data-[state=checked]:bg-ink-inverse group-data-[state=checked]:group-active:translate-x-2.5 motion-reduce:group-active:w-3.5"
+  "h-3.5 w-3.5 rounded-full bg-ink shadow transition-[translate,width,background-color] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active/switch:w-5 group-data-[state=checked]/switch:translate-x-4 group-data-[state=checked]/switch:bg-ink-inverse group-data-[state=checked]/switch:group-active/switch:translate-x-2.5 motion-reduce:group-active/switch:w-3.5"
 
 // Bare, the switch is the root, so a consumer asking for a bigger track must not
 // have to depend on stylesheet order to get it. With text, the row is the root

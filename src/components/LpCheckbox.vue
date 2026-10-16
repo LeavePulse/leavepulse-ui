@@ -35,7 +35,7 @@ const field = useFieldControl(() => ({ wrapped: false, id: props.id, disabled: p
 
 // The label sits a fixed distance from the box; a dense list of options needs that closer.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "group inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
+  "group/check inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
 )
 </script>
 
@@ -49,7 +49,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :model-value="indeterminate ? 'indeterminate' : modelValue"
       :disabled="field.disabled"
       :aria-describedby="field.describedBy"
-      class="flex size-[18px] items-center justify-center rounded-[5px] border border-line-strong bg-surface-soft outline-none transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:not-data-[state=indeterminate]:group-hover:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand data-[state=indeterminate]:border-transparent data-[state=indeterminate]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
+      class="flex size-[18px] items-center justify-center rounded-[5px] border border-line-strong bg-surface-soft outline-none transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:not-data-[state=indeterminate]:group-hover/check:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand data-[state=indeterminate]:border-transparent data-[state=indeterminate]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
       @update:model-value="onUpdate"
     >
       <CheckboxIndicator
