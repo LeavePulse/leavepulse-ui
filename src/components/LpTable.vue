@@ -355,6 +355,23 @@ function onRowContextMenu(row: T) {
   menuRow.value = row
 }
 
+/*
+ * The same menu on a button of the row's own, a "more" button in an actions
+ * cell: cell slots get `openMenu` for its click. A dropdown per row stood up
+ * the full reka menu stack in every row, closed — some twenty components a
+ * row, which on a phone made a list of a few hundred rows take most of a
+ * second to appear. Here the click becomes a right-click at the button's
+ * corner, which the row remembers on its way up and the shared menu opens at.
+ */
+function openRowMenu(event: Event) {
+  const button = event.currentTarget
+  if (!(button instanceof HTMLElement)) return
+  const rect = button.getBoundingClientRect()
+  button.dispatchEvent(
+    new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }),
+  )
+}
+
 // Row items first — they are what the pointer is actually on — then the
 // table-wide ones under a rule, when the row has any of its own.
 const contextMenu = computed<ContextMenuItemDef[]>(() => {
@@ -1300,7 +1317,7 @@ const barInsetTop = computed(() =>
             class="px-4 text-ink"
             :class="[alignClass(col.align), cellY, col.nowrap ? 'whitespace-nowrap' : '']"
           >
-            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
+            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :open-menu="openRowMenu">
               {{ row[col.key] }}
             </slot>
           </td>

@@ -2621,7 +2621,7 @@ export const registry: ComponentEntry[] = [
     name: "Table",
     description:
       "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off. A column's `hideBelow` leaves it out while the table is narrower than that (Status below 520px here).",
-    components: { LpTable, LpBadge, LpButton },
+    components: { LpTable, LpBadge, LpButton, LpIcon },
     state: () => {
       const s = reactive({
         sort: { key: "amount", dir: "desc" },
@@ -2630,6 +2630,7 @@ export const registry: ComponentEntry[] = [
           { key: "id", label: "Order", width: "30%", sortable: true, nowrap: true },
           { key: "amount", label: "Amount", align: "right", sortable: true },
           { key: "status", label: "Status", align: "center", hideBelow: 520 },
+          { key: "actions", label: "", align: "right", width: "48px" },
         ],
         rows: [
           { id: "ORD-1042", amount: 12, status: "paid" },
@@ -2753,8 +2754,13 @@ export const registry: ComponentEntry[] = [
         {{ value }}
       </LpBadge>
     </template>
+    <template #cell-actions="{ openMenu }">
+      <LpButton variant="ghost" size="sm" square aria-label="Actions" @click.stop="openMenu">
+        <LpIcon name="lucide:more-vertical" />
+      </LpButton>
+    </template>
   </LpTable>
-  <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row</p>
+  <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row, or open its menu from the button</p>
 
   <!-- Fixed height + stickyHeader: scrolls via LpScrollArea, header pins to top. -->
   <p class="mt-2 text-xs font-medium text-muted">Many values — open the funnel on Status or Owner. To select: hover a row and click the box at its left edge, or press and hold a row, then keep holding and drag over others; once rows are selected a click adds or removes one, Escape clears:</p>
