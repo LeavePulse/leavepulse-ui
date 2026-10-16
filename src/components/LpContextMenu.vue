@@ -79,6 +79,18 @@ function rememberField() {
     : null
 }
 
+/*
+ * A right-click the menu answers goes no further than its trigger. reka opens
+ * the menu a tick later, and only if nothing has called preventDefault by then;
+ * an app that silences the browser's own menu with a window listener (most
+ * desktop shells do) got there first, so the menu never opened while a long
+ * press, which reka times itself, still did. reka cancels the native menu on
+ * its own once it opens.
+ */
+function keepContextMenu(event: Event) {
+  if (enabled.value) event.stopPropagation()
+}
+
 function returnFocus(event: Event) {
   const saved = field
   field = null
@@ -95,7 +107,12 @@ function returnFocus(event: Event) {
        late, losing its state and focus. A disabled trigger leaves the browser's
        own menu in place. -->
   <ContextMenuRoot>
-    <ContextMenuTrigger as-child :disabled="!enabled" @contextmenu.capture="rememberField">
+    <ContextMenuTrigger
+      as-child
+      :disabled="!enabled"
+      @contextmenu.capture="rememberField"
+      @contextmenu="keepContextMenu"
+    >
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal v-if="items.length">
