@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { anchorPattern, stripDisallowed } from "../src/composables/useInputFilter"
 import { formatColor, hsvToRgb, parseColor, rgbToHex, rgbToHsv } from "../src/components/color"
 import { filterCountries, type Country } from "../src/components/countries"
-import { joinCells } from "../src/components/otp"
+import { groupBreaks, joinCells, upperCells } from "../src/components/otp"
 import { addTags } from "../src/components/tags"
 
 const countries: Country[] = [
@@ -35,6 +35,25 @@ test("otp cells keep their positions across a cleared middle cell", () => {
   delete cells[1]
   expect(joinCells(cells)).toBe("134")
   expect(joinCells(["1", "", "3"])).toBe("13")
+})
+
+test("otp letters are capitalised in place, holes and digits untouched", () => {
+  const cells: (string | number | undefined)[] = ["a", "b", "3", "d"]
+  delete cells[1]
+  const upper = upperCells(cells)
+  expect(upper).toHaveLength(4)
+  expect(1 in upper).toBe(false)
+  expect(joinCells(upper)).toBe("A3D")
+  expect(upperCells([1, 2])).toEqual([1, 2])
+})
+
+test("otp groups break between blocks and never after the last cell", () => {
+  expect([...groupBreaks(8, 4)]).toEqual([3])
+  expect([...groupBreaks(6, 3)]).toEqual([2])
+  expect([...groupBreaks(7, 3)]).toEqual([2, 5])
+  expect(groupBreaks(6, undefined).size).toBe(0)
+  expect(groupBreaks(6, 6).size).toBe(0)
+  expect(groupBreaks(6, 0).size).toBe(0)
 })
 
 test("hsl output round-trips within one step per channel", () => {

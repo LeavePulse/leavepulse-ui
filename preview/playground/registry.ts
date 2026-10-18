@@ -1217,13 +1217,17 @@ export const registry: ComponentEntry[] = [
     id: "otp",
     name: "OtpInput",
     description:
-      "One-time-code (TOTP / 2FA) input — a row of cells with auto-advance, backspace, and full-code paste. v-model is the joined string; @complete fires it once every cell is filled. Digits-only by default; `length`, `mask`, `alphanumeric`, `invalid`.",
+      "One-time-code (TOTP / 2FA) input — a row of cells with auto-advance, backspace (a phone's on-screen one too), and full-code paste. v-model is the joined string; @complete fires it once every cell is filled. Digits-only by default; `length`, `mask`, `alphanumeric`, `invalid`. Alphanumeric codes are capitalised as typed and open a phone's keyboard in capitals (`:uppercase=\"false\"` for a case-sensitive code); `group` draws a separator every N cells. The cells shrink with a narrow container instead of overflowing it (the 300px box).",
     components: { LpOtpInput },
-    state: () => reactive({ code: "", done: "" }),
+    state: () => reactive({ code: "", done: "", backup: "" }),
     template: `<div class="flex flex-col gap-3">
-  <LpOtpInput v-model="code" @complete="done = $event" />
+  <LpOtpInput v-model="code" :group="3" @complete="done = $event" />
   <p class="text-xs text-muted">Code: {{ code || "—" }}</p>
   <p v-if="done" class="text-xs text-action">Completed: {{ done }}</p>
+  <div class="w-[300px] rounded-control border border-dashed border-line p-2">
+    <LpOtpInput v-model="backup" :length="8" :group="4" alphanumeric />
+  </div>
+  <p class="text-xs text-muted">Backup code: {{ backup || "—" }}</p>
 </div>`,
   },
   {
