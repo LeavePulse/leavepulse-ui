@@ -192,6 +192,12 @@ const tabItems = [
   { value: "a", label: "Overview", icon: "lucide:layout-dashboard" },
   { value: "b", label: "Settings", icon: "lucide:settings" },
 ]
+const bottomTabItems = [
+  { value: "home", label: "Home", icon: "lucide:house" },
+  { value: "inbox", label: "Inbox", icon: "lucide:inbox", dot: true },
+  { value: "search", label: "Search", icon: "lucide:search" },
+  { value: "settings", label: "Settings", icon: "lucide:settings" },
+]
 
 export const registry: ComponentEntry[] = [
   {
@@ -401,9 +407,9 @@ export const registry: ComponentEntry[] = [
     id: "tabs",
     name: "Tabs",
     description:
-      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below).",
+      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list.",
     components: { LpTabs },
-    state: () => reactive({ tab: "a", items: tabItems }),
+    state: () => reactive({ tab: "a", items: tabItems, nav: "home", navItems: bottomTabItems }),
     template: `<div class="flex flex-col gap-3">
   <LpTabs v-model="tab" :items="items" />
   <div class="w-[180px] rounded-control border border-dashed border-line p-2">
@@ -412,6 +418,10 @@ export const registry: ComponentEntry[] = [
   <LpTabs v-model="tab" :items="items" block />
   <LpTabs v-model="tab" :items="items" variant="plain" />
   <LpTabs v-model="tab" :items="items" variant="plain" accent />
+  <div class="flex h-48 w-[360px] max-w-full flex-col overflow-hidden rounded-card border border-line">
+    <div class="flex-1 p-3 text-sm text-muted">Page: {{ nav }}</div>
+    <LpTabs v-model="nav" :items="navItems" variant="bottom" accent label="Main" />
+  </div>
 </div>`,
   },
   {

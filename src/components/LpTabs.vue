@@ -10,6 +10,8 @@ export interface TabItem {
   label: string
   /** Optional iconify name (e.g. "lucide:palette"), shown left of the label. */
   icon?: string
+  /** A small dot on the tab: something behind it wants a look (unread, a problem). */
+  dot?: boolean
 }
 
 const props = withDefaults(
@@ -24,15 +26,23 @@ const props = withDefaults(
      * sliding pill marking the active one (for nav bars over a custom surface).
      * "underline" is a flat row over a hairline baseline, marking the active
      * tab with a sliding bottom bar instead of a pill (page-section nav style).
+     * "bottom" is a phone's bottom navigation: full width, equal-share tabs
+     * with the icon over the label, a sliding bar along the top edge marking
+     * the active one, and padding for the gesture strip and side insets of an
+     * edge-to-edge screen. Place it as the last row of the layout.
      */
-    variant?: "contained" | "plain" | "underline"
+    variant?: "contained" | "plain" | "underline" | "bottom"
     /** Tint the active pill + label with the brand colour (nav-bar style). */
     accent?: boolean
     /** Stretch the bar to full width with equal-share triggers. */
     block?: boolean
+    /** Accessible name of the tab list, e.g. "Main" for an app's navigation. */
+    label?: string
   }>(),
   { variant: "contained", accent: false, block: false },
 )
+
+const bottom = computed(() => props.variant === "bottom")
 const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
 // Held here rather than left to reka, so the active marker follows the active
@@ -88,7 +98,11 @@ const panelLayoutTransition = computed(() =>
     : { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 },
 )
 
+// A bottom bar marks only the active tab: on a phone a tap is the hover, and
+// a bar that chased the mouse across a desktop window would point at a tab
+// nobody chose.
 function pillUnder(value: string, active?: string): boolean {
+  if (bottom.value) return active === value
   return hovered.value ? hovered.value === value : active === value
 }
 
@@ -119,30 +133,38 @@ function releaseFocusAfterPointer(event: PointerEvent) {
   >
     <TabsList
       ref="list"
-      class="max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      :class="[
-        block ? 'flex w-full' : 'inline-flex',
-        variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
-        variant === 'underline' ? 'border-b border-line' : '',
-      ]"
+      :aria-label="label"
+      :class="bottom
+        ? 'grid w-full auto-cols-fr grid-flow-col border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'
+        : [
+            'max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            block ? 'flex w-full' : 'inline-flex',
+            variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
+            variant === 'underline' ? 'border-b border-line' : '',
+          ]"
       @pointerleave="hovered = null"
     >
       <TabsTrigger
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="relative inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        class="relative inline-flex items-center justify-center outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
         :class="[
-          block ? 'flex-1' : '',
-          variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : 'rounded-md px-3 py-1.5',
+          bottom
+            ? 'min-h-14 min-w-0 flex-col gap-0.5 px-1 py-1.5 text-[11px] font-medium focus-visible:ring-inset'
+            : 'shrink-0 gap-1.5 whitespace-nowrap text-sm',
+          block && !bottom ? 'flex-1' : '',
+          variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : '',
+          variant === 'contained' || variant === 'plain' ? 'rounded-md px-3 py-1.5' : '',
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
-          hovered === item.value ? 'text-ink' : 'text-muted',
+          hovered === item.value && !bottom ? 'text-ink' : 'text-muted',
         ]"
         @pointerenter="hovered = item.value"
         @pointerup="releaseFocusAfterPointer"
       >
-        <!-- Active marker: a bottom bar in "underline", a filled pill otherwise.
-             Both slide between tabs via the shared motion layoutId. -->
+        <!-- Active marker: a bar under the tab in "underline", over it in
+             "bottom", a filled pill otherwise. All slide between tabs via the
+             shared motion layoutId. -->
         <Motion
           v-if="pillUnder(item.value, current)"
           :layout-id="pillId"
@@ -152,15 +174,32 @@ function releaseFocusAfterPointer(event: PointerEvent) {
                 'absolute inset-x-0 -bottom-px z-0 h-0.5 rounded-full',
                 accent ? 'bg-brand' : 'bg-ink',
               ]
-            : [
-                'absolute inset-0 z-0 rounded-md shadow-sm',
-                accent
-                  ? 'border border-brand/35 bg-brand/12'
-                  : 'border border-line bg-surface-raised',
-              ]"
+            : bottom
+              ? [
+                  'absolute inset-x-[22%] top-0 z-0 h-0.5 rounded-b-full',
+                  accent ? 'bg-brand' : 'bg-ink',
+                ]
+              : [
+                  'absolute inset-0 z-0 rounded-md shadow-sm',
+                  accent
+                    ? 'border border-brand/35 bg-brand/12'
+                    : 'border border-line bg-surface-raised',
+                ]"
         />
-        <LpIcon v-if="item.icon" :name="item.icon" :size="14" class="relative z-10" />
-        <span class="relative z-10">{{ item.label }}</span>
+        <span v-if="item.icon" class="relative z-10 inline-flex">
+          <LpIcon :name="item.icon" :size="bottom ? 22 : 14" />
+          <span
+            v-if="item.dot"
+            aria-hidden="true"
+            class="absolute -right-1 -top-0.5 size-2 rounded-full bg-accent"
+          />
+        </span>
+        <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : ''">{{ item.label }}</span>
+        <span
+          v-if="item.dot && !item.icon"
+          aria-hidden="true"
+          class="relative z-10 size-1.5 self-start rounded-full bg-accent"
+        />
       </TabsTrigger>
     </TabsList>
 
