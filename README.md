@@ -61,7 +61,9 @@ useTheme().setSystem({ light, dark }) // follow the OS colour scheme
 ```
 
 `LpThemeProvider` applies a theme to one subtree only (a dark sidebar in a light
-app, a live preview).
+app, a live preview). With `transition`, changing its `theme` reveals the new one
+with the same circular transition as the page switch, from where the user last
+pressed. `revealTransition(update, origin)` runs any repaint behind that reveal.
 
 ### App-wide configuration
 

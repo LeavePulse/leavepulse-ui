@@ -245,6 +245,7 @@ export type { UseLayout, UseLayoutOptions } from "./layout/useLayout"
 export {
   applyTheme,
   applyThemeWithTransition,
+  revealTransition,
   bootstrapTheme,
   parseTheme,
   serializeTheme,

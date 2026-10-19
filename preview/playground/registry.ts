@@ -3003,6 +3003,8 @@ export const registry: ComponentEntry[] = [
         theme,
         light: presets.light,
         rose: presets.rose,
+        nord: presets.nord,
+        scoped: presets.rose,
         followSystem: () => theme.setSystem({ light: presets.light, dark: presets.dark }),
       }
     },
@@ -3020,10 +3022,13 @@ export const registry: ComponentEntry[] = [
       <p class="text-xs text-muted">This panel keeps its theme whatever the page uses.</p>
       <div class="flex gap-2"><LpButton size="sm" variant="action">Save</LpButton><LpBadge tone="success">online</LpBadge></div>
     </LpThemeProvider>
-    <LpThemeProvider :theme="rose" class="flex flex-col gap-3 rounded-card border border-line p-4">
-      <p class="text-sm font-medium">Always Rose</p>
-      <p class="text-xs text-muted">Previews, embedded widgets, a branded section.</p>
-      <div class="flex gap-2"><LpButton size="sm" variant="action">Save</LpButton><LpBadge tone="danger">failed</LpBadge></div>
+    <LpThemeProvider :theme="scoped" transition class="flex flex-col gap-3 rounded-card border border-line p-4">
+      <p class="text-sm font-medium">{{ scoped.name }}, switchable</p>
+      <p class="text-xs text-muted">With transition, a new theme reveals from the button that changed it.</p>
+      <div class="flex gap-2">
+        <LpButton size="sm" variant="action" @click="scoped = scoped.name === rose.name ? nord : rose">Switch theme</LpButton>
+        <LpBadge tone="danger">failed</LpBadge>
+      </div>
     </LpThemeProvider>
   </div>
 </div>`,

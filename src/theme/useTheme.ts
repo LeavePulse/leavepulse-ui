@@ -167,30 +167,28 @@ export interface RevealOrigin {
 }
 
 type ViewTransitionDocument = Document & {
-  startViewTransition?: (cb: () => void) => { ready: Promise<void>; finished: Promise<void> }
+  startViewTransition?: (cb: () => void | Promise<void>) => { ready: Promise<void>; finished: Promise<void> }
 }
 
 /*
- * Apply a theme with the "circular reveal" transition — a clip-path circle
- * grows from `origin` (usually the toggle button's centre), repainting the page
- * underneath. Uses the View Transitions API; falls back to a plain applyTheme
- * when it's unsupported or the user prefers reduced motion (so behaviour is
- * identical, just without the animation). The actual token write still happens
- * through applyTheme, so this stays a thin wrapper — no duplicated var logic.
+ * Run `update` behind a "circular reveal": a clip-path circle grows from
+ * `origin` (viewport px, the centre when omitted) and shows the repainted page
+ * underneath. Only what `update` changed looks different, so repainting one
+ * subtree reveals just that subtree. Uses the View Transitions API and falls
+ * back to a plain update when it's unsupported or the user prefers reduced
+ * motion. `update` may be async (a framework flush); the snapshot waits for it.
  */
-export function applyThemeWithTransition(
-  theme: TokenSet,
+export function revealTransition(
+  update: () => void | Promise<void>,
   origin?: RevealOrigin,
-  root: HTMLElement = document.documentElement,
   durationMs = 480,
 ): void {
   const doc = document as ViewTransitionDocument
   if (typeof doc.startViewTransition !== "function" || prefersReducedMotion()) {
-    applyTheme(theme, root)
+    void update()
     return
   }
 
-  // Centre of the viewport is the default origin if no click point is given.
   const x = origin?.x ?? window.innerWidth / 2
   const y = origin?.y ?? window.innerHeight / 2
   // Radius that reaches the farthest viewport corner from the origin.
@@ -199,13 +197,15 @@ export function applyThemeWithTransition(
     Math.max(y, window.innerHeight - y),
   )
 
-  const transition = doc.startViewTransition(() => applyTheme(theme, root))
+  const transition = doc.startViewTransition(update)
   transition.ready.then(() => {
     // Animate the OLD snapshot shrinking to a point, revealing the (already
     // repainted) live page underneath through the growing hole. Clipping the
     // old layer — not growing the new one — avoids a one-frame flash of the new
     // theme before the circle starts, which read as the theme "changing twice".
-    root.animate(
+    // The pseudo-elements belong to the document element whatever was updated,
+    // so the animation always targets it.
+    document.documentElement.animate(
       {
         clipPath: [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`],
       },
@@ -222,6 +222,20 @@ export function applyThemeWithTransition(
       },
     )
   })
+}
+
+/*
+ * Apply a theme with the circular reveal, usually from the toggle button's
+ * centre. `root` scopes the theme to a subtree; the reveal still runs on the
+ * document, since that is where the transition snapshots live.
+ */
+export function applyThemeWithTransition(
+  theme: TokenSet,
+  origin?: RevealOrigin,
+  root: HTMLElement = document.documentElement,
+  durationMs = 480,
+): void {
+  revealTransition(() => applyTheme(theme, root), origin, durationMs)
 }
 
 export function serializeTheme(theme: TokenSet): string {
