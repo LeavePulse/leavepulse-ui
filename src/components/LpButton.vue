@@ -9,6 +9,7 @@ import { tv, type VariantProps } from "tailwind-variants"
 import { computed, type Component } from "vue"
 import { useLinkComponent } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import LpIcon from "./LpIcon.vue"
 import { resolveLink, type LinkTarget } from "./link"
 
 const button = tv({
@@ -47,6 +48,8 @@ const button = tv({
     square: { true: "aspect-square p-0" },
     // soft elevation glow keyed to the variant's colour
     glow: { true: "" },
+    // busy: the label fades out in place (no width jump) and a spinner sits on top
+    loading: { true: "relative cursor-progress !text-transparent hover:!text-transparent" },
   },
   compoundVariants: [
     { square: true, size: "xs", class: "size-8" },
@@ -96,6 +99,11 @@ const props = withDefaults(
     href?: string
     type?: "button" | "submit" | "reset"
     disabled?: boolean
+    /**
+     * Busy state: blocks clicks like `disabled` without dimming, fades the label out
+     * in place and shows a spinner over it, so the width never jumps. Sets `aria-busy`.
+     */
+    loading?: boolean
   }>(),
   { type: "button" },
 )
@@ -119,10 +127,19 @@ const isNativeButton = computed(() => resolved.value.is === "button")
  * own handler, which skips navigation once the event is default-prevented.
  */
 function blockDisabled(event: MouseEvent) {
-  if (!props.disabled || isNativeButton.value) return
+  if (!props.loading && (!props.disabled || isNativeButton.value)) return
   event.preventDefault()
   event.stopImmediatePropagation()
 }
+
+const SPINNER_TONE: Record<string, string> = {
+  solid: "text-ink-inverse",
+  action: "text-ink-inverse",
+  danger: "text-ink-inverse",
+  light: "text-[#0b1210]",
+  muted: "text-muted",
+}
+const spinnerTone = computed(() => SPINNER_TONE[props.variant ?? "solid"] ?? "text-ink")
 
 const linkProps = computed(() => {
   if (isNativeButton.value) return {}
@@ -137,6 +154,7 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
     block: props.block,
     square: props.square,
     glow: props.glow,
+    loading: props.loading,
   }),
 )
 </script>
@@ -149,9 +167,18 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
     :disabled="isNativeButton ? disabled : undefined"
     :aria-disabled="!isNativeButton && disabled ? 'true' : undefined"
     :tabindex="!isNativeButton && disabled ? -1 : undefined"
+    :aria-busy="loading ? 'true' : undefined"
     :class="classes"
     @click.capture="blockDisabled"
   >
     <slot />
+    <span
+      v-if="loading"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center animate-[fade-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none"
+      :class="spinnerTone"
+      aria-hidden="true"
+    >
+      <LpIcon name="lucide:loader-circle" class="size-[1.15em] animate-spin motion-reduce:animate-none" />
+    </span>
   </component>
 </template>
