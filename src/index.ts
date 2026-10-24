@@ -26,7 +26,7 @@ export type { ActionBarAction } from "./components/LpActionBar.vue"
 export { default as LpAlert } from "./components/LpAlert.vue"
 export { default as LpAppShell } from "./components/LpAppShell.vue"
 export { default as LpAutocomplete } from "./components/LpAutocomplete.vue"
-export type { AutocompleteOption } from "./components/LpAutocomplete.vue"
+export type { AutocompleteOption, AutocompleteSelection } from "./components/LpAutocomplete.vue"
 export { default as LpAvatar } from "./components/LpAvatar.vue"
 export { default as LpBadge } from "./components/LpBadge.vue"
 export { default as LpBreadcrumbs } from "./components/LpBreadcrumbs.vue"
@@ -364,6 +364,7 @@ export { useToast } from "./composables/useToast"
 export type {
   ToastAction,
   ToastItem,
+  ToastMessage,
   ToastOptions,
   ToastVariant,
 } from "./composables/useToast"

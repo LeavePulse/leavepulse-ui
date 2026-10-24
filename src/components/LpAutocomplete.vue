@@ -25,7 +25,7 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, ref, useAttrs, watch } from "vue"
+import { computed, nextTick, ref, useAttrs, watch } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
@@ -36,6 +36,15 @@ export interface AutocompleteOption {
   value: string
   label?: string
   description?: string
+  /** A picture beside the option: an avatar, an icon of a server. */
+  image?: string
+}
+
+/** What the field's value stands for: a name for an id, with an optional muted hint and picture. */
+export interface AutocompleteSelection {
+  label: string
+  hint?: string
+  image?: string
 }
 
 const props = withDefaults(
@@ -65,6 +74,14 @@ const props = withDefaults(
     pattern?: RegExp | string
     /** Allowed-character RegExp; hard-blocks other input (see LpInput). */
     restrict?: RegExp
+    /**
+     * What the current value stands for, shown in the field itself while it is
+     * not being edited: a picked id reads as a person (avatar in place of the
+     * icon, name, muted hint) instead of digits nobody recognises, and nothing
+     * appears or jumps below the field. Focusing it brings the raw text back.
+     * When room runs short the hint gives way first; the name stays.
+     */
+    selected?: AutocompleteSelection | null
   }>(),
   {
     placeholder: "Type…",
@@ -136,6 +153,11 @@ const filtered = computed(() => {
 
 const open = ref(false)
 const focused = ref(false)
+const showSelected = computed(() => !!props.selected?.label && !focused.value)
+// Focusing a picked value starts a new search from its name, not from the raw
+// value: the name is put in the box selected, so typing replaces it, and
+// leaving without typing keeps the pick as it was.
+const draft = ref<string | null>(null)
 
 // Threshold met AND something to show → the list is allowed to open.
 const canOpen = computed(
@@ -174,19 +196,31 @@ const anchorSize = {
 function onInput(event: Event) {
   filterInput(event)
   typing.value = true
+  draft.value = null
   text.value = (event.target as HTMLInputElement).value
 }
 
-function onFocus() {
+function onFocus(event: FocusEvent) {
   // Arriving at a field that already holds a value shows every option, not just
   // the one it currently holds.
   typing.value = false
   focused.value = true
+  if (props.selected?.label) {
+    draft.value = props.selected.label
+    const input = event.target as HTMLInputElement
+    void nextTick(() => input.select())
+  }
   if (canOpen.value) open.value = true
+}
+
+function onBlur() {
+  focused.value = false
+  draft.value = null
 }
 
 function choose(opt: AutocompleteOption) {
   typing.value = false
+  draft.value = null
   emit("update:modelValue", opt.value)
   emit("select", opt.value)
   open.value = false
@@ -194,6 +228,7 @@ function choose(opt: AutocompleteOption) {
 
 function clear() {
   typing.value = false
+  draft.value = null
   emit("update:modelValue", "")
   open.value = false
 }
@@ -220,7 +255,13 @@ function clear() {
           : 'border-line focus-within:border-brand',
       ]"
     >
-      <LpIcon v-if="icon" :name="icon" :size="16" class="shrink-0 text-muted" />
+      <img
+        v-if="showSelected && selected?.image"
+        :src="selected.image"
+        alt=""
+        class="size-5 shrink-0 rounded-full object-cover"
+      />
+      <LpIcon v-else-if="icon" :name="icon" :size="16" class="shrink-0 text-muted" />
       <!--
         Bind value one-way and update from the raw DOM event, NOT via reka's
         ComboboxInput v-model: reka defers the value/search update to nextTick
@@ -228,23 +269,41 @@ function clear() {
         keystroke lag by one char. Reading event.target.value here is synchronous
         so `text` (and the reactive `open`) track the field exactly.
       -->
-      <ComboboxInput
-        v-bind="inputAttrs"
-        :id="field.id"
-        :model-value="text"
-        :placeholder="placeholder"
-        :disabled="field.disabled"
-        :required="field.required || undefined"
-        :aria-invalid="isInvalidState || undefined"
-        :aria-describedby="field.describedBy"
-        class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
-        @beforeinput="onBeforeInput"
-        @paste="onPaste"
-        @compositionend="onCompositionEnd"
-        @input="onInput"
-        @focus="onFocus"
-        @blur="focused = false"
-      />
+      <div class="relative flex min-w-0 flex-1 self-stretch">
+        <ComboboxInput
+          v-bind="inputAttrs"
+          :id="field.id"
+          :model-value="draft ?? text"
+          :placeholder="placeholder"
+          :disabled="field.disabled"
+          :required="field.required || undefined"
+          :aria-invalid="isInvalidState || undefined"
+          :aria-describedby="field.describedBy"
+          class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none transition-colors duration-[var(--duration-fast)] placeholder:text-muted"
+          :class="showSelected && 'text-transparent placeholder:text-transparent'"
+          @beforeinput="onBeforeInput"
+          @paste="onPaste"
+          @compositionend="onCompositionEnd"
+          @input="onInput"
+          @focus="onFocus"
+          @blur="onBlur"
+        />
+        <Transition
+          enter-active-class="transition-opacity duration-[var(--duration-fast)]"
+          leave-active-class="transition-opacity duration-[var(--duration-fast)]"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
+        >
+          <span
+            v-if="showSelected"
+            class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
+            aria-hidden="true"
+          >
+            <span class="max-w-full shrink-0 truncate">{{ selected?.label }}</span>
+            <span v-if="selected?.hint" class="min-w-0 truncate text-sm text-muted">{{ selected.hint }}</span>
+          </span>
+        </Transition>
+      </div>
       <button
         v-if="clearable && hasValue"
         type="button"
@@ -285,10 +344,13 @@ function clear() {
             :class="[OPTION_ITEM, 'justify-between']"
             @select.prevent="choose(opt)"
           >
-            <span class="flex min-w-0 flex-col">
-              <span class="truncate">{{ opt.label ?? opt.value }}</span>
-              <span v-if="opt.description" class="truncate text-xs text-muted">
-                {{ opt.description }}
+            <span class="flex min-w-0 items-center gap-2.5">
+              <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
+              <span class="flex min-w-0 flex-col">
+                <span class="truncate">{{ opt.label ?? opt.value }}</span>
+                <span v-if="opt.description" class="truncate text-xs text-muted">
+                  {{ opt.description }}
+                </span>
               </span>
             </span>
           </ComboboxItem>

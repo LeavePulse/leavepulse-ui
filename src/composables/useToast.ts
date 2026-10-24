@@ -23,6 +23,8 @@ export interface ToastItem {
   actions?: ToastAction[]
   /** Whole-toast click handler (UAProject-style clickable toast). */
   onClick?: () => void | Promise<void>
+  /** Copied with the message, not shown: what a bug report needs (request, status, ids). */
+  details?: string
 }
 
 export interface ToastOptions {
@@ -36,6 +38,22 @@ export interface ToastOptions {
   duration?: number
   actions?: ToastAction[]
   onClick?: () => void | Promise<void>
+  /** Copied with the message, not shown. An Error passed to `error()` brings its own `details`. */
+  details?: string
+}
+
+/*
+ * What a toast can be made from. An Error shows its message; a `details`
+ * string on it (an API error's request, status and ids) rides along to the
+ * copy button, so "copy" yields something worth pasting into a bug report
+ * instead of the same one line the user already sees.
+ */
+export type ToastMessage = string | (Error & { details?: string })
+
+function split(message: ToastMessage, options: ToastOptions): [string, ToastOptions] {
+  if (typeof message === "string") return [message, options]
+  const details = options.details ?? (typeof message.details === "string" ? message.details : undefined)
+  return [message.message, { ...options, details }]
 }
 
 const DEFAULT_DURATION = 4500
@@ -54,9 +72,10 @@ const queue = state.queue
 
 function push(
   variant: ToastVariant,
-  message: string,
-  options: ToastOptions = {},
+  input: ToastMessage,
+  given: ToastOptions = {},
 ): number {
+  const [message, options] = split(input, given)
   // A server render has no one to show it to, and the queue would outlive the
   // request and surface in the next visitor's page.
   if (typeof window === "undefined") return -1
@@ -70,6 +89,7 @@ function push(
     dismissAt: duration > 0 ? Date.now() + duration : null,
     actions: options.actions,
     onClick: options.onClick,
+    details: options.details,
   }
 
   const same = options.key === undefined ? -1 : queue.findIndex((t) => t.key === options.key)
@@ -91,7 +111,7 @@ function push(
 export interface ToastPromiseMessages<T> {
   loading: string
   success: string | ((value: T) => string)
-  error: string | ((error: unknown) => string)
+  error: string | ((error: unknown) => ToastMessage)
 }
 
 let promiseKey = 0
@@ -135,8 +155,8 @@ export function useToast() {
     toast: (message: string, o?: ToastOptions) => push("info", message, o),
     info: (message: string, o?: ToastOptions) => push("info", message, o),
     success: (message: string, o?: ToastOptions) => push("success", message, o),
-    warning: (message: string, o?: ToastOptions) => push("warning", message, o),
-    error: (message: string, o?: ToastOptions) => push("error", message, o),
+    warning: (message: ToastMessage, o?: ToastOptions) => push("warning", message, o),
+    error: (message: ToastMessage, o?: ToastOptions) => push("error", message, o),
     promise,
     /** Low-level push for bridges (e.g. @leavepulse/ui-sdk apiError). */
     push,

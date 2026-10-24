@@ -225,7 +225,7 @@ let copiedTimer: ReturnType<typeof setTimeout> | undefined
 const copyable = (t: ToastItem) => t.variant === "error" || t.variant === "warning"
 
 async function copyToast(t: ToastItem) {
-  if (!(await copy([t.title, t.message].filter(Boolean).join("\n")))) return
+  if (!(await copy([t.title, t.message, t.details].filter(Boolean).join("\n")))) return
   copiedId.value = tag(t)
   clearTimeout(copiedTimer)
   copiedTimer = setTimeout(() => (copiedId.value = null), 1500)

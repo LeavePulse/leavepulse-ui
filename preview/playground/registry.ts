@@ -286,13 +286,25 @@ export const registry: ComponentEntry[] = [
     id: "autocomplete",
     name: "Autocomplete",
     description:
-      "Free-text field that suggests as you type but never forces a choice — the typed text is the model. Unlike Select, you can submit a value that isn't in the list. Supports client filtering, server-side suggestions, and the same pattern/restrict as Input.",
+      "Free-text field that suggests as you type but never forces a choice — the typed text is the model. Unlike Select, you can submit a value that isn't in the list. Supports client filtering, server-side suggestions, and the same pattern/restrict as Input. Options can carry an image; `selected` shows what an id-like value stands for (picture, name, muted hint) inside the field instead of the raw value.",
     components: { LpAutocomplete },
-    state: () => reactive({
-      value: "",
-      frameworks: ["Vue", "React", "Svelte", "Solid", "Angular", "Qwik", "Preact"],
-    }),
-    template: `<div class="w-72">
+    state: () => {
+      const people = [
+        { value: "1045945759213821962", label: "Angel Flow", description: "@angeloshec", image: avatarSample },
+        { value: "770091071811092481", label: "THÉROËR", description: "@theroer", image: avatarSample },
+      ]
+      return reactive({
+        value: "",
+        frameworks: ["Vue", "React", "Svelte", "Solid", "Angular", "Qwik", "Preact"],
+        person: people[0]!.value,
+        people,
+        get picked() {
+          const p = people.find((o) => o.value === this.person)
+          return p ? { label: p.label, hint: p.description, image: p.image } : null
+        },
+      })
+    },
+    template: `<div class="flex w-72 flex-col gap-3">
   <LpAutocomplete
     v-model="value"
     :options="frameworks"
@@ -300,7 +312,17 @@ export const registry: ComponentEntry[] = [
     clearable
     placeholder="Type a framework…"
   />
-  <p class="mt-2 text-xs text-muted">Value: {{ value || "—" }} (free text, not limited to the list)</p>
+  <p class="text-xs text-muted">Value: {{ value || "—" }} (free text, not limited to the list)</p>
+  <LpAutocomplete
+    v-model="person"
+    :options="people"
+    :selected="picked"
+    icon="lucide:search"
+    :min-chars="0"
+    clearable
+    placeholder="Name or ID"
+  />
+  <p class="text-xs text-muted">The model is an id; the field shows who it is. Focus to search again by name.</p>
 </div>`,
   },
   {
