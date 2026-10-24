@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { localHintStorage } from "../src/composables/useHintSystem"
+import { hintKey, hintSummary, localHintStorage } from "../src/composables/useHintSystem"
 
 const memory = new Map<string, string>()
 globalThis.localStorage = {
@@ -35,5 +35,27 @@ describe("localHintStorage", () => {
   test("a broken stored value reads as empty instead of throwing", () => {
     memory.set("t", "{nope")
     expect(localHintStorage("t").load()).toEqual({})
+  })
+})
+
+describe("hintSummary", () => {
+  const features = {
+    "p.a": { page: "p", title: "A", text: "" },
+    "p.b": { page: "p", title: "B", text: "", required: true },
+    "p.c": { page: "p", title: "C", text: "", required: true, rev: 2 },
+  }
+
+  test("counts explained and used, and lists required ones not shown", () => {
+    const records = new Map([
+      [hintKey.feature("p.a"), { state: "used" as const, dismissed: false, count: 1 }],
+      [hintKey.feature("p.c", 1), { state: "explained" as const, dismissed: false, count: 0 }],
+      [hintKey.page("p"), { state: "seen" as const, dismissed: true, count: 2 }],
+    ])
+    expect(hintSummary(records, features, "p")).toEqual({ tour: "declined", offers: 2, known: 1, total: 3, missing: ["B", "C"] })
+  })
+
+  test("an assigned tour reads as assigned until it is done", () => {
+    const records = new Map([[hintKey.page("p"), { state: "seen" as const, dismissed: false, count: 0, assigned: true }]])
+    expect(hintSummary(records, features, "p").tour).toBe("assigned")
   })
 })

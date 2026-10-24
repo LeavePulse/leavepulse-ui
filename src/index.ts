@@ -212,7 +212,7 @@ export type { TourContext, TourStep } from "./components/LpTour.vue"
 export { holeOf, openContextMenu, panelsAround } from "./components/tour"
 export { default as LpHintLayer } from "./components/LpHintLayer.vue"
 export { default as LpHints } from "./components/LpHints.vue"
-export { createHintSystem, localHintStorage, provideHintSystem, useHintSystem } from "./composables/useHintSystem"
+export { createHintSystem, hintKey, hintSummary, localHintStorage, provideHintSystem, useHintSystem } from "./composables/useHintSystem"
 export type {
   HintDelta,
   HintFeature,
@@ -223,6 +223,7 @@ export type {
   HintPage,
   HintRecord,
   HintStorage,
+  HintSummary,
   HintSystem,
   HintSystemOptions,
   HintTiming,

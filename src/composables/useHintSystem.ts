@@ -170,6 +170,43 @@ function merge(record: HintRecord | undefined, delta: Omit<HintDelta, "key">): H
   }
 }
 
+/** Record keys, for apps that read or assign records directly (a "who knows what" view). */
+export const hintKey = {
+  feature: (id: string, rev = 1) => `f:${id}:${rev}`,
+  page: (page: string) => `t:${page}`,
+  news: (id: string) => `c:${id}`,
+  nudge: (id: string) => `n:${id}`,
+}
+
+export interface HintSummary {
+  tour: "done" | "assigned" | "declined" | "offered" | "never"
+  offers: number
+  known: number
+  total: number
+  /** Titles of `required` features this person has not been shown. */
+  missing: string[]
+}
+
+/** What one person knows of a page, from their records: for a manager's view. */
+export function hintSummary(
+  records: Map<string, Pick<HintRecord, "state" | "dismissed" | "count" | "assigned">>,
+  features: Record<string, HintFeature>,
+  page: string,
+): HintSummary {
+  const own = Object.entries(features).filter(([, f]) => f.page === page)
+  const knows = (id: string, f: HintFeature) => RANK[records.get(hintKey.feature(id, f.rev))?.state ?? "seen"] >= RANK.explained
+  const tour = records.get(hintKey.page(page))
+  return {
+    tour: tour && RANK[tour.state] >= RANK.explained
+      ? "done"
+      : tour?.assigned ? "assigned" : tour?.dismissed ? "declined" : tour ? "offered" : "never",
+    offers: tour?.count ?? 0,
+    known: own.filter(([id, f]) => knows(id, f)).length,
+    total: own.length,
+    missing: own.filter(([id, f]) => f.required && !knows(id, f)).map(([, f]) => f.title),
+  }
+}
+
 function typing(): boolean {
   const el = document.activeElement
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable)
@@ -197,10 +234,10 @@ export function createHintSystem(options: HintSystemOptions) {
   const pending = new Map<string, HintDelta>()
   let flushTimer: ReturnType<typeof setTimeout> | undefined
 
-  const featureKey = (id: string) => `f:${id}:${features[id]?.rev ?? 1}`
-  const pageKey = (page: string) => `t:${page}`
-  const newsKey = (id: string) => `c:${id}`
-  const nudgeKey = (id: string) => `n:${id}`
+  const featureKey = (id: string) => hintKey.feature(id, features[id]?.rev)
+  const pageKey = hintKey.page
+  const newsKey = hintKey.news
+  const nudgeKey = hintKey.nudge
 
   function interrupted(): boolean {
     try {
