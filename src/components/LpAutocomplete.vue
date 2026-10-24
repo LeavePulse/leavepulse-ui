@@ -158,6 +158,7 @@ const showSelected = computed(() => !!props.selected?.label && !focused.value)
 // value: the name is put in the box selected, so typing replaces it, and
 // leaving without typing keeps the pick as it was.
 const draft = ref<string | null>(null)
+const showImage = computed(() => !!props.selected?.image && (!focused.value || draft.value !== null))
 
 // Threshold met AND something to show → the list is allowed to open.
 const canOpen = computed(
@@ -256,8 +257,8 @@ function clear() {
       ]"
     >
       <img
-        v-if="showSelected && selected?.image"
-        :src="selected.image"
+        v-if="showImage"
+        :src="selected?.image"
         alt=""
         class="size-5 shrink-0 rounded-full object-cover"
       />
@@ -279,7 +280,7 @@ function clear() {
           :required="field.required || undefined"
           :aria-invalid="isInvalidState || undefined"
           :aria-describedby="field.describedBy"
-          class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none transition-colors duration-[var(--duration-fast)] placeholder:text-muted"
+          class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
           :class="showSelected && 'text-transparent placeholder:text-transparent'"
           @beforeinput="onBeforeInput"
           @paste="onPaste"
@@ -288,21 +289,16 @@ function clear() {
           @focus="onFocus"
           @blur="onBlur"
         />
-        <Transition
-          enter-active-class="transition-opacity duration-[var(--duration-fast)]"
-          leave-active-class="transition-opacity duration-[var(--duration-fast)]"
-          enter-from-class="opacity-0"
-          leave-to-class="opacity-0"
+        <!-- Swapped instantly, not faded: the name sits where the input's own
+             text sits, so a fade would show an empty field for a moment. -->
+        <span
+          v-if="showSelected"
+          class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
+          aria-hidden="true"
         >
-          <span
-            v-if="showSelected"
-            class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
-            aria-hidden="true"
-          >
-            <span class="max-w-full shrink-0 truncate">{{ selected?.label }}</span>
-            <span v-if="selected?.hint" class="min-w-0 truncate text-sm text-muted">{{ selected.hint }}</span>
-          </span>
-        </Transition>
+          <span class="max-w-full shrink-0 truncate">{{ selected?.label }}</span>
+          <span v-if="selected?.hint" class="min-w-0 truncate text-sm text-muted">{{ selected.hint }}</span>
+        </span>
       </div>
       <button
         v-if="clearable && hasValue"
