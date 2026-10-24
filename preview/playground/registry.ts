@@ -89,6 +89,11 @@ import {
   LpThemeSwitcher,
   LpTilt,
   LpTooltip,
+  LpTour,
+  LpHintLayer,
+  hints,
+  openContextMenu,
+  type TourContext,
   LpUptimeBar,
   LpDateRangePicker,
   LpRangeCalendar,
@@ -2373,6 +2378,73 @@ export const registry: ComponentEntry[] = [
       <p v-for="i in 30" :key="i">Scrollable row {{ i }} — drag the handle to snap.</p>
     </div>
   </LpDrawer>
+</div>`,
+  },
+  {
+    id: "tour",
+    name: "Tour",
+    description:
+      "A guided walk over the real interface. Each step lights its target through the scrim and explains it in a card beside it; arrow keys and Enter step through, Escape closes. A target is a `v-hint` id, a selector or an element, and a step whose target is not on the page is skipped, so a tour built from the hinted controls only ever shows what this user can see. A `try` step waits for the user to press the control themselves (with an optional \"do it for me\"), and `enter` can open what the target lives in, registering its undo with `onLeave` (this step) or `onEnd` (the rest of the tour) so the page is left as it was found. On a phone the card becomes a sheet at the bottom.",
+    components: { LpTour, LpButton, LpContextMenu },
+    state: () =>
+      reactive({
+        open: false,
+        step: 0,
+        log: "",
+        steps: [
+          { title: "A quick look around", text: "Three controls, one minute. Arrow keys work too." },
+          { target: "demo.search", title: "Search", text: "Finds people, roles and channels.", keys: "Ctrl+K" },
+          { target: "demo.export", title: "Export", text: "Downloads what the table shows, filters included.", try: true, perform: () => {} },
+          { target: "demo.missing", title: "Not on this page", text: "Skipped: the target is not rendered for this user." },
+          {
+            target: () => document.querySelector("[role=menu]"),
+            title: "Row menu",
+            text: "Right-click any row for its actions. The tour opened this one for you and closes it when you move on.",
+            side: "right",
+            enter: ({ onLeave }: TourContext) => {
+              const row = hints.element("demo.row")
+              if (!row) return
+              onLeave(openContextMenu(row))
+            },
+          },
+        ],
+      }),
+    template: `<div class="flex w-full max-w-md flex-col gap-3">
+  <div class="flex flex-wrap gap-2">
+    <LpButton v-hint="'demo.search'" variant="outline" size="sm">Search</LpButton>
+    <LpButton v-hint="'demo.export'" variant="outline" size="sm" @click="log = 'Exported'">Export</LpButton>
+  </div>
+  <LpContextMenu :items="[{ label: 'Open card' }, { label: 'Copy ID' }]">
+    <div v-hint="'demo.row'" class="rounded-control border border-line px-3 py-2 text-sm">Row: right-click me</div>
+  </LpContextMenu>
+  <div class="flex items-center gap-3">
+    <LpButton size="sm" @click="step = 0; open = true">Start the tour</LpButton>
+    <span class="text-xs text-muted">{{ log }}</span>
+  </div>
+  <LpTour v-model:open="open" v-model:step="step" :steps="steps" @finish="log = 'Finished'" @dismiss="(at) => log = 'Closed on step ' + (at + 1)" />
+</div>`,
+  },
+  {
+    id: "hint-layer",
+    name: "HintLayer",
+    description:
+      "Quiet \"new\" dots over `v-hint` controls: something changed here, or the user just gained access to it. Nothing pops up by itself; the note opens when the pointer or focus reaches the control, and `read` fires when the user dismisses it or simply uses the control. At most `limit` dots show at once, most important first. The app decides what counts as new from the registry's `seen` and `used` events.",
+    components: { LpHintLayer, LpButton },
+    state: () =>
+      reactive({
+        fresh: ["demo.activity", "demo.remind"],
+        notes: {
+          "demo.activity": { title: "Activity column", text: "Weekly quota progress for each person." },
+          "demo.remind": { title: "Remind everyone", text: "Messages everyone who has not set their hours." },
+        },
+      }),
+    template: `<div class="flex flex-col items-start gap-3">
+  <div class="flex flex-wrap gap-3">
+    <LpButton v-hint="'demo.activity'" variant="outline" size="sm">Activity</LpButton>
+    <LpButton v-hint="'demo.remind'" variant="outline" size="sm">Remind everyone</LpButton>
+  </div>
+  <LpButton size="sm" variant="ghost" @click="fresh = ['demo.activity', 'demo.remind']">Mark as new again</LpButton>
+  <LpHintLayer :fresh="fresh" :notes="notes" @read="(id) => fresh = fresh.filter((x) => x !== id)" />
 </div>`,
   },
   {

@@ -33,6 +33,7 @@ export const COMPONENT_NAMES = [
   "LpFieldNotice",
   "LpFileTree",
   "LpFormField",
+  "LpHintLayer",
   "LpIcon",
   "LpImageEditor",
   "LpInfraNode",
@@ -92,6 +93,7 @@ export const COMPONENT_NAMES = [
   "LpTooltip",
   "LpTooltipProvider",
   "LpTopologyCanvas",
+  "LpTour",
   "LpUptimeBar",
   "LpVideoBackdrop"
 ] as const
