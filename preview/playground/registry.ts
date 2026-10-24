@@ -71,6 +71,7 @@ import {
   LpSection,
   LpSelect,
   LpShift,
+  LpSwap,
   LpSkeleton,
   LpSlider,
   LpRangeSlider,
@@ -1809,6 +1810,38 @@ export const registry: ComponentEntry[] = [
 
   <!-- And with no container at all, which is how a page-level heading is used. -->
   <LpSection as="h2" level="xl" title="On the page, unwrapped" />
+</div>`,
+  },
+  {
+    id: "swap",
+    name: "Swap",
+    description:
+      "One piece of content standing in for another: the section picked in a side nav, a wizard step, the view chosen in a segmented control. The outgoing content fades out, the incoming one rises in like LpTabs panels, and the box eases between the two heights (LpShift), so what sits below glides instead of jumping. `swapKey` decides what counts as another piece: key it by section, not by record, or a data refresh replays the entrance.",
+    components: { LpSwap, LpSegmented, LpCard },
+    state: () =>
+      reactive({
+        view: "short",
+        views: [
+          { value: "short", label: "Short" },
+          { value: "long", label: "Long" },
+          { value: "list", label: "List" },
+        ],
+      }),
+    template: `<div class="flex w-96 flex-col gap-3">
+  <LpSegmented v-model="view" :options="views" />
+  <LpCard>
+    <LpSwap :swap-key="view">
+      <p v-if="view === 'short'" class="text-sm text-muted">A single line of content.</p>
+      <p v-else-if="view === 'long'" class="text-sm leading-relaxed text-muted">
+        A longer paragraph that takes several lines, so the card has to grow. Without the swap the
+        card would snap to its new height in one frame and the line below would jump with it.
+      </p>
+      <ul v-else class="flex flex-col gap-1 text-sm text-muted">
+        <li v-for="n in 5" :key="n">Row {{ n }}</li>
+      </ul>
+    </LpSwap>
+  </LpCard>
+  <p class="text-xs text-muted">This line rides the card's height instead of jumping.</p>
 </div>`,
   },
   {
