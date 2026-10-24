@@ -109,6 +109,31 @@ export const HINT_SIGNALS = {
   paletteActions: "lp.palette-actions",
 } as const
 
+let lastContextTarget: WeakRef<Element> | null = null
+
+/** The element a left click just landed on that also has a right-click menu (a table row rather than the table). */
+export function noteContextTarget(el: Element): void {
+  lastContextTarget = new WeakRef(el)
+}
+
+const onScreen = (el: Element) => {
+  const box = el.getBoundingClientRect()
+  return el.isConnected && box.width > 0 && box.bottom > 0 && box.top < window.innerHeight
+}
+
+/*
+ * What the tip lights up: the thing the user keeps clicking, while it is still
+ * on screen; otherwise a row with a menu, then any menu target. Rows first,
+ * because a page's first target in document order is usually chrome (a
+ * sidebar account card), not the content the habit is about.
+ */
+function rightClickTarget(): Element | null {
+  const last = lastContextTarget?.deref()
+  if (last && onScreen(last)) return last
+  const visible = (selector: string) => [...document.querySelectorAll(selector)].find(onScreen) ?? null
+  return visible("[data-lp-context-row]") ?? visible("main [data-lp-context-menu]") ?? visible("[data-lp-context-menu]")
+}
+
 /** Right click instead of the "…" button. */
 export function contextMenuTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
   return {
@@ -119,10 +144,7 @@ export function contextMenuTip(text: Partial<Pick<HintTip, "title" | "text"> & {
       count(HINT_SIGNALS.contextMenu) === 0
       && (count(HINT_SIGNALS.menuButton) >= 5 || count(HINT_SIGNALS.contextTarget) >= 25),
     step: () => {
-      const target = [...document.querySelectorAll("[data-lp-context-menu]")].find((el) => {
-        const box = el.getBoundingClientRect()
-        return box.width > 0 && box.bottom > 0 && box.top < window.innerHeight
-      })
+      const target = rightClickTarget()
       return target ? { target, title: text.title ?? "Right-click works here", text: text.stepText ?? "Right-click this to see what it can do.", try: true } : null
     },
   }

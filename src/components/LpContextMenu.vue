@@ -9,7 +9,7 @@
 import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from "reka-ui"
 import { computed } from "vue"
 import { hints } from "../composables/useHints"
-import { HINT_SIGNALS } from "../composables/useHintSystem"
+import { HINT_SIGNALS, noteContextTarget } from "../composables/useHintSystem"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
 import { POPOVER_PANEL } from "./dropdown"
@@ -103,8 +103,11 @@ function opened(open: boolean) {
   if (open) hints.use(HINT_SIGNALS.contextMenu)
 }
 
-function leftClick() {
-  if (hinted.value) hints.use(HINT_SIGNALS.contextTarget)
+function leftClick(event: MouseEvent) {
+  if (!hinted.value) return
+  hints.use(HINT_SIGNALS.contextTarget)
+  const el = event.currentTarget as Element
+  noteContextTarget((event.target as Element).closest?.("[data-lp-context-row]") ?? el)
 }
 
 function returnFocus(event: Event) {

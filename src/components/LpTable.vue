@@ -1293,6 +1293,7 @@ const barInsetTop = computed(() =>
           :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
           v-bind="roving.itemProps(String(keyFor(row, index)))"
           :data-paint-key="selectable ? String(keyFor(row, index)) : undefined"
+          :data-lp-context-row="rowMenu ? '' : undefined"
           @click="onRowClick(row, keyFor(row, index))"
           @pointerdown="onRowPointerDown($event, keyFor(row, index))"
           @keydown="onRowKeydown"
