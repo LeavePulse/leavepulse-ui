@@ -18,6 +18,11 @@ describe("toast details", () => {
     expect(toast.queue.at(-1)?.details).toBe("outer")
   })
 
+  test("a hand-written message takes details from its cause", () => {
+    toast.error("Not saved: boom", { cause: Object.assign(new Error("boom"), { details: "PUT /x · 500" }) })
+    expect(toast.queue.at(-1)).toMatchObject({ message: "Not saved: boom", details: "PUT /x · 500" })
+  })
+
   test("a plain string has no details", () => {
     toast.error("Plain")
     expect(toast.queue.at(-1)).toMatchObject({ message: "Plain", details: undefined })

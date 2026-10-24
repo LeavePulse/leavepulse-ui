@@ -40,6 +40,8 @@ export interface ToastOptions {
   onClick?: () => void | Promise<void>
   /** Copied with the message, not shown. An Error passed to `error()` brings its own `details`. */
   details?: string
+  /** The error behind a hand-written message ("Not saved: " + e.message): its `details` ride along. */
+  cause?: unknown
 }
 
 /*
@@ -50,10 +52,15 @@ export interface ToastOptions {
  */
 export type ToastMessage = string | (Error & { details?: string })
 
+function detailsOf(source: unknown): string | undefined {
+  const details = (source as { details?: unknown } | null | undefined)?.details
+  return typeof details === "string" && details ? details : undefined
+}
+
 function split(message: ToastMessage, options: ToastOptions): [string, ToastOptions] {
-  if (typeof message === "string") return [message, options]
-  const details = options.details ?? (typeof message.details === "string" ? message.details : undefined)
-  return [message.message, { ...options, details }]
+  const text = typeof message === "string" ? message : message.message
+  const details = options.details ?? (typeof message === "string" ? undefined : detailsOf(message)) ?? detailsOf(options.cause)
+  return [text, { ...options, details }]
 }
 
 const DEFAULT_DURATION = 4500
