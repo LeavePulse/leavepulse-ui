@@ -290,7 +290,7 @@ export const registry: ComponentEntry[] = [
     components: { LpAutocomplete },
     state: () => {
       const people = [
-        { value: "1045945759213821962", label: "Angel Flow", description: "@angeloshec", image: avatarSample },
+        { value: "1090027634693525664", label: "Sunny", description: "@sunnyxoo.", image: avatarSample },
         { value: "770091071811092481", label: "THÉROËR", description: "@theroer", image: avatarSample },
       ]
       return reactive({
