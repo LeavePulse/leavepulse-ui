@@ -8,3 +8,5 @@
 @import "../src/index.css";
 /* LpTopologyCanvas: Vue Flow base CSS + chrome (the consumer imports this). */
 @import "../src/canvas.css";
+/* Selection in the theme colour instead of the OS accent (opt-in, as for a consumer). */
+@import "../src/tokens/selection.css";

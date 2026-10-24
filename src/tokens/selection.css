@@ -1,0 +1,20 @@
+/*
+ * Text selection in the theme's colours — opt-in, like scrollbar.css. Without
+ * it the browser paints selected text with the operating system's accent
+ * (red, green, whatever the desktop theme picked), which clashes with the kit
+ * palette and changes from machine to machine; WebKitGTK and Chromium on Linux
+ * both read it from the GTK theme.
+ *
+ * Global on purpose, so it lives outside tokens.css (which stays embeddable).
+ * Reads --color-brand, so import it AFTER the tokens:
+ *   @import "@leavepulse/ui";
+ *   @import "@leavepulse/ui/selection.css";
+ *
+ * In `@layer base`, so any rule of the app's own wins over it.
+ */
+@layer base {
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-brand, #7a8a84) 38%, transparent);
+    color: inherit;
+  }
+}

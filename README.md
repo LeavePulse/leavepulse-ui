@@ -161,6 +161,14 @@ scroll restoration and anchor jumps keep working:
 
 Hide a specific scrollbar with the `lp-scrollbar-none` class.
 
+Selected text takes the operating system's accent unless told otherwise (on
+Linux that is the GTK theme, so it can come out red or green next to the kit
+palette). Opt into the theme's colour the same way:
+
+```css
+@import "@leavepulse/ui/selection.css"; /* after the tokens — reads --color-brand */
+```
+
 ## Develop
 
 ```bash

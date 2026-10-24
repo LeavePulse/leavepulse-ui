@@ -30,6 +30,7 @@
     "./css": "./src/index.css",
     "./tokens.css": "./src/tokens/tokens.css",
     "./scrollbar.css": "./src/tokens/scrollbar.css",
+    "./selection.css": "./src/tokens/selection.css",
     "./canvas.css": "./src/canvas.css",
     "./package.json": "./package.json",
     "./dist/*.js": {
