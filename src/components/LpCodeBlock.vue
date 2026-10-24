@@ -236,14 +236,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       class="flex items-center gap-2 border-b border-line bg-surface-soft px-3 py-1.5 text-muted"
     >
       <span v-if="title" class="truncate text-ink">{{ title }}</span>
-      <span v-if="lang !== 'plain'" class="rounded bg-surface px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+      <span v-if="lang !== 'plain'" class="rounded-small bg-surface px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
         {{ lang }}
       </span>
       <div class="ml-auto flex items-center gap-1">
         <button
           v-if="lockToggle"
           type="button"
-          class="group/lock flex items-center gap-1 rounded px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="group/lock flex items-center gap-1 rounded-small px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="locked ? text.unlock : text.lock"
           @click="toggleLock"
         >
@@ -256,7 +256,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <button
           v-if="copyable"
           type="button"
-          class="group/copy flex items-center gap-1 rounded px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="group/copy flex items-center gap-1 rounded-small px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="copied ? text.copied : text.copy"
           @click="copy"
         >
@@ -314,7 +314,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             v-else
           ><button
               type="button"
-              class="lp-fold-toggle flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              class="lp-fold-toggle flex w-full items-center gap-1.5 rounded-small px-1 py-0.5 text-left text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               :aria-expanded="openState[seg.id]"
               @click="toggleFold(seg.id)"
             ><LpIcon

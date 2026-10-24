@@ -1239,7 +1239,7 @@ useHotkeys(() =>
             v-for="(step, i) in trail"
             :key="step.id"
             type="button"
-            class="flex shrink-0 items-center gap-1.5 rounded-md bg-brand-soft px-2 py-1 text-xs font-medium text-brand transition-opacity hover:opacity-80"
+            class="flex shrink-0 items-center gap-1.5 rounded-inner bg-brand-soft px-2 py-1 text-xs font-medium text-brand transition-opacity hover:opacity-80"
             :title="text.back"
             @click="popTo(i)"
           >
@@ -1264,7 +1264,7 @@ useHotkeys(() =>
             @keydown.esc="onEscape"
             @keydown.tab="onTab"
           />
-          <kbd class="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-muted">{{ text.esc }}</kbd>
+          <kbd class="shrink-0 rounded-small border border-line px-1.5 py-0.5 text-[10px] text-muted">{{ text.esc }}</kbd>
         </div>
 
         <!-- Results -->
@@ -1305,7 +1305,7 @@ useHotkeys(() =>
                   :aria-disabled="c.disabled || undefined"
                   :data-cmd-index="flatIndexOf(c)"
                   :disabled="c.href ? undefined : c.disabled"
-                  class="lp-cmd-item flex w-full gap-3 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
+                  class="lp-cmd-item flex w-full gap-3 rounded-inner px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
                   :class="[
                     c.excerpt ? 'items-start' : 'items-center',
                     flatIndexOf(c) === selectedIndex
@@ -1365,7 +1365,7 @@ useHotkeys(() =>
                        shortcut is learned by seeing it rather than reading docs. -->
                   <kbd
                     v-else-if="c.prefix && c.children"
-                    class="shrink-0 rounded border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted"
+                    class="shrink-0 rounded-small border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted"
                   >{{ c.prefix }}</kbd>
                   <!-- Drills in rather than runs: worth saying before the click,
                        since the two look identical otherwise. -->
@@ -1390,7 +1390,7 @@ useHotkeys(() =>
               <span>{{ text.searchFailed }}</span>
               <button
                 type="button"
-                class="rounded-md px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
+                class="rounded-inner px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
                 @click="refresh(); inputRef?.focus()"
               >
                 {{ text.retry }}
@@ -1451,26 +1451,26 @@ useHotkeys(() =>
           class="flex shrink-0 items-center gap-4 border-t border-line px-4 py-2.5 text-[11px] text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden"
         >
           <span class="flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">↑</kbd>
-            <kbd class="rounded border border-line px-1 text-[10px]">↓</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">↑</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">↓</kbd>
             {{ text.navigate }}
           </span>
           <span class="flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">↵</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">↵</kbd>
             {{ text.select }}
           </span>
           <!-- Only inside a mode: at the root Backspace just edits the query,
                and advertising it there would be a lie. -->
           <span v-if="selectedActions.length" class="flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">tab</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">tab</kbd>
             {{ text.actions }}
           </span>
           <span v-if="trail.length" class="flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">⌫</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">⌫</kbd>
             {{ text.back }}
           </span>
           <span class="ml-auto flex items-center gap-1">
-            <kbd class="rounded border border-line px-1 text-[10px]">{{ text.esc }}</kbd>
+            <kbd class="rounded-small border border-line px-1 text-[10px]">{{ text.esc }}</kbd>
             {{ text.close }}
           </span>
         </div>

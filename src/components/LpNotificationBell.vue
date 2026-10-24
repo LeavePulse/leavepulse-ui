@@ -321,7 +321,7 @@ function timeAgo(iso?: string): string {
         <button
           v-if="items.length && handlesClear"
           type="button"
-          class="rounded-md px-1.5 py-0.5 text-xs font-medium text-muted outline-none transition-colors hover:bg-surface-soft hover:text-ink focus-visible:bg-surface-soft"
+          class="rounded-inner px-1.5 py-0.5 text-xs font-medium text-muted outline-none transition-colors hover:bg-surface-soft hover:text-ink focus-visible:bg-surface-soft"
           @click="emit('clear')"
         >
           {{ l.clear }}
@@ -329,7 +329,7 @@ function timeAgo(iso?: string): string {
         <button
           v-if="hasUnread"
           type="button"
-          class="rounded-md px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
+          class="rounded-inner px-1.5 py-0.5 text-xs font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:bg-brand-soft"
           @click="emit('markAllRead')"
         >
           {{ l.markAllRead }}

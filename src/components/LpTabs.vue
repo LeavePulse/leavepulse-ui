@@ -38,8 +38,14 @@ const props = withDefaults(
     block?: boolean
     /** Accessible name of the tab list, e.g. "Main" for an app's navigation. */
     label?: string
+    /**
+     * The marker glides under the hovered tab and springs back on leave (the
+     * default). False pins it to the selected tab: calmer for a dense header
+     * where the pointer crosses the bar on its way elsewhere.
+     */
+    hoverFollow?: boolean
   }>(),
-  { variant: "contained", accent: false, block: false },
+  { variant: "contained", accent: false, block: false, hoverFollow: true },
 )
 
 const bottom = computed(() => props.variant === "bottom")
@@ -154,12 +160,12 @@ function releaseFocusAfterPointer(event: PointerEvent) {
             ? 'min-h-14 min-w-0 flex-col gap-0.5 px-1 py-1.5 text-[11px] font-medium focus-visible:ring-inset'
             : 'shrink-0 gap-1.5 whitespace-nowrap text-sm',
           block && !bottom ? 'flex-1' : '',
-          variant === 'underline' ? 'rounded-t-md px-3 pt-1.5 pb-2' : '',
-          variant === 'contained' || variant === 'plain' ? 'rounded-md px-3 py-1.5' : '',
+          variant === 'underline' ? 'rounded-t-inner px-3 pt-1.5 pb-2' : '',
+          variant === 'contained' || variant === 'plain' ? 'rounded-inner px-3 py-1.5' : '',
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
           hovered === item.value && !bottom ? 'text-ink' : 'text-muted',
         ]"
-        @pointerenter="hovered = item.value"
+        @pointerenter="hoverFollow && (hovered = item.value)"
         @pointerup="releaseFocusAfterPointer"
       >
         <!-- Active marker: a bar under the tab in "underline", over it in
@@ -180,7 +186,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
                   accent ? 'bg-brand' : 'bg-ink',
                 ]
               : [
-                  'absolute inset-0 z-0 rounded-md shadow-sm',
+                  'absolute inset-0 z-0 rounded-inner shadow-sm',
                   accent
                     ? 'border border-brand/35 bg-brand/12'
                     : 'border border-line bg-surface-raised',

@@ -350,7 +350,7 @@ watch(
                and last in usefulness. Still reachable by Tab and Escape. -->
           <DialogClose
             data-lp-dialog-close
-            class="group flex shrink-0 items-center rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            class="group flex shrink-0 items-center rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             :aria-label="text.close"
           >
             <LpIcon

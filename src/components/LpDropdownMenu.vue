@@ -47,7 +47,7 @@ defineProps<{
         <template v-for="(item, i) in items" :key="i">
           <DropdownMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />
           <DropdownMenuItem
-            class="group/item flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
+            class="group/item flex cursor-pointer items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
             :class="item.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand'"
             :disabled="item.disabled"
             @select="item.onSelect?.()"

@@ -305,7 +305,7 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
         <button
           v-if="copyable(t)"
           type="button"
-          class="-mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="-mt-1 rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="copiedId === tag(t) ? text.copied : text.copy"
           :title="copiedId === tag(t) ? text.copied : text.copy"
           @click.stop="copyToast(t)"
@@ -314,7 +314,7 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
         </button>
         <button
           type="button"
-          class="group -mr-1 -mt-1 rounded-md p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
+          class="group -mr-1 -mt-1 rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
           :aria-label="text.dismiss"
           @click.stop="beginClose(t)"
         >

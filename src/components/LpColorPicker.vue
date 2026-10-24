@@ -654,11 +654,11 @@ defineExpose({ open })
                would be painted over the checkerboard and, being translucent
                white, would show it through as a see-through outline. -->
           <span
-            class="relative size-5 shrink-0 overflow-hidden rounded-md"
+            class="relative size-5 shrink-0 overflow-hidden rounded-inner"
             :style="{ background: CHECKERBOARD }"
           >
             <span class="block size-full" :style="{ backgroundColor: previewCss }" />
-            <span class="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-line" />
+            <span class="pointer-events-none absolute inset-0 rounded-inner ring-1 ring-inset ring-line" />
           </span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-strong">
             {{ label ?? current }}
@@ -814,7 +814,7 @@ defineExpose({ open })
                   :disabled="disabled"
                   :aria-label="c"
                   :aria-pressed="isActiveSwatch(c)"
-                  class="relative flex items-center justify-center overflow-hidden rounded-md outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed motion-reduce:hover:scale-100 motion-reduce:active:scale-95"
+                  class="relative flex items-center justify-center overflow-hidden rounded-inner outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed motion-reduce:hover:scale-100 motion-reduce:active:scale-95"
                   :class="row.size"
                   :style="{ background: CHECKERBOARD }"
                   @click="pickSwatch(c)"
@@ -826,7 +826,7 @@ defineExpose({ open })
                        inset ring painted OVER the colour instead, so it reads
                        as one fixed hairline rather than a translucent gap. -->
                   <span class="absolute inset-0" :style="{ backgroundColor: c }" />
-                  <span class="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-line" />
+                  <span class="pointer-events-none absolute inset-0 rounded-inner ring-1 ring-inset ring-line" />
                   <LpIcon
                     v-if="isActiveSwatch(c)"
                     name="lucide:check"

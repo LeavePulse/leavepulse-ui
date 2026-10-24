@@ -64,6 +64,12 @@
   --radius-control: 8px;
   --radius-card: 14px;
   --radius-pill: 9999px;
+  /* Nested shapes derive from the control radius instead of fixing pixels: a
+     row inside a menu, a segment, a small icon button. They match the old 6px
+     and 4px at the default 8px, and follow a theme down to 0 when it squares
+     everything (a fixed rounded-md stayed round in a square theme). */
+  --radius-inner: max(0px, calc(var(--radius-control) - 2px));
+  --radius-small: max(0px, calc(var(--radius-control) - 4px));
 
   /* ── density ─────────────────────────────────── */
   --spacing-unit: 4px; /* base rhythm; scaled per density mode */

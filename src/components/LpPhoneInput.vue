@@ -398,7 +398,7 @@ const inputAttrs = computed(() => {
               :model-value="query"
               :placeholder="searchPlaceholder"
               auto-focus
-              class="h-(--size-control-sm) w-full rounded-md border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
+              class="h-(--size-control-sm) w-full rounded-inner border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
               @input="query = ($event.target as HTMLInputElement).value"
             />
           </div>

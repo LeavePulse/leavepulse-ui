@@ -103,8 +103,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     <div v-if="skeletonHeader" class="flex items-center gap-3 px-1">
       <div class="size-10 shrink-0 animate-pulse rounded-pill bg-surface-soft" />
       <div class="flex-1 space-y-2">
-        <div class="h-3.5 w-24 animate-pulse rounded bg-surface-soft" />
-        <div class="h-3 w-16 animate-pulse rounded bg-surface-soft/60" />
+        <div class="h-3.5 w-24 animate-pulse rounded-small bg-surface-soft" />
+        <div class="h-3 w-16 animate-pulse rounded-small bg-surface-soft/60" />
       </div>
     </div>
     <div class="space-y-1">

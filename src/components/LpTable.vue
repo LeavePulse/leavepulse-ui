@@ -1201,7 +1201,7 @@ const barInsetTop = computed(() =>
             <LpContextMenu v-if="col.sortable || col.filterable" :items="headerMenu(col)">
             <button
               type="button"
-              class="group/sort -mx-1 inline-flex items-center gap-1 rounded px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
                 activeSort?.key === col.key ? 'text-ink' : '',
@@ -1232,7 +1232,7 @@ const barInsetTop = computed(() =>
               <template #trigger>
                 <button
                   type="button"
-                  class="ml-0.5 inline-grid size-5 place-items-center rounded align-middle outline-none transition-colors duration-fast hover:bg-surface-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                  class="ml-0.5 inline-grid size-5 place-items-center rounded-small align-middle outline-none transition-colors duration-fast hover:bg-surface-raised hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
                   :class="hiddenValues[col.key]?.size ? 'text-brand' : 'opacity-60'"
                   :aria-label="text.filterColumn.replace('{column}', col.label)"
                   :data-lp-filter="col.key"

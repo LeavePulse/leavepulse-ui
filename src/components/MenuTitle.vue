@@ -18,10 +18,10 @@ defineProps<{
 
 <template>
   <div class="flex max-w-72 min-w-0 items-center gap-2 px-2.5 pt-1.5 pb-2" aria-hidden="true">
-    <img v-if="image" :src="image" alt="" class="size-7 shrink-0 rounded-md object-cover" />
+    <img v-if="image" :src="image" alt="" class="size-7 shrink-0 rounded-inner object-cover" />
     <span
       v-else-if="icon"
-      class="grid size-7 shrink-0 place-items-center rounded-md bg-surface-soft text-muted"
+      class="grid size-7 shrink-0 place-items-center rounded-inner bg-surface-soft text-muted"
     >
       <LpIcon :name="icon" :size="15" />
     </span>
