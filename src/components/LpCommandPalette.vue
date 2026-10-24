@@ -44,6 +44,8 @@ import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
+import { hints } from "../composables/useHints"
+import { HINT_SIGNALS, runningHintSystem } from "../composables/useHintSystem"
 import { useModalLayer } from "./modalDepth"
 import { useLabels } from "../composables/useLpConfig"
 import {
@@ -516,8 +518,19 @@ function onTab(event: KeyboardEvent) {
   event.stopPropagation()
   const actionsMode: Command = { id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions }
   syntheticModes.add(actionsMode)
+  hints.use(HINT_SIGNALS.paletteActions)
   enter(actionsMode)
 }
+
+// A returning user who never pressed Tab gets the footer key lit up, nothing
+// more: the palette is the one place they already came to on purpose.
+const PALETTE_ACTIONS_AFTER = 3
+const showActionsKey = computed(() => {
+  const system = runningHintSystem()
+  return !!system?.state.loaded
+    && system.count(HINT_SIGNALS.palette) >= PALETTE_ACTIONS_AFTER
+    && system.count(HINT_SIGNALS.paletteActions) === 0
+})
 
 /*
  * A mode holds the command it was entered through, and a static `children`
@@ -1162,8 +1175,10 @@ function onEscape(event: KeyboardEvent) {
 watch(
   () => props.open,
   async (o) => {
-    if (o) claim()
-    else release()
+    if (o) {
+      claim()
+      hints.use(HINT_SIGNALS.palette)
+    } else release()
     cancel()
     query.value = ""
     select(0)
@@ -1461,8 +1476,15 @@ useHotkeys(() =>
           </span>
           <!-- Only inside a mode: at the root Backspace just edits the query,
                and advertising it there would be a lie. -->
-          <span v-if="selectedActions.length" class="flex items-center gap-1">
-            <kbd class="rounded-small border border-line px-1 text-[10px]">tab</kbd>
+          <span
+            v-if="selectedActions.length"
+            class="flex items-center gap-1 transition-colors"
+            :class="showActionsKey && 'font-medium text-brand'"
+          >
+            <kbd
+              class="rounded-small border px-1 text-[10px] transition-colors"
+              :class="showActionsKey ? 'border-brand' : 'border-line'"
+            >tab</kbd>
             {{ text.actions }}
           </span>
           <span v-if="trail.length" class="flex items-center gap-1">

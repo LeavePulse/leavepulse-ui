@@ -68,6 +68,7 @@ const title = computed(() => {
   const o = offer.value
   if (!o) return ""
   if (o.kind === "nudge") return notes.value[o.nudge.feature]?.title ?? ""
+  if (o.kind === "tip") return o.tip.title
   if (o.kind === "news") return fill(labels.value.newsTitle)
   return fill(o.kind === "assigned" ? labels.value.assignedTitle : labels.value.tourTitle)
 })
@@ -76,6 +77,7 @@ const description = computed(() => {
   const o = offer.value
   if (!o) return ""
   if (o.kind === "nudge") return o.nudge.text
+  if (o.kind === "tip") return o.tip.keys ? `${o.tip.text} ${o.tip.keys}` : o.tip.text
   if (o.kind === "news") return o.items.map((n) => n.text).join(" ")
   return o.kind === "assigned" ? labels.value.assignedText : labels.value.tourText
 })
@@ -86,6 +88,10 @@ const actions = computed<ActionBarAction[]>(() => {
   const answer = (choice: "show" | "later" | "never") => () => props.system.answer(choice)
   const show: ActionBarAction = { label: labels.value.show, icon: "lucide:sparkles", onClick: answer("show") }
   if (o.kind === "nudge") return [{ label: labels.value.noThanks, variant: "ghost", onClick: answer("never") }, show]
+  if (o.kind === "tip") {
+    const later: ActionBarAction = { label: labels.value.gotIt, variant: o.tip.step ? "ghost" : undefined, onClick: answer("later") }
+    return [{ label: labels.value.never, variant: "ghost", onClick: answer("never") }, later, ...(o.tip.step ? [show] : [])]
+  }
   if (o.kind === "news") return [{ label: labels.value.gotIt, variant: "ghost", onClick: answer("later") }, show]
   return [
     ...(o.kind === "tour" ? [{ label: labels.value.never, variant: "ghost" as const, onClick: answer("never") }] : []),
@@ -109,7 +115,7 @@ const actions = computed<ActionBarAction[]>(() => {
       :open="!!offer"
       :title="title"
       :description="description"
-      :icon="offer?.kind === 'news' ? 'lucide:gift' : 'lucide:compass'"
+      :icon="offer?.kind === 'news' ? 'lucide:gift' : offer?.kind === 'tip' ? 'lucide:lightbulb' : 'lucide:compass'"
       :actions="actions"
     />
   </template>

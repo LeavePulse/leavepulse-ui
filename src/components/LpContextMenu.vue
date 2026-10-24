@@ -8,6 +8,8 @@
  */
 import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from "reka-ui"
 import { computed } from "vue"
+import { hints } from "../composables/useHints"
+import { HINT_SIGNALS } from "../composables/useHintSystem"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
 import { POPOVER_PANEL } from "./dropdown"
@@ -91,6 +93,14 @@ function keepContextMenu(event: Event) {
   if (enabled.value) event.stopPropagation()
 }
 
+function opened(open: boolean) {
+  if (open) hints.use(HINT_SIGNALS.contextMenu)
+}
+
+function leftClick() {
+  if (enabled.value) hints.use(HINT_SIGNALS.contextTarget)
+}
+
 function returnFocus(event: Event) {
   const saved = field
   field = null
@@ -106,10 +116,12 @@ function returnFocus(event: Event) {
        the reka trigger remounted the wrapped content whenever items arrived
        late, losing its state and focus. A disabled trigger leaves the browser's
        own menu in place. -->
-  <ContextMenuRoot>
+  <ContextMenuRoot @update:open="opened">
     <ContextMenuTrigger
       as-child
       :disabled="!enabled"
+      :data-lp-context-menu="enabled ? '' : undefined"
+      @click.capture="leftClick"
       @contextmenu.capture="rememberField"
       @contextmenu="keepContextMenu"
     >

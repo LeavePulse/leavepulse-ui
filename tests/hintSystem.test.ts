@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test"
-import { hintKey, hintSummary, localHintStorage } from "../src/composables/useHintSystem"
+import { HINT_SIGNALS, contextMenuTip, hintKey, hintSummary, localHintStorage, paletteTip } from "../src/composables/useHintSystem"
 
 const memory = new Map<string, string>()
 globalThis.localStorage = {
@@ -57,5 +57,24 @@ describe("hintSummary", () => {
   test("an assigned tour reads as assigned until it is done", () => {
     const records = new Map([[hintKey.page("p"), { state: "seen" as const, dismissed: false, count: 0, assigned: true }]])
     expect(hintSummary(records, features, "p").tour).toBe("assigned")
+  })
+})
+
+describe("tips", () => {
+  const counter = (counts: Record<string, number>) => (signal: string) => counts[signal] ?? 0
+
+  test("right-click tip waits for repeated \"…\" use and stops once right-click is used", () => {
+    const tip = contextMenuTip()
+    expect(tip.when(counter({ [HINT_SIGNALS.menuButton]: 4 }))).toBe(false)
+    expect(tip.when(counter({ [HINT_SIGNALS.menuButton]: 5 }))).toBe(true)
+    expect(tip.when(counter({ [HINT_SIGNALS.contextTarget]: 25 }))).toBe(true)
+    expect(tip.when(counter({ [HINT_SIGNALS.menuButton]: 9, [HINT_SIGNALS.contextMenu]: 1 }))).toBe(false)
+  })
+
+  test("palette tip is for those who navigate a lot and never opened it", () => {
+    const tip = paletteTip("Ctrl+K", { title: "T" })
+    expect(tip).toMatchObject({ keys: "Ctrl+K", title: "T" })
+    expect(tip.when(counter({ [HINT_SIGNALS.navigate]: 15 }))).toBe(true)
+    expect(tip.when(counter({ [HINT_SIGNALS.navigate]: 15, [HINT_SIGNALS.palette]: 1 }))).toBe(false)
   })
 })

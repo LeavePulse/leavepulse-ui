@@ -270,10 +270,12 @@ watch(
     if (value) {
       direction = 1
       document.addEventListener("click", onTargetClick, true)
+      document.addEventListener("contextmenu", onTargetClick, true)
       frame ||= requestAnimationFrame(track)
       void show()
     } else {
       document.removeEventListener("click", onTargetClick, true)
+      document.removeEventListener("contextmenu", onTargetClick, true)
       end()
     }
   },
@@ -286,6 +288,7 @@ watch(index, () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", onTargetClick, true)
+  document.removeEventListener("contextmenu", onTargetClick, true)
   if (open.value) end()
 })
 

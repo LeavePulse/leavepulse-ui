@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { hints } from "../composables/useHints"
+import { HINT_SIGNALS } from "../composables/useHintSystem"
 import {
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,18 +22,27 @@ export interface MenuItem {
   onSelect?: () => void
 }
 
-defineProps<{
+const props = defineProps<{
   items: MenuItem[]
   /** A heading naming what the menu acts on; see LpContextMenu's `title`. */
   title?: string
   subtitle?: string
   titleIcon?: string
   titleImage?: string
+  /**
+   * The same items are also on a right click (a row's "…" next to its context
+   * menu). Opening it then counts toward the hint system's right-click tip.
+   */
+  rightClickToo?: boolean
 }>()
+
+function opened(open: boolean) {
+  if (open && props.rightClickToo) hints.use(HINT_SIGNALS.menuButton)
+}
 </script>
 
 <template>
-  <DropdownMenuRoot>
+  <DropdownMenuRoot @update:open="opened">
     <DropdownMenuTrigger as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>

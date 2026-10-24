@@ -92,8 +92,10 @@ import {
   LpTour,
   LpHintLayer,
   LpHints,
+  contextMenuTip,
   createHintSystem,
   localHintStorage,
+  paletteTip,
   hints,
   openContextMenu,
   type TourContext,
@@ -2431,7 +2433,7 @@ export const registry: ComponentEntry[] = [
     id: "hints",
     name: "Hints",
     description:
-      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server.",
+      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions.",
     components: { LpHints, LpButton },
     state: () => {
       const storage = localHintStorage("lp-preview-hints")
@@ -2449,6 +2451,7 @@ export const registry: ComponentEntry[] = [
           page: () => "demo",
           sessionKey: "lp-preview-hints:session",
           timing: { settle: 600, offerAgain: 0 },
+          tips: [contextMenuTip(), paletteTip()],
         }),
         reset() {
           localStorage.removeItem("lp-preview-hints")

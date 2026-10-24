@@ -1,4 +1,4 @@
-import { computed, inject, provide, reactive, watch, type ComputedRef, type InjectionKey, type WatchStopHandle } from "vue"
+import { computed, inject, onBeforeUnmount, provide, reactive, shallowRef, watch, type ComputedRef, type InjectionKey, type WatchStopHandle } from "vue"
 import type { HintNote } from "../components/LpHintLayer.vue"
 import type { TourContext, TourStep } from "../components/LpTour.vue"
 import { anyModalOpen } from "../components/modalDepth"
@@ -76,6 +76,69 @@ export interface HintNudge {
   text: string
 }
 
+/**
+ * A better way to do something the user keeps doing the slow way: shown now
+ * and then (at most `max` times, `nudgeAgain` apart) and never again once the
+ * better way is used. `when` reads usage counters — kit components report
+ * their own (see HINT_SIGNALS), and `hints.use(name)` adds any of the app's.
+ */
+export interface HintTip {
+  id: string
+  title: string
+  text: string
+  keys?: string
+  max?: number
+  when: (count: (signal: string) => number) => boolean
+  /** What "show me" lights up on the current screen; without it the tip only informs. */
+  step?: () => TourStep | null
+}
+
+/** Usage the kit reports by itself. */
+export const HINT_SIGNALS = {
+  /** A context menu was opened (right click or long press). */
+  contextMenu: "lp.context-menu",
+  /** A "…" menu marked `rightClickToo` was opened: its items were one right click away. */
+  menuButton: "lp.menu-button",
+  /** A left click on something that also has a context menu. */
+  contextTarget: "lp.context-target",
+  /** The command palette was opened. */
+  palette: "lp.palette",
+  /** The current hint page changed: a navigation. */
+  navigate: "lp.navigate",
+  /** An item's actions were opened in the palette (Tab). */
+  paletteActions: "lp.palette-actions",
+} as const
+
+/** Right click instead of the "…" button. */
+export function contextMenuTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
+  return {
+    id: "lp.tip.context-menu",
+    title: text.title ?? "Right-click works here",
+    text: text.text ?? "Rows and cards open their actions on right-click, even where no … button shows it.",
+    when: (count) =>
+      count(HINT_SIGNALS.contextMenu) === 0
+      && (count(HINT_SIGNALS.menuButton) >= 5 || count(HINT_SIGNALS.contextTarget) >= 25),
+    step: () => {
+      const target = [...document.querySelectorAll("[data-lp-context-menu]")].find((el) => {
+        const box = el.getBoundingClientRect()
+        return box.width > 0 && box.bottom > 0 && box.top < window.innerHeight
+      })
+      return target ? { target, title: text.title ?? "Right-click works here", text: text.stepText ?? "Right-click this to see what it can do.", try: true } : null
+    },
+  }
+}
+
+/** The palette instead of walking the menu. */
+export function paletteTip(keys = "Ctrl+K", text: Partial<Pick<HintTip, "title" | "text">> = {}): HintTip {
+  return {
+    id: "lp.tip.palette",
+    title: text.title ?? "Jump anywhere",
+    text: text.text ?? "Search pages, people and settings from anywhere instead of the menu.",
+    keys,
+    when: (count) => count(HINT_SIGNALS.navigate) >= 15 && count(HINT_SIGNALS.palette) === 0,
+  }
+}
+
 export type HintLevel = "seen" | "explained" | "used"
 
 export interface HintRecord {
@@ -113,6 +176,7 @@ export interface HintSystemOptions {
   features: Record<string, HintFeature>
   pages?: Record<string, HintPage>
   news?: HintNews[]
+  tips?: HintTip[]
   storage?: HintStorage
   /** The current page id, read reactively (map your route to it). */
   page: () => string
@@ -124,6 +188,7 @@ export type HintOffer =
   | { kind: "tour" | "assigned"; page: string }
   | { kind: "news"; page: string; items: HintNews[] }
   | { kind: "nudge"; page: string; nudge: HintNudge }
+  | { kind: "tip"; page: string; tip: HintTip }
 
 const RANK: Record<HintLevel, number> = { seen: 0, explained: 1, used: 2 }
 const DAY = 24 * 3600 * 1000
@@ -217,6 +282,8 @@ export function createHintSystem(options: HintSystemOptions) {
   const features = options.features
   const pages = options.pages ?? {}
   const news = options.news ?? []
+  const tips = options.tips ?? []
+  const TIP_MAX = 3
   const storage = options.storage ?? localHintStorage()
   const sessionKey = options.sessionKey ?? "lp-hints:interrupted"
 
@@ -224,6 +291,7 @@ export function createHintSystem(options: HintSystemOptions) {
     records: new Map<string, HintRecord>(),
     loaded: false,
     page: "",
+    overlay: null as string | null,
     tour: { open: false, step: 0, steps: [] as TourStep[], ids: [] as string[], page: "" },
     offer: null as HintOffer | null,
     candidate: null as (HintNudge & { page: string }) | null,
@@ -238,6 +306,9 @@ export function createHintSystem(options: HintSystemOptions) {
   const pageKey = hintKey.page
   const newsKey = hintKey.news
   const nudgeKey = hintKey.nudge
+  const signalKey = (name: string) => `u:${name}`
+  const tipKey = (id: string) => `p:${id}`
+  const count = (name: string) => state.records.get(signalKey(name))?.count ?? 0
 
   function interrupted(): boolean {
     try {
@@ -390,14 +461,28 @@ export function createHintSystem(options: HintSystemOptions) {
       return
     }
     const n = state.candidate
-    if (!n || n.page !== page) return
-    const seen = state.records.get(nudgeKey(n.id))
-    if (seen?.dismissed || state.records.get(featureKey(n.feature))?.state === "used" || !hints.present(n.feature)) return
-    if (seen && Date.now() - Date.parse(seen.updatedAt) < timing.nudgeAgain) return
-    state.candidate = null
-    spend()
-    record(nudgeKey(n.id), { add: 1 })
-    state.offer = { kind: "nudge", page, nudge: n }
+    if (n && n.page === page) {
+      const seen = state.records.get(nudgeKey(n.id))
+      const f = features[n.feature]
+      const visible = !!f && (!!f.target || !!f.enter || hints.present(n.feature))
+      if (!seen?.dismissed && state.records.get(featureKey(n.feature))?.state !== "used" && visible
+        && !(seen && Date.now() - Date.parse(seen.updatedAt) < timing.nudgeAgain)) {
+        state.candidate = null
+        spend()
+        record(nudgeKey(n.id), { add: 1 })
+        state.offer = { kind: "nudge", page, nudge: n }
+        return
+      }
+    }
+    for (const tip of tips) {
+      const seen = state.records.get(tipKey(tip.id))
+      if (seen?.dismissed || (seen?.count ?? 0) >= (tip.max ?? TIP_MAX)) continue
+      if (seen && Date.now() - Date.parse(seen.updatedAt) < timing.nudgeAgain) continue
+      if (!tip.when(count)) continue
+      spend()
+      state.offer = { kind: "tip", page, tip }
+      return
+    }
   }
 
   let stops: (() => void)[] = []
@@ -405,8 +490,9 @@ export function createHintSystem(options: HintSystemOptions) {
   function start(): void {
     if (stops.length) return
     const stopPage: WatchStopHandle = watch(
-      options.page,
-      (page) => {
+      () => state.overlay ?? options.page(),
+      (page, previous) => {
+        if (previous !== undefined && page !== previous && !state.overlay) record(signalKey(HINT_SIGNALS.navigate), { add: 1 })
         state.page = page
         state.settledAt = Date.now()
         if (state.offer && state.offer.page !== page) state.offer = null
@@ -428,6 +514,7 @@ export function createHintSystem(options: HintSystemOptions) {
       stopPage,
       hints.on("used", (id) => {
         if (features[id]) record(featureKey(id), { state: "used", add: 1 })
+        if (id.startsWith("lp.") || !features[id]) record(signalKey(id), { add: 1 })
       }),
       () => clearInterval(poll),
       () => window.removeEventListener("pagehide", flushOnLeave),
@@ -460,6 +547,16 @@ export function createHintSystem(options: HintSystemOptions) {
     nudge(n: HintNudge): void {
       state.candidate = { ...n, page: state.page }
     },
+    /**
+     * A dialog acts as its own page while open (its dots and tour), then hands
+     * back. Pass null on close, and on unmount: a dialog left open by a route
+     * change would otherwise keep the page.
+     */
+    overlay(page: string | null): void {
+      state.overlay = page
+    },
+    /** How many times a signal was reported (for an app's own tips or reports). */
+    count,
     /** The user navigated on purpose (palette, notification): do not interrupt this arrival. */
     markIntent(): void {
       state.intent = true
@@ -475,6 +572,7 @@ export function createHintSystem(options: HintSystemOptions) {
       if (id) record(featureKey(id), { state: "explained" })
     },
     tourEnded(finished: boolean): void {
+      if (!state.tour.ids.length) return
       record(pageKey(state.tour.page), finished ? { state: "explained" } : { add: 1 })
       baseline(state.tour.page)
     },
@@ -486,6 +584,10 @@ export function createHintSystem(options: HintSystemOptions) {
         const ids = offer.items.map((n) => n.feature).filter((id): id is string => !!id)
         readNews(offer.page)
         if (choice === "show" && ids.length) startTour(offer.page, ids)
+      } else if (offer.kind === "tip") {
+        record(tipKey(offer.tip.id), { add: 1, dismissed: choice === "never" })
+        const step = choice === "show" ? offer.tip.step?.() : null
+        if (step) Object.assign(state.tour, { open: true, step: 0, page: offer.page, ids: [], steps: [step] })
       } else if (offer.kind === "nudge") {
         if (choice === "show") startTour(features[offer.nudge.feature]!.page, [offer.nudge.feature])
         else record(nudgeKey(offer.nudge.id), { dismissed: true })
@@ -503,10 +605,26 @@ export type HintSystem = ReturnType<typeof createHintSystem>
 
 const HINT_SYSTEM: InjectionKey<HintSystem> = Symbol.for("lp-hint-system")
 
+/*
+ * Overlays (the palette, menus) are portalled siblings of the host, not its
+ * descendants, so injection alone would never reach them: the mounted host is
+ * also kept here.
+ */
+const running = shallowRef<HintSystem | null>(null)
+
 export function provideHintSystem(system: HintSystem): void {
   provide(HINT_SYSTEM, system)
+  running.value = system
+  onBeforeUnmount(() => {
+    if (running.value === system) running.value = null
+  })
 }
 
 export function useHintSystem(): HintSystem | null {
-  return inject(HINT_SYSTEM, null)
+  return inject(HINT_SYSTEM, null) ?? running.value
+}
+
+/** The mounted host's system, read reactively from anywhere. */
+export function runningHintSystem(): HintSystem | null {
+  return running.value
 }
