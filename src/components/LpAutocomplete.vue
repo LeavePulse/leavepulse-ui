@@ -256,13 +256,28 @@ function clear() {
           : 'border-line focus-within:border-brand',
       ]"
     >
-      <img
-        v-if="showImage"
-        :src="selected?.image"
-        alt=""
-        class="size-5 shrink-0 rounded-full object-cover"
-      />
-      <LpIcon v-else-if="icon" :name="icon" :size="16" class="shrink-0 text-muted" />
+      <!-- Picture and icon share one fixed box and cross-fade, so the text
+           beside them never moves when one gives way to the other. -->
+      <span
+        v-if="icon || selected?.image"
+        class="relative grid shrink-0 place-items-center"
+        :class="selected?.image ? 'size-5' : 'size-4'"
+      >
+        <LpIcon
+          v-if="icon"
+          :name="icon"
+          :size="16"
+          class="col-start-1 row-start-1 text-muted transition-[opacity,scale] duration-[var(--duration-fast)] motion-reduce:transition-none"
+          :class="showImage ? 'scale-75 opacity-0' : 'opacity-100'"
+        />
+        <img
+          v-if="selected?.image"
+          :src="selected.image"
+          alt=""
+          class="col-start-1 row-start-1 size-5 rounded-full object-cover transition-[opacity,scale] duration-[var(--duration-fast)] motion-reduce:transition-none"
+          :class="showImage ? 'opacity-100' : 'scale-75 opacity-0'"
+        />
+      </span>
       <!--
         Bind value one-way and update from the raw DOM event, NOT via reka's
         ComboboxInput v-model: reka defers the value/search update to nextTick
@@ -289,16 +304,29 @@ function clear() {
           @focus="onFocus"
           @blur="onBlur"
         />
-        <!-- Swapped instantly, not faded: the name sits where the input's own
-             text sits, so a fade would show an empty field for a moment. -->
-        <span
-          v-if="showSelected"
-          class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
-          aria-hidden="true"
+        <!-- Focus and blur do not animate the name: it sits exactly where the
+             input's own text sits, so that swap cannot be seen. The hint, which
+             exists in one state alone, eases in and out beside it, and the
+             whole line fades when a pick appears or is cleared. -->
+        <Transition
+          enter-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+          leave-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+          enter-from-class="opacity-0"
+          leave-to-class="opacity-0"
         >
-          <span class="max-w-full shrink-0 truncate">{{ selected?.label }}</span>
-          <span v-if="selected?.hint" class="min-w-0 truncate text-sm text-muted">{{ selected.hint }}</span>
-        </span>
+          <span
+            v-if="selected?.label"
+            class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
+            aria-hidden="true"
+          >
+            <span class="max-w-full shrink-0 truncate" :class="showSelected ? '' : 'invisible'">{{ selected.label }}</span>
+            <span
+              v-if="selected.hint"
+              class="min-w-0 truncate text-sm text-muted transition-[opacity,translate] duration-[var(--duration-fast)] motion-reduce:transition-none"
+              :class="showSelected ? 'opacity-100' : '-translate-x-1 opacity-0'"
+            >{{ selected.hint }}</span>
+          </span>
+        </Transition>
       </div>
       <button
         v-if="clearable && hasValue"
