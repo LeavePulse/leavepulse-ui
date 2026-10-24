@@ -1,5 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, type MaybeRefOrGetter, toValue } from "vue"
 import { focusableIn, nextInDirection, type Direction } from "./spatialNav"
+import { scrollParent } from "./scroll"
 
 /*
  * A game controller driving the interface: the D-pad and the left stick move
@@ -124,13 +125,7 @@ export function useGamepadNav(options: UseGamepadNavOptions = {}) {
   }
 
   function scrollBy(dx: number, dy: number) {
-    let element = document.activeElement as HTMLElement | null
-    while (element && element !== document.body) {
-      const style = getComputedStyle(element)
-      if (/(auto|scroll)/.test(style.overflowY + style.overflowX) && element.scrollHeight > element.clientHeight) break
-      element = element.parentElement
-    }
-    ;(element && element !== document.body ? element : document.scrollingElement)?.scrollBy(dx, dy)
+    ;(scrollParent(document.activeElement, { axis: "both", self: true }) ?? document.scrollingElement)?.scrollBy(dx, dy)
   }
 
   function poll(now: number) {

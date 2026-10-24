@@ -10,11 +10,12 @@ export default { inheritAttrs: false }
  * Two months sit side by side where there is room, one on a phone.
  */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
-import { computed, onBeforeUnmount, onMounted, ref, useAttrs } from "vue"
+import { computed, ref, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
+import { useMediaQuery } from "../composables/useMediaQuery"
 import {
   clampRange,
   type DateRange,
@@ -113,17 +114,7 @@ function presetFits(preset: DateRangePreset): boolean {
   return !!clampRange(preset.range(), props.min, props.max)
 }
 
-const wide = ref(false)
-let query: MediaQueryList | undefined
-const onQuery = () => {
-  wide.value = !!query?.matches
-}
-onMounted(() => {
-  query = window.matchMedia("(min-width: 640px)")
-  onQuery()
-  query.addEventListener("change", onQuery)
-})
-onBeforeUnmount(() => query?.removeEventListener("change", onQuery))
+const wide = useMediaQuery("(min-width: 640px)")
 
 const shellSize = {
   sm: "h-(--size-control-sm) text-xs",

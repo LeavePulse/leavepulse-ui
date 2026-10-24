@@ -34,6 +34,7 @@ import {
 } from "vaul-vue"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
+import { prefersReducedMotion } from "../composables/easing"
 import { useGlass } from "../composables/useGlass"
 import { useLabels } from "../composables/useLpConfig"
 import LpIcon from "./LpIcon.vue"
@@ -328,10 +329,6 @@ function edgeEnabled(): boolean {
 let track: { id: number; x: number; y: number; t: number; lastX: number; lastT: number; speed: number } | null = null
 const owner = Symbol("edge-pull")
 
-function reducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-}
-
 // A horizontally scrollable ancestor that can still move the way the finger
 // pulls (a carousel, a wide table) keeps the gesture: the pull only claims
 // what nothing under the finger wants.
@@ -414,7 +411,7 @@ function settle() {
             peek.value = 0
           }, 60),
         )
-      }, reducedMotion() ? 0 : 180),
+      }, prefersReducedMotion() ? 0 : 180),
     )
   } else {
     peek.value = 0
@@ -462,7 +459,7 @@ const previewStyle = computed(() => {
   const axis = dir.value === "right" ? off : -off
   return {
     transform: `translateX(${axis}%)`,
-    transition: peeking.value || reducedMotion() ? "none" : "transform 0.18s cubic-bezier(0.32, 0.72, 0, 1)",
+    transition: peeking.value || prefersReducedMotion() ? "none" : "transform 0.18s cubic-bezier(0.32, 0.72, 0, 1)",
     pointerEvents: "none" as const,
   }
 })
@@ -477,7 +474,7 @@ const previewStyle = computed(() => {
       v-show="peeking || peek > 0"
       class="lp-scrim pointer-events-none fixed inset-0"
       :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
-      :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || reducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
+      :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || prefersReducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
     />
     <div
       v-show="peeking || peek > 0"

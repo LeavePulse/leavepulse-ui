@@ -42,6 +42,7 @@ import {
   type SpringState,
 } from "../composables/usePillTransition"
 import { PANEL_SURFACE, TOOLTIP_ANIM } from "./dropdown"
+import { prefersReducedMotion } from "../composables/easing"
 
 const props = withDefaults(
   defineProps<{
@@ -116,9 +117,6 @@ const shared = injectTooltipProviderContext(null)
  */
 const PassThrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 
-const reducedMotion = () =>
-  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-
 const target = { x: 0, y: 0 }
 const offset = ref({ x: 0, y: 0 })
 
@@ -174,7 +172,7 @@ const onPointerMove = (e: PointerEvent) => {
   const dir = props.side === "bottom" ? -1 : 1
   target.y = e.clientY - (rect.top + rect.height / 2) + half * dir
   // Without motion the tip goes straight to the reading instead of trailing.
-  if (reducedMotion()) {
+  if (prefersReducedMotion()) {
     offset.value = { x: target.x, y: target.y }
     return
   }

@@ -1,5 +1,6 @@
 import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
 import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
+import { scrollParent } from "./scroll"
 
 /*
  * Paint selection: press on one item's tick and sweep across the others, and
@@ -51,14 +52,6 @@ interface Stroke<K> {
   x: number
   y: number
   scroller: HTMLElement | null
-}
-
-function scrollParent(el: HTMLElement | null): HTMLElement | null {
-  for (let node = el?.parentElement; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node)
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node
-  }
-  return null
 }
 
 export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {

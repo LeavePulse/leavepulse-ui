@@ -12,6 +12,7 @@
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import { scrollParent } from "../composables/scroll"
 import { usePillTransition } from "../composables/usePillTransition"
 
 export interface TocLink {
@@ -113,24 +114,11 @@ function unfreeze() {
   safetyTimer = null
 }
 
-/*
- * The element that actually scrolls to the heading. Inside an app shell that is
- * a scroll region, not the window, and watching window.scrollY there saw no
- * movement and unfroze on the first frame.
- */
-function scrollerOf(el: HTMLElement): HTMLElement | null {
-  for (let node = el.parentElement; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node)
-    if (/(auto|scroll|overlay)/.test(overflowY) && node.scrollHeight > node.clientHeight) return node
-  }
-  return null
-}
-
 function suppressSpyUntilScrollEnds(target: HTMLElement) {
   spySuppressed = true
   if (rafId != null) cancelAnimationFrame(rafId)
   if (safetyTimer != null) clearTimeout(safetyTimer)
-  const scroller = scrollerOf(target)
+  const scroller = scrollParent(target)
   const position = () => (scroller ? scroller.scrollTop : window.scrollY)
   let last = position()
   const tick = () => {
