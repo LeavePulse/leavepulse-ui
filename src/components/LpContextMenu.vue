@@ -54,6 +54,11 @@ const props = defineProps<{
   /** An icon beside the title, or `titleImage` for a picture (an avatar, a logo). */
   titleIcon?: string
   titleImage?: string
+  /**
+   * Do not count this element as "has a right-click menu" for hint tips: for
+   * menus that only hold generic items (a whole table without row actions).
+   */
+  noHint?: boolean
 }>()
 
 // With no items the trigger is disabled, so the element keeps the browser's
@@ -61,6 +66,7 @@ const props = defineProps<{
 // per element. `always` overrides this so a late-populated menu is ready on the
 // very first click.
 const enabled = computed(() => props.always || props.items.length > 0)
+const hinted = computed(() => enabled.value && !props.noHint)
 
 const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
 
@@ -98,7 +104,7 @@ function opened(open: boolean) {
 }
 
 function leftClick() {
-  if (enabled.value) hints.use(HINT_SIGNALS.contextTarget)
+  if (hinted.value) hints.use(HINT_SIGNALS.contextTarget)
 }
 
 function returnFocus(event: Event) {
@@ -120,7 +126,7 @@ function returnFocus(event: Event) {
     <ContextMenuTrigger
       as-child
       :disabled="!enabled"
-      :data-lp-context-menu="enabled ? '' : undefined"
+      :data-lp-context-menu="hinted ? '' : undefined"
       @click.capture="leftClick"
       @contextmenu.capture="rememberField"
       @contextmenu="keepContextMenu"

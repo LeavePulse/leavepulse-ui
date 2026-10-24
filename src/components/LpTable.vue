@@ -1157,7 +1157,7 @@ const barInsetTop = computed(() =>
     <!-- The table-wide menu, which is what a right-click on empty header space
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
-    <LpContextMenu :items="contextMenu" always>
+    <LpContextMenu :items="contextMenu" always :no-hint="!rowMenu">
     <table ref="tableEl" class="w-full border-collapse text-sm">
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
