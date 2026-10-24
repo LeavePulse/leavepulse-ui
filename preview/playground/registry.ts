@@ -112,6 +112,7 @@ import {
 // A real image, so the avatar demos show the loaded state rather than only the
 // initials fallback, and so the skeleton demo can show what it stands in for.
 import avatarSample from "../assets/avatar-sample.png"
+import avatarSunny from "../assets/avatar-sunny.png"
 import videoBackdropSample from "../assets/video-backdrop-sample.webm"
 import { ConfigScope, CustomSheet, LayerKeys, RatingControl } from "./demos"
 
@@ -290,7 +291,7 @@ export const registry: ComponentEntry[] = [
     components: { LpAutocomplete },
     state: () => {
       const people = [
-        { value: "1090027634693525664", label: "Sunny", description: "@sunnyxoo.", image: avatarSample },
+        { value: "1090027634693525664", label: "Sunny", description: "@sunnyxoo.", image: avatarSunny },
         { value: "770091071811092481", label: "THÉROËR", description: "@theroer", image: avatarSample },
       ]
       return reactive({
