@@ -326,7 +326,7 @@ export function createHintSystem(options: HintSystemOptions) {
 
   function startTour(page = state.page, only?: string[]): void {
     const entries = Object.entries(features)
-      .filter(([id, f]) => f.page === page && (!only || only.includes(id)))
+      .filter(([id, f]) => f.page === page && (!only || only.includes(id)) && (!!f.target || !!f.enter || hints.present(id)))
       .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
     if (!entries.length) return
     state.offer = null
