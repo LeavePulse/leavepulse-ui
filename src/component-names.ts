@@ -34,6 +34,7 @@ export const COMPONENT_NAMES = [
   "LpFileTree",
   "LpFormField",
   "LpHintLayer",
+  "LpHints",
   "LpIcon",
   "LpImageEditor",
   "LpInfraNode",

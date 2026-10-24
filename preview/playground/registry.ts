@@ -91,6 +91,9 @@ import {
   LpTooltip,
   LpTour,
   LpHintLayer,
+  LpHints,
+  createHintSystem,
+  localHintStorage,
   hints,
   openContextMenu,
   type TourContext,
@@ -2422,6 +2425,49 @@ export const registry: ComponentEntry[] = [
     <span class="text-xs text-muted">{{ log }}</span>
   </div>
   <LpTour v-model:open="open" v-model:step="step" :steps="steps" @finish="log = 'Finished'" @dismiss="(at) => log = 'Closed on step ' + (at + 1)" />
+</div>`,
+  },
+  {
+    id: "hints",
+    name: "Hints",
+    description:
+      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server.",
+    components: { LpHints, LpButton },
+    state: () => {
+      const storage = localHintStorage("lp-preview-hints")
+      const features = {
+        "demo.inbox": { page: "demo", order: 1, title: "Inbox", text: "Everything waiting for you." },
+        "demo.compose": { page: "demo", order: 2, title: "Compose", text: "Start a new message.", try: true },
+        "demo.archive": { page: "demo", order: 3, title: "Archive", text: "Done items live here.", rev: 1 },
+      }
+      return reactive({
+        system: createHintSystem({
+          features,
+          pages: { demo: { title: "this demo" } },
+          news: [{ id: "archive-v2", date: "2026-10-25", page: "demo", feature: "demo.archive", text: "Archive now keeps a year." }],
+          storage,
+          page: () => "demo",
+          sessionKey: "lp-preview-hints:session",
+          timing: { settle: 600, offerAgain: 0 },
+        }),
+        reset() {
+          localStorage.removeItem("lp-preview-hints")
+          sessionStorage.removeItem("lp-preview-hints:session")
+          location.reload()
+        },
+      })
+    },
+    template: `<div class="flex flex-col items-start gap-3">
+  <div class="flex flex-wrap gap-2">
+    <LpButton v-hint="'demo.inbox'" variant="outline" size="sm">Inbox</LpButton>
+    <LpButton v-hint="'demo.compose'" variant="outline" size="sm">Compose</LpButton>
+    <LpButton v-hint="'demo.archive'" variant="outline" size="sm">Archive</LpButton>
+  </div>
+  <div class="flex gap-2">
+    <LpButton size="sm" @click="system.startTour('demo')">Take the tour</LpButton>
+    <LpButton size="sm" variant="ghost" @click="reset">Reset as a new user</LpButton>
+  </div>
+  <LpHints :system="system" />
 </div>`,
   },
   {

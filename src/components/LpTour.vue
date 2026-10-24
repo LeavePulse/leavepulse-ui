@@ -125,9 +125,13 @@ const smooth = () => !prefersReducedMotion()
 
 function resolve(raw: TourStep["target"]): Element | null {
   if (!raw) return null
-  if (typeof raw === "function") return raw()
-  if (typeof raw !== "string") return raw.isConnected ? raw : null
-  return hints.element(raw) ?? document.querySelector(raw)
+  try {
+    if (typeof raw === "function") return raw()
+    if (typeof raw !== "string") return raw.isConnected ? raw : null
+    return hints.element(raw) ?? document.querySelector(raw)
+  } catch {
+    return null
+  }
 }
 
 function waitFor(raw: TourStep["target"], mine: number): Promise<Element | null> {
@@ -169,7 +173,13 @@ async function show(): Promise<void> {
   leave()
   const current = step.value
   if (!current) return
-  await current.enter?.({ onLeave: (fn) => leaving.push(fn), onEnd: (fn) => cleanups.push(fn) })
+  try {
+    await current.enter?.({ onLeave: (fn) => leaving.push(fn), onEnd: (fn) => cleanups.push(fn) })
+  } catch (error) {
+    console.warn("[LpTour] step skipped, its enter() failed:", error)
+    if (mine === token) skip()
+    return
+  }
   if (mine !== token) return
   if (!current.target) {
     target.value = null
@@ -214,8 +224,18 @@ async function perform() {
   setTimeout(next, TRY_SETTLE_MS)
 }
 
+function runAll(list: (() => void)[]) {
+  for (const cleanup of list.splice(0).reverse()) {
+    try {
+      cleanup()
+    } catch (error) {
+      console.warn("[LpTour] cleanup failed:", error)
+    }
+  }
+}
+
 function leave() {
-  for (const cleanup of leaving.splice(0).reverse()) cleanup()
+  runAll(leaving)
 }
 
 function end() {
@@ -225,7 +245,7 @@ function end() {
   frame = 0
   target.value = null
   box.value = null
-  for (const cleanup of cleanups.splice(0).reverse()) cleanup()
+  runAll(cleanups)
 }
 
 function finish(): void {

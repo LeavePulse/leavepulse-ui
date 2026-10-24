@@ -211,6 +211,22 @@ export { default as LpTour } from "./components/LpTour.vue"
 export type { TourContext, TourStep } from "./components/LpTour.vue"
 export { holeOf, openContextMenu, panelsAround } from "./components/tour"
 export { default as LpHintLayer } from "./components/LpHintLayer.vue"
+export { default as LpHints } from "./components/LpHints.vue"
+export { createHintSystem, localHintStorage, provideHintSystem, useHintSystem } from "./composables/useHintSystem"
+export type {
+  HintDelta,
+  HintFeature,
+  HintLevel,
+  HintNews,
+  HintNudge,
+  HintOffer,
+  HintPage,
+  HintRecord,
+  HintStorage,
+  HintSystem,
+  HintSystemOptions,
+  HintTiming,
+} from "./composables/useHintSystem"
 export type { HintNote } from "./components/LpHintLayer.vue"
 export { default as LpTooltipProvider } from "./components/LpTooltipProvider.vue"
 export { default as LpTopologyCanvas } from "./components/LpTopologyCanvas.vue"
