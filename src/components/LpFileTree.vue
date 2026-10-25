@@ -37,6 +37,7 @@ import {
 import LpEmptyState from "./LpEmptyState.vue"
 import LpFileTreeNode from "./LpFileTreeNode.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 
@@ -521,10 +522,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <div v-if="loading"
     :class="rootClass"
     v-bind="rest">
-    <div
+    <LpSkeleton
       v-for="n in skeletonRows"
       :key="n"
-      class="h-7 animate-pulse rounded-control bg-surface-soft"
+      class="h-7 shrink-0"
       :style="{ marginLeft: `${(n % 3) * 14}px` }"
     />
   </div>

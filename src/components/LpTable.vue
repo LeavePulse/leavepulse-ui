@@ -8,7 +8,9 @@ export default { inheritAttrs: false }
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, watch } from "vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import LpPagination from "./LpPagination.vue"
 import LpPopover from "./LpPopover.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -24,6 +26,7 @@ import { compareValues } from "./tableSort"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
 import { countValues, parseTableState, serializeTableState, summarizeShown } from "./tableFilter"
+import { resolveRowMenu, type TableRowMenuResult } from "./tableRowMenu"
 
 export interface TableColumn<Row> {
   key: string
@@ -164,6 +167,15 @@ const props = withDefaults(
     pageSize?: number
     /** Wait after a sort or filter change before `load` runs. */
     debounce?: number
+    /**
+     * The rows are on their way, for a table handed `rows` by a parent that
+     * fetches them itself (with `load` the table knows on its own). An empty
+     * table shows skeleton rows in the shape of its columns; a filled one dims
+     * while the next rows come.
+     */
+    loading?: boolean
+    /** How many skeleton rows stand in for the first page. */
+    skeletonRows?: number
     loadingLabel?: string
     errorLabel?: string
     /**
@@ -191,8 +203,10 @@ const props = withDefaults(
     /** Pin the header while the body scrolls. Pair with a height on the wrapper. */
     stickyHeader?: boolean
     /** Per-row right-click menu. Return [] (or omit the prop) to disable it for
-     *  a row; the row then keeps the browser's native context menu. */
-    rowMenu?: (row: T) => ContextMenuItemDef[]
+     *  a row; the row then keeps the browser's native context menu. Return
+     *  `{ title, subtitle?, image?, icon?, items }` to head the menu with the
+     *  row's name, so it is clear which row the right-click hit. */
+    rowMenu?: (row: T) => TableRowMenuResult
     /** Wording for the header's right-click menu. Passed in because the kit
      *  carries no translations: an app that leaves these alone gets English. */
     sortAscLabel?: string
@@ -230,6 +244,7 @@ const props = withDefaults(
   {
     rows: () => [],
     pageSize: 25,
+    skeletonRows: 5,
     debounce: 150,
     emptyIcon: "lucide:inbox",
     selectable: false,
@@ -374,11 +389,27 @@ function openRowMenu(event: Event) {
 
 // Row items first — they are what the pointer is actually on — then the
 // table-wide ones under a rule, when the row has any of its own.
+//
+// `rowMenu` is asked once per right-click, here, and both the items and the
+// heading are read off that one answer: a second call for the title could see
+// a row that changed in between and head one row's actions with another's name.
+const rowMenuFor = computed(() =>
+  resolveRowMenu(menuRow.value ? props.rowMenu?.(menuRow.value) : undefined),
+)
+
+// The heading names the ROW, so it is only shown over the row's own actions: on
+// a row without any, the menu is the table-wide one and a row title would claim
+// those for the row.
+const menuHead = computed(() => {
+  const menu = rowMenuFor.value
+  return menu.items.length && !paint.painting.value ? menu : undefined
+})
+
 const contextMenu = computed<ContextMenuItemDef[]>(() => {
   // A finger's long press opens this menu too; while it is selecting rows, no.
   if (paint.painting.value) return []
   const table = tableMenu()
-  const row = menuRow.value ? (props.rowMenu?.(menuRow.value) ?? []) : []
+  const row = rowMenuFor.value.items
   if (!row.length) return table
   if (!table.length) return row
   return [...row, { ...table[0], separatorBefore: true }, ...table.slice(1)]
@@ -401,7 +432,7 @@ const facets = ref<Record<string, unknown[]>>({})
 const failed = ref(false)
 const page = ref(1)
 const task = useAsyncTask<TablePage<T>>()
-const loading = task.pending
+const busy = computed(() => props.loading || task.pending.value)
 
 const sourceRows = computed<T[]>(() => (props.load ? loaded.value : props.rows))
 const sourceIndex = computed(() => new Map(sourceRows.value.map((row, i) => [row, i])))
@@ -962,12 +993,22 @@ const showBar = computed(
   () => props.summary || (!!props.selectable && props.selected.length > 0) || activeFilters.value.length > 0,
 )
 const filteredOut = computed(() => {
-  if (loading.value || failed.value || displayRows.value.length) return false
+  if (busy.value || failed.value || displayRows.value.length) return false
   if (props.load) return Object.values(hiddenValues.value).some((set) => set.size)
   return props.rows.length > 0
 })
 
 const cellY = computed(() => (props.density === "compact" ? "py-1.5" : "py-3"))
+
+/*
+ * Skeleton bars of uneven width, the way real cells are: a column of identical
+ * bars reads as a striped background rather than as rows of text. Fixed per
+ * cell rather than random, so a re-render does not reshuffle them.
+ */
+const SKELETON_WIDTHS = [72, 48, 88, 60, 40, 80, 56]
+function skeletonWidth(row: number, col: number): string {
+  return `${SKELETON_WIDTHS[(row * 3 + col * 2) % SKELETON_WIDTHS.length]}%`
+}
 
 const colSpan = computed(() => visibleColumns.value.length + (props.selectable ? 1 : 0))
 
@@ -1157,7 +1198,15 @@ const barInsetTop = computed(() =>
     <!-- The table-wide menu, which is what a right-click on empty header space
          reaches: rows and headers carry their own and take the event first, so
          this is the fallback rather than a competitor. -->
-    <LpContextMenu :items="contextMenu" always :no-hint="!rowMenu">
+    <LpContextMenu
+      :items="contextMenu"
+      always
+      :no-hint="!rowMenu"
+      :title="menuHead?.title"
+      :subtitle="menuHead?.subtitle"
+      :title-icon="menuHead?.icon"
+      :title-image="menuHead?.image"
+    >
     <table ref="tableEl" class="w-full border-collapse text-sm">
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
@@ -1265,21 +1314,47 @@ const barInsetTop = computed(() =>
         tag="tbody"
         name="lp-row"
         :css="animating"
-        :class="loading && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
+        :class="busy && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
+        :aria-busy="busy || undefined"
         :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
       >
-        <tr v-if="displayRows.length === 0" key="lp-table-empty" class="lp-row-empty">
-          <td :colspan="colSpan" class="px-4 py-10 text-center text-muted">
-            <LpIcon
-              :name="loading ? 'lucide:loader-circle' : failed ? 'lucide:circle-alert' : filteredOut ? 'lucide:filter-x' : emptyIcon"
-              :size="22"
-              class="mx-auto mb-2 opacity-60"
-              :class="loading ? 'animate-spin' : ''"
-            />
-            <div>{{ loading ? text.loading : failed ? text.error : filteredOut ? text.noMatches : text.empty }}</div>
-            <LpButton v-if="filteredOut" variant="outline" size="sm" class="mt-3" @click="clearAllFilters">
-              {{ text.resetFilters }}
-            </LpButton>
+        <!-- The first page on its way: rows in the shape of the columns rather
+             than a spinner in an empty box, so the table already has its height
+             and its columns when the data lands, and nothing below it moves.
+             The bars share LpSkeleton's pulse; the cells keep the real padding
+             and alignment. -->
+        <template v-if="displayRows.length === 0 && busy">
+          <tr
+            v-for="n in skeletonRows"
+            :key="`lp-table-skeleton-${n}`"
+            class="lp-row-empty border-b border-line/60 last:border-0"
+          >
+            <td v-if="selectable" class="w-px p-0" :class="cellY" />
+            <td
+              v-for="(col, ci) in visibleColumns"
+              :key="col.key"
+              class="px-4"
+              :class="[alignClass(col.align), cellY]"
+            >
+              <LpSkeleton
+                class="inline-block h-3 align-middle"
+                :style="{ width: skeletonWidth(n, ci) }"
+              />
+              <span v-if="n === 1 && ci === 0" class="sr-only">{{ text.loading }}</span>
+            </td>
+          </tr>
+        </template>
+        <tr v-else-if="displayRows.length === 0" key="lp-table-empty" class="lp-row-empty">
+          <td :colspan="colSpan" class="p-0">
+            <LpEmptyState
+              compact
+              :icon="failed ? 'lucide:circle-alert' : filteredOut ? 'lucide:filter-x' : emptyIcon"
+              :title="failed ? text.error : filteredOut ? text.noMatches : text.empty"
+            >
+              <LpButton v-if="filteredOut" variant="outline" size="sm" @click="clearAllFilters">
+                {{ text.resetFilters }}
+              </LpButton>
+            </LpEmptyState>
           </td>
         </tr>
         <!-- A plain <tr>, because TransitionGroup animates element children and
@@ -1332,7 +1407,7 @@ const barInsetTop = computed(() =>
     v-model:page="page"
     :total="total"
     :page-size="pageSize"
-    :disabled="loading"
+    :disabled="busy"
   />
   </div>
 </template>

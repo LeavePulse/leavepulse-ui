@@ -416,10 +416,11 @@ export const registry: ComponentEntry[] = [
     id: "card",
     name: "Card",
     description:
-      "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu. `accent` draws a stripe down the leading edge in ANY CSS colour — for a value that arrives from data (a Discord role colour, a per-project hex) rather than from the palette; it costs no layout, so accented and plain cards line their content up.",
-    components: { LpCard },
+      "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu, headed by `menuTitle` / `menuSubtitle` (items arriving late no longer remount the card's content). `loading` keeps the surface and pulses a skeleton in place of the content (a few lines by default, or the `#loading` slot written as the real layout with `.lp-skeleton-item` blocks); the swap to the content eases its height. `accent` draws a stripe down the leading edge in ANY CSS colour — for a value that arrives from data (a Discord role colour, a per-project hex) rather than from the palette; it costs no layout, so accented and plain cards line their content up.",
+    components: { LpCard, LpSwitch },
     state: () =>
       reactive({
+        loading: false,
         cardMenu: [
           { label: "Rename", icon: "lucide:pencil" },
           { label: "Duplicate", icon: "lucide:copy" },
@@ -427,10 +428,14 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div class="flex flex-col gap-3">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
   <div class="grid w-full grid-cols-3 gap-3">
-    <LpCard>Raised</LpCard>
-    <LpCard variant="flat">Flat</LpCard>
-    <LpCard variant="flat" interactive :menu-items="cardMenu">Right-click me</LpCard>
+    <LpCard :loading="loading">Raised</LpCard>
+    <LpCard variant="flat" :loading="loading">
+      Flat
+      <template #loading><div class="lp-skeleton-item h-5 w-12 rounded-control" /></template>
+    </LpCard>
+    <LpCard variant="flat" interactive :menu-items="cardMenu" menu-title="Project card" menu-subtitle="ger-01-p">Right-click me</LpCard>
   </div>
   <div class="grid w-full grid-cols-3 gap-3">
     <LpCard accent="#5865F2">accent="#5865F2"</LpCard>
@@ -608,13 +613,17 @@ export const registry: ComponentEntry[] = [
     id: "stat",
     name: "Stat",
     description:
-      "Metric tile: label, mono value, hint, and an optional delta/trend badge. Numeric delta auto-derives direction & sign; invertTrend flips colours for \"lower is better\" metrics (latency, errors).",
-    components: { LpStat },
-    template: `<div class="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
-  <LpStat online label="Servers online" value="43" hint="Responding now." />
-  <LpStat label="Revenue" value="€8,420" :delta="12.4" delta-suffix="%" hint="vs last week" />
-  <LpStat label="Avg latency" value="48 ms" :delta="-6" invert-trend hint="lower is better" />
-  <LpStat label="Signups" value="312" delta="+18%" />
+      "Metric tile: label, mono value, hint, and an optional delta/trend badge. Numeric delta auto-derives direction & sign; invertTrend flips colours for \"lower is better\" metrics (latency, errors). `loading` pulses the value and the delta inside their own type size, so the tile is the same height loading and loaded and a KPI row does not move when the figures land.",
+    components: { LpStat, LpSwitch },
+    state: () => reactive({ loading: false }),
+    template: `<div class="flex w-full flex-col gap-4">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
+  <div class="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
+    <LpStat online label="Servers online" value="43" hint="Responding now." :loading="loading" />
+    <LpStat label="Revenue" value="€8,420" :delta="12.4" delta-suffix="%" hint="vs last week" :loading="loading" />
+    <LpStat label="Avg latency" value="48 ms" :delta="-6" invert-trend hint="lower is better" :loading="loading" />
+    <LpStat label="Signups" :value="312" delta="+18%" :loading="loading" />
+  </div>
 </div>`,
   },
   {
@@ -759,10 +768,11 @@ export const registry: ComponentEntry[] = [
     id: "pie",
     name: "Pie / Donut",
     description:
-      "Shares of a whole. Takes any number of slices: the tail folds into \"Other\" (which keeps its total and a count) so twenty categories stay readable without losing data. Hover lifts a slice; click pins a selection — Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu. The legend works from the keyboard, and `data-table` (on Services) adds a visually hidden table for screen readers.",
-    components: { LpPie },
+      "Shares of a whole. Takes any number of slices: the tail folds into \"Other\" (which keeps its total and a count) so twenty categories stay readable without losing data. Hover lifts a slice; click pins a selection — Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu. The legend works from the keyboard, and `data-table` (on Services) adds a visually hidden table for screen readers. `loading` draws a pulsing ring (a disc for `pie`) at the chart's size with legend rows beside it, and eases into the chart; the sweep waits for the data.",
+    components: { LpPie, LpSwitch },
     state: () =>
       reactive({
+        loading: false,
         disk: [
           { label: "Containers", value: 412 },
           { label: "Images", value: 186 },
@@ -802,9 +812,11 @@ export const registry: ComponentEntry[] = [
               ],
       }),
     template: `<div class="flex w-full max-w-3xl flex-col gap-10">
-  <div class="flex flex-wrap gap-10 max-sm:justify-center">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
+  <div class="-mt-6 flex flex-wrap gap-10 max-sm:justify-center">
     <LpPie
       :slices="disk"
+      :loading="loading"
       title="Disk usage"
       subtitle="data-vps · 983 GB"
       unit=" GB"
@@ -815,6 +827,7 @@ export const registry: ComponentEntry[] = [
     <LpPie
       :slices="fleet"
       type="pie"
+      :loading="loading"
       title="Services"
       :size="150"
       :max-slices="0"
@@ -863,10 +876,11 @@ export const registry: ComponentEntry[] = [
     id: "sparkline",
     name: "Sparkline",
     description:
-      "A trend with no axes — sized for a table cell or a stat tile. Measures nothing and holds no state, so a page can carry dozens.",
-    components: { LpSparkline, LpStat, LpBadge },
+      "A trend with no axes — sized for a table cell or a stat tile. Measures nothing and holds no state, so a page can carry dozens. `loading` holds the line's box with a pulsing band, then the line draws itself in.",
+    components: { LpSparkline, LpStat, LpBadge, LpSwitch },
     state: () =>
       reactive({
+        loading: false,
         hosts: [
           { name: "app-vps-1", load: [0.4, 0.5, 0.4, 0.6, 0.5, 0.7, 0.6, 0.8, 1.1, 0.9, 1.0, 1.2], now: "1.24", tone: "brand", up: true },
           { name: "data-vps", load: [2.1, 2.0, 2.2, 1.9, 2.1, 2.0, 2.2, 2.1, 2.0, 2.1, 2.2, 2.0], now: "2.02", tone: "brand", up: true },
@@ -878,16 +892,17 @@ export const registry: ComponentEntry[] = [
         errors: [1, 0, 2, 1, 4, 12, 8, 3, 2, 1, 1, 0],
       }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-8">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
   <!-- In a stat tile: the delta says how much, the shape says how. -->
-  <div class="flex flex-wrap gap-10 max-sm:justify-center">
-    <LpStat label="Revenue" :value="61200" prefix="€" compact :delta="12.5" delta-suffix="%">
+  <div class="-mt-4 flex flex-wrap gap-10 max-sm:justify-center">
+    <LpStat label="Revenue" :value="61200" prefix="€" compact :delta="12.5" delta-suffix="%" :loading="loading">
       <template #trend>
-        <LpSparkline :data="revenue" area show-last :width="96" />
+        <LpSparkline :data="revenue" area show-last :width="96" :loading="loading" />
       </template>
     </LpStat>
-    <LpStat label="Errors" value="0" :delta="-100" delta-suffix="%" invert-trend>
+    <LpStat label="Errors" value="0" :delta="-100" delta-suffix="%" invert-trend :loading="loading">
       <template #trend>
-        <LpSparkline :data="errors" tone="danger" :width="96" />
+        <LpSparkline :data="errors" tone="danger" :width="96" :loading="loading" />
       </template>
     </LpStat>
   </div>
@@ -897,7 +912,7 @@ export const registry: ComponentEntry[] = [
     <div v-for="h in hosts" :key="h.name" class="flex items-center gap-4 px-4 py-2.5">
       <span class="w-24 shrink-0 truncate sm:w-32 font-mono text-sm text-ink">{{ h.name }}</span>
       <span class="w-14 shrink-0 text-right font-mono text-sm tabular-nums text-muted-strong">{{ h.now }}</span>
-      <LpSparkline :data="h.load" :tone="h.tone" show-last />
+      <LpSparkline :data="h.load" :tone="h.tone" show-last :loading="loading" />
       <LpBadge :tone="h.up ? 'success' : 'neutral'" class="ml-auto">
         {{ h.up ? 'online' : 'offline' }}
       </LpBadge>
@@ -913,10 +928,11 @@ export const registry: ComponentEntry[] = [
   {
     id: "uptime-bar",
     name: "Uptime Bar",
-    description: "Status-page uptime scale: per-slice tooltips and a computed %.",
-    components: { LpUptimeBar },
+    description: "Status-page uptime scale: per-slice tooltips and a computed %. `loading` pulses a row of ticks at the bar's height (as many as `segments` holds, else `skeletonSlices`) and holds the figure, so the captions around it stay put.",
+    components: { LpUptimeBar, LpSwitch },
     state: () =>
       reactive({
+        loading: false,
         days: Array.from({ length: 60 }, (_, i) => {
           const status =
             i === 12 ? "down" : i === 33 || i === 34 ? "degraded" : i === 50 ? "maintenance" : "operational"
@@ -924,8 +940,11 @@ export const registry: ComponentEntry[] = [
         }),
       }),
     template: `<div class="w-96 flex flex-col gap-6">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
   <LpUptimeBar
-    :segments="days"
+    :segments="loading ? [] : days"
+    :loading="loading"
+    :skeleton-slices="60"
     title="api.leavepulse.io"
     start-label="60 days ago"
     end-label="Today"
@@ -944,10 +963,11 @@ export const registry: ComponentEntry[] = [
     id: "chart",
     name: "Chart",
     description:
-      "Line, area and bar off one data shape. Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series. `thresholds` draws reference lines or bands (`to`), `markers` pins events to an x position. The plot is keyboard reachable (arrows, Home, End, Enter), reads out a generated summary, and `data-table` adds a visually hidden table of the values.",
-    components: { LpChart, LpButton },
+      "Line, area and bar off one data shape. Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series. `thresholds` draws reference lines or bands (`to`), `markers` pins events to an x position. The plot is keyboard reachable (arrows, Home, End, Enter), reads out a generated summary, and `data-table` adds a visually hidden table of the values. `loading` keeps the plot's height and pulses a stand-in of the chart's type in the plot area (bars, or a line; tick stubs on the axes), then swaps to the marks; an empty chart shows LpEmptyState.",
+    components: { LpChart, LpButton, LpSwitch },
     state: () =>
       reactive({
+        loading: false,
         hours: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`),
         traffic: [
           {
@@ -1005,8 +1025,10 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div class="flex w-full max-w-3xl flex-col gap-10">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading</label>
   <LpChart
     type="area"
+    :loading="loading"
     :series="traffic"
     :labels="hours"
     title="Edge traffic"
@@ -1028,6 +1050,7 @@ export const registry: ComponentEntry[] = [
 
   <LpChart
     type="line"
+    :loading="loading"
     :series="latency"
     :labels="months"
     title="Response time"
@@ -1038,6 +1061,7 @@ export const registry: ComponentEntry[] = [
 
   <LpChart
     type="bar"
+    :loading="loading"
     :series="spend"
     :labels="quarters"
     stacked
@@ -2882,10 +2906,11 @@ export const registry: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu`, stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off. A column's `hideBelow` leaves it out while the table is narrower than that (Status below 520px here).",
-    components: { LpTable, LpBadge, LpButton, LpIcon },
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu` (return `{ title, subtitle, icon, items }` to head it with the row's name), `loading` for rows a parent fetches (skeleton rows in the shape of the columns while empty, dimmed while refreshing), stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off. A column's `hideBelow` leaves it out while the table is narrower than that (Status below 520px here).",
+    components: { LpTable, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () => {
       const s = reactive({
+        loading: false,
         sort: { key: "amount", dir: "desc" },
         selected: ["ORD-1041"],
         columns: [
@@ -2976,9 +3001,13 @@ export const registry: ComponentEntry[] = [
           { title: "Dark mode glitch", priority: "medium", version: "2.2.0" },
         ],
         ticketSort: { key: "priority", dir: "desc" },
-        // Per-row menu: returns items for the right-clicked row.
-        rowMenu(row: { id: string; status: string }) {
-          return [
+        // Per-row menu: the right-clicked row's items, headed by its id.
+        rowMenu(row: { id: string; status: string; amount: number }) {
+          return {
+            title: row.id,
+            subtitle: `€${row.amount.toFixed(2)} · ${row.status}`,
+            icon: "lucide:receipt",
+            items: [
             { label: "Copy ID", icon: "lucide:copy", onSelect: () => navigator.clipboard?.writeText(row.id) },
             {
               label: "Mark as paid",
@@ -2993,15 +3022,18 @@ export const registry: ComponentEntry[] = [
               danger: true,
               onSelect: () => { s.rows = s.rows.filter((r) => r.id !== row.id) },
             },
-          ]
+            ],
+          }
         },
       })
       return s
     },
     template: `<div class="flex flex-col gap-2">
+  <label class="flex items-center gap-2 text-sm text-muted"><LpSwitch v-model="loading" /> Loading (empty table)</label>
   <LpTable
     :columns="columns"
-    :rows="rows"
+    :rows="loading ? [] : rows"
+    :loading="loading"
     row-key="id"
     selectable
     exportable

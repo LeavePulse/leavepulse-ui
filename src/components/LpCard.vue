@@ -1,15 +1,16 @@
 <script lang="ts">
-// Opt out of auto attr inheritance: the template has two root branches (menu /
-// no-menu), so fallthrough class/attrs/events are bound explicitly onto the
-// inner <div> in both — keeping them on the card surface.
+// Opt out of auto attr inheritance: the root is the context menu's trigger, so
+// fallthrough class/attrs/events are bound explicitly onto the inner surface.
 export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import LpSkeleton from "./LpSkeleton.vue"
+import LpSwap from "./LpSwap.vue"
 
 const card = tv({
   // break-words: a card is where text with no spaces in it ends up (a
@@ -76,6 +77,17 @@ const props = withDefaults(
     interactive?: boolean
     /** Right-click menu for the card. Omit (or pass []) to keep the native one. */
     menuItems?: ContextMenuItemDef[]
+    /** Heading of the right-click menu: what the card stands for (its name). */
+    menuTitle?: string
+    /** A muted second line under `menuTitle`. */
+    menuSubtitle?: string
+    /**
+     * Content is still on its way. The card keeps its surface (border, padding,
+     * accent) and shows a skeleton in place of the slot: the `#loading` slot when
+     * given, written as the real layout with `.lp-skeleton-item` blocks, else a
+     * few text lines. The swap to the content eases its height.
+     */
+    loading?: boolean
     /** Element to render as. A card inside a <ul> has to be an `li` to be valid. */
     as?: string
     /**
@@ -92,7 +104,7 @@ const props = withDefaults(
     /** Width of the `accent` stripe. */
     accentWidth?: string
   }>(),
-  { variant: "raised", padded: true, interactive: false, as: "div" },
+  { variant: "raised", padded: true, interactive: false, as: "div", loading: false },
 )
 
 // Merged rather than concatenated: binding the raw `$attrs` would otherwise put the
@@ -106,6 +118,17 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
     interactive: props.interactive,
     accent: Boolean(props.accent),
   }),
+)
+
+// Remembers that this card has been through a loading state, so the swap
+// wrapper stays once content arrives instead of being torn down (which would
+// remount the content right after it faded in).
+const everLoaded = ref(props.loading)
+watch(
+  () => props.loading,
+  (value) => {
+    if (value) everLoaded.value = true
+  },
 )
 
 // Through custom properties rather than a box-shadow written here: the shadow
@@ -123,15 +146,30 @@ const accentStyle = computed(() =>
 </script>
 
 <template>
-  <!-- Fallthrough class/attrs/events are bound onto the <div> in both branches
-       (inheritAttrs:false above), so the card surface looks identical whether or
-       not it's wrapped in a context menu. -->
-  <LpContextMenu v-if="menuItems?.length" :items="menuItems">
-    <component :is="as" :class="classes" :style="accentStyle" v-bind="rest">
-      <slot />
+  <!-- Always wrapped: switching between a bare surface and a menu-wrapped one
+       remounted the whole content (its state, its focus, its running
+       animations) the moment menu items arrived. With no items the trigger is
+       disabled and the browser's own menu stays. -->
+  <LpContextMenu :items="menuItems ?? []" :title="menuTitle" :subtitle="menuSubtitle">
+    <component :is="as" :class="classes" :style="accentStyle" :aria-busy="loading || undefined" v-bind="rest">
+      <!-- The swap only once loading has been asked for: a card that never
+           loads keeps its slot as a direct child, so layouts that style the
+           card's children (grids, `space-y-*`) are left exactly as they were. -->
+      <LpSwap v-if="loading || everLoaded" :swap-key="loading ? 'loading' : 'content'">
+        <!-- The wrapper form: the app's `#loading` markup only names its
+             blocks `.lp-skeleton-item`, and is hidden from assistive tech. -->
+        <LpSkeleton v-if="loading">
+          <slot name="loading">
+            <div class="flex flex-col gap-3">
+              <div class="lp-skeleton-item h-4 w-2/5 rounded-control" />
+              <div class="lp-skeleton-item h-3 w-full rounded-control" />
+              <div class="lp-skeleton-item h-3 w-4/5 rounded-control" />
+            </div>
+          </slot>
+        </LpSkeleton>
+        <slot v-else />
+      </LpSwap>
+      <slot v-else />
     </component>
   </LpContextMenu>
-  <component :is="as" v-else :class="classes" :style="accentStyle" v-bind="rest">
-    <slot />
-  </component>
 </template>

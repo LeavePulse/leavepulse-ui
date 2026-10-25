@@ -18,6 +18,7 @@ import LpIcon from "./LpIcon.vue"
 import LpPopover from "./LpPopover.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import LpShift from "./LpShift.vue"
 
 export interface NotificationItem {
@@ -342,7 +343,7 @@ function timeAgo(iso?: string): string {
          swap keeps the popover from snapping under the bell. -->
     <LpShift axis="height">
       <div v-if="loading" class="space-y-1.5 px-2 pb-2">
-        <div v-for="i in 4" :key="i" class="h-12 animate-pulse rounded-control bg-surface-soft" />
+        <LpSkeleton v-for="i in 4" :key="i" class="h-12" />
       </div>
 
       <LpEmptyState

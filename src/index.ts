@@ -196,6 +196,8 @@ export type { SortState, TableColumn, TablePage, TableQuery } from "./components
 export type { TableLabels } from "./components/LpTable.vue"
 export type { TableExportOptions } from "./components/LpTable.vue"
 export { compareValues } from "./components/tableSort"
+export { resolveRowMenu } from "./components/tableRowMenu"
+export type { TableRowMenu, TableRowMenuResult } from "./components/tableRowMenu"
 export { default as LpTableOfContents } from "./components/LpTableOfContents.vue"
 export type { TocLink } from "./components/LpTableOfContents.vue"
 export { default as LpTabs } from "./components/LpTabs.vue"

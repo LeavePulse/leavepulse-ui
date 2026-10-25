@@ -25,10 +25,12 @@ import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { useReveal } from "../composables/useReveal"
 import { arcPath, calloutLabels, resolveSlices, formatTick, type PieSlice } from "./chart"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
-import LpIcon from "./LpIcon.vue"
+import LpEmptyState from "./LpEmptyState.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
+import LpSkeleton from "./LpSkeleton.vue"
+import LpSwap from "./LpSwap.vue"
 import LpTooltip from "./LpTooltip.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
@@ -36,6 +38,8 @@ import { useLabels } from "../composables/useLpConfig"
 export interface PieText {
   [key: string]: string
   empty: string
+  /** Read out while `loading`; the placeholder itself is silent. */
+  loading: string
   other: string
   total: string
   /** "{n} selected"; `{n}` is replaced by the count. */
@@ -117,6 +121,14 @@ const props = withDefaults(
      */
     menuItems?: (slice: SliceEvent, selection: SliceEvent[]) => ContextMenuItemDef[]
     emptyLabel?: string
+    /**
+     * The slices are on their way. A pulsing ring (a disc for `pie`) of the
+     * chart's own size stands in, with legend rows beside it when there will be
+     * a legend, and eases into the real chart when the data lands.
+     */
+    loading?: boolean
+    /** Legend rows drawn while loading. */
+    skeletonRows?: number
     /** Accessible name for the chart. Defaults to a generated summary. */
     ariaLabel?: string
     /** Render the slices as a visually hidden table for screen readers. */
@@ -127,6 +139,12 @@ const props = withDefaults(
   {
     type: "donut",
     size: 180,
+    loading: false,
+    skeletonRows: 4,
+    // Explicitly undefined: Vue casts an absent boolean prop to `false`, which
+    // made `showLegend ?? !labels` read "hide" and dropped the legend unless
+    // it was asked for by name.
+    showLegend: undefined,
     innerRatio: 0.62,
     maxSlices: 6,
     showPercent: true,
@@ -151,7 +169,7 @@ const emit = defineEmits<{
 
 const strings = useLabels<PieText>(
   "pie",
-  { empty: "No data", other: "Other", total: "total", selected: "{n} selected" },
+  { empty: "No data", loading: "Loading", other: "Other", total: "total", selected: "{n} selected" },
   () => props.text,
 )
 
@@ -167,6 +185,9 @@ const resolved = computed(() =>
 const hasData = computed(() => resolved.value.slices.length > 0)
 
 const legendShown = computed(() => props.showLegend ?? !props.labels)
+
+/* Which of the three the chart area holds; the key of its swap. */
+const viewState = computed(() => (props.loading ? "loading" : hasData.value ? "chart" : "empty"))
 
 const fmt = (v: number): string =>
   `${props.formatValue ? props.formatValue(v) : formatTick(v)}${props.unit ?? ""}`
@@ -237,6 +258,17 @@ const cy = computed(() => canvasHeight.value / 2)
 // The lift has to come out of the radius, not out of the box: a slice that
 // grows past the viewBox would be clipped mid-hover.
 const outer = computed(() => props.size / 2 - 2 - props.hoverOffset)
+
+/*
+ * The placeholder ring sits exactly where the slices will: inset by the same
+ * margin as `outer`, and as thick as the band between `outer` and `inner` (a
+ * pie, with no hole, is a full disc).
+ */
+const skeletonRing = computed(() => {
+  const inset = props.size / 2 - outer.value
+  const band = props.type === "donut" ? outer.value - inner.value : outer.value
+  return { inset: `${inset}px`, borderWidth: `${Math.max(1, band)}px` }
+})
 const inner = computed(() =>
   props.type === "donut" ? outer.value * Math.min(0.95, Math.max(0, props.innerRatio)) : 0,
 )
@@ -302,12 +334,26 @@ const runSweep = () => {
   sweepFrame = requestAnimationFrame(step)
 }
 
+/*
+ * Held while `loading`: the placeholder is what is on screen then, and a sweep
+ * spent on it would leave the slices to appear already complete. A new load
+ * closes the circle again, so the data that follows sweeps in like the first.
+ */
 watch(
-  revealed,
-  (visible) => {
-    if (visible && props.animate) runSweep()
+  () => revealed.value && !props.loading,
+  (go) => {
+    if (go && props.animate) runSweep()
   },
   { immediate: true },
+)
+
+watch(
+  () => props.loading,
+  (loading) => {
+    if (!loading || !props.animate) return
+    stopSweep()
+    sweep.value = 0
+  },
 )
 
 onBeforeUnmount(stopSweep)
@@ -626,20 +672,43 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 <template>
   <div ref="revealAnchor"
     :class="rootClass"
+    :aria-busy="loading || undefined"
     v-bind="rest">
     <div v-if="title || subtitle" class="flex flex-col gap-0.5">
       <span v-if="title" class="text-sm font-medium text-ink">{{ title }}</span>
       <span v-if="subtitle" class="text-xs text-muted">{{ subtitle }}</span>
     </div>
 
-    <div
-      v-if="!hasData"
-      class="flex flex-col items-center justify-center gap-2 rounded-control border border-dashed border-line text-muted"
-      :style="{ width: `${size}px`, height: `${size}px` }"
-    >
-      <LpIcon name="lucide:chart-pie" :size="18" />
-      <span class="text-xs">{{ emptyLabel ?? strings.empty }}</span>
+    <!-- Placeholder, empty state and chart differ in height (a legend can run
+         taller than the circle), so the swap eases the box between them. -->
+    <LpSwap :swap-key="viewState">
+    <div v-if="loading">
+      <span class="sr-only">{{ strings.loading }}</span>
+      <LpSkeleton class="flex flex-wrap items-start gap-x-6 gap-y-3">
+        <div class="relative max-w-full shrink-0 max-sm:mx-auto" :style="{ width: `${size}px`, height: `${size}px` }">
+          <div
+            class="lp-skeleton-item absolute rounded-full border-surface-soft"
+            :style="{ inset: skeletonRing.inset, borderWidth: skeletonRing.borderWidth, borderStyle: 'solid' }"
+          />
+        </div>
+        <div v-if="legendShown" class="flex min-w-0 flex-col gap-1.5">
+          <div v-for="n in skeletonRows" :key="n" class="flex items-center gap-2 px-1 py-0.5">
+            <span class="lp-skeleton-item size-2 shrink-0 rounded-full bg-surface-soft" />
+            <span class="lp-skeleton-item h-2.5 rounded-control bg-surface-soft" :style="{ width: `${56 + ((n * 23) % 40)}px` }" />
+            <span class="lp-skeleton-item ml-auto h-2.5 w-8 shrink-0 rounded-control bg-surface-soft" />
+          </div>
+        </div>
+      </LpSkeleton>
     </div>
+
+    <LpEmptyState
+      v-else-if="!hasData"
+      compact
+      icon="lucide:chart-pie"
+      :title="emptyLabel ?? strings.empty"
+      class="justify-center rounded-control border border-dashed border-line px-3 py-0"
+      :style="{ width: `${size}px`, height: `${size}px` }"
+    />
 
     <!-- items-start, not items-center: an unfolded legend can be taller than
          the circle, and centring would push the circle down past it. -->
@@ -860,8 +929,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </div>
       </div>
     </LpContextMenu>
+    </LpSwap>
 
-    <table v-if="dataTable && hasData" class="sr-only">
+    <table v-if="dataTable && hasData && !loading" class="sr-only">
       <caption v-if="title">{{ title }}</caption>
       <tbody>
         <tr v-for="(a, i) in arcs" :key="`${i}-${a.label}`">
