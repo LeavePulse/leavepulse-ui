@@ -307,7 +307,7 @@ export {
 export type { RevealOrigin } from "./theme/useTheme"
 export { detectBackdropFilter, GLASS_BACKDROP_ATTR, isBrokenBackdropEngine, NO_BACKDROP_ATTR, setGlassBackdrop } from "./theme/backdrop"
 export { DEFAULT_SURFACE } from "./theme/tokens"
-export { defineTheme } from "./theme/define"
+export { defineTheme, withBrand } from "./theme/define"
 export type { ThemeOverrides } from "./theme/define"
 export type {
   ColorTokens,
