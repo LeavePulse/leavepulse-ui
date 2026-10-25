@@ -435,11 +435,11 @@ const ARROW =
 <template>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
-      <!-- Not `lp-scrim--nested` even over another layer: that variant drops
-           the scrim's blur because a nested dialog brings its own glass panel,
-           and a lightbox has none, so the drawer or dialog it opened from read
-           sharp around the picture. -->
+      <!-- Not `lp-scrim--nested` even over another layer: a lightbox wants its
+           full dark backdrop around the picture, not the lighter nested tint.
+           The blur is handed up the stack like every scrim's. -->
       <DialogOverlay
+        :class="{ 'lp-scrim--covered': layer.covered }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />

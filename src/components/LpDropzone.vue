@@ -34,6 +34,8 @@ export default { inheritAttrs: false }
  * clicks through, except the controls the zone itself puts there.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
+import { HINT_SIGNALS, noteDropzone } from "../composables/useHintSystem"
+import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
@@ -231,6 +233,7 @@ async function onDrop(event: DragEvent) {
   pointerOver.value = false
   const data = event.dataTransfer
   if (!data || props.disabled) return
+  direct()
   if (data.files.length) return take(data.files)
   if (!props.links) return
   const url = droppedAddress(data)
@@ -246,11 +249,13 @@ function onPaste(event: ClipboardEvent) {
   // field. A copied picture brings its file and its address; the file wins.
   if (files.length) {
     event.preventDefault()
+    direct()
     return take(files)
   }
   const url = props.links ? addressIn(event.clipboardData?.getData("text/plain")) : null
   if (!url || props.disabled) return
   event.preventDefault()
+  direct()
   emit("link", url)
 }
 
@@ -336,8 +341,19 @@ function press() {
 
 const contentId = useId()
 
+// Usage for `dropzoneTip`: someone who keeps going through the file dialog
+// and never drops or pastes gets told that the zone takes both.
+function direct() {
+  hints.use(HINT_SIGNALS.dropzoneDirect)
+}
+
 function onPicked(event: Event) {
   const el = event.target as HTMLInputElement
+  if (el.files?.length) {
+    hints.use(HINT_SIGNALS.dropzoneBrowse)
+    const zone = revealAnchor.value
+    if (zone instanceof Element) noteDropzone(zone)
+  }
   take(el.files)
   // Cleared so picking the same file twice in a row fires again — otherwise
   // "I chose the wrong one, let me redo it" silently does nothing.

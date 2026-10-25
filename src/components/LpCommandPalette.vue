@@ -1222,7 +1222,7 @@ useHotkeys(() =>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
     <DialogPortal>
       <DialogOverlay
-        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
+        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />

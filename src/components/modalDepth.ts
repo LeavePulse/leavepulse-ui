@@ -24,8 +24,11 @@ export interface ModalLayer {
   /** Join the stack on top. Ignored on the server, where nothing would ever release it. */
   claim: () => void
   release: () => void
-  /** z-index values for this surface's scrim and panel, and whether another modal is under it. */
-  layer: ComputedRef<{ scrim: string; panel: string; nested: boolean }>
+  /**
+   * z-index values for this surface's scrim and panel, whether another modal
+   * is under it (`nested`) and whether another is open above it (`covered`).
+   */
+  layer: ComputedRef<{ scrim: string; panel: string; nested: boolean; covered: boolean }>
   /** Whether this surface is the topmost open one. */
   top: ComputedRef<boolean>
 }
@@ -64,6 +67,7 @@ export function useModalLayer(options: ModalLayerOptions = {}): ModalLayer {
         scrim: `calc(var(--z-overlay) - ${drop})`,
         panel: `calc(var(--z-modal) - ${drop})`,
         nested: stack.value.indexOf(id) > 0,
+        covered: fromTop.value > 0 && stack.value.includes(id),
       }
     }),
     top: computed(() => stack.value[stack.value.length - 1] === id),

@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "reka-ui"
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
+import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
 import { useLabels } from "../composables/useLpConfig"
 import { useShift } from "../composables/useShift"
@@ -79,16 +80,40 @@ const props = withDefaults(
     ariaLabel?: string
     /** `alertdialog` for a prompt that interrupts the user (a confirmation). */
     role?: "dialog" | "alertdialog"
+    /**
+     * Escape and a click on the scrim close the dialog (the default). False
+     * leaves only the close button and the app's own buttons, for a step the
+     * user must finish or cancel on purpose.
+     */
+    dismissible?: boolean
+    /**
+     * Something would be lost by closing: `true` asks "Discard changes?" first
+     * (and warns on leaving the page), a function asks the app. Bind it to the
+     * form's state, `:guard="form.dirty"`. See `useCloseGuard`.
+     */
+    guard?: CloseGuard
     labels?: Partial<{ close: string }>
   }>(),
-  { size: "md", autoFocus: "auto", glass: undefined },
+  { size: "md", autoFocus: "auto", glass: undefined, dismissible: true, guard: undefined },
 )
 
 const text = useLabels("modal", { close: "Close" }, () => props.labels)
 
 const frosted = useGlass(() => props.glass)
 
-defineEmits<{ (e: "update:open", value: boolean): void }>()
+const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
+
+// Every way out (Escape, scrim, the close button, a DialogClose in the app's
+// footer) arrives here as reka asking to close, and reka keeps the dialog open
+// for as long as `open` stays true, so the guard can take its time asking.
+const { allowClose } = useCloseGuard(() => props.guard, () => !!props.open)
+async function onOpenChange(next: boolean) {
+  if (next || (await allowClose())) emit("update:open", next)
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (!props.dismissible) event.preventDefault()
+}
 
 // Spread rather than a plain `:aria-describedby` binding: with a description
 // the key must be absent entirely so reka-ui's own generated id survives, and
@@ -101,6 +126,7 @@ defineEmits<{ (e: "update:open", value: boolean): void }>()
  * attribute and every click behaves exactly as before.
  */
 const onInteractOutside = (event: Event) => {
+  if (!props.dismissible) return event.preventDefault()
   const target = event.target
   if (target instanceof Element && target.closest("[data-lp-modal-aside]")) {
     event.preventDefault()
@@ -252,10 +278,10 @@ watch(
 </script>
 
 <template>
-  <DialogRoot :open="open" @update:open="(v) => $emit('update:open', v)">
+  <DialogRoot :open="open" @update:open="onOpenChange">
     <DialogPortal>
       <DialogOverlay
-        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
+        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />
@@ -314,6 +340,7 @@ watch(
         @open-auto-focus="onOpenAutoFocus"
         @interact-outside="onInteractOutside"
         @pointer-down-outside="onInteractOutside"
+        @escape-key-down="onEscape"
       >
       <aside
         v-if="$slots.aside"

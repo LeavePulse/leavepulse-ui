@@ -214,7 +214,7 @@ export type { TourContext, TourStep } from "./components/LpTour.vue"
 export { holeOf, openContextMenu, panelsAround } from "./components/tour"
 export { default as LpHintLayer } from "./components/LpHintLayer.vue"
 export { default as LpHints } from "./components/LpHints.vue"
-export { HINT_SIGNALS, contextMenuTip, createHintSystem, hintKey, hintSummary, localHintStorage, paletteTip, provideHintSystem, runningHintSystem, useHintSystem } from "./composables/useHintSystem"
+export { HINT_SIGNALS, contextMenuTip, createHintSystem, dropzoneTip, hotkeyTip, noteDropzone, noteHotkeyTarget, hintKey, hintSummary, localHintStorage, paletteTip, provideHintSystem, runningHintSystem, useHintSystem } from "./composables/useHintSystem"
 export type {
   HintDelta,
   HintFeature,
@@ -313,6 +313,7 @@ export {
   hotkeyConflicts,
   hotkeySteps,
   matchesHotkey,
+  parseCombo,
   pendingHotkey,
   sequenceProgress,
   useAppleKeyboard,
@@ -326,7 +327,11 @@ export { focusableIn, nextInDirection } from "./composables/spatialNav"
 export type { Box, Direction } from "./composables/spatialNav"
 export { provideGlass, useGlass } from "./composables/useGlass"
 export { LP_CONFIG, lpConfig, mergeConfig, provideLpConfig, useLabels, useLinkComponent, useLpConfig } from "./composables/useLpConfig"
-export type { LabelScope, LpConfig } from "./composables/useLpConfig"
+export type { KitStorage, LabelScope, LpConfig } from "./composables/useLpConfig"
+export { browserStorage, useKitStorage, usePersisted } from "./composables/usePersisted"
+export { useCloseGuard } from "./composables/useCloseGuard"
+export type { CloseGuard, CloseGuardLabels } from "./composables/useCloseGuard"
+export type { PersistedOptions } from "./composables/usePersisted"
 export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMergedClass"
 export { anchorPattern, stripDisallowed, useInputFilter } from "./composables/useInputFilter"
 export { usePaintSelect } from "./composables/usePaintSelect"

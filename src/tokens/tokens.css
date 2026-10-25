@@ -500,6 +500,29 @@
   background-color: rgb(0 0 0 / var(--scrim-opacity, 0.5));
   -webkit-backdrop-filter: blur(var(--scrim-blur, 4px));
   backdrop-filter: blur(var(--scrim-blur, 4px));
+  transition:
+    -webkit-backdrop-filter var(--duration-medium) var(--ease-emphasized),
+    backdrop-filter var(--duration-medium) var(--ease-emphasized);
+}
+
+/*
+ * One blur for the whole stack, always on its top layer. A scrim with another
+ * modal open above it hands its blur up: the upper scrim blurs everything
+ * beneath it, the page and the dialog it was opened from alike, so both read
+ * as behind and are blurred exactly once. Blurring at every level would cost
+ * a full-screen filter per layer; not blurring the upper one left the dialog
+ * underneath sharp, its edge fighting the one on top. The hand-over is a
+ * transition, so the page never flashes sharp between the two.
+ */
+.lp-scrim--covered {
+  -webkit-backdrop-filter: blur(0px);
+  backdrop-filter: blur(0px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-scrim {
+    transition: none;
+  }
 }
 
 /*
@@ -533,10 +556,9 @@
   --scrim-opacity: 0.32;
 }
 
+/* Lighter: the scrim below still tints, and opacity compounds. */
 .lp-scrim--nested {
   --scrim-opacity: 0.24;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 /* A tour fading out is already over: the click that ended it, or the next one, reaches the page. */

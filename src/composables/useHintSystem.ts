@@ -107,6 +107,14 @@ export const HINT_SIGNALS = {
   navigate: "lp.navigate",
   /** An item's actions were opened in the palette (Tab). */
   paletteActions: "lp.palette-actions",
+  /** A button's `hotkey` was pressed instead of clicking it. */
+  hotkey: "lp.hotkey",
+  /** A button that has a `hotkey` was clicked with the pointer. */
+  hotkeyTarget: "lp.hotkey-target",
+  /** A dropzone's file dialog was used to pick a file. */
+  dropzoneBrowse: "lp.dropzone-browse",
+  /** Something was dropped or pasted onto a dropzone. */
+  dropzoneDirect: "lp.dropzone-direct",
 } as const
 
 let lastContextTarget: WeakRef<Element> | null = null
@@ -114,6 +122,20 @@ let lastContextTarget: WeakRef<Element> | null = null
 /** The element a left click just landed on that also has a right-click menu (a table row rather than the table). */
 export function noteContextTarget(el: Element): void {
   lastContextTarget = new WeakRef(el)
+}
+
+let lastHotkeyTarget: { el: WeakRef<Element>; combo: string } | null = null
+
+/** A button with a hotkey was just clicked with the pointer: what `hotkeyTip` shows. */
+export function noteHotkeyTarget(el: Element, combo: string): void {
+  lastHotkeyTarget = { el: new WeakRef(el), combo }
+}
+
+let lastDropzone: WeakRef<Element> | null = null
+
+/** A dropzone's file dialog was just used: what `dropzoneTip` shows. */
+export function noteDropzone(el: Element): void {
+  lastDropzone = new WeakRef(el)
 }
 
 const onScreen = (el: Element) => {
@@ -158,6 +180,41 @@ export function paletteTip(keys = "Ctrl+K", text: Partial<Pick<HintTip, "title" 
     text: text.text ?? "Search pages, people and settings from anywhere instead of the menu.",
     keys,
     when: (count) => count(HINT_SIGNALS.navigate) >= 15 && count(HINT_SIGNALS.palette) === 0,
+  }
+}
+
+/** The button's key instead of the pointer. */
+export function hotkeyTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
+  const title = text.title ?? "There is a key for this"
+  return {
+    id: "lp.tip.hotkey",
+    title,
+    text: text.text ?? "Buttons you keep clicking have a keyboard shortcut; it is in the button's tooltip and in the key reference (F1).",
+    when: (count) => count(HINT_SIGNALS.hotkey) === 0 && count(HINT_SIGNALS.hotkeyTarget) >= 10,
+    step: () => {
+      const last = lastHotkeyTarget
+      const target = last?.el.deref()
+      return last && target && onScreen(target)
+        ? { target, title, text: text.stepText ?? "Next time, press this instead of clicking:", keys: last.combo }
+        : null
+    },
+  }
+}
+
+/** Dropping or pasting instead of the file dialog. */
+export function dropzoneTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
+  const title = text.title ?? "Drop or paste here"
+  return {
+    id: "lp.tip.dropzone",
+    title,
+    text: text.text ?? "Files can be dragged straight onto the upload area, and a screenshot pasted with Ctrl+V, without the file dialog.",
+    when: (count) => count(HINT_SIGNALS.dropzoneDirect) === 0 && count(HINT_SIGNALS.dropzoneBrowse) >= 4,
+    step: () => {
+      const target = lastDropzone?.deref()
+      return target && onScreen(target)
+        ? { target, title, text: text.stepText ?? "Drag a file onto this, or copy a picture and paste it while this is focused.", keys: "Ctrl+V" }
+        : null
+    },
   }
 }
 

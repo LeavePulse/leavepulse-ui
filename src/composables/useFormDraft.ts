@@ -1,3 +1,4 @@
+import { useKitStorage } from "./usePersisted"
 import {
   onScopeDispose,
   ref,
@@ -91,17 +92,6 @@ export interface UseFormDraft<T> {
   save: () => void
 }
 
-function storage(): Storage | null {
-  // Private windows, storage disabled by policy, SSR. A form that cannot keep
-  // a draft still has to work, so every access is allowed to fail.
-  try {
-    if (typeof window === "undefined") return null
-    return window.localStorage
-  } catch {
-    return null
-  }
-}
-
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
@@ -131,6 +121,9 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
  * record, which is how a form helpfully undoes somebody's work.
  */
 export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T> {
+  // The kit's store (the app's, or the browser's made safe): it already
+  // swallows private windows, quotas and SSR, so the reads below cannot throw.
+  const store = useKitStorage()
   const hasDraft = ref(false)
   const savedAt = ref<string | null>(null)
   const maxAge = options.maxAgeMs ?? WEEK_MS
@@ -151,15 +144,9 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
   }
 
   function read(): T | null {
-    const store = storage()
     const key = currentKey()
-    if (!store || !key) return null
-    let raw: string | null = null
-    try {
-      raw = store.getItem(key)
-    } catch {
-      return null
-    }
+    if (!key) return null
+    const raw = store.get(key)
     if (!raw) return null
     try {
       const parsed = JSON.parse(raw) as DraftEnvelope<T>
@@ -177,36 +164,25 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
   }
 
   function write(value: T) {
-    const store = storage()
     const key = currentKey()
-    if (!store || !key) return
-    try {
-      store.setItem(
-        key,
-        JSON.stringify({
-          version: ENVELOPE_VERSION,
-          savedAt: new Date().toISOString(),
-          value,
-        } satisfies DraftEnvelope<T>),
-      )
-    } catch {
-      // Quota, or storage turned off between the read and now. The form is
-      // unharmed; it simply has no safety net.
-      return
-    }
+    if (!key) return
+    // A quota or storage turned off between the read and now leaves the form
+    // unharmed; it simply has no safety net.
+    store.set(
+      key,
+      JSON.stringify({
+        version: ENVELOPE_VERSION,
+        savedAt: new Date().toISOString(),
+        value,
+      } satisfies DraftEnvelope<T>),
+    )
   }
 
   function discard() {
-    const store = storage()
     const key = currentKey()
     hasDraft.value = false
     savedAt.value = null
-    if (!store || !key) return
-    try {
-      store.removeItem(key)
-    } catch {
-      // Nothing to do about it, and nothing depends on it.
-    }
+    if (key) store.remove(key)
   }
 
   function save() {
@@ -219,15 +195,9 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
     () => {
       hasDraft.value = false
       savedAt.value = null
-      const store = storage()
       const key = currentKey()
-      if (!store || !key) return
-      let raw: string | null = null
-      try {
-        raw = store.getItem(key)
-      } catch {
-        return
-      }
+      if (!key) return
+      const raw = store.get(key)
       if (!raw) return
       try {
         const parsed = JSON.parse(raw) as DraftEnvelope<T>

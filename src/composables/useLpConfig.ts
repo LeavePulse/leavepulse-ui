@@ -27,6 +27,24 @@ export interface LpConfig {
   linkComponent?: Component | string
   /** Text overrides by scope: `{ lightbox: { previous: "Back" } }`. */
   labels?: Partial<Record<string, Partial<LabelScope>>>
+  /**
+   * Where components remember things between visits (a table's sort, a
+   * sidebar folded away, a drawer's width). Browser storage when unset; a
+   * desktop shell can hand in its own store. See `usePersisted`.
+   */
+  storage?: KitStorage
+}
+
+/**
+ * Synchronous key/value store, the shape of `localStorage`. Synchronous on
+ * purpose: a remembered width has to be there on the first frame, or the
+ * panel opens at its default and jumps. An app with an async store keeps a
+ * copy in memory and writes it through in the background.
+ */
+export interface KitStorage {
+  get(key: string): string | null
+  set(key: string, value: string): void
+  remove(key: string): void
 }
 
 export const LP_CONFIG: InjectionKey<MaybeRefOrGetter<LpConfig>> = Symbol.for("lp-config")
@@ -59,7 +77,13 @@ export function mergeConfig(outer: LpConfig, inner: LpConfig): LpConfig {
   for (const [scope, values] of Object.entries(inner.labels ?? {})) {
     labels[scope] = { ...labels[scope], ...values }
   }
-  return { ...outer, ...inner, linkComponent: inner.linkComponent ?? outer.linkComponent, labels }
+  return {
+    ...outer,
+    ...inner,
+    linkComponent: inner.linkComponent ?? outer.linkComponent,
+    storage: inner.storage ?? outer.storage,
+    labels,
+  }
 }
 
 export function useLpConfig(): ComputedRef<LpConfig> {

@@ -35,8 +35,10 @@ import {
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { CLOSE_ICON } from "./dropdown"
 import { prefersReducedMotion } from "../composables/easing"
+import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
 import { useLabels } from "../composables/useLpConfig"
+import { usePersisted } from "../composables/usePersisted"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
@@ -108,6 +110,19 @@ const props = withDefaults(
     /** Max main-axis size while resizing (any CSS length). Default 96vw. */
     maxSize?: string
     /**
+     * Remember the width the user dragged to under this key, across visits
+     * (in the kit's storage, see `usePersisted`). Without it the width lasts
+     * as long as the component.
+     */
+    persist?: string
+    /**
+     * Something would be lost by closing: `true` asks "Discard changes?" first
+     * (and warns on leaving the page), a function asks the app. While a guard
+     * is set the drawer closes by its button, the scrim or Escape only: a
+     * swipe has already carried the panel away before it could be asked.
+     */
+    guard?: CloseGuard
+    /**
      * Frosted glass instead of a solid panel: the page shows through,
      * blurred, under a lighter scrim (.lp-glass-overlay, .lp-scrim--light).
      * A look, not a behaviour, so it is the app's call: unset follows
@@ -174,9 +189,40 @@ const contentClass = computed(() => {
   return [base, map[dir.value]]
 })
 
-// User-resized main-axis size (px), null until the handle is dragged. Persists
-// for the component's lifetime so reopening keeps the chosen width.
-const resizedPx = ref<number | null>(null)
+// User-resized main-axis size (px), null until the handle is dragged. Kept for
+// the component's lifetime so reopening keeps the chosen width, and across
+// visits under `persist`.
+const resizedPx = usePersisted<number | null>(
+  () => props.resizable && props.persist && `lp-drawer:${props.persist}`,
+  null,
+  { validate: (value): value is number | null => value === null || (typeof value === "number" && value > 0) },
+)
+
+/*
+ * vaul slides the panel away first and reports the close after, so a guard
+ * cannot veto it there. While one is armed vaul is told the drawer is not
+ * dismissible and the drawer's own ways out ask before emitting.
+ */
+const { allowClose, armed } = useCloseGuard(() => props.guard, () => !!props.open)
+const guarded = computed(() => props.dismissible && armed())
+async function requestClose() {
+  if (await allowClose()) emit("update:open", false)
+}
+
+// The header's close button is vaul's own and would slide the panel away at
+// once; with a guard it asks first and closes through the same path as above.
+function guardClose(event: MouseEvent) {
+  if (!armed()) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  void requestClose()
+}
+
+function guardEscape(event: KeyboardEvent) {
+  if (!guarded.value) return
+  event.preventDefault()
+  void requestClose()
+}
 
 const sizeStyle = computed(() => {
   // When snapPoints drive the height, let vaul own the main-axis size.
@@ -473,7 +519,7 @@ const previewStyle = computed(() => {
     <div
       v-show="peeking || peek > 0"
       class="lp-scrim pointer-events-none fixed inset-0"
-      :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
+      :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
       :style="{ zIndex: layer.scrim, opacity: peek, transition: peeking || prefersReducedMotion() ? 'none' : 'opacity 0.18s ease-out' }"
     />
     <div
@@ -495,7 +541,7 @@ const previewStyle = computed(() => {
   <DrawerRoot
     :open="open"
     :direction="dir"
-    :dismissible="dismissible"
+    :dismissible="dismissible && !guarded"
     :snap-points="snapPoints"
     :handle-only="handleOnly"
     :should-scale-background="scaleBackground"
@@ -505,8 +551,9 @@ const previewStyle = computed(() => {
     <DrawerPortal>
       <DrawerOverlay
         :style="{ zIndex: layer.scrim }"
+        @click="guarded && requestClose()"
         class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
-        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested }"
+        :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
       />
       <DrawerContent
         ref="contentRef"
@@ -514,6 +561,7 @@ const previewStyle = computed(() => {
         :class="contentClass"
         :style="[sizeStyle, { zIndex: layer.panel }]"
         :data-vaul-animate="handingOff || skipOpenSlide ? 'false' : undefined"
+        @keydown.escape="guardEscape"
       >
         <!-- Resize grip on the inner edge (horizontal drawers). data-vaul-no-drag
              so grabbing it resizes the panel instead of starting a vaul drag. -->
@@ -554,6 +602,7 @@ const previewStyle = computed(() => {
           <DrawerClose
             class="group flex shrink-0 items-center rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             :aria-label="text.close"
+            @click.capture="guardClose"
           >
             <LpIcon
               name="lucide:x"

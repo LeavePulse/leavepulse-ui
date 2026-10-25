@@ -6,8 +6,12 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed, type Component } from "vue"
-import { useLinkComponent } from "../composables/useLpConfig"
+import { computed, getCurrentInstance, onMounted, onUpdated, ref, useAttrs, type Component, type ComponentPublicInstance } from "vue"
+import { HINT_SIGNALS, noteHotkeyTarget } from "../composables/useHintSystem"
+import { hints } from "../composables/useHints"
+import { appleModifierLabel, parseCombo, useAppleKeyboard, useHotkeys } from "../composables/useHotkeys"
+import { useLabels, useLinkComponent } from "../composables/useLpConfig"
+import { useToast } from "../composables/useToast"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 import { resolveLink, type LinkTarget } from "./link"
@@ -104,9 +108,120 @@ const props = withDefaults(
      * in place and shows a spinner over it, so the width never jumps. Sets `aria-busy`.
      */
     loading?: boolean
+    /**
+     * Work the click starts. While it runs the button shows `loading` and
+     * ignores further clicks; a failure is reported as an error toast with
+     * the error's details, unless the app listens to `error` itself. The
+     * state the work was for (a form, a switch) is the app's to roll back.
+     */
+    action?: () => unknown
+    /**
+     * A key that presses the button: "Ctrl+S", "Shift+N", "F2". It works
+     * wherever the button is on screen and not covered by a dialog, appears
+     * in the key reference (F1) and the tooltip, and counts toward
+     * `hotkeyTip()` for people who keep clicking instead.
+     */
+    hotkey?: string
+    /** The key reference's section for `hotkey`. */
+    hotkeyGroup?: string
+    labels?: Partial<{ group: string }>
   }>(),
   { type: "button" },
 )
+
+const emit = defineEmits<{
+  /** The `action` finished. */
+  (e: "done", value: unknown): void
+  /** The `action` failed. Listening turns the kit's own error toast off. */
+  (e: "error", error: unknown): void
+}>()
+
+const labels = useLabels("button", { group: "Actions" }, () => props.labels)
+const toast = useToast()
+const attrs = useAttrs()
+const instance = getCurrentInstance()
+
+const running = ref(false)
+const busy = computed(() => props.loading || running.value)
+
+async function runAction() {
+  if (!props.action || busy.value || props.disabled) return
+  running.value = true
+  try {
+    emit("done", await props.action())
+  } catch (error) {
+    // A listener on `error` means the app reports it its own way.
+    if (instance?.vnode.props?.onError) emit("error", error)
+    else toast.error(error instanceof Error ? error : String(error))
+  } finally {
+    running.value = false
+  }
+}
+
+/*
+ * The hotkey presses the real element, so whatever the app hung on the click
+ * (a router link, a form submit, an `@click`) runs exactly as a click would.
+ */
+const root = ref<HTMLElement | ComponentPublicInstance | null>(null)
+const rootEl = (): HTMLElement | null => {
+  const node = root.value
+  if (node instanceof HTMLElement) return node
+  return node?.$el instanceof HTMLElement ? node.$el : null
+}
+let viaKey = false
+
+// What the button says, for the key reference and the tooltip. Read from the
+// DOM after render: the slot may be an icon with text beside it, or a label
+// that changes ("Save" → "Saved").
+const spoken = ref("")
+function readSpoken() {
+  spoken.value = String(attrs["aria-label"] ?? rootEl()?.textContent?.trim() ?? "")
+}
+onMounted(readSpoken)
+onUpdated(readSpoken)
+
+useHotkeys(() => {
+  if (!props.hotkey || props.disabled) return []
+  const label = spoken.value || props.hotkey
+  return [
+    {
+      ...parseCombo(props.hotkey),
+      help: { group: props.hotkeyGroup ?? labels.value.group, label, combo: props.hotkey },
+      handler: () => {
+        const el = rootEl()
+        if (!el || busy.value) return false
+        viaKey = true
+        el.click()
+        viaKey = false
+      },
+    },
+  ]
+})
+
+const apple = useAppleKeyboard()
+const shownCombo = computed(() =>
+  props.hotkey
+    ?.split("+")
+    .map((key) => appleModifierLabel(key.trim(), apple.value))
+    .join(apple.value ? "" : "+"),
+)
+// Said by the tooltip unless the app wrote its own title.
+const hotkeyTitle = computed(() => {
+  if (!props.hotkey || attrs.title !== undefined) return undefined
+  return spoken.value ? `${spoken.value} (${shownCombo.value})` : shownCombo.value
+})
+
+function onClick(event: MouseEvent) {
+  if (props.hotkey) {
+    if (viaKey) hints.use(HINT_SIGNALS.hotkey)
+    else if (event.detail > 0) {
+      hints.use(HINT_SIGNALS.hotkeyTarget)
+      const el = rootEl()
+      if (el) noteHotkeyTarget(el, props.hotkey)
+    }
+  }
+  void runAction()
+}
 
 const linkComponent = useLinkComponent()
 
@@ -127,7 +242,7 @@ const isNativeButton = computed(() => resolved.value.is === "button")
  * own handler, which skips navigation once the event is default-prevented.
  */
 function blockDisabled(event: MouseEvent) {
-  if (!props.loading && (!props.disabled || isNativeButton.value)) return
+  if (!busy.value && (!props.disabled || isNativeButton.value)) return
   event.preventDefault()
   event.stopImmediatePropagation()
 }
@@ -154,7 +269,7 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
     block: props.block,
     square: props.square,
     glow: props.glow,
-    loading: props.loading,
+    loading: busy.value,
   }),
 )
 </script>
@@ -162,18 +277,22 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
 <template>
   <component
     :is="resolved.is"
+    ref="root"
     v-bind="{ ...rest, ...linkProps }"
+    :title="hotkeyTitle ?? rest.title"
+    :aria-keyshortcuts="hotkey || undefined"
     :type="isNativeButton ? type : undefined"
     :disabled="isNativeButton ? disabled : undefined"
     :aria-disabled="!isNativeButton && disabled ? 'true' : undefined"
     :tabindex="!isNativeButton && disabled ? -1 : undefined"
-    :aria-busy="loading ? 'true' : undefined"
+    :aria-busy="busy ? 'true' : undefined"
     :class="classes"
     @click.capture="blockDisabled"
+    @click="onClick"
   >
     <slot />
     <span
-      v-if="loading"
+      v-if="busy"
       class="pointer-events-none absolute inset-0 flex items-center justify-center animate-[fade-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none"
       :class="spinnerTone"
       aria-hidden="true"

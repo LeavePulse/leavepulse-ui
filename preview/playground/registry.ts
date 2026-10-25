@@ -218,8 +218,17 @@ export const registry: ComponentEntry[] = [
     id: "button",
     name: "Button",
     description:
-      "Variants, sizes (xs–lg), block, square (icon-only), glow, and `as` (render as a link).",
+      "Variants, sizes (xs–lg), block, square (icon-only), glow, and `as` (render as a link). `action` runs the work the click starts: the button shows its spinner until it settles and a failure becomes an error toast (or the `error` event, if the app listens). `hotkey` binds a key that presses the button: it shows in the tooltip and the key reference (F1), works on non-Latin layouts, and feeds `hotkeyTip()` for people who keep clicking instead.",
     components: { LpButton },
+    state: () =>
+      reactive({
+        saved: 0,
+        save: () => new Promise((resolve) => setTimeout(resolve, 1200)),
+        fail: () =>
+          new Promise((_, reject) =>
+            setTimeout(() => reject(Object.assign(new Error("Server said no"), { details: "PUT /api/demo -> 500\nrequest_id: 9c1d" })), 900),
+          ),
+      }),
     template: `<div class="flex flex-col gap-3">
   <div class="flex flex-wrap items-center gap-2">
     <LpButton variant="solid">Solid</LpButton>
@@ -245,6 +254,11 @@ export const registry: ComponentEntry[] = [
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <LpButton as="a" href="#" variant="outline">As link (a)</LpButton>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <LpButton :action="save" hotkey="Ctrl+S" @done="saved++">Save</LpButton>
+    <LpButton variant="danger" :action="fail">Fails</LpButton>
+    <span class="text-xs text-muted">Saved {{ saved }} times · Ctrl+S presses Save</span>
   </div>
 </div>`,
   },
@@ -2152,7 +2166,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Without a title, `aria-label` names the dialog (Drawer and Popover take it too). A custom overlay joins the same stack with `useModalLayer()`, and page-level hotkeys stay quiet while a modal covers them unless they set `overLayers` — see the bottom of the example. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `guard` asks before closing when something would be lost (`:guard=\"form.dirty\"`, or a function for the app's own question), and also warns on leaving the page; `:dismissible=\"false\"` keeps Escape and the scrim from closing a step the user must finish on purpose. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Without a title, `aria-label` names the dialog (Drawer and Popover take it too). A custom overlay joins the same stack with `useModalLayer()`, and page-level hotkeys stay quiet while a modal covers them unless they set `overLayers` — see the bottom of the example. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
     components: { LpModal, LpButton, CustomSheet, LayerKeys },
     state: () => {
       const s = reactive({
@@ -2164,6 +2178,8 @@ export const registry: ComponentEntry[] = [
         sheet: false,
         fromSheet: false,
         lazy: false,
+        guarded: false,
+        draft: "",
         loading: true,
         openLazy() {
           s.loading = true
@@ -2179,6 +2195,14 @@ export const registry: ComponentEntry[] = [
   <LpButton variant="solid" @click="open = true">Open modal</LpButton>
   <LpButton variant="outline" @click="openLazy()">Open with late content</LpButton>
   <LpButton variant="outline" @click="frosted = true">Open glass</LpButton>
+  <LpButton variant="outline" @click="draft = ''; guarded = true">Open with a guard</LpButton>
+
+  <LpModal v-model:open="guarded" title="Edit note" :guard="draft.trim() !== ''">
+    <textarea v-model="draft" rows="3" class="w-full rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" placeholder="Type something, then press Escape" />
+    <template #footer>
+      <LpButton variant="solid" @click="draft = ''; guarded = false">Save</LpButton>
+    </template>
+  </LpModal>
 
   <LpModal v-model:open="open" size="lg" title="Confirm action" description="A token-driven modal on reka Dialog.">
     <p>Body content. Escape or overlay-click closes it.</p>
@@ -2433,7 +2457,7 @@ export const registry: ComponentEntry[] = [
     id: "drawer",
     name: "Drawer",
     description:
-      "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground. Interactive controls inside are auto-excluded from the drag (noDragControls, on by default) so you can select text / use inputs; noDragContent makes the whole body non-draggable (handle/header only).",
+      "Drag-driven panel on vaul-vue: drag-to-dismiss with inertia, snap points, a grab handle and an optional scale-background. direction=top|bottom|left|right (side=left|right still works), size=sm…xl or width=\"…\", snapPoints, dismissible, handleOnly, scaleBackground. Interactive controls inside are auto-excluded from the drag (noDragControls, on by default) so you can select text / use inputs; noDragContent makes the whole body non-draggable (handle/header only). `resizable` with `persist` remembers the width the user dragged to across visits (in the kit's storage, see usePersisted); `guard` asks before closing when something would be lost, and while it is set the drawer closes by its button, the scrim or Escape, not by a swipe.",
     components: { LpDrawer, LpButton, LpInput },
     state: () => reactive({ side: false, sheet: false, snap: false, bare: false, q: "", note: "" }),
     template: `<div class="flex flex-wrap gap-2">
@@ -2442,7 +2466,7 @@ export const registry: ComponentEntry[] = [
   <LpButton variant="outline" @click="snap = true">Snap points</LpButton>
 
   <!-- Side drawer with a form: drag the input → text selects, drawer stays put. -->
-  <LpDrawer v-model:open="side" direction="right" size="lg" title="Filters" description="Try dragging the input — it selects text instead of moving the drawer">
+  <LpDrawer v-model:open="side" direction="right" size="lg" resizable persist="preview-filters" :guard="note.trim() !== ''" title="Filters" description="Try dragging the input — it selects text instead of moving the drawer. Drag the left edge to resize: the width is remembered. Type a note and try to close.">
     <div class="flex flex-col gap-3">
       <LpInput v-model="q" placeholder="Search filters…" />
       <textarea v-model="note" rows="3" class="rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" placeholder="A textarea you can drag-select in" />

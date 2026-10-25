@@ -210,6 +210,44 @@ export function matchesHotkey(event: KeyLike, binding: HotkeyBinding | HotkeySte
   )
 }
 
+const NAMED_KEYS: Record<string, string> = {
+  esc: "escape",
+  escape: "escape",
+  space: " ",
+  enter: "enter",
+  return: "enter",
+  tab: "tab",
+  del: "delete",
+  delete: "delete",
+  backspace: "backspace",
+  up: "arrowup",
+  down: "arrowdown",
+  left: "arrowleft",
+  right: "arrowright",
+}
+
+/**
+ * A chord written the way it reads ("Ctrl+S", "Shift+Alt+N", "F2", "Esc") as
+ * a binding to pass to useHotkeys, for components that take a `hotkey` string.
+ * A letter or digit also matches by physical position, so "Ctrl+S" works on a
+ * Cyrillic layout where that key types "ы". Cmd and Meta read as Ctrl: the
+ * bindings treat the two as one.
+ */
+export function parseCombo(combo: string): HotkeyStep {
+  const parts = combo.split("+").map((part) => part.trim()).filter(Boolean)
+  const step: HotkeyStep = { key: "" }
+  for (const part of parts) {
+    const lower = part.toLowerCase()
+    if (lower === "ctrl" || lower === "cmd" || lower === "meta" || lower === "⌘") step.ctrl = true
+    else if (lower === "shift") step.shift = true
+    else if (lower === "alt" || lower === "option" || lower === "⌥") step.alt = true
+    else step.key = NAMED_KEYS[lower] ?? lower
+  }
+  if (/^[a-z]$/.test(step.key)) step.code = `Key${step.key.toUpperCase()}`
+  else if (/^\d$/.test(step.key)) step.code = `Digit${step.key}`
+  return step
+}
+
 /** The keys a binding waits for, in order: one step for a plain binding. */
 export function hotkeySteps(binding: HotkeyBinding): HotkeyStep[] {
   const raw = binding.sequence
