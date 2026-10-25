@@ -443,7 +443,7 @@ export const registry: ComponentEntry[] = [
     id: "tabs",
     name: "Tabs",
     description:
-      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list.",
+      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list. By default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab.",
     components: { LpTabs },
     state: () => reactive({ tab: "a", items: tabItems, nav: "home", navItems: bottomTabItems }),
     template: `<div class="flex flex-col gap-3">
@@ -452,6 +452,7 @@ export const registry: ComponentEntry[] = [
     <LpTabs v-model="tab" :items="items" />
   </div>
   <LpTabs v-model="tab" :items="items" block />
+  <LpTabs v-model="tab" :items="items" :hover-follow="false" />
   <LpTabs v-model="tab" :items="items" variant="plain" />
   <LpTabs v-model="tab" :items="items" variant="plain" accent />
   <div class="flex h-48 w-[360px] max-w-full flex-col overflow-hidden rounded-card border border-line">
@@ -2050,7 +2051,7 @@ export const registry: ComponentEntry[] = [
     id: "toast",
     name: "Toast",
     description:
-      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist. `toast.promise(task, { loading, success, error })` shows one toast that follows a promise, and a `key` makes a toast replace the one on screen with the same key instead of stacking. An Error can be passed straight to `error()`/`warning()`; its `details` (or `details` in options, or the `cause` behind a hand-written message) are not shown but ride along to the copy button, so a copied error carries the request, status and ids a bug report needs.",
+      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist. `toast.promise(task, { loading, success, error })` shows one toast that follows a promise, and a `key` makes a toast replace the one on screen with the same key instead of stacking. An Error can be passed straight to `error()`/`warning()`; its `details` (or `details` in options, or the `cause` behind a hand-written message) are not shown but ride along to the copy button, so a copied error carries the request, status and ids a bug report needs. A failed `toast.promise` keeps the error's details the same way, and details are also found through a native `Error.cause` chain.",
     components: { LpButton },
     state: () => {
       const toast = useToast()
@@ -2092,6 +2093,15 @@ export const registry: ComponentEntry[] = [
           const error = Object.assign(new Error("timeout"), { details: "PUT /api/settings -> 504\nrequest_id: 81bd02" })
           toast.error(`Not saved: ${error.message}`, { cause: error })
         },
+        failedPromise: () =>
+          toast
+            .promise(
+              new Promise((_, reject) =>
+                setTimeout(() => reject(Object.assign(new Error("502"), { details: "POST /api/deploy -> 502\nrequest_id: c41e07" })), 1200),
+              ),
+              { loading: "Deploying ger-01-p...", success: "Deployed", error: "Deploy failed" },
+            )
+            .catch(() => {}),
         clearAll: () => toast.clear(),
       }
     },
@@ -2107,6 +2117,7 @@ export const registry: ComponentEntry[] = [
   <LpButton size="sm" variant="outline" @click="progress">Keyed (click again)</LpButton>
   <LpButton size="sm" variant="danger" @click="apiError">Error with details</LpButton>
   <LpButton size="sm" variant="danger" @click="withCause">Error with a cause</LpButton>
+  <LpButton size="sm" variant="danger" @click="failedPromise">Failing promise (copy keeps details)</LpButton>
 </div>`,
   },
   {
@@ -2831,7 +2842,19 @@ export const registry: ComponentEntry[] = [
     description:
       "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. The difference between them that you cannot see is what a screen reader does: only `danger` interrupts it (role=\"alert\"), the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it. An alert that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does.",
     components: { LpAlert, LpButton, LpShift },
-    state: () => reactive({ saved: false }),
+    state: () => {
+      const s = reactive({ saved: false, collecting: false, collected: false })
+      return Object.assign(s, {
+        collect() {
+          s.collecting = true
+          s.collected = false
+          setTimeout(() => {
+            s.collecting = false
+            s.collected = true
+          }, 1500)
+        },
+      })
+    },
     template: `<div class="flex w-full max-w-lg flex-col gap-3">
   <LpAlert variant="info" title="Heads up">Your invoice is due in 3 days.</LpAlert>
   <p class="-mt-1.5 text-xs text-muted">Screen reader: read in place, no interruption.</p>
@@ -2841,6 +2864,9 @@ export const registry: ComponentEntry[] = [
   <p class="-mt-1.5 text-xs text-muted">Screen reader: interrupts and reads it at once (role="alert").</p>
   <LpAlert busy>Collecting data from every source…</LpAlert>
   <p class="-mt-1.5 text-xs text-muted">busy: the icon spins and the alert is announced politely.</p>
+  <LpAlert v-if="collecting || collected" :busy="collecting" :variant="collected ? 'success' : 'info'">{{ collected ? "Collected from 6 sources." : "Collecting from 6 sources…" }}</LpAlert>
+  <p v-if="collecting || collected" class="-mt-1.5 text-xs text-muted">Once busy ends the alert stays a polite region, so the result replacing "Collecting…" is announced too.</p>
+  <LpButton variant="outline" size="sm" class="self-start" :loading="collecting" @click="collect">Collect, then show the result</LpButton>
   <LpShift>
     <Transition enter-from-class="opacity-0 -translate-y-1" leave-to-class="opacity-0 -translate-y-1" enter-active-class="transition duration-200" leave-active-class="transition duration-150">
       <div v-if="saved" class="flex flex-col gap-1.5">
