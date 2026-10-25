@@ -8,7 +8,8 @@ export default { inheritAttrs: false }
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import type { ContextMenuItemDef } from "./LpContextMenu.vue"
+import { MenuWhen } from "./menuWhen"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
 
@@ -146,11 +147,9 @@ const accentStyle = computed(() =>
 </script>
 
 <template>
-  <!-- Always wrapped: switching between a bare surface and a menu-wrapped one
-       remounted the whole content (its state, its focus, its running
-       animations) the moment menu items arrived. With no items the trigger is
-       disabled and the browser's own menu stays. -->
-  <LpContextMenu :items="menuItems ?? []" :title="menuTitle" :subtitle="menuSubtitle">
+  <!-- The menu wraps the card only when it has items, so a directive the app
+       puts on the card (`v-hint`) reaches its element: see menuWhen.ts. -->
+  <MenuWhen :items="menuItems" :title="menuTitle" :subtitle="menuSubtitle">
     <component :is="as" :class="classes" :style="accentStyle" :aria-busy="loading || undefined" v-bind="rest">
       <!-- The swap only once loading has been asked for: a card that never
            loads keeps its slot as a direct child, so layouts that style the
@@ -171,5 +170,5 @@ const accentStyle = computed(() =>
       </LpSwap>
       <slot v-else />
     </component>
-  </LpContextMenu>
+  </MenuWhen>
 </template>

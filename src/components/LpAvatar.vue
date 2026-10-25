@@ -8,7 +8,8 @@ export default { inheritAttrs: false }
 import { AvatarFallback, AvatarImage, AvatarRoot } from "reka-ui"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, onMounted, ref } from "vue"
-import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import type { ContextMenuItemDef } from "./LpContextMenu.vue"
+import { MenuWhen } from "./menuWhen"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -117,13 +118,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- Always wrapped, even with no items: a v-if between a wrapped and a bare
-       avatar remounted the whole subtree the moment items arrived (fetched
-       after the first render), replaying the image fade and dropping focus.
-       With an empty list LpContextMenu disables its trigger, so the browser's
-       own menu stays. -->
-  <LpContextMenu
-    :items="menuItems ?? []"
+  <!-- The menu wraps the avatar only when it has items, so a directive the
+       app puts on the avatar reaches its element: see menuWhen.ts. -->
+  <MenuWhen
+    :items="menuItems"
     :title="menuHeading || undefined"
     :subtitle="menuSubtitle"
     :title-image="menuHeading && mounted ? src : undefined"
@@ -136,5 +134,5 @@ onMounted(() => {
         <template v-else>{{ initials }}</template>
       </AvatarFallback>
     </AvatarRoot>
-  </LpContextMenu>
+  </MenuWhen>
 </template>
