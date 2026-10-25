@@ -63,7 +63,8 @@
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags",
     "check:pack": "node scripts/check-pack.mjs",
-    "gen:icons": "node scripts/gen-kit-icons.mjs"
+    "gen:icons": "node scripts/gen-kit-icons.mjs",
+    "gen:meta": "node scripts/gen-preview-meta.mjs"
   },
   "peerDependencies": {
     "@iconify-json/lucide": "^1.2.0",
@@ -96,6 +97,7 @@
     "vite": "^7.0.0",
     "vite-plugin-lib-inject-css": "^2.2.2",
     "vue": "3.5.31",
+    "vue-component-meta": "3.3.5",
     "vue-tsc": "^3.0.0"
   },
   "dependencies": {

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue"
 import {
-  type ContextMenuItemDef,
+  LpAppShell,
   LpButton,
   type Command,
   LpCodeBlock,
   LpCommandPalette,
   LpConfirmHost,
-  LpContextMenu,
   LpEmptyState,
   LpIcon,
   LpKeys,
@@ -16,19 +15,18 @@ import {
   LpPalettePreview,
   LpPaletteStats,
   LpPaletteSwatches,
-  LpScrollArea,
   LpShortcutsDialog,
   LpToaster,
   presets,
-  type RevealOrigin,
   useHotkeys,
-  useTheme,
   type PresetName,
   type ShortcutGroup,
-  type TokenSet,
+  type SidebarSection,
 } from "../src"
+import ThemeStudio from "./ThemeStudio.vue"
+import { PRESETS, useStudio } from "./studio"
 import ComponentPage from "./playground/ComponentPage.vue"
-import { registry } from "./playground/registry"
+import { registry, sectionOf, sections } from "./playground/registry"
 import { href, navigate, useRoute } from "./playground/router"
 import AppShellDemo from "./pages/AppShellDemo.vue"
 import Home from "./pages/Home.vue"
@@ -83,26 +81,9 @@ function goHome(e: MouseEvent) {
   navigate({ kind: "home" })
 }
 
-// Themes are JSON now — the switcher applies a TokenSet via the engine.
-// The preview is a consumer like any app: it starts from the saved choice
-// (a theme, or "follow the OS"), falling back to Dark on a first visit.
-const kitTheme = useTheme()
-kitTheme.init(presets.dark)
-const theme = computed<PresetName>(
-  () =>
-    (Object.keys(presets) as PresetName[]).find((k) => presets[k].name === kitTheme.currentName.value) ??
-    "dark",
-)
-
-function buildTheme(name: PresetName): TokenSet {
-  return presets[name]
-}
-
-// Theme switcher (LeaveHosting style): one icon button — left-click cycles to
-// the next theme, right-click opens the full picker. The circular reveal grows
-// from the button's centre so it reads the same regardless of how it's invoked.
-const THEMES = ["dark", "light", "lime", "rose", "amber", "violet", "nord"] as const
-
+const { studio, pickPreset } = useStudio()
+const theme = computed<PresetName>(() => studio.value.preset)
+const THEMES = PRESETS
 const THEME_ICON: Record<PresetName, string> = {
   dark: "lucide:moon",
   light: "lucide:sun",
@@ -112,32 +93,34 @@ const THEME_ICON: Record<PresetName, string> = {
   violet: "lucide:gem",
   nord: "lucide:snowflake",
 }
-
-const themeBtn = ref<HTMLButtonElement | null>(null)
-function themeOrigin(): RevealOrigin | undefined {
-  const el = themeBtn.value
-  if (!el) return undefined
-  const r = el.getBoundingClientRect()
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-}
-
 function setTheme(name: PresetName) {
-  if (name === theme.value && !kitTheme.system.value) return
-  kitTheme.setTheme(buildTheme(name), themeOrigin())
+  pickPreset(name)
 }
 
-function cycleTheme() {
-  const i = THEMES.indexOf(theme.value as (typeof THEMES)[number])
-  setTheme(THEMES[(i + 1) % THEMES.length])
-}
-
-const themeItems = computed<ContextMenuItemDef[]>(() =>
-  THEMES.map((name) => ({
-    label: presets[name].name,
-    icon: theme.value === name ? "lucide:check" : THEME_ICON[name],
-    onSelect: () => setTheme(name),
+/*
+ * The site is laid out by the kit's own shell: the sections of the registry
+ * are the sidebar's groups, pages and the overview sit around them, and the
+ * current URL is the active item.
+ */
+const navSections = computed<SidebarSection[]>(() => [
+  { items: [{ id: href({ kind: "home" }), label: "Overview", icon: "lucide:house", href: href({ kind: "home" }) }] },
+  ...sections.map((section) => ({
+    title: section.title,
+    collapsible: true,
+    items: section.entries.map((entry) => {
+      const link = href({ kind: "component", id: entry.id })
+      return { id: link, label: entry.name, href: link }
+    }),
   })),
-)
+  {
+    title: "Pages",
+    collapsible: true,
+    items: Object.entries(PAGE_TITLES).map(([id, title]) => ({ id: pageLink(id), label: title, icon: "lucide:layout-dashboard", href: pageLink(id) })),
+  },
+])
+const activeNav = computed(() => href(route.value))
+const sectionTitle = computed(() => (componentEntry.value ? sectionOf.get(componentEntry.value.id)?.title : pageId.value ? "Pages" : null))
+const fullBleed = computed(() => !notFound.value && (pageId.value === "layout" || pageId.value === "infra"))
 
 // ⌘K / Ctrl-K opens the palette. The kit component binds the hotkey itself
 // (`hotkey` defaults on), so this only has to supply the commands and the open
@@ -266,70 +249,53 @@ const SITE_KEYS: ShortcutGroup[] = [
   },
 ]
 
-const chip = "rounded-control px-3 py-1.5 text-sm transition-colors"
-const on = "bg-surface-soft text-ink"
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
-    <nav class="flex items-center gap-3 border-b border-line bg-surface-raised px-4 py-2.5">
-      <!-- A real link: middle-click / cmd-click open it in a new tab. -->
-      <a :href="href({ kind: 'home' })" class="shrink-0 text-sm font-bold text-ink" @click="goHome">
+  <LpAppShell :model-value="activeNav" :sections="navSections" :full-bleed="fullBleed" :auto-collapse-after="16">
+    <template #logo>
+      <a :href="href({ kind: 'home' })" class="flex items-center gap-2 font-semibold text-ink" @click="goHome">
+        <span class="grid size-7 place-items-center rounded-control bg-brand text-ink-inverse">
+          <LpIcon name="lucide:component" :size="16" />
+        </span>
         LeavePulse UI
       </a>
-      <template v-if="crumb && !notFound">
-        <span class="text-muted">/</span>
-        <span class="min-w-0 truncate text-sm text-ink">{{ crumb }}</span>
-      </template>
+    </template>
 
-      <div class="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted">
-        <!-- The palette is the way around the site, and a phone has no Ctrl+K. -->
-        <button
-          type="button"
-          :class="[chip, 'inline-flex items-center gap-1.5 hover:bg-surface-soft hover:text-ink']"
-          aria-label="Search components, pages and themes"
-          @click="paletteOpen = true"
-        >
-          <LpIcon name="lucide:search" :size="16" />
-          <kbd class="hidden font-sans text-[11px] sm:inline">Ctrl K</kbd>
-        </button>
-        <!-- Left-click cycles themes; right-click opens the full picker. The
-             circular reveal grows from the button (same as LeaveHosting). -->
-        <LpContextMenu :items="themeItems">
-          <button
-            ref="themeBtn"
-            type="button"
-            :class="[chip, on, 'inline-flex items-center gap-1.5']"
-            :aria-label="`Theme: ${presets[theme].name}`"
-            title="Click to switch · right-click for all themes"
-            @click="cycleTheme"
-          >
-            <LpIcon :name="THEME_ICON[theme]" :size="16" />
-            <span>{{ presets[theme].name }}</span>
-          </button>
-        </LpContextMenu>
+    <template #header-title>
+      <div class="flex min-w-0 items-center gap-2 text-sm">
+        <span v-if="sectionTitle" class="shrink-0 text-muted">{{ sectionTitle }}</span>
+        <LpIcon v-if="sectionTitle && crumb" name="lucide:chevron-right" :size="14" class="shrink-0 text-muted" />
+        <h1 class="min-w-0 truncate font-semibold text-ink">{{ notFound ? "Nothing here" : crumb ?? "Overview" }}</h1>
       </div>
-    </nav>
+    </template>
 
-    <!-- Layout page manages its own scrolling; others use a drawn overlay bar. -->
-    <main class="flex min-h-0 flex-1">
-      <Layout v-if="!notFound && pageId === 'layout'" class="w-full" />
-      <InfraCanvas v-else-if="!notFound && pageId === 'infra'" class="w-full" />
-      <LpScrollArea v-else class="min-h-0 flex-1">
-        <LpEmptyState
-          v-if="notFound"
-          icon="lucide:compass"
-          title="Nothing here"
-          :description="`No demo at ${missingPath}.`"
-        >
-          <LpButton variant="soft" @click="navigate({ kind: 'home' })">Back to index</LpButton>
-        </LpEmptyState>
-        <ComponentPage v-else-if="componentEntry" :entry="componentEntry" class="w-full" />
-        <Showcase v-else-if="pageId === 'showcase'" class="w-full" />
-        <AppShellDemo v-else-if="pageId === 'appshell'" class="w-full" />
-        <Home v-else class="w-full" />
-      </LpScrollArea>
-    </main>
+    <template #header-actions>
+      <!-- The palette is the way around the site, and a phone has no Ctrl+K. -->
+      <LpButton variant="ghost" size="sm" aria-label="Search components, pages and themes" @click="paletteOpen = true">
+        <LpIcon name="lucide:search" :size="16" />
+        <span class="max-sm:hidden">Search</span>
+        <LpKeys combo="Ctrl+K" class="max-sm:hidden" />
+      </LpButton>
+      <ThemeStudio />
+    </template>
+
+    <Layout v-if="!notFound && pageId === 'layout'" class="h-full w-full" />
+    <InfraCanvas v-else-if="!notFound && pageId === 'infra'" class="h-full w-full" />
+    <LpEmptyState
+      v-else-if="notFound"
+      icon="lucide:compass"
+      title="Nothing here"
+      :description="`No demo at ${missingPath}.`"
+    >
+      <LpButton variant="soft" @click="navigate({ kind: 'home' })">Back to the overview</LpButton>
+    </LpEmptyState>
+    <ComponentPage v-else-if="componentEntry" :entry="componentEntry" class="w-full" />
+    <Showcase v-else-if="pageId === 'showcase'" class="w-full" />
+    <AppShellDemo v-else-if="pageId === 'appshell'" class="w-full" />
+    <Home v-else class="w-full" @search="paletteOpen = true" />
+
+    <template #overlays>
 
     <LpCommandPalette
       v-model:open="paletteOpen"
@@ -396,6 +362,7 @@ const on = "bg-surface-soft text-ink"
 
     <LpToaster />
     <LpConfirmHost />
-  </div>
+    </template>
+  </LpAppShell>
 </template>
 
