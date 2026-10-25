@@ -109,6 +109,7 @@
     "@vue-flow/core": "^1.48.2",
     "@vue-flow/minimap": "^1.5.4",
     "libphonenumber-js": "^1.12.0",
+    "tailwind-merge": "^3.6.0",
     "vaul-vue": "^0.4.1"
   }
 }
