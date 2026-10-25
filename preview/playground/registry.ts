@@ -95,6 +95,7 @@ import {
   LpHints,
   contextMenuTip,
   createHintSystem,
+  HINT_SIGNALS,
   localHintStorage,
   paletteTip,
   hints,
@@ -1300,8 +1301,8 @@ export const registry: ComponentEntry[] = [
   {
     id: "dropdown",
     name: "DropdownMenu",
-    description: "Action menu with icons and danger items.",
-    components: { LpDropdownMenu, LpButton },
+    description: "Action menu with icons and danger items. `rightClickToo` marks a \"…\" button whose items the row also opens on right-click: each use of it counts toward contextMenuTip(), which then tells the user that right-click works there.",
+    components: { LpDropdownMenu, LpButton, LpContextMenu },
     state: () => reactive({
       items: [
         { label: "Edit", icon: "lucide:pencil" },
@@ -1309,9 +1310,19 @@ export const registry: ComponentEntry[] = [
         { label: "Delete", icon: "lucide:trash-2", danger: true, separatorBefore: true },
       ],
     }),
-    template: `<LpDropdownMenu :items="items" title="Quarterly report.pdf" subtitle="2.4 MB" title-icon="lucide:file-text">
-  <template #trigger><LpButton variant="outline">Actions ▾</LpButton></template>
-</LpDropdownMenu>`,
+    template: `<div class="flex flex-col items-start gap-4">
+  <LpDropdownMenu :items="items" title="Quarterly report.pdf" subtitle="2.4 MB" title-icon="lucide:file-text">
+    <template #trigger><LpButton variant="outline">Actions ▾</LpButton></template>
+  </LpDropdownMenu>
+  <LpContextMenu :items="items">
+    <div class="flex w-72 items-center justify-between rounded-control border border-line px-3 py-2 text-sm">
+      <span>Row (right-click works too)</span>
+      <LpDropdownMenu :items="items" right-click-too>
+        <template #trigger><LpButton size="sm" variant="ghost" aria-label="Row actions">…</LpButton></template>
+      </LpDropdownMenu>
+    </div>
+  </LpContextMenu>
+</div>`,
   },
   {
     id: "codeblock",
@@ -1599,7 +1610,7 @@ export const registry: ComponentEntry[] = [
     id: "contextmenu",
     name: "ContextMenu",
     description:
-      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus, and an optional \`title\` heading naming what the menu acts on. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element.",
+      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus, and an optional \`title\` heading naming what the menu acts on. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element. A left click on an element with a menu counts toward contextMenuTip(); `noHint` leaves an element out of that count (a whole table with only generic items), and table rows with their own menu are what the tip lights.",
     components: { LpContextMenu },
     state: () =>
       reactive({
@@ -2038,7 +2049,7 @@ export const registry: ComponentEntry[] = [
     id: "toast",
     name: "Toast",
     description:
-      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist. `toast.promise(task, { loading, success, error })` shows one toast that follows a promise, and a `key` makes a toast replace the one on screen with the same key instead of stacking.",
+      "Stackable notifications via the useToast() composable (a global singleton). LpToaster is mounted once at the app root; anywhere can call toast.success(...) etc. Hover pauses the countdown; toasts support a title, action buttons, a whole-toast click, and duration:0 to persist. `toast.promise(task, { loading, success, error })` shows one toast that follows a promise, and a `key` makes a toast replace the one on screen with the same key instead of stacking. An Error can be passed straight to `error()`/`warning()`; its `details` (or `details` in options, or the `cause` behind a hand-written message) are not shown but ride along to the copy button, so a copied error carries the request, status and ids a bug report needs.",
     components: { LpButton },
     state: () => {
       const toast = useToast()
@@ -2070,6 +2081,16 @@ export const registry: ComponentEntry[] = [
             toast.info(`Syncing backups: ${step} of 4`, { key: "backup-sync", title: "Keyed toast" })
           }
         })(),
+        apiError: () => {
+          const error = Object.assign(new Error("Bad parameter: subject_id"), {
+            details: "GET /api/journal/feed?subject_id=Sel -> 400\nrequest_id: 3f2a9c\nsubject_id (query): invalid literal for int()",
+          })
+          toast.error(error)
+        },
+        withCause: () => {
+          const error = Object.assign(new Error("timeout"), { details: "PUT /api/settings -> 504\nrequest_id: 81bd02" })
+          toast.error(`Not saved: ${error.message}`, { cause: error })
+        },
         clearAll: () => toast.clear(),
       }
     },
@@ -2083,6 +2104,8 @@ export const registry: ComponentEntry[] = [
   <LpButton size="sm" variant="ghost" @click="clearAll">Clear all</LpButton>
   <LpButton size="sm" variant="outline" @click="promised">toast.promise</LpButton>
   <LpButton size="sm" variant="outline" @click="progress">Keyed (click again)</LpButton>
+  <LpButton size="sm" variant="danger" @click="apiError">Error with details</LpButton>
+  <LpButton size="sm" variant="danger" @click="withCause">Error with a cause</LpButton>
 </div>`,
   },
   {
@@ -2490,7 +2513,7 @@ export const registry: ComponentEntry[] = [
     name: "Hints",
     description:
       "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions. A feature that is absent right now (nothing flagged, nobody left) can pass `example`: the tour and \"what changed\" draw a sample for the step and remove it afterwards.",
-    components: { LpHints, LpButton },
+    components: { LpHints, LpButton, LpContextMenu },
     state: () => {
       const storage = localHintStorage("lp-preview-hints")
       const features = {
@@ -2523,6 +2546,11 @@ export const registry: ComponentEntry[] = [
           sessionStorage.removeItem("lp-preview-hints:session")
           location.reload()
         },
+        habit(signal: string, times: number) {
+          for (let i = 0; i < times; i++) hints.use(signal)
+          sessionStorage.removeItem("lp-preview-hints:session")
+        },
+        signals: HINT_SIGNALS,
       })
     },
     template: `<div class="flex flex-col items-start gap-3">
@@ -2532,9 +2560,17 @@ export const registry: ComponentEntry[] = [
     <LpButton v-hint="'demo.archive'" variant="outline" size="sm">Archive</LpButton>
     <LpButton v-if="state.sample" v-hint="'demo.flagged'" variant="outline" size="sm">Flagged (sample)</LpButton>
   </div>
+  <LpContextMenu :items="[{ label: 'Reply', icon: 'lucide:reply' }, { label: 'Archive', icon: 'lucide:archive' }]">
+    <div class="w-72 rounded-control border border-line px-3 py-2 text-sm">A message row: it has a right-click menu</div>
+  </LpContextMenu>
   <div class="flex gap-2">
     <LpButton size="sm" @click="system.startTour('demo')">Take the tour</LpButton>
     <LpButton size="sm" variant="ghost" @click="reset">Reset as a new user</LpButton>
+  </div>
+  <p class="text-xs text-muted">Habit tips appear on their own after the usage below; these buttons fake it so you can see one now (dismiss the tour offer first, one interruption per session).</p>
+  <div class="flex flex-wrap gap-2">
+    <LpButton size="sm" variant="outline" @click="habit(signals.menuButton, 5)">Pretend I keep using "…" and never right-click</LpButton>
+    <LpButton size="sm" variant="outline" @click="habit(signals.navigate, 15)">Pretend I walk the menu and never open the palette</LpButton>
   </div>
   <LpHints :system="system" />
 </div>`,
@@ -3184,7 +3220,7 @@ export const registry: ComponentEntry[] = [
     id: "theme-switcher",
     name: "ThemeSwitcher",
     description:
-      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads. `system` adds a \"System\" entry that follows the OS colour scheme with a light/dark pair (`useTheme().setSystem({ light, dark })` does the same in code). LpThemeProvider paints one subtree in another theme, derived tokens included.",
+      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads. `system` adds a \"System\" entry that follows the OS colour scheme with a light/dark pair (`useTheme().setSystem({ light, dark })` does the same in code). LpThemeProvider paints one subtree in another theme, derived tokens included. Selected text follows the theme too once the app imports the opt-in `@leavepulse/ui/selection.css` (this preview does: select any text here and switch themes); without it the browser paints selection in the OS accent, which on Linux comes from the GTK theme.",
     components: { LpThemeSwitcher, LpThemeProvider, LpButton, LpBadge },
     state: () => {
       const theme = useTheme()
