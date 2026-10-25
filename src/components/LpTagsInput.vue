@@ -7,6 +7,8 @@ export type TagsInputLabels = {
   max: string
   added: string
   removed: string
+  loading: string
+  suggestions: string
 }
 </script>
 
@@ -24,13 +26,17 @@ export type TagsInputLabels = {
  * the form, and a repeat makes the tag it repeats pulse.
  */
 import {
+  PopoverAnchor,
+  PopoverContent,
+  PopoverPortal,
+  PopoverRoot,
   TagsInputInput,
   TagsInputItem,
   TagsInputItemDelete,
   TagsInputItemText,
   TagsInputRoot,
 } from "reka-ui"
-import { computed, ref, useAttrs, useId } from "vue"
+import { computed, ref, useAttrs, useId, watch } from "vue"
 import { fieldMessageId, useField, useFieldControl } from "../composables/useField"
 import { prefersReducedMotion } from "../composables/easing"
 import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
@@ -40,6 +46,8 @@ import { mergeClass } from "../composables/useMergedClass"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpFormField from "./LpFormField.vue"
 import LpIcon from "./LpIcon.vue"
+import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
+import type { LpOptionBase, OptionSelection } from "./options"
 import { addTags, splitTags, type TagDuplicates, type TagRejection, type TagValidator } from "./tags"
 
 const props = withDefaults(
@@ -68,14 +76,42 @@ const props = withDefaults(
     hint?: string
     error?: string
     labels?: Partial<TagsInputLabels>
+    /**
+     * What a tag stands for: return a name (with an optional muted hint and
+     * picture) to draw the tag as a person or a server rather than its raw
+     * value, or null to show the value as typed. The model keeps the values.
+     */
+    display?: (tag: string) => OptionSelection | null | undefined
+    /**
+     * Suggestions offered while typing; picking one adds its `value`. Typed
+     * text that matches none still becomes a tag as before. Already-added
+     * values are left out of the list.
+     */
+    options?: LpOptionBase<string>[]
+    /** Suggestions are being fetched (listen to `search` to fetch them). */
+    loading?: boolean
+    /** Filter `options` against the typed text here. Off when the parent narrows them itself. */
+    filter?: boolean
+    /** Box height and text size, as LpInput. */
+    size?: "sm" | "md" | "lg"
   }>(),
-  { modelValue: () => [], delimiter: () => [",", "\n", "\t"], duplicates: "reject", addOnBlur: true },
+  {
+    modelValue: () => [],
+    delimiter: () => [",", "\n", "\t"],
+    duplicates: "reject",
+    addOnBlur: true,
+    loading: false,
+    filter: true,
+    size: "md",
+  },
 )
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string[]): void
   (e: "reject", rejected: TagRejection[]): void
   (e: "blur", event: FocusEvent): void
+  /** The text being typed, for fetching suggestions server-side. */
+  (e: "search", text: string): void
 }>()
 
 const text = useLabels<TagsInputLabels>(
@@ -86,6 +122,8 @@ const text = useLabels<TagsInputLabels>(
     max: "Up to {max} items",
     added: "{tag} added",
     removed: "{tag} removed",
+    loading: "Searching…",
+    suggestions: "Suggestions",
   },
   () => props.labels,
 )
@@ -170,7 +208,7 @@ const keyed = computed(() => {
   return props.modelValue.map((tag) => {
     const n = seen.get(tag) ?? 0
     seen.set(tag, n + 1)
-    return { tag, key: `${n}:${tag}` }
+    return { tag, key: `${n}:${tag}`, shown: props.display?.(tag) ?? null }
   })
 })
 
@@ -188,9 +226,13 @@ function pulse(tag: string): void {
   )
 }
 
-/** Add whatever `raw` splits into; returns the text that should stay typed. */
-function add(raw: string): string {
-  const parts = splitTags(raw, props.delimiter)
+/**
+ * Add whatever `raw` splits into; returns the text that should stay typed.
+ * A picked suggestion is one value even if it holds a delimiter, so `whole`
+ * skips the split.
+ */
+function add(raw: string, whole = false): string {
+  const parts = whole ? [raw.trim()].filter(Boolean) : splitTags(raw, props.delimiter)
   if (!parts.length) return ""
   const { tags, rejected, ignored } = addTags(props.modelValue, parts, {
     max: props.max,
@@ -228,6 +270,65 @@ const joiner = computed(() => {
 
 function commit(el: HTMLInputElement): void {
   el.value = add(el.value)
+  sync(el)
+}
+
+/*
+ * Suggestions. The list is the kit's dropdown look in a popover anchored to
+ * the whole box, but the keyboard stays in the text field: ↑/↓ walk the list
+ * (aria-activedescendant), Enter picks the walked-to row, and Enter with no
+ * row walked to still turns the typed text into a tag. Nothing is highlighted
+ * until the user arrows into the list, so free entry never gets swapped for
+ * the first suggestion by accident.
+ */
+const draft = ref("")
+const focused = ref(false)
+const dismissed = ref(false)
+const activeIndex = ref(-1)
+const listId = `${useId()}-suggestions`
+
+function sync(el: HTMLInputElement): void {
+  if (draft.value === el.value) return
+  draft.value = el.value
+  dismissed.value = false
+  emit("search", el.value)
+}
+
+const suggestions = computed(() => {
+  if (!props.options) return []
+  const fresh = props.options.filter((o) => !props.modelValue.includes(o.value))
+  const q = draft.value.trim().toLowerCase()
+  if (!props.filter || !q) return fresh
+  return fresh.filter((o) => `${o.label ?? o.value} ${o.description ?? ""}`.toLowerCase().includes(q))
+})
+
+const listOpen = computed(
+  () =>
+    !!props.options &&
+    focused.value &&
+    !dismissed.value &&
+    !!draft.value.trim() &&
+    (props.loading || suggestions.value.length > 0),
+)
+watch([suggestions, listOpen], () => {
+  activeIndex.value = -1
+})
+const optionId = (i: number) => `${listId}-${i}`
+
+function choose(opt: LpOptionBase<string>): void {
+  const el = inputEl.value
+  const left = add(opt.value, true)
+  if (el) {
+    el.value = left
+    sync(el)
+    el.focus()
+  }
+}
+
+/** Clicks on the box itself are not "outside" the list: they are typing. */
+function keepOpenInside(event: Event): void {
+  const target = event.target
+  if (target instanceof Node && boxEl.value?.contains(target)) event.preventDefault()
 }
 
 function isDelimiter(data: string): boolean {
@@ -238,6 +339,21 @@ function isDelimiter(data: string): boolean {
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.isComposing || !(event.target instanceof HTMLInputElement)) return
+  const count = suggestions.value.length
+  if (listOpen.value && count) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault()
+      const step = event.key === "ArrowDown" ? 1 : -1
+      activeIndex.value = activeIndex.value < 0 && step < 0 ? count - 1 : (activeIndex.value + step + count) % count
+      return
+    }
+    const picked = suggestions.value[activeIndex.value]
+    if (event.key === "Enter" && picked && !picked.disabled) {
+      event.preventDefault()
+      choose(picked)
+      return
+    }
+  }
   if (event.key === "Enter" && event.target.value.trim()) {
     event.preventDefault()
     commit(event.target)
@@ -252,7 +368,8 @@ function onBeforeInput(event: InputEvent): void {
   }
 }
 
-function onInput(): void {
+function onInput(event: Event): void {
+  if (event.target instanceof HTMLInputElement) sync(event.target)
   if (!stuck.value) return
   stuck.value = false
   unsay()
@@ -266,11 +383,24 @@ function onPaste(event: ClipboardEvent): void {
   const el = event.target
   const typed = el.value.slice(0, el.selectionStart ?? el.value.length) + pasted + el.value.slice(el.selectionEnd ?? el.value.length)
   el.value = add(typed)
+  sync(el)
 }
 
 function onBlur(event: FocusEvent): void {
+  focused.value = false
   emit("blur", event)
   if (props.addOnBlur && event.target instanceof HTMLInputElement && event.target.value.trim()) commit(event.target)
+}
+
+function onFocus(): void {
+  focused.value = true
+  dismissed.value = false
+}
+
+const sizeCls = {
+  sm: "min-h-(--size-control-sm) py-1 text-xs",
+  md: "min-h-(--size-control-md) py-1.5 text-sm",
+  lg: "min-h-(--size-control-lg) py-2 text-sm",
 }
 
 function onModel(value: (string | Record<string, unknown>)[] | null): void {
@@ -309,7 +439,8 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
         :ref="(c) => (boxEl = (c as { $el?: HTMLElement } | null)?.$el ?? null)"
         :class="
           mergeClass(
-            'flex min-h-(--size-control-md) w-full flex-wrap items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2 py-1.5 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55',
+            'flex w-full flex-wrap items-center gap-1.5 rounded-control border border-line bg-surface-soft px-2 text-ink transition-colors duration-[var(--duration-fast)] focus-within:border-brand focus-within:ring-2 focus-within:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55',
+            sizeCls[size],
             field.invalid ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft' : '',
             hasField ? '' : (attrs.class as string),
             tweening
@@ -328,16 +459,24 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
           leave-active-class="animate-[chip-out_var(--duration-fast)_ease] motion-reduce:animate-none"
         >
         <TagsInputItem
-          v-for="{ tag, key } in keyed"
+          v-for="{ tag, key, shown } in keyed"
           :key="key"
           :data-tag-key="key"
           :value="tag"
-          class="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+          class="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+          :class="shown?.image ? 'pl-0.5' : 'pl-2.5'"
         >
-          <TagsInputItemText class="truncate" />
+          <img v-if="shown?.image" :src="shown.image" alt="" class="size-4 shrink-0 rounded-full object-cover" />
+          <TagsInputItemText class="flex min-w-0 items-baseline gap-1">
+            <template v-if="shown">
+              <span class="truncate">{{ shown.label }}</span>
+              <span v-if="shown.hint" class="truncate font-normal text-muted">{{ shown.hint }}</span>
+            </template>
+            <span v-else class="truncate">{{ tag }}</span>
+          </TagsInputItemText>
           <TagsInputItemDelete
             :aria-labelledby="undefined"
-            :aria-label="text.remove.replace('{tag}', tag)"
+            :aria-label="text.remove.replace('{tag}', shown?.label ?? tag)"
             class="grid size-4 shrink-0 place-items-center rounded-pill text-muted transition-colors hover:bg-ink/10 hover:text-ink"
           >
             <LpIcon name="lucide:x" :size="12" />
@@ -349,7 +488,13 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
           :placeholder="modelValue.length ? undefined : placeholder"
           :aria-invalid="field.invalid || undefined"
           :aria-describedby="describedBy"
+          :role="options ? 'combobox' : undefined"
+          :aria-autocomplete="options ? 'list' : undefined"
+          :aria-expanded="options ? listOpen : undefined"
+          :aria-controls="options ? listId : undefined"
+          :aria-activedescendant="listOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined"
           class="min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted"
+          @focus="onFocus"
           @keydown="onKeydown"
           @beforeinput="onBeforeInput"
           @input="onInput"
@@ -358,6 +503,53 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
         />
       </TagsInputRoot>
       <LpFieldNotice v-if="standalone" :notice="notice" :id="noticeId" />
+      <PopoverRoot v-if="options" :open="listOpen" @update:open="(o) => !o && (dismissed = true)">
+        <PopoverAnchor v-if="boxEl" :reference="boxEl" class="hidden" />
+        <PopoverPortal>
+          <PopoverContent
+            :id="listId"
+            role="listbox"
+            :aria-label="text.suggestions"
+            position="popper"
+            side="bottom"
+            align="start"
+            :side-offset="6"
+            :collision-padding="8"
+            :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-popper-anchor-width) overflow-y-auto p-1 outline-none']"
+            @open-auto-focus.prevent
+            @close-auto-focus.prevent
+            @interact-outside="keepOpenInside"
+          >
+            <div v-if="loading" class="px-3 py-4 text-center text-sm italic text-muted">
+              {{ text.loading }}
+            </div>
+            <template v-else>
+              <div
+                v-for="(opt, i) in suggestions"
+                :id="optionId(i)"
+                :key="opt.value"
+                role="option"
+                :aria-selected="i === activeIndex"
+                :aria-disabled="opt.disabled || undefined"
+                :data-highlighted="i === activeIndex ? '' : undefined"
+                :data-disabled="opt.disabled ? '' : undefined"
+                :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
+                :class="[OPTION_ITEM, 'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
+                @pointerdown.prevent
+                @pointermove="activeIndex = i"
+                @click="!opt.disabled && choose(opt)"
+              >
+                <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
+                <LpIcon v-else-if="opt.icon" :name="opt.icon" :size="16" class="shrink-0 text-muted" />
+                <span class="flex min-w-0 flex-col">
+                  <span class="truncate">{{ opt.label ?? opt.value }}</span>
+                  <span v-if="opt.description" class="truncate text-xs text-muted">{{ opt.description }}</span>
+                </span>
+              </div>
+            </template>
+          </PopoverContent>
+        </PopoverPortal>
+      </PopoverRoot>
     </div>
     <span class="sr-only" aria-live="polite">{{ announcement }}</span>
   </component>

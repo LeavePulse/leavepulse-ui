@@ -1,5 +1,12 @@
 <script lang="ts">
 export default { inheritAttrs: false }
+
+export type AutocompleteLabels = {
+  clear: string
+  placeholder: string
+  empty: string
+  loading: string
+}
 </script>
 
 <script setup lang="ts">
@@ -31,21 +38,12 @@ import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { CLOSE_ICON, OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import type { LpOptionBase, OptionSelection } from "./options"
 
-export interface AutocompleteOption {
-  value: string
-  label?: string
-  description?: string
-  /** A picture beside the option: an avatar, an icon of a server. */
-  image?: string
-}
+export type AutocompleteOption = LpOptionBase<string>
 
 /** What the field's value stands for: a name for an id, with an optional muted hint and picture. */
-export interface AutocompleteSelection {
-  label: string
-  hint?: string
-  image?: string
-}
+export type AutocompleteSelection = OptionSelection
 
 const props = withDefaults(
   defineProps<{
@@ -83,16 +81,14 @@ const props = withDefaults(
      * When room runs short the hint gives way first; the name stays.
      */
     selected?: AutocompleteSelection | null
+    labels?: Partial<AutocompleteLabels>
   }>(),
   {
-    placeholder: "Type…",
     size: "md",
     clearable: false,
     filter: true,
     minChars: 1,
-    emptyText: "No suggestions",
     loading: false,
-    loadingText: "Searching…",
   },
 )
 
@@ -127,7 +123,13 @@ const field = useFieldControl(() => ({
   disabled: props.disabled,
 }))
 const isInvalidState = computed(() => field.value.invalid)
-const labels = useLabels("autocomplete", { clear: "Clear" })
+const labels = useLabels<AutocompleteLabels>(
+  "autocomplete",
+  { clear: "Clear", placeholder: "Type…", empty: "No suggestions", loading: "Searching…" },
+  () => props.labels,
+)
+// An explicit prop still wins; unset, the app's labels translate it.
+const placeholderText = computed(() => props.placeholder ?? labels.value.placeholder)
 
 // Normalise string|option to a stable shape.
 const items = computed<AutocompleteOption[]>(() =>
@@ -317,7 +319,7 @@ function clear() {
           v-bind="inputAttrs"
           :id="field.id"
           :model-value="draft ?? text"
-          :placeholder="placeholder"
+          :placeholder="placeholderText"
           :disabled="field.disabled"
           :required="field.required || undefined"
           :aria-invalid="isInvalidState || undefined"
@@ -383,22 +385,24 @@ function clear() {
       >
         <ComboboxViewport class="max-h-72 overflow-y-auto p-1">
           <div v-if="loading" class="px-3 py-4 text-center text-sm italic text-muted">
-            {{ loadingText }}
+            {{ loadingText ?? labels.loading }}
           </div>
           <ComboboxEmpty v-else class="px-3 py-4 text-center text-sm italic text-muted">
-            {{ emptyText }}
+            {{ emptyText ?? labels.empty }}
           </ComboboxEmpty>
 
           <ComboboxItem
             v-for="(opt, i) in filtered"
             :key="opt.value"
             :value="opt.value"
+            :disabled="opt.disabled"
             :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
-            :class="[OPTION_ITEM, 'justify-between']"
+            :class="[OPTION_ITEM, 'justify-between data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
             @select.prevent="choose(opt)"
           >
             <span class="flex min-w-0 items-center gap-2.5">
               <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
+              <LpIcon v-else-if="opt.icon" :name="opt.icon" :size="16" class="shrink-0 text-muted" />
               <span class="flex min-w-0 flex-col">
                 <span class="truncate">{{ opt.label ?? opt.value }}</span>
                 <span v-if="opt.description" class="truncate text-xs text-muted">
