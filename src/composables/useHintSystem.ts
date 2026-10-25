@@ -249,6 +249,8 @@ export interface HintTiming {
   freshLimit: number
   nudgeAgain: number
   flush: number
+  /** How long a news item opened from a feed waits for its page and feature, ms. */
+  newsWait: number
 }
 
 export interface HintSystemOptions {
@@ -278,6 +280,7 @@ const DEFAULT_TIMING: HintTiming = {
   freshLimit: 3,
   nudgeAgain: 7 * DAY,
   flush: 2000,
+  newsWait: 8000,
 }
 
 /** Records in localStorage: for anonymous sessions and apps without a server. */
@@ -509,6 +512,41 @@ export function createHintSystem(options: HintSystemOptions) {
     for (const n of unread(page)) record(newsKey(n.id), { state: "explained" })
   }
 
+  // A news item opened from a feed elsewhere (a notification bell): the app
+  // navigates, and the change is shown as soon as its page is up and the thing
+  // (or its sample) is there to point at. Waiting is bounded: an item whose
+  // feature never appears is only marked read.
+  let pendingNews: (() => void) | null = null
+
+  function showNews(id: string): void {
+    const item = news.find((n) => n.id === id)
+    if (!item) return
+    record(newsKey(item.id), { state: "explained" })
+    const feature = item.feature
+    if (!feature) return
+    pendingNews?.()
+    let done = false
+    let stopWatch: WatchStopHandle | undefined
+    const finish = () => {
+      done = true
+      clearTimeout(timer)
+      stopWatch?.()
+      if (pendingNews === finish) pendingNews = null
+    }
+    const timer = setTimeout(finish, timing.newsWait)
+    pendingNews = finish
+    stopWatch = watch(
+      () => state.page === item.page && showable(feature) && !state.tour.open,
+      (ready) => {
+        if (!ready || done) return
+        finish()
+        startTour(item.page, [feature])
+      },
+      { immediate: true },
+    )
+    if (done) stopWatch()
+  }
+
   function considerOffer(): void {
     const page = state.page
     const ready = state.loaded && !state.tour.open && !state.offer && !anyModalOpen() && !typing()
@@ -651,6 +689,8 @@ export function createHintSystem(options: HintSystemOptions) {
     },
     unreadNews: (page?: string) => unread(page),
     readNews,
+    /** Open one news item from a feed: mark it read and show its feature once the app is on its page. */
+    showNews,
     pageTitle: (page: string) => pages[page]?.title ?? page,
     readFresh(id: string): void {
       record(featureKey(id), { state: "explained" })

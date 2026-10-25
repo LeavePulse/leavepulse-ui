@@ -111,15 +111,26 @@ function detach(el: HTMLElement) {
   idOf.delete(el)
 }
 
+// Inside an LpHintExample the mark names a part of the sample instead: the
+// app drops its real component with made-up data into the sample, and the
+// component's own marks tell the tour where each step points, without
+// counting the sample as the real thing.
+function mark(el: HTMLElement, id: string | null | undefined) {
+  if (!id) return
+  if (el.closest("[data-lp-hint-example]")) el.dataset.lpHintPart = id
+  else attach(el, id)
+}
+
 /** `v-hint="'page.feature'"` on the element that represents a feature. */
 export const vHint: Directive<HTMLElement, string | null | undefined> = {
   mounted(el, binding) {
-    if (binding.value) attach(el, binding.value)
+    mark(el, binding.value)
   },
   updated(el, binding) {
-    if (binding.value === idOf.get(el)) return
+    if (binding.value === (idOf.get(el) ?? el.dataset.lpHintPart)) return
     detach(el)
-    if (binding.value) attach(el, binding.value)
+    delete el.dataset.lpHintPart
+    mark(el, binding.value)
   },
   beforeUnmount(el) {
     detach(el)

@@ -17,14 +17,13 @@
  * control: it does not mark the feature seen or used.
  *
  * One sample can stand in for several steps that live in the same block (a
- * list and the detail beside it): pass the ids as an array and mark each part
- * with `data-lp-hint-part="id"`. The tour then points at that part, and the
- * sample stays put while the walk moves between them instead of shrinking and
- * growing back.
+ * list and the detail beside it): pass the ids as an array. The component
+ * inside keeps its own `v-hint` marks; within a sample they become parts
+ * (`data-lp-hint-part`) instead of real marks, so the tour points at each part
+ * and the sample stays put while the walk moves between them.
  *
  *   <LpHintExample :hint="['errors.list', 'errors.detail']">
- *     <div data-lp-hint-part="errors.list">...</div>
- *     <div data-lp-hint-part="errors.detail">...</div>
+ *     <ErrorsBoard :alerts="[sampleAlert]" />
  *   </LpHintExample>
  *
  * `inline` is for a sample inside a row or a cell (an icon next to a name): a

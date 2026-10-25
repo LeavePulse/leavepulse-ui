@@ -125,6 +125,10 @@ const props = withDefaults(
     animate?: boolean
     /** Shown when every series is empty. */
     emptyLabel?: string
+    /** Second line of the empty state: why it is empty, what period it covers. */
+    emptyDescription?: string
+    /** Icon of the empty state. The `empty` slot puts an action under it ("Show 90 days"). */
+    emptyIcon?: string
     /**
      * Inside a `v-hint` element with nothing to draw, a tour step on that hint
      * draws made-up data here instead of the empty state, tagged "Example".
@@ -1267,11 +1271,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpEmptyState
           v-else-if="!hasData"
           compact
-          icon="lucide:chart-no-axes-column"
+          :icon="emptyIcon ?? 'lucide:chart-no-axes-column'"
           :title="emptyLabel ?? strings.empty"
+          :description="emptyDescription"
           class="justify-center rounded-control border border-dashed border-line py-0"
           :style="{ height: `${height}px` }"
-        />
+        >
+          <template v-if="$slots.empty" #default><slot name="empty" /></template>
+        </LpEmptyState>
 
         <svg
           v-else-if="width > 0"
