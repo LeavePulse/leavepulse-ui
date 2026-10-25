@@ -398,13 +398,15 @@ export const registry: ComponentEntry[] = [
     description:
       "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` and a `description` (a secondary line the control is described by); LpSwitch also `label-position=\"start\"` for a settings row with the switch at the right edge. LpRadioGroup takes `:options` (each may carry a `description` line, an `icon`, or be `disabled`), or LpRadio children when a row needs custom content. A switch with `action` saves its own state: it flips at once, spins in its thumb while the work runs, and flips back with an error toast if it fails (the last row fails every other time).",
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
-    state: () => reactive({
-      synced: false,
-      saves: 0,
-      sync(this: { saves: number }) {
-        const fail = ++this.saves % 2 === 0
+    state: () => {
+      let saves = 0
+      const sync = () => {
+        const fail = ++saves % 2 === 0
         return new Promise((resolve, reject) => setTimeout(() => (fail ? reject(new Error("Could not save the setting")) : resolve(true)), 900))
-      },
+      }
+      return reactive({
+      synced: false,
+      sync,
       on: true,
       checked: true,
       notify: false,
@@ -417,7 +419,8 @@ export const registry: ComponentEntry[] = [
         { value: "yearly", label: "Yearly", description: "Two months free." },
         { value: "lifetime", label: "Lifetime", description: "Sold out.", disabled: true },
       ],
-    }),
+    })
+    },
     template: `<div class="flex flex-col gap-6">
   <div class="flex flex-wrap items-start gap-8">
     <LpSwitch v-model="on" />
