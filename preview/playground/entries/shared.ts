@@ -9,6 +9,8 @@ export interface ComponentEntry {
   id: string
   name: string
   description: string
+  /** Components compared or composed by this example, with a reason to choose each. */
+  related?: { id: string; description: string }[]
   /** Editable Vue template for the live example. */
   template: string
   /** A small static template for the index card: the component's look at a glance, no interaction needed. Rendered with the entry's components and state. */

@@ -61,7 +61,7 @@ function lead(text: string): string {
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <LpCard><LpStat compact label="Components" :value="registry.length" icon="lucide:component" /></LpCard>
+        <LpCard><LpStat compact label="Component examples" :value="registry.filter(entry => !entry.related).length" icon="lucide:component" /></LpCard>
         <LpCard><LpStat compact label="Sections" :value="sections.length" icon="lucide:shapes" /></LpCard>
         <LpCard><LpStat compact label="Themes" :value="Object.keys(presets).length" icon="lucide:palette" /></LpCard>
         <LpCard><LpStat compact label="Showcase pages" :value="showcasePages.length" icon="lucide:layout-dashboard" /></LpCard>

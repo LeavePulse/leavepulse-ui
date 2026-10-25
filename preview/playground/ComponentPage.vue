@@ -6,7 +6,7 @@ import CodeEditor from "./CodeEditor.vue"
 import LivePreview from "./LivePreview.vue"
 import { meta } from "./meta"
 import PropsPlayground from "./PropsPlayground.vue"
-import { sectionOf, type ComponentEntry } from "./registry"
+import { registry, sectionOf, type ComponentEntry } from "./registry"
 import { href, navigate } from "./router"
 
 const props = defineProps<{ entry: ComponentEntry }>()
@@ -16,6 +16,10 @@ const scopeState = ref(props.entry.state?.() ?? {})
 const tab = ref("example")
 
 const section = computed(() => sectionOf.get(props.entry.id))
+const related = computed(() => props.entry.related
+  ? props.entry.related.map(link => ({ ...link, entry: registry.find(entry => entry.id === link.id) }))
+  : registry.filter(entry => entry.related?.some(link => link.id === props.entry.id))
+    .map(entry => ({ id: entry.id, entry, description: entry.description })))
 
 // The kit components this entry is about: the ones in its scope that have API
 // data. The one whose name matches the entry leads; the rest follow.
@@ -45,7 +49,7 @@ const importLine = computed(() =>
 
 const tabs = computed(() => [
   { value: "example", label: "Example", icon: "lucide:play" },
-  ...(lead.value ? [{ value: "playground", label: "Playground", icon: "lucide:sliders-horizontal" }] : []),
+  ...(lead.value && !props.entry.related ? [{ value: "playground", label: "Playground", icon: "lucide:sliders-horizontal" }] : []),
   ...(documented.value.length ? [{ value: "api", label: "API", icon: "lucide:braces" }] : []),
 ])
 
@@ -73,6 +77,18 @@ function go(e: MouseEvent, id: string) {
       <p class="max-w-3xl text-sm leading-relaxed text-muted">{{ entry.description }}</p>
       <LpCodeBlock v-if="importLine" :model-value="importLine" lang="ts" copyable class="max-w-3xl" />
     </header>
+
+    <nav v-if="related.length" :aria-label="entry.related ? 'When to use each component' : 'Compare and compose'" class="flex flex-col gap-3">
+      <h2 class="text-sm font-semibold text-ink">{{ entry.related ? 'When to use each component' : 'Compare and compose' }}</h2>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <a v-for="link in related" :key="link.id" :href="href({ kind: 'component', id: link.id })"
+          class="flex min-w-0 flex-col gap-1 rounded-card border border-line p-3 transition-colors hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-ring"
+          @click="go($event, link.id)">
+          <span class="text-sm font-medium text-ink">{{ link.entry?.name ?? link.id }} ↗</span>
+          <span class="text-xs leading-relaxed text-muted">{{ link.description }}</span>
+        </a>
+      </div>
+    </nav>
 
     <LpTabs v-model="tab" :items="tabs">
       <template #panel="{ value }">

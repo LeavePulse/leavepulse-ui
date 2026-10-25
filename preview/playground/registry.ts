@@ -7,6 +7,7 @@ import { onboarding } from "./entries/onboarding"
 import { overlays } from "./entries/overlays"
 import type { ComponentEntry } from "./entries/shared"
 import { theming } from "./entries/theming"
+import { patterns } from "./entries/patterns"
 import * as fields from "./entries/fields"
 import * as looks from "./entries/looks"
 import * as process from "./entries/process"
@@ -30,6 +31,7 @@ export interface Section {
 }
 
 export const sections: Section[] = [
+  { id: "patterns", title: "Patterns", icon: "lucide:combine", lead: "Choose between similar components and try useful combinations with shared state.", entries: patterns },
   { id: "basics", title: "Basics", icon: "lucide:shapes", lead: "Buttons, cards, badges and the small pieces every screen is made of.", entries: [...basics, ...extra("Basics")] },
   { id: "forms", title: "Forms", icon: "lucide:text-cursor-input", lead: "Fields, pickers and uploads, each with its own validation and notices.", entries: [...forms, ...extra("Forms")] },
   { id: "data", title: "Data", icon: "lucide:chart-column", lead: "Charts, tables, stats and logs that load, empty and update without jumping.", entries: [...data, ...extra("Data")] },
