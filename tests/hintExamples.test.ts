@@ -25,3 +25,18 @@ describe("hint examples", () => {
     stop()
   })
 })
+
+describe("tour over samples", () => {
+  test("a page whose only feature is a sample still has a tour", async () => {
+    const { createHintSystem } = await import("../src/composables/useHintSystem")
+    const system = createHintSystem({
+      features: { "t.gone": { page: "t-page", title: "Gone", text: "" } },
+      page: () => "t-page",
+      storage: { load: () => ({}), save: () => {} },
+    })
+    expect(system.hasTour("t-page")).toBe(false)
+    const stop = hints.registerExample("t.gone")
+    expect(system.hasTour("t-page")).toBe(true)
+    stop()
+  })
+})

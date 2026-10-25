@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import LpIcon from "./LpIcon.vue"
 
 const alert = tv({
@@ -55,8 +55,16 @@ const props = withDefaults(
   { variant: "info", live: undefined, busy: false },
 )
 
+// A region that was busy stays a polite region after the work ends: dropping
+// the role exactly when the result replaces "Saving…" would leave the result
+// unannounced, and a live region that comes and goes is read unreliably.
+const wasBusy = ref(props.busy)
+watch(() => props.busy, (busy) => {
+  if (busy) wasBusy.value = true
+})
+
 const role = computed(() => {
-  const live = props.live ?? (props.variant === "danger" ? "assertive" : props.busy ? "polite" : false)
+  const live = props.live ?? (props.variant === "danger" ? "assertive" : wasBusy.value ? "polite" : false)
   return live === "assertive" ? "alert" : live === "polite" ? "status" : undefined
 })
 

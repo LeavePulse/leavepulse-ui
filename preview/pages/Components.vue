@@ -152,6 +152,8 @@ const heading = "text-sm font-semibold uppercase tracking-wider text-muted"
           </LpCard>
         </template>
       </LpTabs>
+      <p class="mt-4 text-xs text-muted">Pinned marker (<code>:hover-follow="false"</code>): hovering only tints the tab.</p>
+      <LpTabs v-model="tab" :items="tabs" :hover-follow="false" class="mt-2" />
     </section>
 
     <!-- FormField -->

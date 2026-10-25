@@ -10,6 +10,7 @@
  */
 import { computed, onBeforeUnmount, onErrorCaptured, onMounted, ref, unref, watch } from "vue"
 import { provideHintSystem, type HintSystem } from "../composables/useHintSystem"
+import { appleModifierLabel, useAppleKeyboard } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
 import LpActionBar, { type ActionBarAction } from "./LpActionBar.vue"
 import LpHintLayer from "./LpHintLayer.vue"
@@ -62,6 +63,12 @@ watch(() => [state.tour.open, state.tour.step] as const, ([open, step]) => open 
 
 const offer = computed(() => state.offer)
 const page = computed(() => (offer.value ? props.system.pageTitle(offer.value.page) : ""))
+// "Ctrl+K" reads "⌘K" on a Mac: bindings treat the two as one modifier.
+const apple = useAppleKeyboard()
+const keyLabel = (combo: string) => {
+  const parts = combo.split("+").map((key) => appleModifierLabel(key, apple.value))
+  return parts.join(apple.value ? "" : "+")
+}
 const fill = (text: string) => text.replace("{page}", page.value)
 
 const title = computed(() => {
@@ -77,7 +84,7 @@ const description = computed(() => {
   const o = offer.value
   if (!o) return ""
   if (o.kind === "nudge") return o.nudge.text
-  if (o.kind === "tip") return o.tip.keys ? `${o.tip.text} ${o.tip.keys}` : o.tip.text
+  if (o.kind === "tip") return o.tip.keys ? `${o.tip.text} ${keyLabel(o.tip.keys)}` : o.tip.text
   if (o.kind === "news") return o.items.map((n) => n.text).join(" ")
   return o.kind === "assigned" ? labels.value.assignedText : labels.value.tourText
 })
@@ -89,8 +96,8 @@ const actions = computed<ActionBarAction[]>(() => {
   const show: ActionBarAction = { label: labels.value.show, icon: "lucide:sparkles", onClick: answer("show") }
   if (o.kind === "nudge") return [{ label: labels.value.noThanks, variant: "ghost", onClick: answer("never") }, show]
   if (o.kind === "tip") {
-    const later: ActionBarAction = { label: labels.value.gotIt, variant: o.tip.step ? "ghost" : undefined, onClick: answer("later") }
-    return [{ label: labels.value.never, variant: "ghost", onClick: answer("never") }, later, ...(o.tip.step ? [show] : [])]
+    const later: ActionBarAction = { label: labels.value.gotIt, variant: o.step ? "ghost" : undefined, onClick: answer("later") }
+    return [{ label: labels.value.never, variant: "ghost", onClick: answer("never") }, later, ...(o.step ? [show] : [])]
   }
   if (o.kind === "news") return [{ label: labels.value.gotIt, variant: "ghost", onClick: answer("later") }, show]
   return [

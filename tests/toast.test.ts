@@ -28,3 +28,20 @@ describe("toast details", () => {
     expect(toast.queue.at(-1)).toMatchObject({ message: "Plain", details: undefined })
   })
 })
+
+describe("toast.promise", () => {
+  const toast = useToast()
+  beforeEach(() => toast.clear())
+
+  test("a failed task keeps the error's details on the error toast", async () => {
+    const error = Object.assign(new Error("boom"), { details: "POST /y · 502" })
+    await toast.promise(Promise.reject(error), { loading: "…", success: "ok", error: "Not saved" }).catch(() => {})
+    expect(toast.queue.at(-1)).toMatchObject({ message: "Not saved", details: "POST /y · 502" })
+  })
+
+  test("details are found through a native Error.cause", () => {
+    const inner = Object.assign(new Error("inner"), { details: "GET /z · 500" })
+    toast.error(new Error("outer", { cause: inner }))
+    expect(toast.queue.at(-1)?.details).toBe("GET /z · 500")
+  })
+})

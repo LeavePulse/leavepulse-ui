@@ -155,6 +155,24 @@ function waitFor(raw: TourStep["target"], mine: number): Promise<Element | null>
   })
 }
 
+// The hole's corners match the kit's controls. The token may be written in rem
+// or calc(), which parseFloat would misread (0.5rem → 0.5px), so the browser
+// resolves it on a throwaway element.
+function controlRadius(): number {
+  const probe = document.createElement("div")
+  probe.style.cssText = "position:absolute;visibility:hidden;border-top-left-radius:var(--radius-control)"
+  document.body.append(probe)
+  const px = parseFloat(getComputedStyle(probe).borderTopLeftRadius)
+  probe.remove()
+  return Number.isFinite(px) ? px : 8
+}
+
+// A target that is still easing in (an LpHintExample growing from nothing)
+// would be scrolled to at its first-frame size; the walk waits for it to land.
+async function settled(el: Element): Promise<void> {
+  await Promise.allSettled(el.getAnimations().map((a) => a.finished))
+}
+
 function measure() {
   viewport.value = { width: window.innerWidth, height: window.innerHeight }
   const el = target.value
@@ -198,6 +216,8 @@ async function show(): Promise<void> {
   if (mine !== token) return
   if (!el || !el.getClientRects().length) return skip()
   target.value = el
+  await settled(el)
+  if (mine !== token) return
   scrollToElement(el, { block: wide.value ? "nearest" : "center", behavior: smooth() ? "smooth" : "auto", margin: 48 })
   await nextTick()
   measure()
@@ -276,7 +296,7 @@ watch(
     if (value) {
       direction = 1
       box.value = null
-      radius.value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--radius-control")) || 8
+      radius.value = controlRadius()
       document.addEventListener("click", onTargetClick, true)
       document.addEventListener("contextmenu", onTargetClick, true)
       frame ||= requestAnimationFrame(track)
@@ -317,7 +337,7 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
   <Teleport to="body">
     <Transition
       enter-active-class="transition-opacity duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
-      leave-active-class="transition-opacity duration-[var(--duration-medium)] ease-out motion-reduce:transition-none"
+      leave-active-class="lp-tour-gone transition-opacity duration-[var(--duration-medium)] ease-out motion-reduce:transition-none"
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
@@ -365,7 +385,7 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
       </PopoverPortal>
     </PopoverRoot>
 
-    <Transition leave-active-class="animate-[rise-out_var(--duration-fast)_ease-out] motion-reduce:animate-none">
+    <Transition leave-active-class="lp-tour-gone animate-[rise-out_var(--duration-fast)_ease-out] motion-reduce:animate-none">
     <div
       v-if="open && !wide && ready"
       :class="[CARD, 'pointer-events-auto fixed inset-x-3 bottom-3 z-[calc(var(--z-tour)+1)] w-auto animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none']"

@@ -87,6 +87,10 @@ function rememberField() {
     : null
 }
 
+// A menu a tour opens (openContextMenu dispatches an untrusted event) is not
+// the user's habit, so it must not switch off the right-click tip.
+let synthetic = false
+
 /*
  * A right-click the menu answers goes no further than its trigger. reka opens
  * the menu a tick later, and only if nothing has called preventDefault by then;
@@ -96,18 +100,30 @@ function rememberField() {
  * its own once it opens.
  */
 function keepContextMenu(event: Event) {
+  synthetic = !event.isTrusted
   if (enabled.value) event.stopPropagation()
 }
 
 function opened(open: boolean) {
-  if (open) hints.use(HINT_SIGNALS.contextMenu)
+  if (open && !synthetic) hints.use(HINT_SIGNALS.contextMenu)
+  synthetic = false
 }
 
+/*
+ * One click is one signal, however many hinted menus it sits inside. And where
+ * the menu is really the rows' (a table marks them data-lp-context-row), only
+ * a click on a row counts: a header or the pager has nothing on right click.
+ */
+const counted = new WeakSet<Event>()
+
 function leftClick(event: MouseEvent) {
-  if (!hinted.value) return
-  hints.use(HINT_SIGNALS.contextTarget)
+  if (!hinted.value || counted.has(event)) return
   const el = event.currentTarget as Element
-  noteContextTarget((event.target as Element).closest?.("[data-lp-context-row]") ?? el)
+  const row = (event.target as Element).closest?.("[data-lp-context-row]")
+  if (!row && el.querySelector("[data-lp-context-row]")) return
+  counted.add(event)
+  hints.use(HINT_SIGNALS.contextTarget)
+  noteContextTarget(row ?? el)
 }
 
 function returnFocus(event: Event) {

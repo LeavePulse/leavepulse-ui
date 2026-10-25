@@ -210,7 +210,7 @@ export type HintOffer =
   | { kind: "tour" | "assigned"; page: string }
   | { kind: "news"; page: string; items: HintNews[] }
   | { kind: "nudge"; page: string; nudge: HintNudge }
-  | { kind: "tip"; page: string; tip: HintTip }
+  | { kind: "tip"; page: string; tip: HintTip; step: TourStep | null }
 
 const RANK: Record<HintLevel, number> = { seen: 0, explained: 1, used: 2 }
 const DAY = 24 * 3600 * 1000
@@ -415,7 +415,13 @@ export function createHintSystem(options: HintSystemOptions) {
     Object.fromEntries(Object.entries(features).map(([id, f]) => [id, { title: f.title, text: f.text }])),
   )
 
-  const hasTour = (page = state.page) => Object.values(features).some((f) => f.page === page)
+  const showable = (id: string) => hints.present(id) || hints.hasExample(id)
+  const lit = (id: string, f: HintFeature) => !!f.target || !!f.enter || showable(id)
+  const tourable = (page: string, only?: string[]) =>
+    Object.entries(features)
+      .filter(([id, f]) => f.page === page && (!only || only.includes(id)) && lit(id, f))
+      .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
+  const hasTour = (page = state.page) => tourable(page).length > 0
 
   async function showStep(id: string, f: HintFeature, example: boolean, context: TourContext): Promise<void> {
     if (example) context.onLeave(hints.showExample(id))
@@ -423,9 +429,7 @@ export function createHintSystem(options: HintSystemOptions) {
   }
 
   function startTour(page = state.page, only?: string[]): void {
-    const entries = Object.entries(features)
-      .filter(([id, f]) => f.page === page && (!only || only.includes(id)) && (!!f.target || !!f.enter || hints.present(id) || hints.hasExample(id)))
-      .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
+    const entries = tourable(page, only)
     if (!entries.length) return
     state.offer = null
     Object.assign(state.tour, {
@@ -449,7 +453,6 @@ export function createHintSystem(options: HintSystemOptions) {
     })
   }
 
-  const showable = (id: string) => hints.present(id) || hints.hasExample(id)
   const unread = (page?: string) =>
     news.filter((n) => (!page || n.page === page) && !state.records.has(newsKey(n.id)) && (!page || !n.feature || showable(n.feature)))
 
@@ -496,7 +499,7 @@ export function createHintSystem(options: HintSystemOptions) {
     if (n && n.page === page) {
       const seen = state.records.get(nudgeKey(n.id))
       const f = features[n.feature]
-      const visible = !!f && (!!f.target || !!f.enter || hints.present(n.feature))
+      const visible = !!f && lit(n.feature, f)
       if (!seen?.dismissed && state.records.get(featureKey(n.feature))?.state !== "used" && visible
         && !(seen && Date.now() - Date.parse(seen.updatedAt) < timing.nudgeAgain)) {
         state.candidate = null
@@ -512,7 +515,8 @@ export function createHintSystem(options: HintSystemOptions) {
       if (seen && Date.now() - Date.parse(seen.updatedAt) < timing.nudgeAgain) continue
       if (!tip.when(count)) continue
       spend()
-      state.offer = { kind: "tip", page, tip }
+      record(tipKey(tip.id), { add: 1 })
+      state.offer = { kind: "tip", page, tip, step: tip.step?.() ?? null }
       return
     }
   }
@@ -523,8 +527,7 @@ export function createHintSystem(options: HintSystemOptions) {
     if (stops.length) return
     const stopPage: WatchStopHandle = watch(
       () => state.overlay ?? options.page(),
-      (page, previous) => {
-        if (previous !== undefined && page !== previous && !state.overlay) record(signalKey(HINT_SIGNALS.navigate), { add: 1 })
+      (page) => {
         state.page = page
         state.settledAt = Date.now()
         if (state.offer && state.offer.page !== page) state.offer = null
@@ -533,6 +536,9 @@ export function createHintSystem(options: HintSystemOptions) {
       },
       { immediate: true },
     )
+    const stopNavigate = watch(options.page, (page, previous) => {
+      if (previous !== undefined && page !== previous) record(signalKey(HINT_SIGNALS.navigate), { add: 1 })
+    })
     const poll = setInterval(() => {
       try {
         considerOffer()
@@ -544,6 +550,7 @@ export function createHintSystem(options: HintSystemOptions) {
     window.addEventListener("pagehide", flushOnLeave)
     stops = [
       stopPage,
+      stopNavigate,
       hints.on("used", (id) => {
         if (features[id]) record(featureKey(id), { state: "used", add: 1 })
         if (id.startsWith("lp.") || !features[id]) record(signalKey(id), { add: 1 })
@@ -617,9 +624,10 @@ export function createHintSystem(options: HintSystemOptions) {
         readNews(offer.page)
         if (choice === "show" && ids.length) startTour(offer.page, ids)
       } else if (offer.kind === "tip") {
-        record(tipKey(offer.tip.id), { add: 1, dismissed: choice === "never" })
-        const step = choice === "show" ? offer.tip.step?.() : null
-        if (step) Object.assign(state.tour, { open: true, step: 0, page: offer.page, ids: [], steps: [step] })
+        if (choice === "never") record(tipKey(offer.tip.id), { dismissed: true })
+        if (choice === "show" && offer.step) {
+          Object.assign(state.tour, { open: true, step: 0, page: offer.page, ids: [], steps: [offer.step] })
+        }
       } else if (offer.kind === "nudge") {
         if (choice === "show") startTour(features[offer.nudge.feature]!.page, [offer.nudge.feature])
         else record(nudgeKey(offer.nudge.id), { dismissed: true })

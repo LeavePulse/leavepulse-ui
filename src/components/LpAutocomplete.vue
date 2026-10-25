@@ -25,7 +25,7 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, nextTick, ref, useAttrs, watch } from "vue"
+import { computed, nextTick, ref, useAttrs, useId, watch } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
@@ -78,7 +78,8 @@ const props = withDefaults(
      * What the current value stands for, shown in the field itself while it is
      * not being edited: a picked id reads as a person (avatar in place of the
      * icon, name, muted hint) instead of digits nobody recognises, and nothing
-     * appears or jumps below the field. Focusing it brings the raw text back.
+     * appears or jumps below the field. Focusing it puts the name in the box,
+     * selected, so typing starts a new search; leaving untouched keeps the pick.
      * When room runs short the hint gives way first; the name stays.
      */
     selected?: AutocompleteSelection | null
@@ -159,6 +160,20 @@ const showSelected = computed(() => !!props.selected?.label && !focused.value)
 // leaving without typing keeps the pick as it was.
 const draft = ref<string | null>(null)
 const showImage = computed(() => !!props.selected?.image && (!focused.value || draft.value !== null))
+// The pick can change under an untouched, focused field (the name resolves, a
+// parent swaps the value): the box follows it instead of keeping the old name.
+watch(
+  () => props.selected?.label,
+  (label) => {
+    if (draft.value !== null) draft.value = label ?? null
+  },
+)
+// The box shows the name, but the input's own value is the raw id: a screen
+// reader is told who it is through a description.
+const selectedId = useId()
+const describedBy = computed(() =>
+  [field.value.describedBy, showSelected.value ? selectedId : undefined].filter(Boolean).join(" ") || undefined,
+)
 
 // Threshold met AND something to show → the list is allowed to open.
 const canOpen = computed(
@@ -201,16 +216,27 @@ function onInput(event: Event) {
   text.value = (event.target as HTMLInputElement).value
 }
 
+// A click focuses on pointerdown and places the caret on the mouseup that
+// follows, which undid the selection made on focus. That one mouseup is
+// cancelled; keyboard focus has none and needs nothing.
+let pointerFocus = false
+
+function onPointerDown() {
+  if (!focused.value) pointerFocus = true
+}
+
 function onFocus(event: FocusEvent) {
   // Arriving at a field that already holds a value shows every option, not just
   // the one it currently holds.
   typing.value = false
   focused.value = true
+  const input = event.target as HTMLInputElement
   if (props.selected?.label) {
     draft.value = props.selected.label
-    const input = event.target as HTMLInputElement
+    if (pointerFocus) input.addEventListener("mouseup", (e) => e.preventDefault(), { once: true })
     void nextTick(() => input.select())
   }
+  pointerFocus = false
   if (canOpen.value) open.value = true
 }
 
@@ -257,11 +283,12 @@ function clear() {
       ]"
     >
       <!-- Picture and icon share one fixed box and cross-fade, so the text
-           beside them never moves when one gives way to the other. -->
+           beside them never moves when one gives way to the other. A field
+           that can show a pick sizes the box for the picture from the start. -->
       <span
         v-if="icon || selected?.image"
         class="relative grid shrink-0 place-items-center"
-        :class="selected?.image ? 'size-5' : 'size-4'"
+        :class="selected === undefined ? 'size-4' : 'size-5'"
       >
         <LpIcon
           v-if="icon"
@@ -294,13 +321,14 @@ function clear() {
           :disabled="field.disabled"
           :required="field.required || undefined"
           :aria-invalid="isInvalidState || undefined"
-          :aria-describedby="field.describedBy"
+          :aria-describedby="describedBy"
           class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
           :class="showSelected && 'text-transparent placeholder:text-transparent'"
           @beforeinput="onBeforeInput"
           @paste="onPaste"
           @compositionend="onCompositionEnd"
           @input="onInput"
+          @pointerdown="onPointerDown"
           @focus="onFocus"
           @blur="onBlur"
         />
@@ -319,6 +347,7 @@ function clear() {
             class="pointer-events-none absolute inset-0 flex min-w-0 items-center gap-1.5"
             aria-hidden="true"
           >
+            <span :id="selectedId" class="sr-only">{{ selected.hint ? `${selected.label}, ${selected.hint}` : selected.label }}</span>
             <span class="max-w-full shrink-0 truncate" :class="showSelected ? '' : 'invisible'">{{ selected.label }}</span>
             <span
               v-if="selected.hint"

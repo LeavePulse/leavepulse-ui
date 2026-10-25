@@ -52,9 +52,13 @@ export interface ToastOptions {
  */
 export type ToastMessage = string | (Error & { details?: string })
 
-function detailsOf(source: unknown): string | undefined {
-  const details = (source as { details?: unknown } | null | undefined)?.details
-  return typeof details === "string" && details ? details : undefined
+// Follows the native `Error.cause` chain too: an app that wraps an API error
+// in its own ("Not saved", { cause }) keeps the request details on copy.
+function detailsOf(source: unknown, depth = 0): string | undefined {
+  if (!source || typeof source !== "object" || depth > 4) return undefined
+  const { details, cause } = source as { details?: unknown; cause?: unknown }
+  if (typeof details === "string" && details) return details
+  return detailsOf(cause, depth + 1)
 }
 
 function split(message: ToastMessage, options: ToastOptions): [string, ToastOptions] {
@@ -141,7 +145,7 @@ function promise<T>(
     },
     (error: unknown) => {
       const text = typeof messages.error === "function" ? messages.error(error) : messages.error
-      push("error", text, { ...options, key })
+      push("error", text, { ...options, key, cause: options.cause ?? error })
     },
   )
   return task

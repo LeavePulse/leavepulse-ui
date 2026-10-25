@@ -539,6 +539,12 @@
   backdrop-filter: none;
 }
 
+/* A tour fading out is already over: the click that ended it, or the next one, reaches the page. */
+.lp-tour-gone,
+.lp-tour-gone * {
+  pointer-events: none !important;
+}
+
 /*
  * Frosted overlay: a floating panel that lets the page show through, softened.
  * For surfaces that float over everything and are read briefly (the command

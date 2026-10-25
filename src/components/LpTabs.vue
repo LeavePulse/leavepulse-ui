@@ -163,7 +163,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
           variant === 'underline' ? 'rounded-t-inner px-3 pt-1.5 pb-2' : '',
           variant === 'contained' || variant === 'plain' ? 'rounded-inner px-3 py-1.5' : '',
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
-          hovered === item.value && !bottom ? 'text-ink' : 'text-muted',
+          hovered === item.value && !bottom ? 'text-ink' : !hoverFollow && !bottom ? 'text-muted hover:text-ink' : 'text-muted',
         ]"
         @pointerenter="hoverFollow && (hovered = item.value)"
         @pointerup="releaseFocusAfterPointer"
