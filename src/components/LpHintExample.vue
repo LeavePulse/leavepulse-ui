@@ -16,39 +16,53 @@
  * the registry entry needs nothing extra. The sample never counts as the real
  * control: it does not mark the feature seen or used.
  *
+ * One sample can stand in for several steps that live in the same block (a
+ * list and the detail beside it): pass the ids as an array and mark each part
+ * with `data-lp-hint-part="id"`. The tour then points at that part, and the
+ * sample stays put while the walk moves between them instead of shrinking and
+ * growing back.
+ *
+ *   <LpHintExample :hint="['errors.list', 'errors.detail']">
+ *     <div data-lp-hint-part="errors.list">...</div>
+ *     <div data-lp-hint-part="errors.detail">...</div>
+ *   </LpHintExample>
+ *
  * `inline` is for a sample inside a row or a cell (an icon next to a name): a
  * span instead of a block, and no tag, which would not fit there. The tour
  * card still says it is an example.
  */
 import { computed, watch } from "vue"
-import { easingToken, prefersReducedMotion } from "../composables/easing"
+import { durationToken, easingToken, prefersReducedMotion } from "../composables/easing"
 import { hints } from "../composables/useHints"
-import { useLabels } from "../composables/useLpConfig"
+import HintSampleTag from "./HintSampleTag.vue"
 
 const props = defineProps<{
-  /** The hint id this stands in for, as in `v-hint`. */
-  hint: string
+  /** The hint id this stands in for, as in `v-hint`, or several for a sample with parts. */
+  hint: string | string[]
   inline?: boolean
   labels?: Partial<{ badge: string }>
 }>()
 
-const labels = useLabels("hintExample", { badge: "Example" }, () => props.labels)
+const ids = computed(() => (Array.isArray(props.hint) ? props.hint : [props.hint]))
+
+// Offered only for the ids whose real element is absent: with it on the page
+// the tour points there, and the card must not call it an example.
+const absent = computed(() => ids.value.filter((id) => !hints.present(id)))
 
 watch(
-  () => props.hint,
-  (id, _, onCleanup) => onCleanup(hints.registerExample(id)),
+  () => absent.value.join(" "),
+  (_, __, onCleanup) => {
+    const releases = absent.value.map((id) => hints.registerExample(id))
+    onCleanup(() => releases.forEach((release) => release()))
+  },
   { immediate: true },
 )
 
-const visible = computed(() => hints.showingExample(props.hint) && !hints.present(props.hint))
+const visible = computed(() => absent.value.some((id) => hints.showingExample(id)))
 
 // The block grows from nothing and shrinks back, so what sits below it glides
 // instead of jumping. It exists only while shown: an always-present wrapper
 // would take a gap in the parent's flex column even when empty.
-function duration(): number {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue("--duration-medium").trim()
-  return Number.parseFloat(raw) || 220
-}
 
 function grow(el: Element, done: () => void, opening: boolean) {
   if (prefersReducedMotion()) return done()
@@ -59,7 +73,7 @@ function grow(el: Element, done: () => void, opening: boolean) {
   ]
   box.style.overflow = "hidden"
   box.animate(opening ? frames : frames.reverse(), {
-    duration: duration(),
+    duration: durationToken("duration-medium"),
     easing: easingToken("ease-emphasized"),
   }).onfinish = () => {
     box.style.overflow = ""
@@ -76,7 +90,7 @@ function grow(el: Element, done: () => void, opening: boolean) {
     enter-from-class="opacity-0"
     leave-to-class="opacity-0"
   >
-    <span v-if="visible" :data-lp-hint-example="hint" inert aria-hidden="true" class="inline-flex">
+    <span v-if="visible" :data-lp-hint-example="ids.join(' ')" inert aria-hidden="true" class="inline-flex">
       <slot />
     </span>
   </Transition>
@@ -86,11 +100,9 @@ function grow(el: Element, done: () => void, opening: boolean) {
     @enter="(el, done) => grow(el, done, true)"
     @leave="(el, done) => grow(el, done, false)"
   >
-    <div v-if="visible" :data-lp-hint-example="hint" inert aria-hidden="true" class="relative">
+    <div v-if="visible" :data-lp-hint-example="ids.join(' ')" inert aria-hidden="true" class="relative">
       <slot />
-      <span
-        class="pointer-events-none absolute -top-2 right-3 z-10 rounded-pill border border-brand/40 bg-surface-raised px-1.5 py-px text-[10px] font-medium tracking-wide text-brand"
-      >{{ labels.badge }}</span>
+      <HintSampleTag :labels="labels" />
     </div>
   </Transition>
 </template>

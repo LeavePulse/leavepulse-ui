@@ -54,6 +54,18 @@ export const easingToken = (
 }
 
 /**
+ * A duration token in milliseconds, for an animation or a timer driven in
+ * script. Same reasoning as `easingToken`: a typed-out 220 would not follow a
+ * theme that retunes the token.
+ */
+export const durationToken = (name: "duration-fast" | "duration-medium", fallback = 220): number => {
+  if (typeof window === "undefined" || !window.getComputedStyle) return fallback
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim()
+  const ms = Number.parseFloat(raw)
+  return Number.isFinite(ms) ? (raw.endsWith("ms") || !raw.endsWith("s") ? ms : ms * 1000) : fallback
+}
+
+/**
  * Comes to rest — `--ease-settle`'s shape without the overshoot.
  *
  * Gently decelerating: the value keeps moving visibly for most of the travel

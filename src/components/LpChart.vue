@@ -50,7 +50,9 @@ import LpEmptyState from "./LpEmptyState.vue"
 import LpShift from "./LpShift.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
-import { skeletonHeights, skeletonWave } from "./chartSkeleton"
+import { sampleValues, skeletonHeights, skeletonWave } from "./chartSkeleton"
+import HintSampleTag from "./HintSampleTag.vue"
+import { useSample } from "../composables/useSample"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { backgroundOf, downloadFile, fileStem, resolveCssColor, svgToPng, toCsv, type CsvOptions } from "./exportData"
 
@@ -123,6 +125,12 @@ const props = withDefaults(
     /** Shown when every series is empty. */
     emptyLabel?: string
     /**
+     * Inside a `v-hint` element with nothing to draw, a tour step on that hint
+     * draws made-up data here instead of the empty state, tagged "Example".
+     * Off: the empty state shows on the tour too.
+     */
+    sample?: boolean
+    /**
      * The series are on their way. The plot keeps its `height` and draws a
      * pulsing stand-in of the chart's own type in the area the marks will take
      * (bars for `bar`, a line for line/area, tick stubs where the axes are), so
@@ -161,6 +169,7 @@ const props = withDefaults(
     thresholds: () => [],
     markers: () => [],
     dataTable: false,
+    sample: true,
   },
 )
 
@@ -227,12 +236,26 @@ const toggleSeries = (id: string) => {
   if (next.has(id)) next.delete(id)
   else next.add(id)
   // Never hide the last visible series — an empty plot reads as broken.
-  if (next.size < props.series.length) hidden.value = next
+  if (next.size < source.value.length) hidden.value = next
 }
+
+const SAMPLE_POINTS = 12
+const sampling = useSample(
+  root,
+  () => !props.loading && !props.series.some((s) => s.data.some((v) => v != null)),
+  () => props.sample,
+)
+// The sample keeps the series' own names, colours and axes; only the values are made up.
+const source = computed<ChartSeries[]>(() => {
+  if (!sampling.value) return props.series
+  const count = props.labels?.length || SAMPLE_POINTS
+  const series = props.series.length ? props.series : [{ name: "", data: [] }]
+  return series.map((s, i) => ({ ...s, data: sampleValues(count, i) }))
+})
 
 // Identity is position plus name, so two series sharing a name stay separate.
 const allSeries = computed(() =>
-  normalise(props.series).map((s, i) => ({ ...s, id: `${i}:${s.name}` })),
+  normalise(source.value).map((s, i) => ({ ...s, id: `${i}:${s.name}` })),
 )
 const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.id)))
 
@@ -305,7 +328,7 @@ watch(
 )
 
 const count = computed(() => pointCount(allSeries.value))
-const labels = computed(() => resolveLabels(props.series, props.labels, count.value))
+const labels = computed(() => resolveLabels(source.value, props.labels, count.value))
 const banded = computed(() => props.type === "bar")
 
 const hasData = computed(() =>
@@ -1128,8 +1151,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
 <template>
   <div ref="root"
-    :class="rootClass"
+    :class="[rootClass, sampling && 'relative']"
+    :inert="sampling || undefined"
     v-bind="rest">
+    <HintSampleTag v-if="sampling" />
     <div v-if="title || subtitle || $slots.actions" class="flex items-start justify-between gap-3">
       <div class="flex flex-col gap-0.5">
         <span v-if="title" class="text-sm font-medium text-ink">{{ title }}</span>

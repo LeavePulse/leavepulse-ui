@@ -2694,7 +2694,7 @@ export const registry: ComponentEntry[] = [
     name: "Tour",
     description:
       "A guided walk over the real interface. Each step lights its target through the scrim and explains it in a card beside it; arrow keys and Enter step through, Escape closes. A target is a `v-hint` id, a selector or an element, and a step whose target is not on the page is skipped, so a tour built from the hinted controls only ever shows what this user can see. A `try` step waits for the user to press the control themselves (with an optional \"do it for me\"), and `enter` can open what the target lives in, registering its undo with `onLeave` (this step) or `onEnd` (the rest of the tour) so the page is left as it was found. On a phone the card becomes a sheet at the bottom.",
-    components: { LpTour, LpButton, LpContextMenu },
+    components: { LpTour, LpButton, LpContextMenu, LpChart },
     state: () =>
       reactive({
         open: false,
@@ -2705,6 +2705,7 @@ export const registry: ComponentEntry[] = [
           { target: "demo.search", title: "Search", text: "Finds people, roles and channels.", keys: "Ctrl+K" },
           { target: "demo.export", title: "Export", text: "Downloads what the table shows, filters included.", try: true, perform: () => {} },
           { target: "demo.missing", title: "Not on this page", text: "Skipped: the target is not rendered for this user." },
+          { target: "demo.chart", title: "Traffic", text: "Requests per hour. Empty here, so the chart draws an example while this step is on it." },
           {
             target: () => document.querySelector("[role=menu]"),
             title: "Row menu",
@@ -2723,6 +2724,9 @@ export const registry: ComponentEntry[] = [
     <LpButton v-hint="'demo.search'" variant="outline" size="sm">Search</LpButton>
     <LpButton v-hint="'demo.export'" variant="outline" size="sm" @click="log = 'Exported'">Export</LpButton>
   </div>
+  <div v-hint="'demo.chart'">
+    <LpChart :series="[{ name: 'Requests', data: [] }, { name: 'Errors', data: [], axis: 'right' }]" :height="140" />
+  </div>
   <LpContextMenu :items="[{ label: 'Open card' }, { label: 'Copy ID' }]">
     <div v-hint="'demo.row'" class="rounded-control border border-line px-3 py-2 text-sm">Row: right-click me</div>
   </LpContextMenu>
@@ -2737,7 +2741,7 @@ export const registry: ComponentEntry[] = [
     id: "hints",
     name: "Hints",
     description:
-      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions. A feature that is absent right now (nothing flagged, nobody left) gets a sample the way LpSkeleton gets a layout: wrap the app's own markup with made-up data in <LpHintExample hint=\"id\">; it shows only while a tour step or \"what changed\" reaches that id with the real thing absent, eases in, is inert and tagged \"Example\", and leaves with the step. Nothing to add to the registry.",
+      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions. A feature that is absent right now (nothing flagged, nobody left) gets a sample the way LpSkeleton gets a layout: wrap the app's own markup with made-up data in <LpHintExample hint=\"id\">; it shows only while a tour step or \"what changed\" reaches that id with the real thing absent, eases in, is inert and tagged \"Example\", and leaves with the step. Nothing to add to the registry. One sample can cover several steps of one block (a list and its detail): pass the ids as an array and mark each part with data-lp-hint-part. Data components need no wrapper at all: an LpChart or LpSparkline inside a `v-hint` element with nothing to draw shows made-up data on its own while a step is on that hint, tagged \"Example\"; `:sample=\"false\"` turns that off.",
     components: { LpHints, LpButton, LpContextMenu, LpHintExample },
     state: () => {
       const storage = localHintStorage("lp-preview-hints")

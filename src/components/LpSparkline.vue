@@ -14,8 +14,10 @@
  *   <LpSparkline :data="cpu" />
  *   <LpSparkline :data="load" area tone="danger" :width="72" />
  */
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import LpSkeleton from "./LpSkeleton.vue"
+import { sampleValues } from "./chartSkeleton"
+import { useSample } from "../composables/useSample"
 import { useReveal } from "../composables/useReveal"
 import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
@@ -64,9 +66,15 @@ const props = withDefaults(
      * arrives, and the line then draws itself in as usual.
      */
     loading?: boolean
+    /**
+     * Inside a `v-hint` element with no values, a tour step on that hint draws
+     * a made-up trend here (no tag: it would not fit inline; the tour card
+     * says it is an example). Off: the flat stub shows on the tour too.
+     */
+    sample?: boolean
     labels?: Partial<Record<"empty" | "up" | "down" | "flat" | "latest" | "loading", string>>
   }>(),
-  { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900 },
+  { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900, sample: true },
 )
 
 const TONE: Record<string, string> = {
@@ -79,7 +87,9 @@ const TONE: Record<string, string> = {
 
 const stroke = computed(() => props.color ?? TONE[props.tone])
 
-const series = computed(() => normalise([{ name: "s", data: props.data }]))
+const data = computed(() => (sampling.value ? sampleValues(props.data.length || 12) : props.data))
+
+const series = computed(() => normalise([{ name: "s", data: data.value }]))
 
 /*
  * The path is built in the viewBox's own coordinates and the SVG scales it, so
@@ -110,7 +120,7 @@ const geo = computed(() => ({
   min: bounds.value.min,
   max: bounds.value.max,
   box: box.value,
-  count: props.data.length,
+  count: data.value.length,
   banded: false,
 }))
 
@@ -129,7 +139,7 @@ const lastPoint = computed(() => {
     const w = props.width - PAD * 2
     const h = props.height - PAD * 2
     return {
-      x: props.data.length <= 1 ? PAD + w / 2 : PAD + (w / (props.data.length - 1)) * i,
+      x: data.value.length <= 1 ? PAD + w / 2 : PAD + (w / (data.value.length - 1)) * i,
       y: PAD + h - ((v - bounds.value.min) / span) * h,
       v,
     }
@@ -171,7 +181,7 @@ const label = computed(() => {
  * and keeps the component render-only, as SSR needs.
  */
 const pathLength = computed(() => {
-  const n = Math.max(1, props.data.length - 1)
+  const n = Math.max(1, data.value.length - 1)
   const segment = Math.hypot((props.width - PAD * 2) / n, props.height - PAD * 2)
   return Math.ceil(segment * n + 4)
 })
@@ -182,6 +192,15 @@ const pathLength = computed(() => {
  * finished before the rows carrying them were ever scrolled to.
  */
 const { el, revealed } = useReveal({ immediate: () => !props.animate })
+
+// The stub holds the place when there is nothing to draw, so the sample can
+// still find the hint it sits in.
+const stub = ref<Element | null>(null)
+const sampling = useSample(
+  computed(() => el.value ?? stub.value),
+  () => !props.loading && !props.data.some((v) => v != null),
+  () => props.sample,
+)
 
 const revealStyle = computed(() =>
   props.animate
@@ -237,6 +256,7 @@ const gradientId = `lp-spark-${Math.random().toString(36).slice(2, 9)}`
     v-else-if="hasData"
     key="line"
     ref="el"
+    :inert="sampling || undefined"
     :width="width"
     :height="height"
     :viewBox="`0 0 ${width} ${height}`"
@@ -297,6 +317,7 @@ const gradientId = `lp-spark-${Math.random().toString(36).slice(2, 9)}`
   <span
     v-else
     key="empty"
+    ref="stub"
     class="inline-block shrink-0 rounded-pill bg-surface-soft"
     :style="{ width: `${width}px`, height: '2px' }"
     role="img"

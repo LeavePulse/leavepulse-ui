@@ -147,7 +147,11 @@ export const hints = {
     listeners[event].add(listener)
     return () => listeners[event].delete(listener)
   },
-  /** Whether the page offers a sample of this id (an LpHintExample is mounted). Reactive. */
+  /**
+   * Whether the page can show a sample of this id right now: an LpHintExample
+   * standing in for an absent element, or a data component (LpChart,
+   * LpSparkline) inside that element with nothing to draw. Reactive.
+   */
   hasExample(id: string): boolean {
     return (examples.get(id) ?? 0) > 0
   },
@@ -162,9 +166,11 @@ export const hints = {
       showing.delete(id)
     }
   },
-  /** The shown sample's element, the tour's target while it stands in. */
+  /** The shown sample's element, the tour's target while it stands in: its part for this id, or all of it. */
   exampleElement(id: string): HTMLElement | null {
-    return document.querySelector<HTMLElement>(`[data-lp-hint-example="${CSS.escape(id)}"]`)
+    const quoted = JSON.stringify(id)
+    const sample = document.querySelector<HTMLElement>(`[data-lp-hint-example~=${quoted}]`)
+    return sample?.querySelector<HTMLElement>(`[data-lp-hint-part=${quoted}]`) ?? sample
   },
   /** Called by LpHintExample: count a sample in while it is mounted. */
   registerExample(id: string): () => void {

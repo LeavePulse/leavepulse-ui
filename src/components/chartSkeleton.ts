@@ -17,6 +17,18 @@ export function skeletonHeights(count: number): number[] {
 }
 
 /**
+ * Made-up values for a tour sample (useSample): the same uneven pattern on a
+ * 0–100 scale, shifted per series so two lines do not lie on top of each other.
+ * Fixed for the same reason as the placeholder: a sample that changed between
+ * renders would read as live data.
+ */
+export function sampleValues(count: number, series = 0): number[] {
+  const n = Math.max(2, Math.floor(count))
+  const scale = 100 - series * 30
+  return Array.from({ length: n }, (_, i) => Math.round(PATTERN[(i + series * 5) % PATTERN.length] * scale))
+}
+
+/**
  * A smooth line through those heights, in a 100 × 100 box with y pointing down
  * (the SVG convention), each point centred in its slot. Scaled to the plot with
  * `preserveAspectRatio="none"`, so it needs no measuring.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { skeletonHeights, skeletonWave } from "../src/components/chartSkeleton"
+import { sampleValues, skeletonHeights, skeletonWave } from "../src/components/chartSkeleton"
 
 describe("skeletonHeights", () => {
   test("is stable from one call to the next", () => {
@@ -33,5 +33,19 @@ describe("skeletonWave", () => {
 
   test("is empty without heights", () => {
     expect(skeletonWave([])).toBe("")
+  })
+})
+
+describe("sampleValues", () => {
+  test("is stable, so a sample never looks like data changing", () => {
+    expect(sampleValues(12, 1)).toEqual(sampleValues(12, 1))
+  })
+
+  test("gives each series its own line", () => {
+    expect(sampleValues(12, 0)).not.toEqual(sampleValues(12, 1))
+  })
+
+  test("draws at least a segment", () => {
+    expect(sampleValues(0)).toHaveLength(2)
   })
 })

@@ -480,11 +480,6 @@ export function createHintSystem(options: HintSystemOptions) {
       .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
   const hasTour = (page = state.page) => tourable(page).length > 0
 
-  async function showStep(id: string, f: HintFeature, example: boolean, context: TourContext): Promise<void> {
-    if (example) context.onLeave(hints.showExample(id))
-    await f.enter?.(context)
-  }
-
   function startTour(page = state.page, only?: string[]): void {
     const entries = tourable(page, only)
     if (!entries.length) return
@@ -494,19 +489,16 @@ export function createHintSystem(options: HintSystemOptions) {
       step: 0,
       page,
       ids: entries.map(([id]) => id),
-      steps: entries.map(([id, f]) => {
-        const example = !hints.present(id) && hints.hasExample(id)
-        return {
-          target: example ? () => hints.exampleElement(id) : (f.target ?? id),
-          title: f.title,
-          text: f.text,
-          keys: f.keys,
-          try: example ? false : f.try,
-          side: f.side,
-          example,
-          enter: example || f.enter ? (context: TourContext) => showStep(id, f, example, context) : undefined,
-        }
-      }),
+      steps: entries.map(([id, f]) => ({
+        target: f.target ?? id,
+        hint: id,
+        title: f.title,
+        text: f.text,
+        keys: f.keys,
+        try: f.try,
+        side: f.side,
+        enter: f.enter,
+      })),
     })
   }
 
