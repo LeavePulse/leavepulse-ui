@@ -50,6 +50,13 @@ export interface HintFeature {
   /** When the `v-hint` id is not the element to light (a column header, an opened menu). */
   target?: () => Element | null
   enter?: (context: TourContext) => void | Promise<void>
+  /**
+   * Draw a sample of the thing when there is none right now (nobody left the
+   * server, no flag to show), so the tour and "what changed" can still point
+   * at it. Return the way to remove the sample; it runs when the step is left.
+   * Only used when the real element is absent.
+   */
+  example?: () => (() => void) | void
 }
 
 export interface HintPage {
@@ -204,6 +211,8 @@ export interface HintSystemOptions {
   page: () => string
   sessionKey?: string
   timing?: Partial<HintTiming>
+  /** Added to a step that shows a sample (`example`) instead of the real thing. */
+  exampleNote?: string
 }
 
 export type HintOffer =
@@ -417,9 +426,19 @@ export function createHintSystem(options: HintSystemOptions) {
 
   const hasTour = (page = state.page) => Object.values(features).some((f) => f.page === page)
 
+  const exampleNote = options.exampleNote ?? "This is a sample: there are none right now."
+
+  async function showStep(f: HintFeature, sample: boolean, context: TourContext): Promise<void> {
+    if (sample) {
+      const remove = f.example?.()
+      if (remove) context.onLeave(remove)
+    }
+    await f.enter?.(context)
+  }
+
   function startTour(page = state.page, only?: string[]): void {
     const entries = Object.entries(features)
-      .filter(([id, f]) => f.page === page && (!only || only.includes(id)) && (!!f.target || !!f.enter || hints.present(id)))
+      .filter(([id, f]) => f.page === page && (!only || only.includes(id)) && (!!f.target || !!f.enter || !!f.example || hints.present(id)))
       .sort(([, a], [, b]) => (a.order ?? 0) - (b.order ?? 0))
     if (!entries.length) return
     state.offer = null
@@ -428,20 +447,24 @@ export function createHintSystem(options: HintSystemOptions) {
       step: 0,
       page,
       ids: entries.map(([id]) => id),
-      steps: entries.map(([id, f]) => ({
-        target: f.target ?? id,
-        title: f.title,
-        text: f.text,
-        keys: f.keys,
-        try: f.try,
-        side: f.side,
-        enter: f.enter,
-      })),
+      steps: entries.map(([id, f]) => {
+        const sample = !!f.example && !hints.present(id)
+        return {
+          target: f.target ?? id,
+          title: f.title,
+          text: sample ? `${f.text} ${exampleNote}` : f.text,
+          keys: f.keys,
+          try: sample ? false : f.try,
+          side: f.side,
+          enter: sample || f.enter ? (context: TourContext) => showStep(f, sample, context) : undefined,
+        }
+      }),
     })
   }
 
+  const showable = (id: string) => hints.present(id) || !!features[id]?.example
   const unread = (page?: string) =>
-    news.filter((n) => (!page || n.page === page) && !state.records.has(newsKey(n.id)) && (!page || !n.feature || hints.present(n.feature)))
+    news.filter((n) => (!page || n.page === page) && !state.records.has(newsKey(n.id)) && (!page || !n.feature || showable(n.feature)))
 
   function readNews(page: string): void {
     for (const n of unread(page)) record(newsKey(n.id), { state: "explained" })
