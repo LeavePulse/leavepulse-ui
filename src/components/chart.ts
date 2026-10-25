@@ -171,6 +171,32 @@ export const niceScale = (
   return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step }
 }
 
+/**
+ * A scale of exactly `intervals` steps that still covers min..max, for an axis
+ * that must land on another axis's gridlines (the right axis on the left one).
+ * Stretching niceScale's own run to that count could cut the top below the
+ * data, and the curve ran off the plot; the step grows to the next round one
+ * until the run covers it.
+ */
+export const fitScale = (min: number, max: number, intervals: number): { min: number; max: number; step: number } => {
+  const n = Math.max(1, intervals)
+  const band = min === max ? niceScale(min, max, n) : { min, max }
+  const [low, high] = [band.min, band.max]
+  let step = roundUp((high - low) / n)
+  for (;;) {
+    const start = Math.floor(low / step) * step
+    if (start + step * n >= high) return { min: start, max: start + step * n, step }
+    step = roundUp(step * 1.01)
+  }
+}
+
+/** The smallest of 1, 2, 5 × 10ⁿ that is at least `value`. */
+const roundUp = (value: number): number => {
+  const mag = 10 ** Math.floor(Math.log10(value))
+  const norm = value / mag
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
+}
+
 export const axisTicks = (min: number, max: number, step: number): number[] => {
   const out: number[] = []
   // Guard against a degenerate step producing an unbounded loop.

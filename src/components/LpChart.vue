@@ -29,6 +29,7 @@ import {
   chartSummary,
   markerIndex,
   extent,
+  fitScale,
   formatTick,
   linePath,
   nearestIndex,
@@ -491,9 +492,7 @@ const targetRightScale = computed(() => {
     1,
     axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step).length - 1,
   )
-  const nice = niceScale(raw.min, raw.max, steps)
-  // Stretch the top so the run divides into exactly `steps` intervals.
-  return { min: nice.min, max: nice.min + nice.step * steps, step: nice.step }
+  return fitScale(raw.min, raw.max, steps)
 })
 
 // The right axis travels on the same clock as the left, or a series measured
