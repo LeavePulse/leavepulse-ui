@@ -24,6 +24,11 @@ export interface SidebarItem {
   /** Right-click menu for this item (e.g. "Open in new tab", "Pin"). */
   menu?: ContextMenuItemDef[]
   /**
+   * Heading of that menu. Defaults to `label` (with `icon` beside it), so the
+   * menu says which item it acts on; an empty string drops the heading.
+   */
+  menuTitle?: string
+  /**
    * Extra terms the sidebar's filter should match, beyond the label. For the
    * item people look for under a name it does not carry — "Billing" found by
    * "invoice", a page found by the feature it used to be called.

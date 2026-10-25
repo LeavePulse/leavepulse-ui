@@ -457,10 +457,47 @@ export const registry: ComponentEntry[] = [
     id: "tabs",
     name: "Tabs",
     description:
-      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list. By default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab.",
-    components: { LpTabs },
-    state: () => reactive({ tab: "a", items: tabItems, nav: "home", navItems: bottomTabItems }),
+      "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list. By default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab. An item can carry a `badge` count (rolls when it changes), be `disabled` (skipped by arrows and hover), and take a right-click `menu` headed by its label. Without v-model the tabs pick the first enabled item when `items` arrive late or the current one disappears (the row with \"Reload items\").",
+    components: { LpTabs, LpButton },
+    state: () => {
+      const loaded = () => [
+        {
+          value: "open",
+          label: "Open",
+          icon: "lucide:circle-dot",
+          badge: 12,
+          menu: [
+            { label: "Mark all read", icon: "lucide:check-check" },
+            { label: "Copy link", icon: "lucide:link", shortcut: "Ctrl+L" },
+          ],
+        },
+        { value: "review", label: "In review", icon: "lucide:eye", badge: 3 },
+        { value: "archived", label: "Archived", icon: "lucide:archive", disabled: true },
+      ]
+      const s = reactive({
+        tab: "a",
+        items: tabItems,
+        nav: "home",
+        navItems: bottomTabItems,
+        late: [] as ReturnType<typeof loaded>,
+        reload() {
+          s.late = []
+          setTimeout(() => (s.late = loaded()), 700)
+        },
+        bump() {
+          const first = s.late[0]
+          if (first) first.badge = (first.badge ?? 0) + 1
+        },
+      })
+      s.reload()
+      return s
+    },
     template: `<div class="flex flex-col gap-3">
+  <div class="flex flex-wrap items-center gap-2">
+    <LpTabs :items="late" />
+    <LpButton size="sm" variant="ghost" @click="reload">Reload items</LpButton>
+    <LpButton size="sm" variant="ghost" @click="bump">+1 open</LpButton>
+  </div>
   <LpTabs v-model="tab" :items="items" />
   <div class="w-[180px] rounded-control border border-dashed border-line p-2">
     <LpTabs v-model="tab" :items="items" />
@@ -479,7 +516,7 @@ export const registry: ComponentEntry[] = [
     id: "sidebar",
     name: "Sidebar",
     description:
-      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. `searchable` puts a filter above the items — matching label and any `keywords`, dropping sections that match nothing, and opening folded groups while a query is on (try `invoice`). Mirrors the cabinet/profile sidebars in the apps. An item with `to` renders the configured link component (\"Button docs\" in the panel example navigates through the preview's router).",
+      "App-shell side navigation: icon + label items, labelled sections, badge counts, a sliding brand pill for the active item, a loading skeleton, and header/footer/actions slots (logo, user chip, logout). v-model binds the active id; pass isActive for router prefix-matching. Items can carry a `menu` for a right-click context menu, headed by the item's label and icon (`menuTitle` overrides, \"\" drops it). `hoverFollow` makes the pill glide under the hovered item as in Tabs; it is off by default, since a tall nav the pointer keeps crossing would flicker (on in the panel example). The loading skeleton is an LpSkeleton layout. Set `responsive` + v-model:open to swap the rail for a swipe-to-close drawer on phones (the burger button below opens it). `variant=\"panel\"` boxes it as a card for a nav that sits inside a page (a settings index, a table picker) rather than along the shell edge. `searchable` puts a filter above the items — matching label and any `keywords`, dropping sections that match nothing, and opening folded groups while a query is on (try `invoice`). Mirrors the cabinet/profile sidebars in the apps. An item with `to` renders the configured link component (\"Button docs\" in the panel example navigates through the preview's router).",
     components: { LpSidebar, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () =>
       reactive({
@@ -574,7 +611,7 @@ export const registry: ComponentEntry[] = [
   <!-- variant="panel": the same nav inside a page, boxed on all four sides and
        rounded, sitting next to the content it drives. -->
   <div class="flex h-64 gap-4">
-    <LpSidebar v-model="section" variant="panel" width="14rem" :sections="pageSections" class="shrink-0" />
+    <LpSidebar v-model="section" variant="panel" width="14rem" :sections="pageSections" hover-follow class="shrink-0" />
     <div class="flex-1 rounded-card border border-line bg-surface-soft p-4 text-sm text-muted">
       Settings for <span class="text-ink">{{ section }}</span>
     </div>
@@ -634,17 +671,24 @@ export const registry: ComponentEntry[] = [
   {
     id: "avatar",
     name: "Avatar",
-    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. `icon` replaces the initials for things with no name worth abbreviating. Pass `menuItems` for a right-click account menu.",
+    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. `icon` replaces the initials for things with no name worth abbreviating. Pass `menuItems` for a right-click account menu, headed by `alt` and the picture (`menuTitle`/`menuSubtitle` override). The avatar is wrapped the same way with or without items, so a menu that arrives after the first render does not remount it (the one marked \"late menu\").",
     components: { LpAvatar },
-    state: () =>
-      reactive({
+    state: () => {
+      const s = reactive({
         avatarSample,
         accountMenu: [
           { label: "View profile", icon: "lucide:user" },
           { label: "Account settings", icon: "lucide:settings" },
           { label: "Sign out", icon: "lucide:log-out", danger: true, separatorBefore: true },
         ],
-      }),
+        lateMenu: [] as object[],
+        loadMenu() {
+          if (s.lateMenu.length) return
+          setTimeout(() => (s.lateMenu = s.accountMenu), 600)
+        },
+      })
+      return s
+    },
     template: `<div class="flex flex-wrap items-center gap-3">
   <LpAvatar size="sm" :src="avatarSample" alt="THEROER" />
   <LpAvatar size="md" :src="avatarSample" alt="THEROER" />
@@ -654,8 +698,9 @@ export const registry: ComponentEntry[] = [
   <!-- No src: the initials carry it. -->
   <LpAvatar size="md" fallback="LP" />
   <LpAvatar size="md" icon="lucide:globe" shape="soft" />
-  <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" />
-  <span class="text-sm text-muted">right-click the last one →</span>
+  <LpAvatar size="lg" alt="System Admin" :menu-items="accountMenu" menu-subtitle="admin@leavepulse.io" />
+  <LpAvatar size="lg" :src="avatarSample" alt="THEROER" :menu-items="lateMenu" @mouseenter="loadMenu" />
+  <span class="text-sm text-muted">right-click the last two (the last: late menu, loaded on hover) →</span>
 </div>`,
   },
   {
@@ -1317,23 +1362,39 @@ export const registry: ComponentEntry[] = [
   {
     id: "dropdown",
     name: "DropdownMenu",
-    description: "Action menu with icons and danger items. `rightClickToo` marks a \"…\" button whose items the row also opens on right-click: each use of it counts toward contextMenuTip(), which then tells the user that right-click works there.",
+    description: "Action menu with icons and danger items. Its items are ContextMenu items drawn by the same renderer, so one array serves a row's \"…\" button and its right click alike: submenus (`children`), tick-box items (`checked`, the menu stays open) and shortcut hints (LpKeys: \"Ctrl+D\" reads ⌘D on a Mac) all show in both. `title`/`subtitle`/`titleIcon` head the menu with what it acts on. `rightClickToo` marks a \"…\" button whose items the row also opens on right-click: each use of it counts toward contextMenuTip(), which then tells the user that right-click works there.",
     components: { LpDropdownMenu, LpButton, LpContextMenu },
     state: () => reactive({
       items: [
-        { label: "Edit", icon: "lucide:pencil" },
-        { label: "Duplicate", icon: "lucide:copy" },
-        { label: "Delete", icon: "lucide:trash-2", danger: true, separatorBefore: true },
+        { label: "Edit", icon: "lucide:pencil", shortcut: "Ctrl+E" },
+        { label: "Duplicate", icon: "lucide:copy", shortcut: "Ctrl+D" },
+        {
+          label: "Move to",
+          icon: "lucide:folder-input",
+          children: [
+            { label: "Archive", icon: "lucide:archive" },
+            { label: "Shared", icon: "lucide:users" },
+          ],
+        },
+        { label: "Delete", icon: "lucide:trash-2", shortcut: "Del", danger: true, separatorBefore: true },
       ],
+      pinned: true,
+      // A tick-box item on top of the shared ones: it stays open on select.
+      get rowItems(): object[] {
+        return [
+          { label: "Pinned", checked: this.pinned, onSelect: () => (this.pinned = !this.pinned) },
+          ...this.items,
+        ]
+      },
     }),
     template: `<div class="flex flex-col items-start gap-4">
   <LpDropdownMenu :items="items" title="Quarterly report.pdf" subtitle="2.4 MB" title-icon="lucide:file-text">
     <template #trigger><LpButton variant="outline">Actions ▾</LpButton></template>
   </LpDropdownMenu>
-  <LpContextMenu :items="items">
+  <LpContextMenu :items="rowItems" title="Row">
     <div class="flex w-72 items-center justify-between rounded-control border border-line px-3 py-2 text-sm">
       <span>Row (right-click works too)</span>
-      <LpDropdownMenu :items="items" right-click-too>
+      <LpDropdownMenu :items="rowItems" title="Row" right-click-too>
         <template #trigger><LpButton size="sm" variant="ghost" aria-label="Row actions">…</LpButton></template>
       </LpDropdownMenu>
     </div>
@@ -1626,13 +1687,13 @@ export const registry: ComponentEntry[] = [
     id: "contextmenu",
     name: "ContextMenu",
     description:
-      "Right-click menu (reka ContextMenu): icons, shortcut hints, danger items, separators and nested submenus, and an optional \`title\` heading naming what the menu acts on. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element. A left click on an element with a menu counts toward contextMenuTip(); `noHint` leaves an element out of that count (a whole table with only generic items), and table rows with their own menu are what the tip lights.",
+      "Right-click menu (reka ContextMenu): icons, shortcut hints (drawn with LpKeys, so \"Ctrl+C\" reads ⌘C on an Apple keyboard), danger items, separators and nested submenus, and an optional \`title\` heading naming what the menu acts on. Right-click (or long-press) the target. With an empty `items` it's a passthrough — the element keeps the browser's native menu — so wrappers like Table/Sidebar/Avatar/Card can pass [] to opt out per element. A left click on an element with a menu counts toward contextMenuTip(); `noHint` leaves an element out of that count (a whole table with only generic items), and table rows with their own menu are what the tip lights.",
     components: { LpContextMenu },
     state: () =>
       reactive({
         items: [
           { label: "Open", icon: "lucide:external-link", shortcut: "⏎" },
-          { label: "Copy", icon: "lucide:copy", shortcut: "⌘C" },
+          { label: "Copy", icon: "lucide:copy", shortcut: "Ctrl+C" },
           {
             label: "Move to",
             icon: "lucide:folder-input",
@@ -3143,7 +3204,7 @@ export const registry: ComponentEntry[] = [
     id: "file-tree",
     name: "FileTree",
     description:
-      "File/folder tree: directories-first ordering, type-derived icons, size/modified columns, per-row context menus and lazy children (a dir with no `children` emits `expand` once). `checkable` turns it into a picker — tri-state folders, cascading ticks, and a rolled-up summary of what's selected. Arrows navigate, →/← expand, Space ticks.",
+      "File/folder tree: directories-first ordering, type-derived icons, size/modified columns, per-row context menus (headed by the entry's name and icon) and lazy children (a dir with no `children` emits `expand` once). `checkable` turns it into a picker — tri-state folders, cascading ticks, and a rolled-up summary of what's selected. Arrows navigate, →/← expand, Space ticks.",
     components: { LpFileTree, LpSwitch },
     state: () => {
       const s = reactive({
@@ -3309,10 +3370,11 @@ export const registry: ComponentEntry[] = [
     id: "toc",
     name: "TableOfContents",
     description:
-      "On-this-page rail with scroll-spy: nested heading links, an indicator that slides to the section in view, and smooth-scroll on click.",
-    components: { LpTableOfContents },
+      "On-this-page rail with scroll-spy: nested heading links, an indicator that slides to the section in view, and smooth-scroll on click. The indicator follows the hovered link as in Tabs; `:hover-follow=\"false\"` pins it to the section in view (the toggle).",
+    components: { LpTableOfContents, LpSwitch },
     state: () =>
       reactive({
+        follow: true,
         links: [
           { id: "toc-install", text: "Install" },
           {
@@ -3327,7 +3389,10 @@ export const registry: ComponentEntry[] = [
         ],
       }),
     template: `<div class="flex gap-8">
-  <LpTableOfContents :links="links" class="w-52 shrink-0" />
+  <div class="flex w-52 shrink-0 flex-col gap-3">
+    <label class="flex items-center gap-2 text-xs text-muted"><LpSwitch v-model="follow" /> Follow hover</label>
+    <LpTableOfContents :links="links" :hover-follow="follow" />
+  </div>
   <!-- Scrollable article so the spy has something to track. -->
   <div class="h-72 flex-1 overflow-y-auto rounded-card border border-line p-4">
     <section v-for="l in [links[0], links[1], links[1].children[0], links[1].children[1], links[2]]" :key="l.id" :id="l.id" class="mb-6">
@@ -3364,7 +3429,7 @@ export const registry: ComponentEntry[] = [
     id: "media-gallery",
     name: "MediaGallery",
     description:
-      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through.",
+      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through. `itemMenu(item, index)` gives a thumbnail a right-click menu headed by its title and picture (a covered spoiler shows neither); the first grid has one. Texts come from `labels` (\"mediaGallery\" scope).",
     components: { LpMediaGallery },
     state: () => {
       const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>
@@ -3401,7 +3466,15 @@ export const registry: ComponentEntry[] = [
   <div>
     <p class="mb-2 text-xs text-muted">columns=3 — click any tile</p>
     <div class="w-[420px] max-w-full">
-      <LpMediaGallery :items="shots" :columns="3" />
+      <LpMediaGallery
+        :items="shots"
+        :columns="3"
+        :item-menu="() => [
+          { label: 'Download', icon: 'lucide:download', shortcut: 'Ctrl+S' },
+          { label: 'Copy link', icon: 'lucide:link' },
+          { label: 'Delete', icon: 'lucide:trash-2', danger: true, separatorBefore: true },
+        ]"
+      />
     </div>
   </div>
 

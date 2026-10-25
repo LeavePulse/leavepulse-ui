@@ -1,7 +1,6 @@
 <script lang="ts">
-// Opt out of auto attr inheritance: the template has two root branches (menu /
-// no-menu), so fallthrough class/attrs/events are bound explicitly onto
-// AvatarRoot via v-bind="$attrs" in both.
+// Opt out of auto attr inheritance: the root is LpContextMenu, so fallthrough
+// class/attrs/events are bound explicitly onto AvatarRoot instead.
 export default { inheritAttrs: false }
 </script>
 
@@ -57,6 +56,13 @@ const props = withDefaults(
     ring?: boolean
     /** Right-click menu (e.g. account quick actions). Consumer-supplied. */
     menuItems?: ContextMenuItemDef[]
+    /**
+     * Heading of that menu. Defaults to `alt` with the picture beside it, so
+     * the menu says whose avatar it acts on; an empty string drops it.
+     */
+    menuTitle?: string
+    /** A muted line under the menu heading, e.g. a handle or a role. */
+    menuSubtitle?: string
   }>(),
   { size: "md", shape: "circle", ring: false },
 )
@@ -103,13 +109,26 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 // keeps the fix in one place instead of each call site wrapping us in
 // <ClientOnly>.
 const mounted = ref(false)
+
+const menuHeading = computed(() => props.menuTitle ?? props.alt)
 onMounted(() => {
   mounted.value = true
 })
 </script>
 
 <template>
-  <LpContextMenu v-if="menuItems?.length" :items="menuItems">
+  <!-- Always wrapped, even with no items: a v-if between a wrapped and a bare
+       avatar remounted the whole subtree the moment items arrived (fetched
+       after the first render), replaying the image fade and dropping focus.
+       With an empty list LpContextMenu disables its trigger, so the browser's
+       own menu stays. -->
+  <LpContextMenu
+    :items="menuItems ?? []"
+    :title="menuHeading || undefined"
+    :subtitle="menuSubtitle"
+    :title-image="menuHeading && mounted ? src : undefined"
+    :title-icon="menuHeading && !src ? icon : undefined"
+  >
     <AvatarRoot :class="rootClass" :style="sizeStyle" v-bind="rest">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
       <AvatarFallback>
@@ -118,11 +137,4 @@ onMounted(() => {
       </AvatarFallback>
     </AvatarRoot>
   </LpContextMenu>
-  <AvatarRoot v-else :class="rootClass" :style="sizeStyle" v-bind="rest">
-    <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
-    <AvatarFallback>
-      <LpIcon v-if="icon && !fallback" :name="icon" :size="iconSize" />
-      <template v-else>{{ initials }}</template>
-    </AvatarFallback>
-  </AvatarRoot>
 </template>

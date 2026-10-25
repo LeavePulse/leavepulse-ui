@@ -14,12 +14,13 @@ export default { inheritAttrs: false }
  */
 import { Motion } from "motion-v"
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "reka-ui"
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpBadge from "./LpBadge.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
 import { resolveLink, type ResolvedLink } from "./link"
 import { useLinkComponent } from "../composables/useLpConfig"
@@ -41,8 +42,17 @@ const props = withDefaults(
      * nav itself only reports the intent to change it.
      */
     collapsedKeys?: string[]
+    /**
+     * The active pill glides under the hovered item and springs back on leave,
+     * as in LpTabs and LpTableOfContents. Off by default here, unlike those:
+     * a sidebar is tall and the pointer crosses it on the way to the page
+     * beside it, so a pill chasing every pass would flicker through a dozen
+     * rows and hide the one thing a nav must keep in view, where you are. A
+     * short rail (an app switcher, a settings list) can turn it on.
+     */
+    hoverFollow?: boolean
   }>(),
-  { skeletonRows: 6, skeletonHeader: true, collapsedKeys: () => [] },
+  { skeletonRows: 6, skeletonHeader: true, collapsedKeys: () => [], hoverFollow: false },
 )
 
 const emit = defineEmits<{
@@ -77,6 +87,17 @@ function isOpen(section: SidebarSection): boolean {
 
 const pillTransition = usePillTransition()
 
+const hovered = ref<string | null>(null)
+
+function hover(item: SidebarItem) {
+  if (props.hoverFollow && !item.disabled) hovered.value = item.id
+}
+
+/** The pill sits under the hovered item while following hover, else the active one. */
+function pillUnder(item: SidebarItem): boolean {
+  return hovered.value ? hovered.value === item.id : props.itemActive(item)
+}
+
 const linkComponent = useLinkComponent()
 
 /*
@@ -96,29 +117,36 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 </script>
 
 <template>
-  <!-- Loading skeleton: an optional identity row + a run of item rows. -->
-  <div v-if="loading"
+  <!-- Loading skeleton: an optional identity row + a run of item rows, as an
+       LpSkeleton wrapper so it pulses in phase with every other placeholder
+       on the page and stops under reduced motion. -->
+  <LpSkeleton v-if="loading"
     :class="rootClass"
     v-bind="rest">
     <div v-if="skeletonHeader" class="flex items-center gap-3 px-1">
-      <div class="size-10 shrink-0 animate-pulse rounded-pill bg-surface-soft" />
+      <div class="lp-skeleton-item size-10 shrink-0 rounded-pill bg-surface-soft" />
       <div class="flex-1 space-y-2">
-        <div class="h-3.5 w-24 animate-pulse rounded-small bg-surface-soft" />
-        <div class="h-3 w-16 animate-pulse rounded-small bg-surface-soft/60" />
+        <div class="lp-skeleton-item h-3.5 w-24 rounded-small bg-surface-soft" />
+        <div class="lp-skeleton-item h-3 w-16 rounded-small bg-surface-soft/60" />
       </div>
     </div>
     <div class="space-y-1">
       <div
         v-for="n in skeletonRows"
         :key="n"
-        class="h-9 animate-pulse rounded-control bg-surface-soft"
+        class="lp-skeleton-item h-9 rounded-control bg-surface-soft"
       />
     </div>
-  </div>
+  </LpSkeleton>
 
   <!-- min-h-full keeps the content as tall as the viewport so the #actions
        block's mt-auto can still pin it to the bottom. -->
-  <LpScrollArea v-else class="min-h-0 flex-1" content-class="flex min-h-full flex-col gap-4">
+  <LpScrollArea
+    v-else
+    class="min-h-0 flex-1"
+    content-class="flex min-h-full flex-col gap-4"
+    @pointerleave="hovered = null"
+  >
     <CollapsibleRoot
       v-for="(section, si) in groups"
       :key="si"
@@ -172,11 +200,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         class="flex flex-col gap-0.5 overflow-hidden data-[state=open]:animate-[collapsible-down_260ms_var(--ease-emphasized)] data-[state=closed]:animate-[collapsible-up_200ms_var(--ease-emphasized)] motion-reduce:animate-none"
       >
       <!-- Optional right-click menu per item; passthrough when item.menu is
-           absent or empty, so the item keeps the native context menu. -->
+           absent or empty, so the item keeps the native context menu. Headed
+           by the item's label and icon unless it names its own. -->
       <LpContextMenu
         v-for="item in section.items"
         :key="item.id"
         :items="item.menu ?? []"
+        :title="(item.menuTitle ?? item.label) || undefined"
+        :title-icon="item.icon"
       >
         <component
           :is="rowOf(item).is"
@@ -186,14 +217,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           :class="item.disabled
             ? 'cursor-not-allowed text-muted/50'
-            : itemActive(item)
+            : itemActive(item) || hovered === item.id
               ? 'text-ink'
               : 'text-muted hover:text-ink'"
           @click="emit('activate', item)"
+          @pointerenter="hover(item)"
         >
           <!-- Sliding active pill -->
           <Motion
-            v-if="itemActive(item)"
+            v-if="pillUnder(item)"
             :layout-id="pillId"
             :transition="pillTransition"
             class="absolute inset-0 z-0 rounded-control bg-brand-soft"

@@ -1,26 +1,20 @@
 <script setup lang="ts">
+/*
+ * A menu opened from a button (usually a row's "…"). Its items are the same
+ * shape as LpContextMenu's and are drawn by the same renderer, so one array
+ * serves both the right click and the button: submenus (`children`), tick-box
+ * items (`checked`) and shortcut hints appear in either.
+ */
 import { hints } from "../composables/useHints"
 import { HINT_SIGNALS } from "../composables/useHintSystem"
-import {
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuRoot,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "reka-ui"
+import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from "reka-ui"
+import ContextMenuItems from "./ContextMenuItems.vue"
+import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import { POPOVER_PANEL } from "./dropdown"
-import LpIcon from "./LpIcon.vue"
 import MenuTitle from "./MenuTitle.vue"
 
-export interface MenuItem {
-  label: string
-  icon?: string
-  danger?: boolean
-  separatorBefore?: boolean
-  disabled?: boolean
-  onSelect?: () => void
-}
+/** A dropdown item: the context-menu item shape, kept under its old name. */
+export type MenuItem = ContextMenuItemDef
 
 const props = defineProps<{
   items: MenuItem[]
@@ -35,6 +29,8 @@ const props = defineProps<{
    */
   rightClickToo?: boolean
 }>()
+
+const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
 
 function opened(open: boolean) {
   if (open && props.rightClickToo) hints.use(HINT_SIGNALS.menuButton)
@@ -51,27 +47,11 @@ function opened(open: boolean) {
         :collision-padding="8"
         :side-offset="6"
         align="end"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) min-w-44 p-1 outline-none']"
+        :class="PANEL"
         :aria-label="title"
       >
         <MenuTitle v-if="title" :title="title" :subtitle="subtitle" :icon="titleIcon" :image="titleImage" />
-        <template v-for="(item, i) in items" :key="i">
-          <DropdownMenuSeparator v-if="item.separatorBefore" class="my-1 h-px bg-line" />
-          <DropdownMenuItem
-            class="group/item flex cursor-pointer items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
-            :class="item.danger ? 'text-danger data-[highlighted]:bg-danger-soft data-[highlighted]:text-danger' : 'text-ink data-[highlighted]:text-brand'"
-            :disabled="item.disabled"
-            @select="item.onSelect?.()"
-          >
-            <LpIcon
-              v-if="item.icon"
-              :name="item.icon"
-              :size="15"
-              class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[highlighted]/item:translate-x-0.5"
-            />
-            {{ item.label }}
-          </DropdownMenuItem>
-        </template>
+        <ContextMenuItems :items="items" :panel="PANEL" kind="dropdown" />
       </DropdownMenuContent>
     </DropdownMenuPortal>
   </DropdownMenuRoot>

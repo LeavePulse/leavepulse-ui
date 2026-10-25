@@ -30,8 +30,14 @@ const props = withDefaults(
     /** px offset from the top used as the scroll-spy trigger line. */
     offset?: number
     labels?: Partial<{ title: string }>
+    /**
+     * The bar glides under the hovered link and springs back on leave (the
+     * default), as in LpTabs. False pins it to the section in view: calmer for
+     * a rail beside the text, which the pointer crosses on its way to scroll.
+     */
+    hoverFollow?: boolean
   }>(),
-  { offset: 96 },
+  { offset: 96, hoverFollow: true },
 )
 
 const text = useLabels("toc", { title: "On this page" }, () => props.labels)
@@ -173,7 +179,7 @@ onBeforeUnmount(() => {
           :style="{ paddingLeft: `${0.875 + depth * 0.875}rem` }"
           :aria-current="activeId === link.id ? 'location' : undefined"
           @click="onClick(link.id, $event)"
-          @mouseenter="hoveredId = link.id"
+          @mouseenter="hoverFollow && (hoveredId = link.id)"
         >
           <Motion
             v-if="litId === link.id"

@@ -171,8 +171,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :aria-expanded="canExpand ? isOpen : undefined"
     :aria-disabled="node.disabled || undefined"
   >
-    <!-- Passthrough when the node has no menu, so the row keeps the native one. -->
-    <LpContextMenu :items="node.menu ?? []">
+    <!-- Passthrough when the node has no menu, so the row keeps the native one.
+         Headed by the entry's own name and icon: in a column of look-alike
+         rows the menu says which file the right click caught. -->
+    <LpContextMenu
+      :items="node.menu ?? []"
+      :title="node.name"
+      :title-icon="fileIcon(node, isOpen)"
+    >
       <!-- The ring is drawn inset, like LpTable's rows: a row spans the full
            width of the branch, and a branch clips its overflow to animate its
            height, so an outset ring loses its left and right edge. -->
