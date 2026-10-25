@@ -1,13 +1,4 @@
-import { expect, test as base } from "@playwright/test"
-
-const test = base.extend({
-  page: async ({ page }, use) => {
-    const errors: string[] = []
-    page.on("pageerror", (error) => errors.push(error.message))
-    await use(page)
-    expect(errors).toEqual([])
-  },
-})
+import { expect, test } from "./fixtures"
 
 for (const layout of ["auto", "horizontal", "stacked"]) {
   test(`narrow ${layout} data list wraps values beside its copy button`, async ({ page }) => {

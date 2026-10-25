@@ -1556,23 +1556,25 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </div>
     </LpContextMenu>
 
-    <table v-if="dataTable && ready" class="sr-only">
-      <caption v-if="title">{{ title }}</caption>
-      <thead>
-        <tr>
-          <th scope="col"></th>
-          <th v-for="s in allSeries" :key="s.id" scope="col">{{ s.name }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(label, i) in labels" :key="i">
-          <th scope="row">{{ label }}</th>
-          <td v-for="s in allSeries" :key="s.id">
-            {{ s.values[i] == null ? "—" : fmtSeries(s, s.values[i] as number) }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-if="dataTable && ready" class="sr-only">
+      <table>
+        <caption v-if="title">{{ title }}</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th v-for="s in allSeries" :key="s.id" scope="col">{{ s.name }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(label, i) in labels" :key="i">
+            <th scope="row">{{ label }}</th>
+            <td v-for="s in allSeries" :key="s.id">
+              {{ s.values[i] == null ? "—" : fmtSeries(s, s.values[i] as number) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 

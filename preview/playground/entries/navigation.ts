@@ -38,7 +38,7 @@ export const navigation: ComponentEntry[] = [
     name: "Tabs",
     description:
       "Sliding indicator + animated panels. variant=\"plain\" drops the bar chrome for nav rows. A row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below). variant=\"bottom\" is a phone's bottom navigation — equal-share tabs, icon over label, a sliding bar along the top edge and safe-area padding; an item's `dot` flags a tab that wants a look, and `label` names the tab list. By default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab. An item can carry a `badge` count (rolls when it changes), be `disabled` (skipped by arrows and hover), and take a right-click `menu` headed by its label. Without v-model the tabs pick the first enabled item when `items` arrive late or the current one disappears (the row with \"Reload items\").",
-    components: { LpTabs, LpButton },
+    components: { LpTabs, LpButton, LpSkeleton },
     state: () => {
       const loaded = () => [
         {
@@ -72,11 +72,14 @@ export const navigation: ComponentEntry[] = [
       s.reload()
       return s
     },
-    template: `<div class="flex flex-col gap-3">
+    template: `<div class="flex w-full max-w-2xl flex-col gap-3">
   <div class="flex flex-wrap items-center gap-2">
-    <LpTabs :items="late" />
-    <LpButton size="sm" variant="ghost" @click="reload">Reload items</LpButton>
-    <LpButton size="sm" variant="ghost" @click="bump">+1 open</LpButton>
+    <div class="flex h-11 w-[360px] max-w-full items-center">
+      <LpSkeleton v-if="!late.length" class="h-[42px] w-full" />
+      <LpTabs v-show="late.length" :items="late" />
+    </div>
+    <LpButton size="sm" variant="ghost" :loading="!late.length" @click="reload">Reload items</LpButton>
+    <LpButton size="sm" variant="ghost" :disabled="!late.length" @click="bump">+1 open</LpButton>
   </div>
   <LpTabs v-model="tab" :items="items" />
   <div class="w-[180px] rounded-control border border-dashed border-line p-2">

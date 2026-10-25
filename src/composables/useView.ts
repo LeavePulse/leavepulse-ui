@@ -64,6 +64,9 @@ export function forwardViewEvents(from: Document, to: Document): () => void {
     const Copy = event.constructor as new (type: string, init: Event) => Event
     const copy = new Copy(event.type, event) as Marked
     copy[ORIGIN] = from
+    const path = event.composedPath()
+    Object.defineProperty(copy, "target", { value: event.target })
+    copy.composedPath = () => path
     to.dispatchEvent(copy)
   }
   for (const type of FORWARDED) from.addEventListener(type, forward)

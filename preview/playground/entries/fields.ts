@@ -63,11 +63,15 @@ export const fieldsBasics: ComponentEntry[] = [
     name: "Truncate",
     description:
       "Cuts text with an ellipsis (one line or several) and shows the whole of it in a tip only when something was actually cut, measured as the box resizes. Middle mode keeps both ends of ids, paths and hashes.",
-    components: { LpTruncate },
+    components: { LpTruncate, LpSlider },
     state: () => reactive({ width: 220 }),
-    template: `<div class="flex w-96 flex-col gap-4">
-  <label class="flex items-center gap-2 text-xs text-muted">Width <input v-model.number="width" type="range" min="80" max="380" class="flex-1" /></label>
-  <div class="flex flex-col gap-3 rounded-card border border-line p-3 text-sm" :style="{ width: width + 'px' }">
+    template: `<div class="flex w-full max-w-sm flex-col gap-4">
+  <div class="flex items-center gap-2 text-xs text-muted">
+    <span>Width</span>
+    <LpSlider v-model="width" :min="80" :max="380" aria-label="Text width" class="min-w-0 flex-1" />
+    <output class="w-10 text-right tabular-nums">{{ width }}px</output>
+  </div>
+  <div class="flex max-w-full flex-col gap-3 rounded-card border border-line p-3 text-sm" :style="{ width: width + 'px' }">
     <LpTruncate text="Survival — Frankfurt #2 (whitelist, 1.21)" />
     <LpTruncate text="/srv/minecraft/world/region/r.12.-4.mca" middle :tail="10" class="font-mono text-xs" />
     <LpTruncate text="sha256:4b2f9c0d1e7a83b56f20c9e1aa7d3f5e8b104c62" middle copyable class="font-mono text-xs" />

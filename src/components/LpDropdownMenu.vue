@@ -45,7 +45,7 @@ const guardOutside = useOutsideGuard()
 </script>
 
 <template>
-  <DropdownMenuRoot @update:open="opened">
+  <DropdownMenuRoot :modal="false" @update:open="opened">
     <DropdownMenuTrigger as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>

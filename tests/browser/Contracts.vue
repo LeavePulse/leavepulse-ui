@@ -3,7 +3,8 @@ import { reactive, ref } from "vue"
 import {
   LpButton, LpConfirmHost, LpDatePicker, LpDateRangePicker, LpDrawer,
   LpEditable, LpFormField, LpInput, LpPasswordInput, LpRepeater,
-  LpSecretField, LpSelect, LpDataList, useForm, type DateRange,
+  LpSecretField, LpSelect, LpDataList, LpChart, LpFrame,
+  LpContextMenu, LpDropdownMenu, LpPopover, useForm, type DateRange,
 } from "../../src"
 
 const params = new URLSearchParams(location.search)
@@ -33,11 +34,49 @@ const service = reactive(useForm({
 }))
 const submit = service.handleSubmit((value) => { saved.value.push(value) })
 const emptyPort = () => ({ port: "" })
+const rows = ref([
+  { name: "First", children: [{ name: "First child" }] },
+  { name: "Second", children: [{ name: "Second child" }] },
+])
+const newRow = () => ({ name: "New", children: [] as { name: string }[] })
+const pickedEnvironment = ref("")
+const menuItems = [{ label: "Move to", children: [
+  { label: "Production", onSelect: () => { pickedEnvironment.value = "Production" } },
+  { label: "Staging", onSelect: () => { pickedEnvironment.value = "Staging" } },
+] }]
 </script>
 
 <template>
   <main class="mx-auto flex max-w-xl flex-col gap-4 p-6">
-    <div v-if="scenario === 'data-list'" class="w-[220px] rounded-card border border-line px-4">
+    <template v-if="scenario === 'frame'">
+      <button data-test-outside>Outside frame</button>
+      <LpFrame :height="420" title="Frame interactions">
+        <div class="flex flex-col items-start gap-5 p-6">
+          <LpDropdownMenu :items="menuItems">
+            <template #trigger><LpButton aria-label="Frame actions">Actions</LpButton></template>
+          </LpDropdownMenu>
+          <LpPopover>
+            <template #trigger><LpButton aria-label="Frame popover">Popover</LpButton></template>
+            <p>Popover body</p>
+          </LpPopover>
+          <LpSelect :options="[{ value: 'tcp', label: 'TCP' }]" aria-label="Frame select" />
+          <LpContextMenu :items="menuItems">
+            <button class="h-12 w-40 border border-line">Context target</button>
+          </LpContextMenu>
+          <output aria-label="Picked environment">{{ pickedEnvironment }}</output>
+        </div>
+      </LpFrame>
+    </template>
+    <LpChart v-else-if="scenario === 'chart'" title="Thresholds and markers" :labels="['Jan', 'Feb']" :series="[{ name: 'Latency', data: [40, 60] }]" data-table :height="200" />
+    <LpRepeater v-else-if="scenario === 'repeater'" v-model="rows" :create-item="newRow" label="Rows">
+      <template #default="{ item, index }">
+        <LpInput v-model="item.name" :aria-label="`Row ${index + 1}`" />
+        <LpRepeater v-if="mode === 'nested'" v-model="item.children" :create-item="() => ({ name: '' })" :labels="{ add: 'Add child', remove: 'Remove child {index}' }">
+          <template #default="{ item: child }"><LpInput v-model="child.name" aria-label="Child" /></template>
+        </LpRepeater>
+      </template>
+    </LpRepeater>
+    <div v-else-if="scenario === 'data-list'" class="w-[220px] rounded-card border border-line px-4">
       <LpDataList :layout="mode === 'horizontal' ? 'horizontal' : mode === 'stacked' ? 'stacked' : 'auto'" :items="[
         { label: 'Address', value: 'play.leavepulse.net:25565', mono: true, copyable: true },
         { label: 'Description', value: 'A'.repeat(100) },

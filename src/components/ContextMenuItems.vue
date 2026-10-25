@@ -28,6 +28,7 @@ import {
   DropdownMenuSubTrigger,
 } from "reka-ui"
 import { computed } from "vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import MenuShortcut from "./MenuShortcut.vue"
@@ -66,6 +67,8 @@ const PRIMITIVES = {
 } as const
 
 const P = computed(() => PRIMITIVES[props.kind])
+const portalTo = usePortalTarget()
+const guardOutside = useOutsideGuard()
 
 const ITEM =
   "group/item flex cursor-pointer select-none items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft"
@@ -89,8 +92,8 @@ const ICON =
         </span>
         <LpIcon name="lucide:chevron-right" :size="14" class="text-muted" />
       </component>
-      <component :is="P.Portal">
-        <component :is="P.SubContent" :collision-padding="8" :class="panel" :side-offset="2" :align-offset="-4">
+      <component :is="P.Portal" :to="portalTo">
+        <component :is="P.SubContent" @interact-outside="guardOutside" @focus-outside="guardOutside" @escape-key-down="guardOutside" :collision-padding="8" :class="panel" :side-offset="2" :align-offset="-4">
           <ContextMenuItems :items="item.children" :panel="panel" :kind="kind" />
         </component>
       </component>

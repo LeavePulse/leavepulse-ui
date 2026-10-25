@@ -14,7 +14,7 @@ import { HINT_SIGNALS, noteContextTarget } from "../composables/useHintSystem"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
 import { POPOVER_PANEL } from "./dropdown"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { useOutsideGuard, usePortalTarget, useView, viewDocument } from "../composables/useView"
 
 export interface ContextMenuItemDef {
   label: string
@@ -81,12 +81,13 @@ const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
 // selection if the menu action left the text as it was.
 type TextField = HTMLInputElement | HTMLTextAreaElement
 const SELECTABLE = new Set(["text", "search", "url", "tel", "password"])
+const view = useView()
 let field: { el: TextField; value: string; start: number; end: number } | null = null
 
 function rememberField() {
-  const el = document.activeElement
+  const el = viewDocument(view.value).activeElement
   const text =
-    el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && SELECTABLE.has(el.type))
+    el?.tagName === "TEXTAREA" || (el?.tagName === "INPUT" && SELECTABLE.has((el as HTMLInputElement).type))
   field = text
     ? { el: el as TextField, value: (el as TextField).value, start: (el as TextField).selectionStart ?? 0, end: (el as TextField).selectionEnd ?? 0 }
     : null
