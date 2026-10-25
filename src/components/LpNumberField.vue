@@ -13,11 +13,11 @@ import {
   NumberFieldInput,
   NumberFieldRoot,
 } from "reka-ui"
-import { computed, useId } from "vue"
+import { computed, useAttrs, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
-import { useFieldControl } from "../composables/useField"
+import { focusLeft, useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
-import { useMergedAttrs } from "../composables/useMergedClass"
+import { useMergedClass } from "../composables/useMergedClass"
 
 export interface NumberFieldLabels extends Record<string, string> {
   increase: string
@@ -30,7 +30,33 @@ const props = withDefaults(defineProps<{
   modelValue?: number | null
   min?: number
   max?: number
+  /**
+   * What the steppers and arrow keys add. A typed value is snapped to the
+   * nearest step from `min` (or 0) when it is committed, unless `stepSnapping`
+   * is false: then 0.37 stays 0.37 in a field that steps by 0.5.
+   */
   step?: number
+  stepSnapping?: boolean
+  /**
+   * How the value is shown and, with it, how far it is rounded: the field
+   * commits the number it displays, so `{ maximumFractionDigits: 0 }` makes it
+   * an integer field. Intl options, read in `locale` (the document's by default).
+   */
+  formatOptions?: Intl.NumberFormatOptions
+  locale?: string
+  /** Shown and focusable, not changed: typing, the steppers, arrows and the wheel all stop. */
+  readonly?: boolean
+  /** The wheel over a focused field steps the value unless this is set. */
+  disableWheelChange?: boolean
+  invertWheelChange?: boolean
+  /** A step from the buttons moves focus to the input (reka's default); false keeps it on the button. */
+  focusOnChange?: boolean
+  /**
+   * The − and + buttons. Off, the field is a plain numeric input; arrow keys
+   * still step. A field narrower than 8.5rem drops them by itself: two 32 px
+   * buttons left a 100 px column eleven pixels for the digits.
+   */
+  steppers?: boolean
   disabled?: boolean
   // The unit the number is in ("mm", "W", "mA"). It sits inside the field
   // rather than in the label, because a grid of bare boxes labelled "Width",
@@ -41,9 +67,15 @@ const props = withDefaults(defineProps<{
   /** Control height, matching LpInput. */
   size?: "sm" | "md" | "lg"
   labels?: Partial<NumberFieldLabels>
-}>(), { size: "md" })
+}>(), { size: "md", stepSnapping: true, steppers: true, focusOnChange: true })
 
-defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
+// The value is committed when the field loses focus or Enter is pressed, and on
+// every step, not on each keystroke: "1." or "-" is not a number yet, and a
+// model that followed the keys would flicker through them.
+const emit = defineEmits<{
+  (e: "update:modelValue", value: number | null): void
+  (e: "blur", event: FocusEvent): void
+}>()
 
 // The unit is described to the input rather than merely placed beside it: on
 // screen the two read as one field, and without this a reader announces "380"
@@ -64,15 +96,35 @@ const SIZE = {
   lg: "h-(--size-control-lg) text-sm",
 }
 
-const field = useFieldControl(() => ({ wrapped: false, invalid: props.invalid, disabled: props.disabled }))
+const attrs = useAttrs()
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: typeof attrs.id === "string" ? attrs.id : undefined,
+  invalid: props.invalid,
+  disabled: props.disabled,
+}))
 const describedBy = computed(
   () => [field.value.describedBy, props.unit ? unitId : undefined].filter(Boolean).join(" ") || undefined,
 )
 
+// The frame takes the consumer's class and style, and `name` goes to reka's
+// hidden input, which submits the number itself rather than its formatted
+// text and carries `required` for the form's own check; every other attribute
+// (placeholder, name, aria-label, inputmode, listeners) belongs to the input,
+// which is what a form, a reader and a test reach for.
+const inputAttrs = computed(() => {
+  const { class: _c, style: _s, id: _i, name: _n, ...rest } = attrs
+  return rest
+})
+
+function onFocusOut(event: FocusEvent) {
+  if (focusLeft(event)) emit("blur", event)
+}
+
 // The field is full-width with its own control frame — the two things a consumer laying out a compact numeric column needs to change.
-const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+const rootClass = useMergedClass(() =>
   [
-    "flex w-full items-center rounded-control border bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    "@container flex w-full items-center rounded-control border bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
     SIZE[props.size],
     field.value.invalid
       ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
@@ -87,16 +139,26 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     :min="min"
     :max="max"
     :step="step"
+    :step-snapping="stepSnapping"
+    :readonly="readonly"
+    :disable-wheel-change="disableWheelChange"
+    :invert-wheel-change="invertWheelChange"
+    :focus-on-change="focusOnChange"
+    :format-options="formatOptions"
+    :locale="locale"
     :disabled="field.disabled"
     :required="field.required"
     data-lp-ring-owner
     :class="rootClass"
-    v-bind="rest"
-    @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
+    :style="attrs.style"
+    :name="typeof attrs.name === 'string' ? attrs.name : undefined"
+    @update:model-value="(v) => emit('update:modelValue', Number.isNaN(v) ? null : (v ?? null))"
+    @focusout="onFocusOut"
   >
     <NumberFieldDecrement
+      v-if="steppers"
       :aria-label="text.decrease"
-      class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
+      class="group grid h-full w-8 shrink-0 place-items-center @max-[8.5rem]:hidden text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
       <LpIcon
         name="lucide:minus"
@@ -105,18 +167,21 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       />
     </NumberFieldDecrement>
     <NumberFieldInput
+      v-bind="inputAttrs"
       :id="field.id"
       :aria-describedby="describedBy"
       :aria-invalid="field.invalid || undefined"
-      class="min-w-0 flex-1 bg-transparent text-center text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      class="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      :class="steppers ? 'text-center @max-[8.5rem]:px-3 @max-[8.5rem]:text-left' : 'px-3'"
     />
     <!-- The unit sits between the value and the increment button, so a long one
          narrows the field rather than covering the digits. Not focusable and
          not part of the value: it is read, never typed. -->
-    <span v-if="unit" :id="unitId" class="shrink-0 pr-1 text-xs text-muted">{{ unit }}</span>
+    <span v-if="unit" :id="unitId" class="shrink-0 pr-1 text-xs text-muted" :class="!steppers && 'pr-3'">{{ unit }}</span>
     <NumberFieldIncrement
+      v-if="steppers"
       :aria-label="text.increase"
-      class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
+      class="group grid h-full w-8 shrink-0 place-items-center @max-[8.5rem]:hidden text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
       <LpIcon
         name="lucide:plus"

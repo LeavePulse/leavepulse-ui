@@ -82,8 +82,8 @@ function onUpdate(value: boolean) {
 </script>
 
 <template>
-  <label v-if="labelled" :class="[rootClass, field.disabled && 'cursor-not-allowed']">
-    <span v-if="labelPosition === 'start'" class="flex min-w-0 flex-col">
+  <component :is="labelled ? 'label' : 'span'" :class="labelled ? [rootClass, field.disabled && 'cursor-not-allowed'] : 'contents'">
+    <span v-if="labelled && labelPosition === 'start'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
       <span v-if="description" :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
     </span>
@@ -92,33 +92,19 @@ function onUpdate(value: boolean) {
       :id="field.id"
       :model-value="modelValue"
       :disabled="field.disabled"
+      :required="field.required"
       :aria-describedby="describedBy"
       :aria-busy="pending || undefined"
-      :class="TRACK"
+      :class="labelled ? TRACK : rootClass"
       @update:model-value="onUpdate"
     >
       <SwitchThumb :class="[THUMB, 'grid place-items-center']">
         <LpIcon v-if="pending" name="lucide:loader-circle" class="size-2.5 animate-spin text-ink-inverse group-data-[state=checked]/switch:text-ink motion-reduce:animate-none" />
       </SwitchThumb>
     </SwitchRoot>
-    <span v-if="labelPosition === 'end'" class="flex min-w-0 flex-col">
+    <span v-if="labelled && labelPosition === 'end'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
       <span v-if="description" :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
     </span>
-  </label>
-  <SwitchRoot
-    v-else
-    v-bind="rest"
-    :id="field.id"
-    :model-value="modelValue"
-    :disabled="field.disabled"
-    :aria-describedby="describedBy"
-    :aria-busy="pending || undefined"
-    :class="rootClass"
-    @update:model-value="onUpdate"
-  >
-    <SwitchThumb :class="[THUMB, 'grid place-items-center']">
-      <LpIcon v-if="pending" name="lucide:loader-circle" class="size-2.5 animate-spin text-ink-inverse group-data-[state=checked]/switch:text-ink motion-reduce:animate-none" />
-    </SwitchThumb>
-  </SwitchRoot>
+  </component>
 </template>

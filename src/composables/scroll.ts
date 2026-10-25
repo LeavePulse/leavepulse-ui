@@ -17,7 +17,7 @@ export interface ScrollParentOptions {
 /** The nearest ancestor that scrolls along `axis` and has something to scroll, or null. */
 export function scrollParent(el: Element | null | undefined, { axis = "y", self = false }: ScrollParentOptions = {}): HTMLElement | null {
   for (let node = self ? (el as HTMLElement | null | undefined) : el?.parentElement; node; node = node.parentElement) {
-    if (node === document.body || node === document.documentElement) return null
+    if (node === node.ownerDocument.body || node === node.ownerDocument.documentElement) return null
     const style = getComputedStyle(node)
     const y = axis !== "x" && SCROLLS.test(style.overflowY) && node.scrollHeight > node.clientHeight
     const x = axis !== "y" && SCROLLS.test(style.overflowX) && node.scrollWidth > node.clientWidth
@@ -40,9 +40,12 @@ export function scrollToElement(
   { block = "nearest", behavior = "auto", margin = 0 }: ScrollToElementOptions = {},
 ): void {
   if (!el) return
-  const box = scrollParent(el) ?? (document.scrollingElement as HTMLElement | null)
+  // The element's own document and window: inside an LpFrame they are the frame's.
+  const doc = el.ownerDocument
+  const win = doc.defaultView ?? window
+  const box = scrollParent(el) ?? (doc.scrollingElement as HTMLElement | null)
   if (!box) return
-  const outer = box === document.scrollingElement ? new DOMRect(0, 0, window.innerWidth, window.innerHeight) : box.getBoundingClientRect()
+  const outer = box === doc.scrollingElement ? new DOMRect(0, 0, win.innerWidth, win.innerHeight) : box.getBoundingClientRect()
   const inner = el.getBoundingClientRect()
   const top = inner.top - outer.top + box.scrollTop
   let target = box.scrollTop

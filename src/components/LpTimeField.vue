@@ -20,7 +20,7 @@ export default { inheritAttrs: false }
 import { Time } from "@internationalized/date"
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui"
 import { computed } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { focusLeft, useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 
@@ -43,7 +43,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string | undefined): void
+  (e: "blur", event: FocusEvent): void
 }>()
+
+function onFocusOut(event: FocusEvent) {
+  if (focusLeft(event)) emit("blur", event)
+}
 
 const value = computed(() => {
   const match = /^(\d{2}):(\d{2})/.exec(props.modelValue || "")
@@ -89,11 +94,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     :locale="locale"
     granularity="minute"
     :disabled="field.disabled"
+    :required="field.required"
     :aria-invalid="field.invalid || undefined"
     :aria-describedby="field.describedBy"
+    :aria-labelledby="field.labelId"
     :class="rootClass"
     v-bind="rest"
     @update:model-value="onUpdate"
+    @focusout="onFocusOut"
   >
     <LpIcon v-if="icon" name="lucide:clock" :size="15" class="mr-1.5 shrink-0 text-muted" />
     <!-- Indexed keys: in 12-hour mode the segments hold two "literal" parts

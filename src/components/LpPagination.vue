@@ -18,7 +18,7 @@ export default { inheritAttrs: false }
  * motion-v's shared layoutId with zero list-animation conflicts.
  */
 import { Motion } from "motion-v"
-import { computed, useId } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -73,10 +73,46 @@ const current = computed(() =>
 // stable as the user pages through.
 type Slot = { kind: "page"; page: number } | { kind: "gap" }
 
+// The row gives up siblings, down to none, when the room it is given is too
+// narrow for them: on a phone nine slots and two arrows ran past the screen.
+// The room is the parent's width, not the row's own, so dropping siblings
+// cannot make the row look wide enough to bring them back.
+const root = ref<HTMLElement | null>(null)
+const room = ref(Infinity)
+const slotWidth = ref(32)
+const gap = ref(6)
+let observer: ResizeObserver | null = null
+function measure() {
+  const nav = root.value
+  if (!nav || !nav.children.length) return
+  gap.value = parseFloat(getComputedStyle(nav).columnGap) || 0
+  const items = nav.children.length
+  const used = [...nav.children].reduce((sum, el) => sum + (el as HTMLElement).offsetWidth, 0)
+  slotWidth.value = used / items
+}
+onMounted(() => {
+  const parent = root.value?.parentElement
+  if (!parent || typeof ResizeObserver === "undefined") return
+  observer = new ResizeObserver(([entry]) => {
+    measure()
+    if (entry) room.value = entry.contentRect.width
+  })
+  observer.observe(parent)
+})
+onBeforeUnmount(() => observer?.disconnect())
+
+const siblings = computed(() => {
+  for (let n = props.siblings; n > 0; n--) {
+    const items = Math.min(n * 2 + 1 + 4, count.value) + 2
+    if (items * slotWidth.value + (items - 1) * gap.value <= room.value) return n
+  }
+  return 0
+})
+
 const slots = computed<Slot[]>(() => {
   const c = count.value
   const cur = current.value
-  const inner = props.siblings * 2 + 1 // pages shown around (and including) current
+  const inner = siblings.value * 2 + 1 // pages shown around (and including) current
   // Total = first + leftGap + inner + rightGap + last. Constant for a given
   // count, so the row width never changes as you page through.
   const total = inner + 4
@@ -88,8 +124,8 @@ const slots = computed<Slot[]>(() => {
 
   // Inner window [lo..hi] of length `inner`, clamped into [3 .. c-2] so there's
   // always a slot for first(1)+page 2 on the left and page c-1+last(c) on right.
-  let lo = cur - props.siblings
-  let hi = cur + props.siblings
+  let lo = cur - siblings.value
+  let hi = cur + siblings.value
   if (lo < 3) {
     hi += 3 - lo
     lo = 3
@@ -137,6 +173,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
 <template>
   <nav
+    ref="root"
     :class="rootClass"
     v-bind="rest" :aria-label="text.nav">
     <button

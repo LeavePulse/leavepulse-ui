@@ -50,7 +50,7 @@ function isCurrent(i: number): boolean {
 
 // The stepper spaces its steps evenly; a compact wizard header needs that spacing under the consumer's control.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex items-center gap-2",
+  "@container flex w-full min-w-0 items-center gap-2",
 )
 </script>
 
@@ -61,10 +61,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     <li
       v-for="(step, i) in steps"
       :key="step.key ?? i"
-      class="flex flex-1 items-center gap-2 last:flex-none"
+      class="flex min-w-0 flex-1 items-center gap-2 last:flex-none"
       :aria-current="isCurrent(i) ? 'step' : undefined"
     >
-      <div class="flex items-center gap-2">
+      <div class="flex min-w-0 items-center">
         <span
           class="flex size-7 shrink-0 items-center justify-center rounded-pill border text-xs font-semibold transition-colors duration-[var(--duration-medium)]"
           :class="isCompleted(step, i)
@@ -86,19 +86,30 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             </template>
           </LpRollingText>
         </span>
+        <!-- Where only the current step has room for its name (a narrow
+             container), the others fold their label to nothing rather than
+             dropping it in one frame: the row slides instead of jumping when
+             the step changes. Folded, the words stay in the reading order. -->
         <span
-          class="text-sm transition-colors duration-[var(--duration-medium)]"
-          :class="isCompleted(step, i) || isCurrent(i) ? 'text-ink' : 'text-muted'"
+          class="grid min-w-0 grid-cols-[1fr] transition-[grid-template-columns,opacity] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none"
+          :class="!isCurrent(i) && '@max-md:grid-cols-[0fr] @max-md:opacity-0'"
         >
-          {{ step.label }}
-          <!-- Status for screen readers; the colour/check are visual only. -->
-          <span class="sr-only">{{
-            isCompleted(step, i)
-              ? "(completed)"
-              : isCurrent(i)
-                ? "(current step)"
-                : ""
-          }}</span>
+          <span class="min-w-0 overflow-hidden">
+            <span
+              class="block truncate pl-2 text-sm transition-colors duration-[var(--duration-medium)]"
+              :class="isCompleted(step, i) || isCurrent(i) ? 'text-ink' : 'text-muted'"
+            >
+              {{ step.label }}
+              <!-- Status for screen readers; the colour/check are visual only. -->
+              <span class="sr-only">{{
+                isCompleted(step, i)
+                  ? "(completed)"
+                  : isCurrent(i)
+                    ? "(current step)"
+                    : ""
+              }}</span>
+            </span>
+          </span>
         </span>
       </div>
       <!-- The connector fills from the step it leaves towards the next one,

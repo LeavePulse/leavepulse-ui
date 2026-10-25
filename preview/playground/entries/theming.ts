@@ -55,11 +55,12 @@ export const theming: ComponentEntry[] = [
     <LpThemeSwitcher variant="swatch" />
     <LpThemeSwitcher variant="icon" />
   </div>
-  <LpThemeProvider :theme="rose" class="flex items-center gap-2 rounded-card border border-line p-3">
-    <span class="text-sm font-medium">{{ rose.name }}</span>
+  <LpThemeProvider :theme="tTheme" class="flex items-center gap-2 rounded-card border border-line p-3">
+    <span class="text-sm font-medium">{{ tTheme.name }}</span>
     <LpButton size="sm" variant="action">Save</LpButton>
     <LpBadge tone="success">online</LpBadge>
   </LpThemeProvider>
 </div>`,
+    thumbLoop: { every: 2200, frames: [{ tTheme: presets.rose }, { tTheme: presets.nord }, { tTheme: presets.light }] },
   },
 ]

@@ -19,6 +19,7 @@ import LpShift from "./LpShift.vue"
 import LpTableFilter, { type TableFilterOption } from "./LpTableFilter.vue"
 import { useKitStorage } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
+import { useTableFacets } from "./tableFacets"
 import { useHotkeys } from "../composables/useHotkeys"
 import { usePaintSelect } from "../composables/usePaintSelect"
 import { useRovingFocus } from "../composables/useRovingFocus"
@@ -26,7 +27,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { compareValues } from "./tableSort"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
-import { countValues, parseTableState, serializeTableState, summarizeShown } from "./tableFilter"
+import { parseTableState, serializeTableState, summarizeShown } from "./tableFilter"
 import { resolveRowMenu, type TableRowMenuResult } from "./tableRowMenu"
 
 export interface TableColumn<Row> {
@@ -512,15 +513,16 @@ const visibleColumns = computed(() =>
   ),
 )
 
-/** The distinct values a filterable column holds, in first-seen order. */
+const facetColumns = computed(() => props.columns.filter((col) => col.filterable).map((col) => col.key))
+const localFacets = useTableFacets({
+  rows: () => props.load ? [] : props.rows,
+  columns: () => facetColumns.value,
+  hidden: () => hiddenValues.value,
+})
+
 function valuesOf(col: TableColumn<T>): unknown[] {
-  if (props.load && facets.value[col.key]) return facets.value[col.key]
-  const seen: unknown[] = []
-  for (const row of sourceRows.value) {
-    const v = row[col.key]
-    if (!seen.includes(v)) seen.push(v)
-  }
-  return seen
+  if (props.load) return facets.value[col.key] ?? [...new Set(sourceRows.value.map((row) => row[col.key]))]
+  return localFacets.distinct(col.key)
 }
 
 function isValueHidden(key: string, value: unknown): boolean {
@@ -555,17 +557,16 @@ function labelOf(col: TableColumn<T>, value: unknown): string {
  * way a faceted search does: with "Status: open" set, the "Owner" filter
  * counts open rows, which is what the user is about to narrow further.
  */
-function filterOptions(col: TableColumn<T>): TableFilterOption[] {
-  let counts: Map<unknown, number> | undefined
-  if (!props.load) {
-    const others = Object.entries(hiddenValues.value).filter(([key, set]) => key !== col.key && set.size)
-    const rows = others.length
-      ? props.rows.filter((row) => others.every(([key, hidden]) => !hidden.has(row[key])))
-      : props.rows
-    counts = countValues(rows, col.key)
-  }
-  return valuesOf(col).map((value) => ({ value, label: labelOf(col, value), count: counts?.get(value) ?? (counts ? 0 : undefined) }))
-}
+const facetOptions = computed(() => new Map(props.columns.filter((col) => col.filterable).map((col) => {
+  return [col.key, computed(() => {
+    const counts = props.load ? undefined : localFacets.counts(col.key)
+    return valuesOf(col).map((value) => ({
+      value,
+      label: labelOf(col, value),
+      count: counts?.get(value) ?? (counts ? 0 : undefined),
+    }))
+  })]
+})))
 
 /** Every column with something hidden, summarised for the chips above the table. */
 const activeFilters = computed(() =>
@@ -791,9 +792,10 @@ function fetchPage(delay = 0) {
   })
 }
 
-// A new sort or filter starts from the first page: page 4 of a different
-// question is a page of nothing in particular.
-watch([activeSort, hiddenValues], () => {
+// A new sort, filter or page size starts from the first page: page 4 of a
+// different question, or of a different cut of the rows, is a page of nothing
+// in particular.
+watch([activeSort, hiddenValues, () => props.pageSize], () => {
   if (!props.load) return
   if (page.value !== 1) page.value = 1
   else fetchPage(props.debounce)
@@ -1286,7 +1288,7 @@ const barInsetTop = computed(() =>
                 </button>
               </template>
               <LpTableFilter
-                :options="filterOptions(col)"
+                :options="facetOptions.get(col.key)?.value ?? []"
                 :hidden="hiddenValues[col.key] ?? new Set()"
                 :labels="filterLabels()"
                 @update:hidden="(next) => setHidden(col.key, next)"

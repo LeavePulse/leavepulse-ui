@@ -184,3 +184,28 @@ export function dayAllowed(iso: string, rules: DayRules = {}): boolean {
   if (rules.isDisabled?.(value)) return false
   return !rules.isDateUnavailable?.(value)
 }
+
+export interface RangeRules extends DayRules {
+  /** Longest range, in days, counting both ends. */
+  maximumDays?: number
+}
+
+/**
+ * A preset's range under the same rules as one picked on the calendar: trimmed
+ * to min/max, then refused if either end is a disabled day, it is longer than
+ * maximumDays, or a day inside it is unavailable. A preset that breaks them is
+ * shown disabled instead of writing a range the calendar would never allow.
+ */
+export function allowedRange(range: DateRange, rules: RangeRules = {}): DateRange | undefined {
+  const trimmed = clampRange(range, rules.min, rules.max)
+  if (!trimmed) return undefined
+  const end = (iso: string) => !rules.isDisabled?.(iso)
+  if (!end(trimmed.start)) return undefined
+  return (
+    reshapeRange(trimmed.start, trimmed.end, {
+      allowed: end,
+      unavailable: rules.isDateUnavailable,
+      maximumDays: rules.maximumDays,
+    }) ?? undefined
+  )
+}

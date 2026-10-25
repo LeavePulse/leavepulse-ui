@@ -26,6 +26,7 @@ import { useBarStack } from "./actionBar"
 import { CLOSE_ICON } from "./dropdown"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
+import { usePortalTarget } from "../composables/useView"
 
 export interface ActionBarAction {
   label: string
@@ -198,6 +199,9 @@ watch(root, (el) => {
 })
 
 onBeforeUnmount(() => observer?.disconnect())
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
 </script>
 
 <template>
@@ -207,7 +211,7 @@ onBeforeUnmount(() => observer?.disconnect())
        ancestor instead, and the kit is full of such ancestors (any panel with a
        blur). Declaring it next to the form it belongs to should not decide
        where on screen it lands. -->
-  <Teleport to="body">
+  <Teleport :to="portalTo">
     <!-- `forwards` on the way out, because the leave animation finishing is not
          the same moment as the element leaving. `rise-out` is a bare `to {}`, so
          once it ends the element snaps back to opacity 1 at its resting

@@ -66,8 +66,6 @@ const props = withDefaults(
     isActive?: (item: SidebarItem) => boolean
     /** Override the header title. Falls back to the active item's label. */
     title?: string
-    /** Mobile drawer open state (v-model:open). */
-    open?: boolean
     /** Tailwind breakpoint below which the rail becomes a drawer. */
     mobileBreakpoint?: "sm" | "md" | "lg" | "xl"
     /** Show the brand/header divider in the rail. */
@@ -94,7 +92,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "update:modelValue", id: string): void
-  (e: "update:open", value: boolean): void
   (e: "update:collapsed", keys: string[]): void
   (e: "select", item: SidebarItem): void
 }>()
@@ -139,10 +136,9 @@ const pageTitle = computed(() => {
 
 // Mobile drawer: also close it on every path change, so href/select navigation
 // from a nav item dismisses it.
-const drawerOpen = computed({
-  get: () => props.open ?? false,
-  set: (v) => emit("update:open", v),
-})
+// Its own state when the app does not bind it: the shell's burger must open
+// the drawer either way. v-model:open still controls it from outside.
+const drawerOpen = defineModel<boolean>("open", { default: false })
 const text = useLabels(
   "appShell",
   { openMenu: "Open menu", skipToContent: "Skip to content" },
@@ -165,7 +161,7 @@ function skipToMain() {
 watch(
   () => props.path,
   () => {
-    if (drawerOpen.value) emit("update:open", false)
+    if (drawerOpen.value) drawerOpen.value = false
     scrollArea.value?.viewportEl?.scrollTo({ top: 0, left: 0, behavior: "instant" })
   },
 )
@@ -186,7 +182,7 @@ const burgerHidden: Record<NonNullable<typeof props.mobileBreakpoint>, string> =
 const burgerClass = computed(() => burgerHidden[props.mobileBreakpoint])
 
 // Expose the burger trigger so a host can omit its own header entirely.
-const _openDrawer = () => emit("update:open", true)
+const _openDrawer = () => (drawerOpen.value = true)
 defineExpose({ openDrawer: _openDrawer })
 
 // The shell claims the full viewport height, which is wrong when it is embedded in a page that already has a header of its own.
@@ -221,7 +217,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :auto-collapse-after="autoCollapseAfter"
       class="shrink-0"
       @update:model-value="onModel"
-      @update:open="(v) => emit('update:open', v)"
+      @update:open="(v) => (drawerOpen = v)"
       @update:collapsed="(v) => emit('update:collapsed', v)"
       @select="onSelect"
     >
@@ -256,7 +252,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           size="sm"
           square
           :aria-label="text.openMenu"
-          @click="emit('update:open', true)"
+          @click="drawerOpen = true"
         >
           <LpIcon name="lucide:menu" :size="18" />
         </LpButton>

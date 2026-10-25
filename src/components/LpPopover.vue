@@ -8,6 +8,7 @@ import {
 import { computed } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +32,12 @@ const open = defineModel<boolean>("open")
 const panel = computed(() =>
   mergeClass(POPOVER_PANEL, "z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none", props.panelClass),
 )
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -38,8 +45,10 @@ const panel = computed(() =>
     <PopoverTrigger as-child>
       <slot name="trigger" />
     </PopoverTrigger>
-    <PopoverPortal>
+    <PopoverPortal :to="portalTo">
       <PopoverContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         :collision-padding="8"
         :side="side"
         :align="align"

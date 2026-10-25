@@ -49,9 +49,10 @@ export const data: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="grid w-72 grid-cols-2 gap-4">
-  <LpStat online label="Servers online" value="43" />
-  <LpStat label="Revenue" value="€8,420" :delta="12.4" delta-suffix="%" />
+  <LpStat online label="Servers online" :value="tOnline" />
+  <LpStat label="Revenue" :value="tRevenue" :delta="tDelta" delta-suffix="%" />
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tOnline: "43", tRevenue: "€8,420", tDelta: 12.4 }, { tOnline: "41", tRevenue: "€8,135", tDelta: -3.4 }, { tOnline: "46", tRevenue: "€9,010", tDelta: 7.1 }] }
   },
   {
     id: "progress",
@@ -102,11 +103,12 @@ export const data: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="flex w-64 items-center gap-5">
   <div class="flex min-w-0 flex-1 flex-col gap-3">
-    <LpProgress title="CPU" :value="64" tone="auto" caption :animate-on-mount="false" />
-    <LpProgress title="Disk" :value="94" tone="auto" caption :animate-on-mount="false" />
+    <LpProgress title="CPU" :value="tCpu" tone="auto" caption :animate-on-mount="false" />
+    <LpProgress title="Disk" :value="tDisk" tone="auto" caption :animate-on-mount="false" />
   </div>
-  <LpProgress variant="ring" :value="64" :size="56" label :animate-on-mount="false" />
+  <LpProgress variant="ring" :value="tCpu" :size="56" label :animate-on-mount="false" />
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tCpu: 64, tDisk: 94 }, { tCpu: 31, tDisk: 72 }, { tCpu: 88, tDisk: 51 }] }
   },
   {
     id: "number-flow",
@@ -172,9 +174,10 @@ export const data: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-2">
-  <LpNumberFlow class="font-mono text-3xl font-medium text-ink" :value="1250000" grouped />
-  <LpRollingText class="font-mono text-lg text-muted-strong" value="operational" />
+  <LpNumberFlow class="font-mono text-3xl font-medium text-ink" :value="tCount" grouped />
+  <LpRollingText class="font-mono text-lg text-muted-strong" :value="tWord" />
 </div>`,
+    thumbLoop: { every: 1900, frames: [{ tCount: 1250000, tWord: "operational" }, { tCount: 1318402, tWord: "degraded" }, { tCount: 1402977, tWord: "recovering" }] }
   },
   {
     id: "pie",
@@ -283,7 +286,15 @@ export const data: ComponentEntry[] = [
     :show-total="false"
   />
 </div>`,
-    thumb: `<LpPie :slices="fleet" :size="120" :show-total="false" />`,
+    thumb: `<LpPie :slices="tFleet" :size="120" :show-total="false" />`,
+    thumbLoop: {
+      every: 2200,
+      frames: [
+        { tFleet: [{ label: "Running", value: 38, color: "var(--color-action)" }, { label: "Stopped", value: 3, color: "var(--color-muted)" }, { label: "Crashloop", value: 1, color: "var(--color-danger)" }] },
+        { tFleet: [{ label: "Running", value: 30, color: "var(--color-action)" }, { label: "Stopped", value: 8, color: "var(--color-muted)" }, { label: "Crashloop", value: 4, color: "var(--color-danger)" }] },
+        { tFleet: [{ label: "Running", value: 41, color: "var(--color-action)" }, { label: "Stopped", value: 1, color: "var(--color-muted)" }, { label: "Crashloop", value: 0, color: "var(--color-danger)" }] },
+      ],
+    }
   },
   {
     id: "sparkline",
@@ -340,10 +351,11 @@ export const data: ComponentEntry[] = [
     thumb: `<div class="flex w-72 flex-col divide-y divide-line rounded-card border border-line">
   <div v-for="h in hosts.slice(1, 4)" :key="h.name" class="flex items-center gap-3 px-3 py-1.5">
     <span class="w-24 shrink-0 truncate font-mono text-xs text-ink">{{ h.name }}</span>
-    <LpSparkline :data="h.load" :tone="h.tone" :width="80" :height="22" show-last />
+    <LpSparkline :data="[...h.load, ...[...h.load].reverse()].slice(tShift, tShift + 12)" :tone="h.tone" :width="80" :height="22" show-last />
     <span class="ml-auto font-mono text-xs tabular-nums text-muted-strong">{{ h.now }}</span>
   </div>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tShift: 0 }, { tShift: 2 }, { tShift: 4 }, { tShift: 6 }] },
   },
   {
     id: "uptime-bar",
@@ -379,8 +391,9 @@ export const data: ComponentEntry[] = [
   />
 </div>`,
     thumb: `<div class="w-72">
-  <LpUptimeBar :segments="days" title="api.leavepulse.io" start-label="60 days ago" end-label="Today" />
+  <LpUptimeBar :segments="[...days.slice(tShift), ...days.slice(0, tShift)]" title="api.leavepulse.io" start-label="60 days ago" end-label="Today" />
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tShift: 0 }, { tShift: 1 }, { tShift: 2 }, { tShift: 3 }] },
   },
   {
     id: "chart",
@@ -531,8 +544,9 @@ export const data: ComponentEntry[] = [
   />
 </div>`,
     thumb: `<div class="w-72">
-  <LpChart type="area" :series="[traffic[0]]" :labels="hours" :height="140" :show-legend="false" :y-ticks="3" />
+  <LpChart type="area" :series="[{ ...traffic[0], data: [...traffic[0].data.slice(tShift), ...traffic[0].data.slice(0, tShift)] }]" :labels="hours" :height="140" :show-legend="false" :y-ticks="3" />
 </div>`,
+    thumbLoop: { every: 2200, frames: [{ tShift: 0 }, { tShift: 4 }, { tShift: 8 }] },
   },
   {
     id: "log-viewer",
@@ -621,8 +635,9 @@ export const data: ComponentEntry[] = [
   <LpLogViewer :lines="lines" toolbar persist="preview-logs" :max-lines="12" line-numbers height="14rem" />
 </div>`,
     thumb: `<div class="w-72">
-  <LpLogViewer :lines="lines.slice(0, 6)" height="8.5rem" :row-menu="false" />
+  <LpLogViewer :lines="lines.slice(tStart, tStart + 6)" height="8.5rem" :row-menu="false" />
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tStart: 0 }, { tStart: 1 }, { tStart: 2 }, { tStart: 3 }] },
   },
   {
     id: "table",
@@ -837,7 +852,7 @@ export const data: ComponentEntry[] = [
     thumb: `<div class="w-72">
   <LpTable
     :columns="[{ key: 'id', label: 'Order', nowrap: true }, { key: 'amount', label: 'Amount', align: 'right' }, { key: 'status', label: 'Status', align: 'center' }]"
-    :rows="rows.slice(0, 3)"
+    :rows="tRows"
     row-key="id"
     density="compact"
   >
@@ -847,6 +862,14 @@ export const data: ComponentEntry[] = [
     </template>
   </LpTable>
 </div>`,
+    thumbLoop: {
+      every: 2000,
+      frames: [
+        { tRows: [{ id: "ORD-1042", amount: 12, status: "paid" }, { id: "ORD-1041", amount: 12, status: "pending" }, { id: "ORD-1040", amount: 24, status: "failed" }] },
+        { tRows: [{ id: "ORD-1042", amount: 12, status: "paid" }, { id: "ORD-1041", amount: 12, status: "paid" }, { id: "ORD-1040", amount: 24, status: "failed" }] },
+        { tRows: [{ id: "ORD-1043", amount: 31, status: "pending" }, { id: "ORD-1042", amount: 12, status: "paid" }, { id: "ORD-1041", amount: 12, status: "paid" }] },
+      ],
+    },
   },
   {
     id: "pagination",
@@ -882,9 +905,10 @@ export const data: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-2">
-  <LpPagination :page="4" :total="240" :page-size="10" :siblings="0" />
-  <p class="text-xs text-muted">Page 4 of 24</p>
+  <LpPagination :page="tPage" :total="240" :page-size="10" :siblings="0" />
+  <p class="text-xs text-muted">Page {{ tPage }} of 24</p>
 </div>`,
+    thumbLoop: { every: 1400, frames: [{ tPage: 4 }, { tPage: 5 }, { tPage: 6 }, { tPage: 7 }, { tPage: 6 }, { tPage: 5 }] }
   },
   {
     id: "file-tree",
@@ -1020,12 +1044,13 @@ export const data: ComponentEntry[] = [
       ] },
       { id: 'launcher.lock', name: 'launcher.lock', kind: 'file', size: 0 },
     ]"
-    :expanded="['config']"
+    :expanded="tOpen"
     :checked="['config']"
     checkable
     show-size
   />
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tOpen: ["config"] }, { tOpen: [] }] },
   },
   {
     id: "media-gallery",
@@ -1177,12 +1202,13 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
   </div>
   <div class="flex items-center gap-3">
     <LpIcon name="lucide:chevron-left" :size="18" class="text-white/70" />
-    <img :src="shots[0].src" alt="" class="h-20 rounded-inner object-cover" />
+    <img :src="shots[tShot].src" alt="" class="h-20 rounded-inner object-cover" />
     <LpIcon name="lucide:chevron-right" :size="18" class="text-white/70" />
   </div>
   <div class="flex gap-1">
-    <img v-for="(s, i) in shots" :key="i" :src="s.src" alt="" class="h-5 w-7 rounded-[3px] object-cover" :class="i === 0 ? 'ring-2 ring-white' : 'opacity-50'" />
+    <img v-for="(s, i) in shots" :key="i" :src="s.src" alt="" class="h-5 w-7 rounded-[3px] object-cover transition-opacity duration-300" :class="i === tShot ? 'ring-2 ring-white' : 'opacity-50'" />
   </div>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tShot: 0 }, { tShot: 1 }, { tShot: 2 }] },
   },
 ]

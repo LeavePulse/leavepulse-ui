@@ -1,6 +1,7 @@
 import { CalendarDate } from "@internationalized/date"
 import { describe, expect, test } from "bun:test"
 import {
+  allowedRange,
   clampRange,
   dayAllowed,
   defaultDatePresets,
@@ -92,5 +93,20 @@ describe("dayAllowed", () => {
     expect(dayAllowed("2026-05-03", { isDateUnavailable: (d) => d === "2026-05-03" })).toBe(false)
     expect(dayAllowed("2026-05-04", { isDisabled: () => false, isDateUnavailable: () => false })).toBe(true)
     expect(dayAllowed("nope")).toBe(false)
+  })
+})
+
+describe("allowedRange", () => {
+  const week = { start: "2026-10-01", end: "2026-10-07" }
+  test("a preset longer than maximumDays is refused", () => {
+    expect(allowedRange(week, { maximumDays: 3 })).toBeUndefined()
+    expect(allowedRange(week, { maximumDays: 7 })).toEqual(week)
+  })
+  test("a disabled end or an unavailable day inside refuses it", () => {
+    expect(allowedRange(week, { isDisabled: () => true })).toBeUndefined()
+    expect(allowedRange(week, { isDateUnavailable: (d) => d === "2026-10-04" })).toBeUndefined()
+  })
+  test("min and max still trim it", () => {
+    expect(allowedRange(week, { min: "2026-10-03" })).toEqual({ start: "2026-10-03", end: "2026-10-07" })
   })
 })

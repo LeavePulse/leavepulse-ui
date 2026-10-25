@@ -72,6 +72,7 @@ import {
   type RecentEntry,
   type RecentItem,
 } from "./commandPalette"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -910,11 +911,17 @@ function paneHighlight(text: string): HighlightPart[] {
 const paneQuery = computed(() => parsePaletteQuery(query.value.trim()))
 
 // What the pane draws: the last row it showed, kept while the pane slides out
-// so it leaves with its content instead of emptying first.
+// so it leaves with its content instead of emptying first. Immediate: the
+// first row is already highlighted when the palette opens, and the pane
+// opened beside it empty until the highlight moved.
 const paneBody = shallowRef<Command | undefined>()
-watch(paneCommand, (command) => {
-  if (command) paneBody.value = command
-})
+watch(
+  paneCommand,
+  (command) => {
+    if (command) paneBody.value = command
+  },
+  { immediate: true },
+)
 
 /*
  * The text in paragraphs, so they can arrive one after another. A blank line
@@ -1216,17 +1223,25 @@ useHotkeys(() =>
       ]
     : [],
 )
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogPortal>
+    <DialogPortal :to="portalTo">
       <DialogOverlay
         :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
         :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         ref="contentRef"
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"

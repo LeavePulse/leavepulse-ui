@@ -90,3 +90,20 @@
   caret-color: var(--color-ink);
   filter: none;
 }
+
+/*
+ * A floating panel that should travel when its anchor moves rather than jump:
+ * the tour's card going to the next target, the theme studio following its
+ * switcher as a theme change resizes it. reka places the panel through a
+ * transform on its popper wrapper, which the panel cannot class itself, hence
+ * the :has(). The panel sets the attribute only while travel is wanted (the
+ * tour drops it while the page scrolls, where the card must stick).
+ */
+[data-reka-popper-content-wrapper]:has(> [data-lp-glide-position]) {
+  transition: transform var(--duration-medium) var(--ease-emphasized);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reka-popper-content-wrapper]:has(> [data-lp-glide-position]) {
+    transition: none;
+  }
+}

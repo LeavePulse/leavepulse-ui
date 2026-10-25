@@ -85,14 +85,14 @@ export const overlays: ComponentEntry[] = [
     thumb: `<div class="flex items-start gap-2">
   <div class="relative grid size-8 place-items-center rounded-control text-ink">
     <LpIcon name="lucide:bell" :size="18" />
-    <LpBadge tone="danger" class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4">2</LpBadge>
+    <LpBadge tone="danger" class="absolute -right-1 -top-1 min-w-4 justify-center px-1 py-0 text-[10px] leading-4 transition duration-300" :class="tUnread ? '' : 'scale-50 opacity-0'">{{ tUnread || 1 }}</LpBadge>
   </div>
   <div class="w-60 rounded-control border border-line bg-surface-overlay shadow-panel">
     <div class="flex items-center justify-between px-3 py-2"><span class="text-sm font-semibold text-ink">Notifications</span><span class="text-xs font-medium text-brand">Mark all read</span></div>
     <div class="flex flex-col gap-0.5 px-2 pb-2">
-      <div class="flex items-start gap-2.5 rounded-control bg-brand-soft/35 px-2 py-1.5">
+      <div class="flex items-start gap-2.5 rounded-control px-2 py-1.5 transition-colors duration-300" :class="tUnread ? 'bg-brand-soft/35' : ''">
         <span class="grid size-7 shrink-0 place-items-center rounded-control bg-action-soft text-action"><LpIcon name="lucide:check-circle" :size="15" /></span>
-        <span class="min-w-0 flex-1"><span class="flex items-center gap-1.5"><span class="truncate text-sm font-medium text-ink">Payment received</span><span class="size-1.5 shrink-0 rounded-full bg-brand" /></span><span class="block text-[11px] text-muted/70">2 min ago</span></span>
+        <span class="min-w-0 flex-1"><span class="flex items-center gap-1.5"><span class="truncate text-sm font-medium text-ink">Payment received</span><span class="size-1.5 shrink-0 rounded-full bg-brand transition-opacity duration-300" :class="tUnread ? '' : 'opacity-0'" /></span><span class="block text-[11px] text-muted/70">2 min ago</span></span>
       </div>
       <div class="flex items-start gap-2.5 rounded-control px-2 py-1.5">
         <span class="grid size-7 shrink-0 place-items-center rounded-control bg-surface-soft text-muted"><LpIcon name="lucide:receipt-text" :size="15" /></span>
@@ -101,6 +101,7 @@ export const overlays: ComponentEntry[] = [
     </div>
   </div>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tUnread: 2 }, { tUnread: 0 }] },
   },
   {
     id: "toast",
@@ -180,14 +181,15 @@ export const overlays: ComponentEntry[] = [
     <LpIcon name="lucide:check-circle" :size="16" class="mt-0.5 shrink-0 text-action" />
     <div class="flex min-w-0 flex-1 flex-col gap-0.5"><span class="text-sm font-semibold text-ink">Profile updated</span><span class="text-xs text-muted">Saved</span></div>
     <LpIcon name="lucide:x" :size="14" class="text-muted" />
-    <span class="absolute inset-x-0 bottom-0 h-0.5 w-2/3 bg-action" />
+    <span class="absolute inset-x-0 bottom-0 h-0.5 bg-action ease-linear" :class="tBar < 66 ? 'transition-[width] duration-[1600ms]' : ''" :style="{ width: tBar + '%' }" />
   </div>
-  <div class="flex items-start gap-3 rounded-card border border-line bg-surface-raised shadow-panel p-3">
+  <div class="flex items-start gap-3 rounded-card border border-line bg-surface-raised shadow-panel p-3 transition duration-500 ease-out" :class="tShow ? '' : 'translate-x-6 opacity-0'">
     <LpIcon name="lucide:circle-x" :size="16" class="mt-0.5 shrink-0 text-danger" />
     <div class="flex min-w-0 flex-1 flex-col gap-0.5"><span class="text-sm font-semibold text-ink">Billing failed</span><span class="text-xs text-muted">Upstream timed out</span></div>
     <LpIcon name="lucide:x" :size="14" class="text-muted" />
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tBar: 66.67, tShow: true }, { tBar: 33, tShow: true }, { tBar: 0, tShow: false }] },
   },
   {
     id: "modal",
@@ -293,7 +295,7 @@ export const overlays: ComponentEntry[] = [
     <LayerKeys />
   </div>
 </div>`,
-    thumb: `<div class="w-72 rounded-card border border-line bg-surface-raised shadow-panel">
+    thumb: `<div class="w-72 rounded-card border border-line bg-surface-raised shadow-panel transition duration-300 ease-out" :class="tOpen ? '' : 'translate-y-2 scale-95 opacity-0'">
   <div class="flex items-start justify-between gap-4 p-4 pb-2">
     <div class="flex flex-col gap-0.5"><span class="text-base font-semibold text-ink">Confirm action</span><span class="text-xs text-muted">A token-driven modal.</span></div>
     <LpIcon name="lucide:x" :size="16" class="text-muted" />
@@ -304,6 +306,7 @@ export const overlays: ComponentEntry[] = [
     <LpButton size="sm" variant="solid">Confirm</LpButton>
   </div>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tOpen: true }, { tOpen: true }, { tOpen: false }] },
   },
   {
     id: "modal-nav",
@@ -370,9 +373,7 @@ export const overlays: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="flex items-start gap-2">
   <div class="flex w-24 flex-col gap-0.5 rounded-card border border-line bg-surface-raised p-1 text-xs shadow-panel">
-    <span class="flex items-center gap-1.5 rounded-inner bg-brand-soft px-2 py-1.5 text-brand"><LpIcon name="lucide:activity" :size="13" />Activity</span>
-    <span class="flex items-center gap-1.5 px-2 py-1.5 text-ink"><LpIcon name="lucide:mic" :size="13" />Voice</span>
-    <span class="flex items-center gap-1.5 px-2 py-1.5 text-ink"><LpIcon name="lucide:star" :size="13" />Reviews</span>
+    <span v-for="(s, i) in [{ icon: 'lucide:activity', label: 'Activity' }, { icon: 'lucide:mic', label: 'Voice' }, { icon: 'lucide:star', label: 'Reviews' }]" :key="s.label" class="flex items-center gap-1.5 rounded-inner px-2 py-1.5 transition-colors duration-300" :class="i === tSec ? 'bg-brand-soft text-brand' : 'text-ink'"><LpIcon :name="s.icon" :size="13" />{{ s.label }}</span>
   </div>
   <div class="w-44 rounded-card border border-line bg-surface-raised shadow-panel p-3">
     <div class="flex items-start justify-between gap-2"><span class="text-sm font-semibold text-ink">Staff member</span><LpIcon name="lucide:x" :size="14" class="text-muted" /></div>
@@ -380,6 +381,7 @@ export const overlays: ComponentEntry[] = [
     <div class="mt-3 flex justify-end"><LpButton size="sm" variant="ghost">Close</LpButton></div>
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tSec: 0 }, { tSec: 1 }, { tSec: 2 }] },
   },
   {
     id: "confirm",
@@ -433,7 +435,7 @@ export const overlays: ComponentEntry[] = [
     Players are disconnected for about a minute.
   </LpConfirmDialog>
 </div>`,
-    thumb: `<div class="w-64 rounded-card border border-line bg-surface-raised shadow-panel p-4">
+    thumb: `<div class="w-64 rounded-card border border-line bg-surface-raised shadow-panel p-4 transition duration-300 ease-out" :class="tOpen ? '' : 'translate-y-2 scale-95 opacity-0'">
   <p class="m-0 text-base font-semibold text-ink">Delete server?</p>
   <p class="m-0 mt-1 text-sm text-muted">This cannot be undone.</p>
   <div class="mt-4 flex justify-end gap-2">
@@ -441,6 +443,7 @@ export const overlays: ComponentEntry[] = [
     <LpButton size="sm" variant="danger">Delete</LpButton>
   </div>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tOpen: true }, { tOpen: true }, { tOpen: false }] },
   },
   {
     id: "shortcuts-dialog",
@@ -545,13 +548,14 @@ export const overlays: ComponentEntry[] = [
   </LpDrawer>
 </div>`,
     thumb: `<div class="relative h-36 w-72 overflow-hidden rounded-card border border-line bg-surface-soft">
-  <div class="absolute inset-0 bg-black/30" />
-  <div class="absolute inset-y-0 right-0 flex w-44 flex-col gap-2 border-l border-line bg-surface-raised p-3 shadow-panel">
+  <div class="absolute inset-0 bg-black/30 transition-opacity duration-500" :class="tOpen ? '' : 'opacity-0'" />
+  <div class="absolute inset-y-0 right-0 flex w-44 flex-col gap-2 border-l border-line bg-surface-raised p-3 shadow-panel transition-transform duration-500 ease-out" :class="tOpen ? '' : 'translate-x-full'">
     <div class="flex items-center justify-between"><span class="text-sm font-semibold text-ink">Filters</span><LpIcon name="lucide:x" :size="14" class="text-muted" /></div>
     <LpInput size="sm" placeholder="Search filters…" />
     <div class="h-2 w-3/4 rounded-pill bg-surface-soft" />
     <div class="h-2 w-1/2 rounded-pill bg-surface-soft" />
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tOpen: true }, { tOpen: true }, { tOpen: false }] },
   },
 ]

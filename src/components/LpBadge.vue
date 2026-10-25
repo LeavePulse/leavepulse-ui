@@ -6,7 +6,11 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
+import { useSlots } from "vue"
 import { useMergedClass } from "../composables/useMergedClass"
+import LpRollingText from "./LpRollingText.vue"
+import LpShift from "./LpShift.vue"
+import { slotText } from "./slotText"
 
 const badge = tv({
   /*
@@ -17,7 +21,14 @@ const badge = tv({
    * the moment it gained a status. The badge now occupies the height it says it
    * does and leaves the line it sits on alone.
    */
-  base: "inline-flex shrink-0 items-center gap-1.5 rounded-pill align-middle font-medium leading-[1.2]",
+  /*
+   * A status changes while it is watched, so the change shows as one: the
+   * colours ease between tones, the width eases (LpShift) and plain text rolls
+   * to the new word (LpRollingText). The outline tone draws its edge as an
+   * inset ring rather than a border, so switching to it neither adds a pixel
+   * nor snaps: the ring is there in every tone, transparent.
+   */
+  base: "inline-flex shrink-0 items-center rounded-pill align-middle font-medium leading-[1.2] ring-1 ring-transparent ring-inset transition-[color,background-color,box-shadow] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none",
   variants: {
     size: {
       // Fits inside a text-sm line without growing it — for a badge beside a
@@ -35,7 +46,7 @@ const badge = tv({
       // it a half-failed thing has to render as either fine or broken.
       warning: "bg-accent/15 text-accent",
       danger: "bg-danger-soft text-danger",
-      outline: "border border-line text-ink",
+      outline: "text-ink ring-line",
     },
   },
   defaultVariants: { tone: "neutral", size: "md" },
@@ -51,11 +62,20 @@ const props = defineProps<{
 }>()
 
 const classes = useMergedClass(() => badge({ tone: props.tone, size: props.size }))
+
+// Plain words roll to the new ones; richer content only eases its width.
+const slots = useSlots()
+const plainText = () => slotText(slots.default)
 </script>
 
 <template>
   <span v-bind="$attrs" :class="classes">
-    <span v-if="dot" class="size-1.5 rounded-full bg-current" />
-    <slot />
+    <LpShift axis="width">
+      <span class="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <span v-if="dot" class="size-1.5 shrink-0 rounded-full bg-current" />
+        <LpRollingText v-if="plainText() !== null" :value="plainText()!" align="start" />
+        <slot v-else />
+      </span>
+    </LpShift>
   </span>
 </template>

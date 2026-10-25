@@ -98,6 +98,7 @@ const action =
       v-model="query"
       size="sm"
       icon="lucide:search"
+      clearable
       :placeholder="labels.search"
       :aria-label="labels.search"
     />

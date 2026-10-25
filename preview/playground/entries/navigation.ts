@@ -92,11 +92,12 @@ export const navigation: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="flex w-72 flex-col gap-3">
-  <LpTabs model-value="a" :items="items" />
+  <LpTabs :model-value="tTab" :items="items" />
   <div class="overflow-hidden rounded-card border border-line">
-    <LpTabs model-value="inbox" :items="navItems" variant="bottom" accent label="Main" />
+    <LpTabs :model-value="tNav" :items="navItems" variant="bottom" accent label="Main" />
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tTab: "a", tNav: "inbox" }, { tTab: "b", tNav: "search" }, { tTab: "a", tNav: "settings" }, { tTab: "b", tNav: "home" }] }
   },
   {
     id: "sidebar",
@@ -205,7 +206,7 @@ export const navigation: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<LpSidebar
-  model-value="server"
+  :model-value="tPage"
   variant="panel"
   width="13rem"
   :sections="[{ items: [
@@ -214,6 +215,7 @@ export const navigation: ComponentEntry[] = [
     { id: 'economy', label: 'Economy', icon: 'lucide:coins', badge: 5 },
   ] }]"
 />`,
+    thumbLoop: { every: 1500, frames: [{ tPage: "server" }, { tPage: "logs" }, { tPage: "economy" }] }
   },
   {
     id: "stepper",
@@ -238,8 +240,9 @@ export const navigation: ComponentEntry[] = [
   <LpStepper :steps="steps" current="profile" :completed="['account', 'done']" />
 </div>`,
     thumb: `<div class="w-72">
-  <LpStepper :steps="steps" :current="1" />
+  <LpStepper :steps="steps" :current="tStep" />
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tStep: 1 }, { tStep: 2 }, { tStep: 0 }] }
   },
   {
     id: "breadcrumbs",
@@ -256,7 +259,15 @@ export const navigation: ComponentEntry[] = [
   <LpBreadcrumbs :items="items" />
   <LpBreadcrumbs :items="routed" />
 </div>`,
-    thumb: `<LpBreadcrumbs :items="items" />`,
+    thumb: `<LpBreadcrumbs :items="tTrail" />`,
+    thumbLoop: {
+      every: 1800,
+      frames: [
+        { tTrail: [{ label: "Home", href: "#" }, { label: "Servers", href: "#" }, { label: "ger-01-p" }] },
+        { tTrail: [{ label: "Home", href: "#" }, { label: "Servers", href: "#" }, { label: "ger-01-p", href: "#" }, { label: "Logs" }] },
+        { tTrail: [{ label: "Home", href: "#" }, { label: "Servers" }] },
+      ],
+    },
   },
   {
     id: "dropdown",
@@ -302,12 +313,13 @@ export const navigation: ComponentEntry[] = [
     thumb: `<div class="flex w-56 flex-col items-start gap-1.5">
   <LpButton variant="outline" size="sm">Actions ▾</LpButton>
   <div class="w-full rounded-control border border-line bg-surface-overlay p-1 shadow-panel">
-    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm bg-brand-soft text-brand"><span class="flex items-center gap-2"><LpIcon name="lucide:pencil" :size="15" />Edit</span><LpKeys combo="Ctrl+E" size="sm" /></div>
-    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm text-ink"><span class="flex items-center gap-2"><LpIcon name="lucide:copy" :size="15" />Duplicate</span><LpKeys combo="Ctrl+D" size="sm" /></div>
+    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 0 ? 'bg-brand-soft text-brand' : 'text-ink'"><span class="flex items-center gap-2"><LpIcon name="lucide:pencil" :size="15" />Edit</span><LpKeys combo="Ctrl+E" size="sm" /></div>
+    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 1 ? 'bg-brand-soft text-brand' : 'text-ink'"><span class="flex items-center gap-2"><LpIcon name="lucide:copy" :size="15" />Duplicate</span><LpKeys combo="Ctrl+D" size="sm" /></div>
     <div class="my-1 h-px bg-line" />
-    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm text-danger"><span class="flex items-center gap-2"><LpIcon name="lucide:trash-2" :size="15" />Delete</span><LpKeys combo="Del" size="sm" /></div>
+    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm text-danger transition-colors duration-300" :class="tRow === 2 ? 'bg-danger-soft' : ''"><span class="flex items-center gap-2"><LpIcon name="lucide:trash-2" :size="15" />Delete</span><LpKeys combo="Del" size="sm" /></div>
   </div>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tRow: 0 }, { tRow: 1 }, { tRow: 2 }, { tRow: 1 }] },
   },
   {
     id: "commandpalette",
@@ -489,15 +501,16 @@ export const navigation: ComponentEntry[] = [
     thumb: `<div class="w-72 overflow-hidden rounded-card border border-line bg-surface-raised shadow-panel">
   <div class="flex items-center gap-2 border-b border-line px-3 py-2 text-sm">
     <LpIcon name="lucide:search" :size="15" class="text-muted" />
-    <span class="flex-1 text-ink">dep</span>
+    <span class="flex-1 text-ink">{{ tQuery }}</span>
     <LpKeys combo="Esc" size="sm" />
   </div>
   <div class="p-1">
     <p class="px-2.5 pb-0.5 pt-1 text-[11px] font-medium text-muted">Actions</p>
-    <div class="flex items-center gap-2 rounded-inner bg-brand-soft px-2.5 py-1.5 text-sm text-brand"><LpIcon name="lucide:rocket" :size="15" /><span class="flex-1">Deploy current branch</span></div>
-    <div class="flex items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm text-ink"><LpIcon name="lucide:plus" :size="15" /><span class="flex-1">New server</span><LpKeys combo="Ctrl+N" size="sm" /></div>
+    <div class="flex items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 0 ? 'bg-brand-soft text-brand' : 'text-ink'"><LpIcon name="lucide:rocket" :size="15" /><span class="flex-1">Deploy current branch</span></div>
+    <div class="flex items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 1 ? 'bg-brand-soft text-brand' : 'text-ink'"><LpIcon name="lucide:plus" :size="15" /><span class="flex-1">New server</span><LpKeys combo="Ctrl+N" size="sm" /></div>
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tQuery: "dep", tRow: 0 }, { tQuery: "de", tRow: 1 }, { tQuery: "d", tRow: 0 }] },
   },
   {
     id: "palettepreview",
@@ -552,9 +565,10 @@ export const navigation: ComponentEntry[] = [
     thumb: `<div class="w-72 rounded-card border border-line bg-surface-raised p-3">
   <LpPalettePreview>
     <LpPaletteHeader eyebrow="Modrinth" title="Sodium" subtitle="by CaffeineMC" :image="{ src: '', fallback: 'So' }" />
-    <LpPaletteStats :items="[{ label: 'Downloads', value: downloads, compact: true }, { label: 'Follows', value: follows }]" />
+    <LpPaletteStats :items="[{ label: 'Downloads', value: tDownloads, compact: true }, { label: 'Follows', value: tFollows }]" />
   </LpPalettePreview>
 </div>`,
+    thumbLoop: { every: 1900, frames: [{ tDownloads: 1250000, tFollows: 8400 }, { tDownloads: 1362000, tFollows: 8437 }, { tDownloads: 1471000, tFollows: 8474 }] },
   },
   {
     id: "contextmenu",
@@ -588,10 +602,11 @@ export const navigation: ComponentEntry[] = [
   <div class="absolute bottom-2 right-3 w-48 rounded-control border border-line bg-surface-overlay p-1 shadow-panel">
     <div class="flex items-center gap-2 px-2.5 pb-1.5 pt-1"><span class="grid size-6 place-items-center rounded-inner bg-surface-soft text-muted"><LpIcon name="lucide:server" :size="13" /></span><span class="truncate text-sm font-medium text-ink">api-gateway</span></div>
     <div class="mb-1 h-px bg-line" />
-    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm bg-brand-soft text-brand"><span class="flex items-center gap-2"><LpIcon name="lucide:copy" :size="15" />Copy</span><LpKeys combo="Ctrl+C" size="sm" /></div>
-    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm text-ink"><span class="flex items-center gap-2"><LpIcon name="lucide:folder-input" :size="15" />Move to</span><LpIcon name="lucide:chevron-right" :size="14" class="text-muted" /></div>
+    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 0 ? 'bg-brand-soft text-brand' : 'text-ink'"><span class="flex items-center gap-2"><LpIcon name="lucide:copy" :size="15" />Copy</span><LpKeys combo="Ctrl+C" size="sm" /></div>
+    <div class="flex items-center justify-between gap-3 rounded-inner px-2.5 py-1.5 text-sm transition-colors duration-300" :class="tRow === 1 ? 'bg-brand-soft text-brand' : 'text-ink'"><span class="flex items-center gap-2"><LpIcon name="lucide:folder-input" :size="15" />Move to</span><LpIcon name="lucide:chevron-right" :size="14" class="text-muted" /></div>
   </div>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tRow: 0 }, { tRow: 1 }] },
   },
   {
     id: "gamepad-nav",
@@ -617,9 +632,10 @@ export const navigation: ComponentEntry[] = [
     thumb: `<div class="flex items-center gap-4">
   <LpIcon name="lucide:gamepad-2" :size="36" class="text-muted" />
   <div class="grid grid-cols-3 gap-1.5">
-    <LpButton v-for="n in 6" :key="n" size="sm" variant="soft" :class="n === 5 ? 'ring-[3px] ring-ring ring-offset-2 ring-offset-surface' : ''">{{ n }}</LpButton>
+    <LpButton v-for="n in 6" :key="n" size="sm" variant="soft" :class="n === tFocus ? 'ring-[3px] ring-ring ring-offset-2 ring-offset-surface' : ''">{{ n }}</LpButton>
   </div>
 </div>`,
+    thumbLoop: { every: 1400, frames: [{ tFocus: 5 }, { tFocus: 6 }, { tFocus: 3 }, { tFocus: 2 }] },
   },
   {
     id: "actionbar",

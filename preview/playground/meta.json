@@ -301,12 +301,6 @@
     "description": "Override the header title. Falls back to the active item's label."
    },
    {
-    "name": "open",
-    "type": "boolean | undefined",
-    "required": false,
-    "description": "Mobile drawer open state (v-model:open)."
-   },
-   {
     "name": "mobileBreakpoint",
     "type": "\"md\" | \"sm\" | \"lg\" | \"xl\" | undefined",
     "required": false,
@@ -350,6 +344,12 @@
     "type": "Partial<{ openMenu: string; skipToContent: string; }> | undefined",
     "required": false,
     "description": "Text overrides: the burger's name and the skip link."
+   },
+   {
+    "name": "open",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
    }
   ],
   "events": [
@@ -2416,12 +2416,22 @@
     "name": "labels",
     "type": "Partial<{ orLink: string; placeholder: string; done: string; keys: string; invalid: string; }> | undefined",
     "required": false
+   },
+   {
+    "name": "linking",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
    }
   ],
   "events": [
    {
     "name": "link",
     "type": "[url: string]"
+   },
+   {
+    "name": "update:linking",
+    "type": "[value: boolean]"
    },
    {
     "name": "files",
@@ -2784,6 +2794,30 @@
    }
   ]
  },
+ "LpFrame": {
+  "props": [
+   {
+    "name": "height",
+    "type": "string | number | undefined",
+    "required": false,
+    "description": "Fixed height (px or any CSS length). Without it the frame grows with its content."
+   },
+   {
+    "name": "title",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"Preview\"",
+    "description": "Read by assistive technology for the frame as a whole."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpHintExample": {
   "props": [
    {
@@ -3022,6 +3056,17 @@
    {
     "name": "icon",
     "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "clearable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Show an accessible clear button, returning focus to the input."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ clear: string; }> | undefined",
     "required": false
    },
    {
@@ -4040,7 +4085,56 @@
    {
     "name": "step",
     "type": "number | undefined",
+    "required": false,
+    "description": "What the steppers and arrow keys add. A typed value is snapped to the\nnearest step from `min` (or 0) when it is committed, unless `stepSnapping`\nis false: then 0.37 stays 0.37 in a field that steps by 0.5."
+   },
+   {
+    "name": "stepSnapping",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "formatOptions",
+    "type": "Intl.NumberFormatOptions | undefined",
+    "required": false,
+    "description": "How the value is shown and, with it, how far it is rounded: the field\ncommits the number it displays, so `{ maximumFractionDigits: 0 }` makes it\nan integer field. Intl options, read in `locale` (the document's by default)."
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
     "required": false
+   },
+   {
+    "name": "readonly",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Shown and focusable, not changed: typing, the steppers, arrows and the wheel all stop."
+   },
+   {
+    "name": "disableWheelChange",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The wheel over a focused field steps the value unless this is set."
+   },
+   {
+    "name": "invertWheelChange",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "focusOnChange",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "A step from the buttons moves focus to the input (reka's default); false keeps it on the button."
+   },
+   {
+    "name": "steppers",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "The − and + buttons. Off, the field is a plain numeric input; arrow keys\nstill step. A field narrower than 8.5rem drops them by itself: two 32 px\nbuttons left a 100 px column eleven pixels for the digits."
    },
    {
     "name": "disabled",
@@ -4079,6 +4173,10 @@
    {
     "name": "update:modelValue",
     "type": "[value: number | null]"
+   },
+   {
+    "name": "blur",
+    "type": "[event: FocusEvent]"
    }
   ],
   "slots": []
@@ -4793,7 +4891,7 @@
   "slots": [
    {
     "name": "center",
-    "type": "{ total: number; active: { d: string; lift: string; label: string; value: number; color: string; fraction: number; isOther: boolean; count: number; } | null; selection: { d: string; lift: string; label: string; value: number; color: string; fraction: number; isOther: boolean; count: number; }[]; }"
+    "type": "{ total: number; active: { key: string; d: string; lift: string; label: string; value: number; color: string; fraction: number; isOther: boolean; count: number; } | null; selection: { key: string; d: string; lift: string; label: string; value: number; color: string; fraction: number; isOther: boolean; count: number; }[]; }"
    }
   ]
  },
@@ -5159,6 +5257,59 @@
   ],
   "slots": []
  },
+ "LpRepeater": {
+  "props": [
+   {
+    "name": "createItem",
+    "type": "() => T",
+    "required": true,
+    "description": "Return a fresh item when Add is pressed. Data and validation remain the caller's."
+   },
+   {
+    "name": "itemKey",
+    "type": "RepeaterItemKey<T> | undefined",
+    "required": false,
+    "description": "Stable business key for immutable reloads; omitted, object identity keeps unsaved rows stable."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ add: string; remove: string; empty: string; }> | undefined",
+    "required": false
+   },
+   {
+    "name": "modelValue",
+    "type": "T[] | undefined",
+    "required": false,
+    "default": "[]"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:modelValue",
+    "type": "[value: T[]]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{ item: T; index: number; disabled: boolean; update: (item: T) => void; remove: () => void; }"
+   },
+   {
+    "name": "empty",
+    "type": "any"
+   }
+  ]
+ },
  "LpRollingText": {
   "props": [
    {
@@ -5484,6 +5635,11 @@
    {
     "name": "update:searchTerm",
     "type": "[string]"
+   },
+   {
+    "name": "blur",
+    "type": "[FocusEvent]",
+    "description": "Focus left the whole field (not into its own list or clear button)."
    }
   ],
   "slots": []
@@ -6501,7 +6657,7 @@
     "type": "number | undefined",
     "required": false,
     "default": "96",
-    "description": "px offset from the top used as the scroll-spy trigger line."
+    "description": "The least distance, px from the top, of the scroll-spy trigger line. The\nline sits at a quarter of the view when that is lower: a heading a\ncouple of lines down already starts what is being read, and a fixed line\nnear the top kept the previous section lit under it."
    },
    {
     "name": "labels",
@@ -6828,6 +6984,71 @@
    }
   ]
  },
+ "LpThemeStudio": {
+  "props": [
+   {
+    "name": "studio",
+    "type": "ThemeStudio | undefined",
+    "required": false,
+    "description": "A studio from useThemeStudio; by default the shared one for `storageKey`."
+   },
+   {
+    "name": "themes",
+    "type": "TokenSet[] | undefined",
+    "required": false,
+    "description": "Base themes, when the panel makes its own studio."
+   },
+   {
+    "name": "storageKey",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "brands",
+    "type": "string[] | undefined",
+    "required": false,
+    "description": "Brand swatches offered beside the free colour picker."
+   },
+   {
+    "name": "hide",
+    "type": "ThemeStudioPart[] | undefined",
+    "required": false,
+    "description": "Built-in rows to leave out."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<ThemeStudioLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "start",
+    "type": "{ studio: ThemeStudio; }"
+   },
+   {
+    "name": "end",
+    "type": "{ studio: ThemeStudio; }"
+   }
+  ]
+ },
+ "LpThemeStudioSection": {
+  "props": [
+   {
+    "name": "label",
+    "type": "string",
+    "required": true
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpThemeSwitcher": {
   "props": [
    {
@@ -6903,9 +7124,25 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ trigger: string; system: string; }> | undefined",
+    "type": "Partial<{ trigger: string; system: string; studio: string; openStudio: string; }> | undefined",
     "required": false,
     "description": "Text overrides. `trigger` may contain `{name}`."
+   },
+   {
+    "name": "studio",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The right-click menu ends with \"Theme studio…\", set apart from the\nthemes, which opens LpThemeStudio by the trigger: the theme plus brand\ncolour, corners, control size and motion, remembered under `studioKey`.\nPicks and left-click cycling go through the studio then, so a tuned\nbrand or corner survives the next theme. Rows of the app's own go in\nthe `#studio-start` / `#studio-end` slots, built-in ones leave with\n`studioHide`."
+   },
+   {
+    "name": "studioKey",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "studioHide",
+    "type": "ThemeStudioPart[] | undefined",
+    "required": false
    }
   ],
   "events": [
@@ -6918,7 +7155,16 @@
     "type": "[theme: TokenSet]"
    }
   ],
-  "slots": []
+  "slots": [
+   {
+    "name": "studio-start",
+    "type": "{ studio: ThemeStudio; }"
+   },
+   {
+    "name": "studio-end",
+    "type": "{ studio: ThemeStudio; }"
+   }
+  ]
  },
  "LpTilt": {
   "props": [
@@ -7020,6 +7266,10 @@
    {
     "name": "update:modelValue",
     "type": "[value: string | undefined]"
+   },
+   {
+    "name": "blur",
+    "type": "[event: FocusEvent]"
    }
   ],
   "slots": []

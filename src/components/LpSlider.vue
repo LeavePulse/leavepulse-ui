@@ -11,6 +11,7 @@ export default { inheritAttrs: false }
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
 const props = withDefaults(
   defineProps<{
@@ -43,8 +44,9 @@ const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled 
 
 // A slider is full-width by default; putting one in a toolbar means constraining it, and a fixed h-5 has to yield to a denser row.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55",
+  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`,
 )
+const { dragging, onPointerDown } = useSliderDrag()
 </script>
 
 <template>
@@ -56,6 +58,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :disabled="field.disabled"
     :class="rootClass"
     v-bind="rest"
+    :data-dragging="dragging || undefined"
+    @pointerdown="onPointerDown"
     @update:model-value="onUpdate"
     @value-commit="onCommit"
   >

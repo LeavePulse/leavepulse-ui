@@ -6,10 +6,11 @@ export default { inheritAttrs: false }
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
 import { useFieldControl } from "../composables/useField"
+import { useLabels } from "../composables/useLpConfig"
 import { useInputFilter } from "../composables/useInputFilter"
 import { DEFAULT_MASK_TOKENS, useInputMask, type MaskSpec, type MaskTokens } from "../composables/useInputMask"
 import { mergeClass } from "../composables/useMergedClass"
-import LpFormField from "./LpFormField.vue"
+import FieldWrapper from "./FieldWrapper.vue"
 import LpIcon from "./LpIcon.vue"
 
 // Single source of truth for the field shell — bare input and adorned input
@@ -57,6 +58,9 @@ const props = withDefaults(
     hint?: string
     error?: string
     icon?: string
+    /** Show an accessible clear button, returning focus to the input. */
+    clearable?: boolean
+    labels?: Partial<{ clear: string }>
     /**
      * Marks the label with the required indicator. The attribute still reaches
      * the underlying <input> for native validation; this only makes the field
@@ -130,7 +134,7 @@ const patternInvalid = computed(() => isInvalid(props.modelValue))
 const slots = useSlots()
 const attrs = useAttrs()
 const hasLeading = computed(() => !!slots.leading || !!props.icon)
-const hasTrailing = computed(() => !!slots.trailing)
+const hasTrailing = computed(() => !!slots.trailing || showClear.value)
 const hasField = computed(
   () => !!props.label || !!props.hint || !!props.error,
 )
@@ -142,6 +146,8 @@ const field = useFieldControl(() => ({
   required: props.required,
   disabled: props.disabled,
 }))
+const text = useLabels("input", { clear: "Clear" }, () => props.labels)
+const showClear = computed(() => props.clearable && !!props.modelValue && !field.value.disabled && (attrs.readonly === undefined || attrs.readonly === false))
 const isInvalidState = computed(() => field.value.invalid)
 const shellClass = computed(() =>
   shell({ size: props.size, invalid: isInvalidState.value }),
@@ -150,14 +156,18 @@ const shellClass = computed(() =>
 // class/style belong to the wrapper (so `<LpInput class="...">` lays out the
 // whole field); every other attr (autocomplete, name, @keyup, inputmode…) goes
 // to the real <input>.
-const rootClass = computed(() => attrs.class)
-const rootStyle = computed(() => attrs.style)
 const inputAttrs = computed(() => {
   const { class: _c, style: _s, ...rest } = attrs
   return rest
 })
 
 const inputEl = ref<HTMLInputElement | null>(null)
+function clear() {
+  if (!showClear.value) return
+  emit("update:modelValue", "")
+  if (masking.active.value) emit("update:raw", "")
+  inputEl.value?.focus()
+}
 defineExpose({
   focus: (options?: FocusOptions) => inputEl.value?.focus(options),
   blur: () => inputEl.value?.blur(),
@@ -167,20 +177,20 @@ defineExpose({
 </script>
 
 <template>
-  <component
-    :is="hasField ? LpFormField : 'div'"
-    :label="hasField ? label : undefined"
-    :hint="hasField ? hint : undefined"
-    :error="hasField ? error : undefined"
-    :required="hasField ? required : undefined"
-    :id="hasField ? field.id : undefined"
-    :class="hasField ? rootClass : 'contents'"
-    :style="hasField ? rootStyle : undefined"
+  <FieldWrapper
+    :wrapped="hasField"
+    :id="field.id"
+    :label="label"
+    :hint="hint"
+    :error="error"
+    :required="required"
+    :class="attrs.class"
+    :style="attrs.style"
   >
     <div
       data-lp-ring-owner
-      :class="mergeClass(shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : (rootClass as string))"
-      :style="hasField ? undefined : rootStyle"
+      :class="mergeClass(shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : (attrs.class as string))"
+      :style="hasField ? undefined : attrs.style"
     >
       <span v-if="hasLeading" class="flex shrink-0 items-center text-muted">
         <slot name="leading"><LpIcon v-if="icon" :name="icon" :size="16" /></slot>
@@ -198,6 +208,7 @@ defineExpose({
         :aria-describedby="field.describedBy"
         :class="[
           'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
+          clearable && '[&::-webkit-search-cancel-button]:hidden',
           hasLeading ? 'pl-2' : padX[size ?? 'md'],
           hasTrailing ? '' : padX[size ?? 'md'],
         ]"
@@ -207,6 +218,9 @@ defineExpose({
         @input="onInputEvent"
       />
       <slot name="trailing" />
+      <button v-if="showClear" type="button" :aria-label="text.clear" class="shrink-0 rounded-inner p-1 text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring" @pointerdown.prevent @click="clear">
+        <LpIcon name="lucide:x" :size="size === 'sm' ? 12 : 16" />
+      </button>
     </div>
-  </component>
+  </FieldWrapper>
 </template>

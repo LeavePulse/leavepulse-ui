@@ -81,3 +81,15 @@ export function useFieldControl(
     }
   })
 }
+
+/**
+ * Whether a focusout leaves the whole control, not just moves between its own
+ * parts (a trigger and a clear button, the segments of a time field, an input
+ * and its stepper). Composite controls emit their `blur` only then: focus
+ * events do not bubble, so a consumer's `@blur` on the wrapper never fired, and
+ * `useForm().field()` could not mark such a field touched.
+ */
+export function focusLeft(event: FocusEvent): boolean {
+  const next = event.relatedTarget
+  return !(next instanceof Node && (event.currentTarget as Node | null)?.contains(next))
+}

@@ -73,6 +73,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       :name="name"
       :model-value="indeterminate ? 'indeterminate' : modelValue"
       :disabled="field.disabled"
+      :required="field.required"
       :aria-describedby="describedBy"
       :aria-busy="pending || undefined"
       :class="description ? 'mt-px' : ''"

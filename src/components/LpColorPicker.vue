@@ -57,6 +57,7 @@ import { POPOVER_PANEL } from "./dropdown"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 /**
  * Every user-facing string the picker renders on its own — the menu items, the
@@ -614,6 +615,12 @@ const field = useFieldControl(() => ({
 }))
 
 defineExpose({ open })
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -669,8 +676,10 @@ defineExpose({ open })
       </LpContextMenu>
     </PopoverAnchor>
 
-    <PopoverPortal>
+    <PopoverPortal :to="portalTo">
       <PopoverContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         :collision-padding="8"
         :side="side"
         :align="align"

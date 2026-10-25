@@ -66,6 +66,7 @@ import {
   type PhoneLib,
 } from "./phone"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 export interface PhoneDetail {
   /** Matched country, or undefined when the prefix matches none. */
@@ -359,6 +360,12 @@ const inputAttrs = computed(() => {
   const { style: _s, ...others } = rest.value
   return others
 })
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -395,8 +402,10 @@ const inputAttrs = computed(() => {
         </ComboboxTrigger>
       </ComboboxAnchor>
 
-      <ComboboxPortal>
+      <ComboboxPortal :to="portalTo">
         <ComboboxContent
+          @interact-outside="guardOutside"
+          @escape-key-down="guardOutside"
           :collision-padding="8"
           position="popper"
           align="start"

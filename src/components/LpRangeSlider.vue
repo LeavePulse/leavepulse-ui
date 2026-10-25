@@ -16,6 +16,7 @@ export default { inheritAttrs: false }
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
 const props = withDefaults(
   defineProps<{
@@ -56,8 +57,9 @@ function onCommit(v: number[] | undefined) {
 const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55",
+  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`,
 )
+const { dragging, onPointerDown } = useSliderDrag()
 
 const thumbClass =
   "group/thumb relative block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
@@ -75,6 +77,8 @@ const labelClass =
     :disabled="field.disabled"
     :class="rootClass"
     v-bind="rest"
+    :data-dragging="dragging || undefined"
+    @pointerdown="onPointerDown"
     @update:model-value="onUpdate"
     @value-commit="onCommit"
   >

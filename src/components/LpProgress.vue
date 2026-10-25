@@ -17,10 +17,11 @@ export default { inheritAttrs: false }
  * value either way).
  */
 import { ProgressIndicator, ProgressRoot } from "reka-ui"
-import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { easeOut, prefersReducedMotion } from "../composables/easing"
+import { computed, ref, watch } from "vue"
+import { easeOut } from "../composables/easing"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
+import { lerp, useTween } from "../composables/useTween"
 import LpNumberFlow from "./LpNumberFlow.vue"
 
 const props = withDefaults(
@@ -105,44 +106,10 @@ const props = withDefaults(
  * gap to the other end. Interpolating here and handing both the same number
  * keeps them exactly level, because there is only one number.
  */
-/*
- * `shown` is the position on screen, and it is the thing that is animated —
- * not a phase that something else multiplies by.
- *
- * The earlier shape kept an eased 0..1 and derived the position from it and a
- * `from` captured in the watcher. That could not work: `from` was read off a
- * computed over `props.value`, so by the time the watcher ran it already
- * reported the DESTINATION, and every sweep after the first interpolated from
- * the answer to the answer. The entrance still animated, which is what made
- * the bug look like a decision — the bar filled beautifully once and jumped
- * forever after.
- *
- * Animating the position directly removes the question. Wherever the bar is is
- * where the next sweep starts, including one that interrupts another midway.
- */
-const shown = ref(props.animateOnMount ? 0 : props.value)
-let raf = 0
-
-const runSweep = (to: number, ms: number) => {
-  if (raf) cancelAnimationFrame(raf)
-  const from = shown.value
-  if (prefersReducedMotion() || ms <= 0 || from === to) {
-    shown.value = to
-    return
-  }
-  const t0 = performance.now()
-  const step = (now: number) => {
-    const t = Math.min(1, (now - t0) / ms)
-    // The kit's shared curve — the same function LpNumberFlow eases on, so the
-    // arc and the counter agree by construction rather than by comment.
-    shown.value = from + (to - from) * easeOut(t)
-    raf = t < 1 ? requestAnimationFrame(step) : 0
-  }
-  raf = requestAnimationFrame(step)
-}
-
-onBeforeUnmount(() => {
-  if (raf) cancelAnimationFrame(raf)
+const target = ref(props.animateOnMount ? 0 : props.value)
+const shown = useTween(() => target.value, lerp, {
+  duration: () => props.duration,
+  ease: easeOut,
 })
 
 /*
@@ -163,7 +130,7 @@ const bindReveal = (instance: unknown) => {
 watch(
   revealed,
   (visible) => {
-    if (visible && props.animateOnMount) runSweep(props.value, props.duration)
+    if (visible && props.animateOnMount && typeof window !== "undefined") target.value = props.value
   },
   { immediate: true },
 )
@@ -171,7 +138,7 @@ watch(
 /* A later change eases to the new value from wherever the bar stands. */
 watch(
   () => [props.value, props.max],
-  () => runSweep(props.value, props.duration),
+  () => { target.value = props.value },
 )
 
 // A zero or missing max (no quota known yet) reads as empty, not as NaN%.

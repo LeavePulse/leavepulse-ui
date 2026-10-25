@@ -151,6 +151,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :type="alphanumeric ? 'text' : 'number'"
     :mask="mask"
     :disabled="field.disabled"
+    :required="field.required"
     otp
     :class="rootClass"
     v-bind="rest"

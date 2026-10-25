@@ -22,6 +22,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
+import { lerp, mixValues, resample, useTween } from "../composables/useTween"
 import {
   areaPath,
   axisTicks,
@@ -227,10 +228,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   ro?.disconnect()
   ro = null
-  if (presenceFrame) cancelAnimationFrame(presenceFrame)
-  if (scaleFrame) cancelAnimationFrame(scaleFrame)
-  if (rightFrame) cancelAnimationFrame(rightFrame)
-  if (gutterFrame) cancelAnimationFrame(gutterFrame)
 })
 
 // ── data ───────────────────────────────────────
@@ -282,11 +279,22 @@ const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s
    a control responding. */
 const SETTLE_MS = 260
 
-const presence = ref(new Map<string, number>())
-let presenceFrame: number | undefined
+/*
+ * Every value the chart moves — presence, both axes, the gutters, the readings
+ * themselves — travels on this one clock, so a change reads as one gesture
+ * rather than as several things settling at their own pace. The curve is
+ * `--ease-travel`'s: an ease-out covers most of a big rescale (800 down to 40)
+ * in its first frames and then creeps, which looks like a snap with a slow
+ * tail rather than a scale moving.
+ */
+const settle = {
+  duration: SETTLE_MS,
+  ease: easeTravel,
+  enabled: () => props.animate,
+}
 
 /*
- * A series with no entry yet is fully present, NOT "0 because it is hidden".
+ * A series with no entry is fully present, NOT "0 because it is hidden".
  *
  * Falling back to the hidden flag raced the animation it was meant to start:
  * the computed that draws the curve and the watcher that animates it both run
@@ -294,43 +302,87 @@ let presenceFrame: number | undefined
  * reported the end state — so a series being hidden jumped to the floor while
  * one being shown eased up from it.
  */
-const presenceOf = (id: string) => presence.value.get(id) ?? 1
+const presenceTargets = computed(
+  () => new Map(allSeries.value.map((s) => [s.id, hidden.value.has(s.id) ? 0 : 1])),
+)
 
-watch(
-  // A string, not the Set: `hidden` is replaced wholesale on every toggle, and a
-  // watcher handed the object itself compares the new reference to the old one
-  // and sees a change it cannot describe — or, with a stale copy in the array,
-  // no change at all. The names that are currently off say it exactly.
-  () =>
-    allSeries.value.map((s) => `${s.id}:${hidden.value.has(s.id) ? 0 : 1}`).join(","),
-  () => {
-    const targets = new Map(allSeries.value.map((s) => [s.id, hidden.value.has(s.id) ? 0 : 1]))
-    if (!props.animate || prefersReducedMotion()) {
-      presence.value = targets
-      return
-    }
-
-    const from = new Map(allSeries.value.map((s) => [s.id, presenceOf(s.id)]))
-    if ([...targets].every(([name, to]) => from.get(name) === to)) return
-
-    const start = performance.now()
-    if (presenceFrame) cancelAnimationFrame(presenceFrame)
-
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / SETTLE_MS)
-      // Same curve as the axis: the curve and its scale travel together.
-      const eased = easeTravel(t)
-      const next = new Map<string, number>()
-      for (const [name, to] of targets) {
-        const a = from.get(name) ?? to
-        next.set(name, a + (to - a) * eased)
-      }
-      presence.value = next
-      presenceFrame = t < 1 ? requestAnimationFrame(step) : undefined
-    }
-    presenceFrame = requestAnimationFrame(step)
+const presence = useTween(
+  () => presenceTargets.value,
+  (from, to, t) => new Map([...to].map(([id, v]) => [id, lerp(from.get(id) ?? v, v, t)])),
+  {
+    ...settle,
+    // `hidden` is replaced wholesale on every toggle, and the map is rebuilt on
+    // every data change; only a different set of levels is a change worth moving.
+    equal: (a, b) => a.size === b.size && [...b].every(([id, v]) => a.get(id) === v),
   },
 )
+
+const presenceOf = (id: string) => presence.value.get(id) ?? 1
+
+/*
+ * The readings as DRAWN: each series travelling from its last values to its
+ * new ones, so a refresh moves the curve rather than replacing it.
+ *
+ * Matched by name, not by `id`: the id carries the series' position, and a
+ * series dropped from the front would shift every other one onto a new id and
+ * make them all look new. A series that arrives grows up out of the baseline;
+ * one that is gone stays in the drawing, collapsing onto it, until the move
+ * ends. The axis is on the same clock (`settle`), so each frame is a
+ * consistent picture: readings partway, on a scale partway.
+ *
+ * Only what is drawn moves. Hover, the tooltip's figures, the legend and the
+ * exports read the data as it now is.
+ */
+type DrawnSeries = (typeof allSeries.value)[number] & {
+  key: string
+  /** 0 → 1 for a series arriving, 1 → 0 for one leaving; 1 otherwise. */
+  enter: number
+}
+
+const targetDrawn = computed<DrawnSeries[]>(() => {
+  const seen = new Map<string, number>()
+  return allSeries.value.map((s) => {
+    const n = seen.get(s.name) ?? 0
+    seen.set(s.name, n + 1)
+    return { ...s, key: `${s.name}#${n}`, enter: 1 }
+  })
+})
+
+const mixDrawn = (from: DrawnSeries[], to: DrawnSeries[], t: number): DrawnSeries[] => {
+  const before = new Map(from.map((s) => [s.key, s]))
+  const after = new Set(to.map((s) => s.key))
+  const out = to.map((s) => {
+    const was = before.get(s.key)
+    return was
+      ? { ...s, values: mixValues(was.values, s.values, t), enter: lerp(was.enter, 1, t) }
+      : { ...s, enter: t }
+  })
+  // Laid on the new x positions too, or a leaving curve drawn with the old
+  // point count would stop short of (or run past) the plot while it collapses.
+  const points = count.value
+  for (const s of from)
+    if (!after.has(s.key))
+      out.push({ ...s, values: resample(s.values, points), enter: s.enter * (1 - t) })
+  return out
+}
+
+const drawnSeries = useTween(() => targetDrawn.value, mixDrawn, {
+  ...settle,
+  /*
+   * Only a plot already on screen morphs. While the wipe is still to come, or
+   * while the placeholder stands in (no svg yet), the data that follows draws
+   * itself in on its own entrance — a morph from readings nobody saw would
+   * only muddy it.
+   */
+  enabled: () => props.animate && revealed.value && !!svgEl.value,
+})
+
+/** The drawn copy of each current series, by id, for marks built from `visible`. */
+const drawnById = computed(() => {
+  const out = new Map<string, DrawnSeries>()
+  for (const s of drawnSeries.value) if (!out.has(s.id)) out.set(s.id, s)
+  return out
+})
 
 const count = computed(() => pointCount(allSeries.value))
 const labels = computed(() => resolveLabels(source.value, props.labels, count.value))
@@ -443,39 +495,20 @@ const targetScale = computed(() =>
  * and `y2` on an SVG <line> never became CSS properties, so a gridline jumps
  * while the curve eases, which is the two-beat effect this avoids.
  */
-const scale = ref(targetScale.value)
-let scaleFrame: number | undefined
+type Range = { min: number; max: number; step: number }
 
-watch(targetScale, (to, from) => {
-  if (!props.animate || prefersReducedMotion() || !from) {
-    scale.value = to
-    return
-  }
-  if (from.min === to.min && from.max === to.max && from.step === to.step) return
+const sameRange = (a: Range | null, b: Range | null) =>
+  a === b || (!!a && !!b && a.min === b.min && a.max === b.max && a.step === b.step)
 
-  const start = performance.now()
-  if (scaleFrame) cancelAnimationFrame(scaleFrame)
-
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - start) / SETTLE_MS)
-    /* easeTravel, not easeOut: an ease-out covers most of the range in the first
-       frames, which on a big rescale (800 down to 40) looks like a snap with a
-       slow tail rather than a scale moving. */
-    const eased = easeTravel(t)
-    scale.value =
-      t < 1
-        ? {
-            min: from.min + (to.min - from.min) * eased,
-            max: from.max + (to.max - from.max) * eased,
-            /* The step stays the target's: it decides how many ticks there are,
-               and a travelling one would add and drop labels mid-move. */
-            step: to.step,
-          }
-        : to
-    scaleFrame = t < 1 ? requestAnimationFrame(tick) : undefined
-  }
-  scaleFrame = requestAnimationFrame(tick)
+const mixRange = (from: Range, to: Range, t: number): Range => ({
+  min: lerp(from.min, to.min, t),
+  max: lerp(from.max, to.max, t),
+  /* The step stays the target's: it decides how many ticks there are, and a
+     travelling one would add and drop labels mid-move. */
+  step: to.step,
 })
+
+const scale = useTween(() => targetScale.value, mixRange, { ...settle, equal: sameRange })
 
 /*
  * The right axis reuses the LEFT axis's tick COUNT so both sets of labels land
@@ -501,34 +534,12 @@ const targetRightScale = computed(() => {
 
 // The right axis travels on the same clock as the left, or a series measured
 // against it arrives before the one beside it.
-const rightScale = ref(targetRightScale.value)
-let rightFrame: number | undefined
-
-watch(targetRightScale, (to, from) => {
-  if (!to || !from || !props.animate || prefersReducedMotion()) {
-    rightScale.value = to
-    return
-  }
-  if (from.min === to.min && from.max === to.max && from.step === to.step) return
-
-  const start = performance.now()
-  if (rightFrame) cancelAnimationFrame(rightFrame)
-
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - start) / SETTLE_MS)
-    const eased = easeTravel(t)
-    rightScale.value =
-      t < 1
-        ? {
-            min: from.min + (to.min - from.min) * eased,
-            max: from.max + (to.max - from.max) * eased,
-            step: to.step,
-          }
-        : to
-    rightFrame = t < 1 ? requestAnimationFrame(tick) : undefined
-  }
-  rightFrame = requestAnimationFrame(tick)
-})
+const rightScale = useTween(
+  () => targetRightScale.value,
+  // An axis that appears or goes has no range to travel from or to.
+  (from, to, t) => (from && to ? mixRange(from, to, t) : to),
+  { ...settle, equal: sameRange },
+)
 
 const fmtWith = (v: number, unit?: string, f?: (n: number) => string): string =>
   `${f ? f(v) : formatTick(v)}${unit ?? ""}`
@@ -583,33 +594,11 @@ const targetGutters = computed(() => ({
   right: props.showYAxis && rightLabels.value.length ? gutter(rightLabels.value) : 12,
 }))
 
-const gutters = ref(targetGutters.value)
-let gutterFrame: number | undefined
-
-watch(targetGutters, (to, from) => {
-  if (!props.animate || prefersReducedMotion() || !from) {
-    gutters.value = to
-    return
-  }
-  if (from.left === to.left && from.right === to.right) return
-
-  const start = performance.now()
-  if (gutterFrame) cancelAnimationFrame(gutterFrame)
-
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - start) / SETTLE_MS)
-    const eased = easeTravel(t)
-    gutters.value =
-      t < 1
-        ? {
-            left: from.left + (to.left - from.left) * eased,
-            right: from.right + (to.right - from.right) * eased,
-          }
-        : to
-    gutterFrame = t < 1 ? requestAnimationFrame(tick) : undefined
-  }
-  gutterFrame = requestAnimationFrame(tick)
-})
+const gutters = useTween(
+  () => targetGutters.value,
+  (from, to, t) => ({ left: lerp(from.left, to.left, t), right: lerp(from.right, to.right, t) }),
+  { ...settle, equal: (a, b) => a.left === b.left && a.right === b.right },
+)
 
 const box = computed<Box>(() => ({
   width: width.value,
@@ -705,9 +694,10 @@ const baseY = computed(() =>
  * what "stop showing this one" should look like.
  */
 const lines = computed(() =>
-  allSeries.value.map((s) => {
+  drawnSeries.value.map((s) => {
     const g = geoOf(s)
-    const p = presenceOf(s.id)
+    // A series leaving the data collapses exactly as one being hidden does.
+    const p = presenceOf(s.id) * s.enter
     // Values pulled toward the axis floor, so the curve flattens into it.
     const base = Math.min(Math.max(0, g.min), g.max)
     const values = p === 1 ? s.values : s.values.map((v) => (v == null ? null : base + (v - base) * p))
@@ -755,9 +745,13 @@ const bars = computed(() => {
   const negTop = new Array(count.value).fill(0)
 
   visible.value.forEach((s, si) => {
+    // Heights from the drawn copy, so bars grow and shrink to their new values;
+    // a series just arriving rises from the baseline.
+    const drawn = drawnById.value.get(s.id)
     for (let i = 0; i < count.value; i++) {
-      const v = s.values[i]
-      if (v == null) continue
+      const raw = drawn ? drawn.values[i] : s.values[i]
+      if (raw == null) continue
+      const v = raw * (drawn?.enter ?? 1)
       const centre = xAt(i, count.value, box.value, true)
       const x = props.stacked ? centre - inner / 2 : centre - inner / 2 + si * slot
       let y: number
@@ -894,12 +888,14 @@ const activePoints = computed(() => {
     .filter((r): r is { s: (typeof visible.value)[number]; v: number } => r.v != null)
     .map(({ s, v }) => {
       const sc = scaleOf(s)
+      // The dot rides the curve as drawn; the figure is the reading itself.
+      const at = drawnById.value.get(s.id)?.values[active.value] ?? v
       return {
         color: s.color,
         id: s.id,
         name: s.name,
         value: v,
-        y: yAt(v, sc.min, sc.max, box.value),
+        y: yAt(at, sc.min, sc.max, box.value),
       }
     })
 })
@@ -948,13 +944,14 @@ const tooltipTarget = computed(() => {
 const floatTransition = usePillTransition("float")
 
 // ── animation ──────────────────────────────────
-// One clip rect wipes across the plot; re-keyed on data change so an update
-// replays the reveal instead of snapping.
+// One clip rect wipes across the plot; re-keyed when the chart changes KIND so
+// a line turned into bars is drawn in afresh rather than snapping.
 const revealKey = shallowRef(0)
-/* Keyed on the chart's SHAPE, not its values: a polled dashboard refreshing
-   its numbers every few seconds must not re-wipe on every tick. */
+/* Only the type: new values, a new point count and series coming or going all
+   morph (see `drawnSeries`), and a polled dashboard refreshing its numbers
+   must not re-wipe on every tick. */
 watch(
-  () => `${props.type}|${count.value}|${allSeries.value.map((s) => s.id).join(",")}`,
+  () => props.type,
   () => {
     revealKey.value++
   },
@@ -1296,7 +1293,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             <linearGradient
               v-for="(s, i) in lines"
               :id="gradientId(s.name, i)"
-              :key="s.id"
+              :key="s.key"
               x1="0"
               y1="0"
               x2="0"
@@ -1415,7 +1412,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             />
 
             <!-- one group per series, so hiding one drops only that curve -->
-            <g v-for="(s, i) in lines" :key="`s-${s.id}`" :style="{ opacity: s.alpha }">
+            <g v-for="(s, i) in lines" :key="`s-${s.key}`" :style="{ opacity: s.alpha }">
               <path
                 v-show="type === 'area'"
                 :d="s.fill"

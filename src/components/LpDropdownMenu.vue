@@ -12,6 +12,7 @@ import ContextMenuItems from "./ContextMenuItems.vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import { POPOVER_PANEL } from "./dropdown"
 import MenuTitle from "./MenuTitle.vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 /** A dropdown item: the context-menu item shape, kept under its old name. */
 export type MenuItem = ContextMenuItemDef
@@ -35,6 +36,12 @@ const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
 function opened(open: boolean) {
   if (open && props.rightClickToo) hints.use(HINT_SIGNALS.menuButton)
 }
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -42,8 +49,10 @@ function opened(open: boolean) {
     <DropdownMenuTrigger as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>
-    <DropdownMenuPortal>
+    <DropdownMenuPortal :to="portalTo">
       <DropdownMenuContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         :collision-padding="8"
         :side-offset="6"
         align="end"

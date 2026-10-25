@@ -82,7 +82,8 @@ export function openContextMenu(el: Element): () => void {
   )
   return () => {
     const outside = { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }
-    document.body.dispatchEvent(new PointerEvent("pointerdown", outside))
-    document.body.dispatchEvent(new PointerEvent("pointerup", outside))
+    const body = el.ownerDocument.body
+    body.dispatchEvent(new PointerEvent("pointerdown", outside))
+    body.dispatchEvent(new PointerEvent("pointerup", outside))
   }
 }

@@ -17,6 +17,7 @@ import { useModalLayer } from "./modalDepth"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 /*
  * Stacking depth, so a dialog opened FROM a dialog sits above the one that
@@ -122,6 +123,7 @@ function close() {
 defineExpose({ close })
 
 function onEscape(event: KeyboardEvent) {
+  guardOutside(event)
   if (!props.dismissible) event.preventDefault()
 }
 
@@ -136,6 +138,7 @@ function onEscape(event: KeyboardEvent) {
  * attribute and every click behaves exactly as before.
  */
 const onInteractOutside = (event: Event) => {
+  guardOutside(event)
   if (!props.dismissible) return event.preventDefault()
   const target = event.target
   if (target instanceof Element && target.closest("[data-lp-modal-aside]")) {
@@ -285,11 +288,17 @@ watch(
   },
   { flush: "post" },
 )
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
   <DialogRoot :open="open" @update:open="onOpenChange">
-    <DialogPortal>
+    <DialogPortal :to="portalTo">
       <DialogOverlay
         :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
         class="lp-scrim fixed inset-0 data-[state=open]:animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[fade-out_120ms_ease]"

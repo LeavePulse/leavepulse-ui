@@ -72,15 +72,16 @@ export const onboarding: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="flex items-center gap-3">
   <div class="rounded-control p-1 ring-2 ring-brand ring-offset-2 ring-offset-surface">
-    <LpButton variant="outline" size="sm">Search</LpButton>
+    <LpButton variant="outline" size="sm">{{ ["Search", "Filters", "Export"][tStep] }}</LpButton>
   </div>
   <div class="w-48 rounded-card border border-line bg-surface-overlay p-3 text-sm text-ink shadow-panel">
-    <div class="flex items-start justify-between gap-2"><p class="m-0 font-medium">Search</p><LpIcon name="lucide:x" :size="14" class="text-muted" /></div>
-    <p class="m-0 mt-1 text-xs text-muted">Finds people, roles and channels.</p>
-    <LpKeys combo="Ctrl+K" size="sm" class="mt-1.5" />
-    <div class="mt-2 flex items-center justify-between"><span class="text-xs tabular-nums text-muted">2 / 5</span><LpButton size="xs">Next</LpButton></div>
+    <div class="flex items-start justify-between gap-2"><p class="m-0 font-medium">{{ ["Search", "Filters", "Export"][tStep] }}</p><LpIcon name="lucide:x" :size="14" class="text-muted" /></div>
+    <p class="m-0 mt-1 text-xs text-muted">{{ ["Finds people, roles and channels.", "Narrows the list to what matters.", "Saves the table as a CSV file."][tStep] }}</p>
+    <LpKeys :combo="['Ctrl+K', 'Ctrl+F', 'Ctrl+E'][tStep]" size="sm" class="mt-1.5" />
+    <div class="mt-2 flex items-center justify-between"><span class="text-xs tabular-nums text-muted">{{ tStep + 2 }} / 5</span><LpButton size="xs">Next</LpButton></div>
   </div>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tStep: 0 }, { tStep: 1 }, { tStep: 2 }] },
   },
   {
     id: "hints",

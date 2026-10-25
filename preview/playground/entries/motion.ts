@@ -52,13 +52,16 @@ export const motion: ComponentEntry[] = [
   <p class="text-xs text-muted">This line rides the card's height instead of jumping.</p>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-2">
-  <LpSegmented model-value="long" :options="views" size="sm" />
+  <LpSegmented :model-value="tView" :options="views" size="sm" />
   <LpCard>
-    <LpSwap swap-key="long">
-      <p class="m-0 text-sm leading-relaxed text-muted">A longer paragraph that takes two lines, so the card grows.</p>
+    <LpSwap :swap-key="tView">
+      <p v-if="tView === 'short'" class="m-0 text-sm text-muted">One line.</p>
+      <p v-else-if="tView === 'long'" class="m-0 text-sm leading-relaxed text-muted">A longer paragraph that takes two lines, so the card grows.</p>
+      <ul v-else class="m-0 flex list-none flex-col gap-1 p-0 text-sm text-muted"><li>api-1 · healthy</li><li>api-2 · healthy</li><li>worker · restarting</li></ul>
     </LpSwap>
   </LpCard>
 </div>`,
+    thumbLoop: { every: 2200, frames: [{ tView: "long" }, { tView: "list" }, { tView: "short" }] }
   },
   {
     id: "shift",
@@ -114,13 +117,14 @@ export const motion: ComponentEntry[] = [
     <LpShift axis="width">
       <div class="flex items-center gap-2">
         <LpButton size="sm">Deploy</LpButton>
-        <LpButton size="sm" variant="outline">Roll back</LpButton>
+        <LpButton v-if="tMore" size="sm" variant="outline">Roll back</LpButton>
       </div>
     </LpShift>
     <LpBadge tone="neutral">← this shifts</LpBadge>
   </div>
   <LpCard variant="flat" padded class="w-64"><p class="m-0 text-sm text-ink">app-vps-1 · healthy</p></LpCard>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tMore: true }, { tMore: false }] }
   },
   {
     id: "disclosure",
@@ -146,10 +150,11 @@ export const motion: ComponentEntry[] = [
   <div class="flex h-40 items-start justify-center text-xs text-muted">extra space below</div>
 </div>`,
     thumb: `<div class="w-64">
-  <LpDisclosure label="Customize text" icon="lucide:sliders-horizontal" default-open>
+  <LpDisclosure label="Customize text" icon="lucide:sliders-horizontal" :open="tOpen">
     <p class="m-0 text-sm text-muted">Revealed content eases in under the trigger.</p>
   </LpDisclosure>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tOpen: true }, { tOpen: false }] },
   },
   {
     id: "video-backdrop",

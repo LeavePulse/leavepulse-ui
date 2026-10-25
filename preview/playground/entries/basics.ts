@@ -17,6 +17,7 @@ import {
   LpSection,
   LpShift,
   LpSkeleton,
+  LpSwap,
   LpSwitch,
   LpTooltip,
 } from "../../../src"
@@ -98,13 +99,14 @@ export const basics: ComponentEntry[] = [
   <LpBadge tone="danger" dot>Error</LpBadge>
 </div>`,
     thumb: `<div class="flex max-w-64 flex-wrap justify-center gap-2">
-  <LpBadge tone="brand" dot>Online</LpBadge>
+  <LpBadge :tone="['brand', 'warning', 'neutral'][tStatus]" dot>{{ ["Online", "Away", "Offline"][tStatus] }}</LpBadge>
   <LpBadge tone="success" dot>Healthy</LpBadge>
   <LpBadge tone="action">Active</LpBadge>
   <LpBadge tone="danger" dot>Error</LpBadge>
   <LpBadge tone="neutral">Draft</LpBadge>
   <LpBadge tone="outline">v2.4</LpBadge>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tStatus: 0 }, { tStatus: 1 }, { tStatus: 2 }] },
   },
   {
     id: "card",
@@ -182,8 +184,9 @@ export const basics: ComponentEntry[] = [
   <LpAvatar size="md" :src="avatarSample" alt="THEROER" shape="soft" />
   <LpAvatar size="md" fallback="LP" />
   <LpAvatar size="md" icon="lucide:globe" shape="soft" />
-  <LpAvatar size="sm" alt="Ada Lovelace" />
+  <LpAvatar size="sm" :alt="tName" />
 </div>`,
+    thumbLoop: { every: 1700, frames: [{ tName: "Ada Lovelace" }, { tName: "Grace Hopper" }, { tName: "Linus Torvalds" }] },
   },
   {
     id: "codeblock",
@@ -211,13 +214,22 @@ export const basics: ComponentEntry[] = [
     id: "emptystate",
     name: "EmptyState",
     description: "Placeholder for empty lists.",
-    components: { LpEmptyState, LpButton },
+    components: { LpEmptyState, LpButton, LpSwap },
     template: `<LpEmptyState icon="lucide:inbox" title="No servers yet" description="Add your first server to start monitoring.">
   <LpButton variant="solid" size="sm">Add server</LpButton>
 </LpEmptyState>`,
-    thumb: `<LpEmptyState icon="lucide:inbox" title="No servers yet" description="Add your first server." class="py-2">
-  <LpButton variant="solid" size="sm">Add server</LpButton>
-</LpEmptyState>`,
+    thumb: `<LpSwap :swap-key="tEmpty">
+  <LpEmptyState v-if="tEmpty === 0" icon="lucide:inbox" title="No servers yet" description="Add your first server." class="py-2">
+    <LpButton variant="solid" size="sm">Add server</LpButton>
+  </LpEmptyState>
+  <LpEmptyState v-else-if="tEmpty === 1" icon="lucide:search-x" title="Nothing found" description="Try another search." class="py-2">
+    <LpButton variant="outline" size="sm">Clear search</LpButton>
+  </LpEmptyState>
+  <LpEmptyState v-else icon="lucide:bell-off" title="All caught up" description="No new notifications." class="py-2">
+    <LpButton variant="outline" size="sm">Open inbox</LpButton>
+  </LpEmptyState>
+</LpSwap>`,
+    thumbLoop: { every: 2200, frames: [{ tEmpty: 0 }, { tEmpty: 1 }, { tEmpty: 2 }] },
   },
   {
     id: "skeleton",
@@ -225,7 +237,7 @@ export const basics: ComponentEntry[] = [
     name: "Skeleton",
     description:
       "Loading placeholders, in two shapes. Bare, it is one pulsing block sized by your classes. Given content it becomes a WRAPPER and lends its pulse to any `.lp-skeleton-item` inside, at any depth, so a skeleton can be the real markup with its content swapped for divs, keeping the same flex, gaps and responsive classes instead of being rebuilt as a stack of bars.",
-    components: { LpSkeleton, LpCard, LpAvatar, LpButton },
+    components: { LpSkeleton, LpCard, LpAvatar, LpButton, LpSwap },
     state: () => {
       const s = reactive({
         avatarSample,
@@ -287,14 +299,25 @@ export const basics: ComponentEntry[] = [
     </LpCard>
   </div>
 </div>`,
-    thumb: `<LpSkeleton class="flex w-64 items-center gap-3">
-  <div class="lp-skeleton-item size-10 shrink-0 rounded-pill bg-surface-soft" />
-  <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-    <div class="lp-skeleton-item h-3.5 w-28 rounded-control bg-surface-soft" />
-    <div class="lp-skeleton-item h-3 w-full rounded-control bg-surface-soft" />
-    <div class="lp-skeleton-item h-3 w-2/3 rounded-control bg-surface-soft" />
+    thumb: `<LpSwap :swap-key="tLoaded ? 'data' : 'wait'">
+  <LpSkeleton v-if="!tLoaded" class="flex w-64 items-center gap-3">
+    <div class="lp-skeleton-item size-10 shrink-0 rounded-pill bg-surface-soft" />
+    <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div class="lp-skeleton-item h-3.5 w-28 rounded-control bg-surface-soft" />
+      <div class="lp-skeleton-item h-3 w-full rounded-control bg-surface-soft" />
+      <div class="lp-skeleton-item h-3 w-2/3 rounded-control bg-surface-soft" />
+    </div>
+  </LpSkeleton>
+  <div v-else class="flex w-64 items-center gap-3">
+    <LpAvatar size="md" :src="tAvatar" alt="THEROER" />
+    <div class="flex min-w-0 flex-1 flex-col">
+      <span class="truncate text-sm font-medium text-ink">THEROER</span>
+      <span class="truncate text-xs text-muted">theroer · owner</span>
+      <span class="truncate text-xs text-muted">Builds the kit and the launcher.</span>
+    </div>
   </div>
-</LpSkeleton>`,
+</LpSwap>`,
+    thumbLoop: { every: 2000, frames: [{ tLoaded: false, tAvatar: avatarSample }, { tLoaded: true }] },
   },
   {
     id: "section",
@@ -427,9 +450,10 @@ export const basics: ComponentEntry[] = [
   </LpTooltipProvider>
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-1.5">
-  <div class="rounded-control border border-line bg-surface-overlay px-2.5 py-1.5 text-xs text-ink shadow-panel">Delete instance</div>
+  <div class="rounded-control border border-line bg-surface-overlay px-2.5 py-1.5 text-xs text-ink shadow-panel transition duration-300 ease-out" :class="tShow ? '' : 'translate-y-1 opacity-0'">Delete instance</div>
   <LpButton variant="outline" square aria-label="Delete instance"><LpIcon name="lucide:trash-2" :size="16" /></LpButton>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tShow: true }, { tShow: true }, { tShow: false }] },
   },
   {
     id: "popover",
@@ -465,11 +489,12 @@ export const basics: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-1.5">
   <LpButton variant="outline" size="sm">Open popover</LpButton>
-  <div class="w-56 rounded-control border border-line bg-surface-overlay p-3 text-sm shadow-panel">
+  <div class="w-56 rounded-control border border-line bg-surface-overlay p-3 text-sm shadow-panel transition duration-300 ease-out" :class="tShow ? '' : '-translate-y-1 scale-95 opacity-0'">
     <p class="font-semibold text-ink">Popover content</p>
     <p class="mt-1 text-xs text-muted">Anchored to its trigger.</p>
   </div>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tShow: true }, { tShow: true }, { tShow: false }] },
   },
   {
     id: "scrollarea",
@@ -526,7 +551,8 @@ export const basics: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="flex w-72 flex-col gap-2">
   <LpAlert variant="info" title="Heads up">Invoice due in 3 days.</LpAlert>
-  <LpAlert variant="success">Payment received.</LpAlert>
+  <LpAlert :variant="['success', 'warning', 'danger'][tAlert]">{{ ["Payment received.", "Card expires soon.", "Payment failed."][tAlert] }}</LpAlert>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tAlert: 0 }, { tAlert: 1 }, { tAlert: 2 }] },
   },
 ]

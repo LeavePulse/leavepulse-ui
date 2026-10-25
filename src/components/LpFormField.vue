@@ -3,6 +3,7 @@
 // appended to it, so opt out of the automatic pass-through that would add it
 // a second time, unmerged.
 export default { inheritAttrs: false }
+
 </script>
 
 <script setup lang="ts">
@@ -16,7 +17,7 @@ export default { inheritAttrs: false }
  * eased box, so the thing being typed into never moves.
  */
 import { Label } from "reka-ui"
-import { computed, useId, useSlots } from "vue"
+import { computed, ref, useId, useSlots } from "vue"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpShift from "./LpShift.vue"
 import { fieldMessageId, provideField } from "../composables/useField"
@@ -67,6 +68,24 @@ defineExpose({ notify: notice.show, clearNotice: notice.clear })
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex min-w-0 flex-col gap-1.5",
 )
+/*
+ * A label's `for` only focuses an element that can be labelled (an input, a
+ * button, a select). Composite controls put the field id on a group or have no
+ * single input (a time field's segments, a pin input's cells), so clicking the
+ * label did nothing there. Then the label focuses the first focusable thing in
+ * the control instead.
+ */
+const control = ref<HTMLElement | null>(null)
+const LABELABLE = "input, button, select, textarea, meter, output, progress"
+function focusControl() {
+  const target = document.getElementById(id.value)
+  if (target?.matches(LABELABLE)) return
+  const first = control.value?.querySelector<HTMLElement>(
+    'input:not([type="hidden"]):not([disabled]), button:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',
+  )
+  first?.focus()
+}
+
 </script>
 
 <template>
@@ -78,7 +97,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <div
     :class="rootClass"
     v-bind="rest">
-    <Label v-if="label" :id="`${id}-label`" :for="id" class="text-sm font-medium text-ink">
+    <Label v-if="label" :id="`${id}-label`" :for="id" class="text-sm font-medium text-ink" @click="focusControl">
       {{ label }}
       <span v-if="required" class="text-danger">*</span>
     </Label>
@@ -86,7 +105,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     <!-- The note from `notify` floats from here, over the message line below,
          so raising one never moves the form; the line fades out under it
          rather than showing through. -->
-    <div class="relative">
+    <div ref="control" class="relative">
       <slot :id="id" :describedBy="hasMessage ? messageId : undefined" />
       <LpFieldNotice :notice="notice" :id="noticeId" />
     </div>

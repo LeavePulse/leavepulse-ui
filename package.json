@@ -88,6 +88,7 @@
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^6.0.6",
+    "@vue/compiler-dom": "3.5.31",
     "motion-v": "^2.2.1",
     "reka-ui": "^2.9.10",
     "shiki": "^4.2.0",

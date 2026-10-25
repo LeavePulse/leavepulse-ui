@@ -16,6 +16,7 @@ import {
   LpImageEditor,
   LpInput,
   LpNumberField,
+  LpRepeater,
   LpTimeField,
   LpOtpInput,
   LpPasswordInput,
@@ -40,6 +41,40 @@ import { RatingControl } from "../demos"
 import { type ComponentEntry, selectOpts, radioOpts } from "./shared"
 
 export const forms: ComponentEntry[] = [
+  {
+    id: "repeater",
+    name: "Repeater",
+    description: "Repeatable form rows with stable identity, add/remove controls and a slot for each row. Ports and volumes use the same list shell; their fields and validation stay in the application. itemKey preserves identity across immutable reloads; without one, unsaved rows keep their identity without adding keys to your data.",
+    components: { LpRepeater, LpInput, LpSelect, LpFormField, LpButton },
+    state: () => reactive({
+      ports: [{ container: "443", host: "8443", bind: "", proto: "tcp" }],
+      volumes: [{ name: "data", mount: "/var/lib/app" }],
+      emptyPort: () => ({ container: "", host: "", bind: "", proto: "tcp" }),
+      emptyVolume: () => ({ name: "", mount: "" }),
+      locked: false,
+    }),
+    template: `<div class="flex w-full max-w-2xl flex-col gap-6">
+  <LpRepeater v-model="ports" :create-item="emptyPort" label="Ports" :disabled="locked">
+    <template #default="{ item, disabled }">
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <LpInput v-model="item.container" label="Container" inputmode="numeric" :disabled="disabled" />
+        <LpInput v-model="item.host" label="Host" inputmode="numeric" :disabled="disabled" />
+        <LpInput v-model="item.bind" label="Bind address" :disabled="disabled" />
+        <LpFormField label="Protocol"><LpSelect v-model="item.proto" :options="[{value:'tcp',label:'TCP'},{value:'udp',label:'UDP'}]" :disabled="disabled" /></LpFormField>
+      </div>
+    </template>
+  </LpRepeater>
+  <LpRepeater v-model="volumes" :create-item="emptyVolume" label="Volumes" :disabled="locked">
+    <template #default="{ item, disabled }">
+      <div class="grid grid-cols-2 gap-2">
+        <LpInput v-model="item.name" label="Name" :disabled="disabled" />
+        <LpInput v-model="item.mount" label="Mount path" :disabled="disabled" />
+      </div>
+    </template>
+  </LpRepeater>
+  <LpButton variant="outline" @click="locked = !locked">{{ locked ? 'Unlock' : 'Lock' }} lists</LpButton>
+</div>`,
+  },
   {
     id: "input",
     name: "Input",
@@ -125,12 +160,12 @@ export const forms: ComponentEntry[] = [
   <p class="text-xs text-muted">The model is an id; the field shows who it is. Focus to search again by name.</p>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-1.5">
-  <LpAutocomplete model-value="Sv" :options="frameworks" icon="lucide:search" />
+  <LpAutocomplete :model-value="tQuery" :options="frameworks" icon="lucide:search" />
   <div class="flex flex-col rounded-control border border-line bg-surface-overlay p-1 text-sm shadow-panel">
-    <span class="rounded-inner bg-brand-soft px-2.5 py-1 text-brand">Svelte</span>
-    <span class="px-2.5 py-1 text-ink">Solid</span>
+    <span v-for="(f, i) in ['Svelte', 'Solid']" :key="f" class="rounded-inner px-2.5 py-1 transition-colors duration-300" :class="i === tRow ? 'bg-brand-soft text-brand' : 'text-ink'">{{ f }}</span>
   </div>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tQuery: "Sv", tRow: 0 }, { tQuery: "So", tRow: 1 }, { tQuery: "S", tRow: 0 }] },
   },
   {
     id: "select",
@@ -181,9 +216,17 @@ export const forms: ComponentEntry[] = [
   <p class="text-xs text-muted">searchTerm: "{{ remoteTerm }}" (pick, then search for something else: the pick keeps its name)</p>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-2">
-  <LpSelect :model-value="person" :options="people" />
-  <LpSelect :model-value="team" :options="people" multiple />
+  <LpSelect :model-value="tPerson" :options="people" />
+  <LpSelect :model-value="tTeam" :options="people" multiple />
 </div>`,
+    thumbLoop: {
+      every: 2000,
+      frames: [
+        { tPerson: "1090027634693525664", tTeam: ["1090027634693525664", "770091071811092481", "3"] },
+        { tPerson: "770091071811092481", tTeam: ["1090027634693525664", "770091071811092481"] },
+        { tPerson: "4", tTeam: ["770091071811092481", "3", "4"] },
+      ],
+    },
   },
   {
     id: "switch",
@@ -255,10 +298,11 @@ export const forms: ComponentEntry[] = [
   </LpRadioGroup>
 </div>`,
     thumb: `<div class="flex flex-col gap-3">
-  <LpSwitch :model-value="true" label="Dark mode" />
-  <LpCheckbox :model-value="true" label="Remember me" />
-  <LpRadioGroup model-value="pro" :options="radioOpts" />
+  <LpSwitch :model-value="tOn" label="Dark mode" />
+  <LpCheckbox :model-value="!tOn" label="Remember me" />
+  <LpRadioGroup :model-value="tOn ? 'pro' : 'free'" :options="radioOpts" />
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tOn: true }, { tOn: false }] }
   },
   {
     id: "segmented",
@@ -295,9 +339,10 @@ export const forms: ComponentEntry[] = [
   <LpSegmented v-model="inbox" :options="inboxOpts" :hover-follow="false" />
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-3">
-  <LpSegmented model-value="grid" :options="viewOpts" />
-  <LpSegmented model-value="default" :options="densityOpts" size="sm" />
+  <LpSegmented :model-value="tView" :options="viewOpts" />
+  <LpSegmented :model-value="tDensity" :options="densityOpts" size="sm" />
 </div>`,
+    thumbLoop: { every: 1700, frames: [{ tView: "grid", tDensity: "default" }, { tView: "board", tDensity: "comfortable" }, { tView: "list", tDensity: "compact" }] }
   },
   {
     id: "textarea",
@@ -349,9 +394,17 @@ export const forms: ComponentEntry[] = [
   <p class="text-xs text-muted">Phone raw: {{ raw || "\u2014" }}</p>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-2">
-  <LpInput model-value="+380 (50) 123-45-67" label="Phone" />
-  <LpInput model-value="4111 1111 1111 1111" label="Card" />
+  <LpInput :model-value="tPhone" label="Phone" />
+  <LpInput :model-value="tCard" label="Card" />
 </div>`,
+    thumbLoop: {
+      every: 1500,
+      frames: [
+        { tPhone: "+380 (50) 123-45-67", tCard: "4111 1111 1111 1111" },
+        { tPhone: "+380 (5", tCard: "4111 11" },
+        { tPhone: "+380 (50) 123-4", tCard: "4111 1111 1111" },
+      ],
+    },
   },
   {
     id: "tags-input",
@@ -393,8 +446,15 @@ export const forms: ComponentEntry[] = [
   </LpFormField>
 </div>`,
     thumb: `<div class="w-72">
-  <LpTagsInput :model-value="['ada@example.com', 'grace@example.com', 'linus@example.com']" placeholder="Add more" />
+  <LpTagsInput :model-value="tTags" placeholder="Add more" />
 </div>`,
+    thumbLoop: {
+      every: 1800,
+      frames: [
+        { tTags: ["ada@example.com", "grace@example.com", "linus@example.com"] },
+        { tTags: ["ada@example.com", "grace@example.com", "linus@example.com", "ken@x.io"] },
+      ],
+    },
   },
   {
     id: "use-form",
@@ -435,13 +495,14 @@ export const forms: ComponentEntry[] = [
   <p v-if="saved" class="text-xs text-muted">Submitted {{ saved }}</p>
 </form>`,
     thumb: `<div class="flex w-64 flex-col gap-2">
-  <LpInput model-value="admin" label="Username" error="That username is taken" />
+  <LpInput :model-value="tName" label="Username" :error="tName === 'admin' ? 'That username is taken' : undefined" :hint="tName === 'admin' ? undefined : 'Available'" />
   <div class="flex items-center gap-2">
     <LpButton size="sm">Save</LpButton>
     <LpButton size="sm" variant="ghost">Reset</LpButton>
-    <LpBadge tone="warning">Unsaved</LpBadge>
+    <LpBadge :tone="tSaved ? 'neutral' : 'warning'">{{ tSaved ? "Saved" : "Unsaved" }}</LpBadge>
   </div>
 </div>`,
+    thumbLoop: { every: 1900, frames: [{ tName: "admin", tSaved: false }, { tName: "ada", tSaved: false }, { tName: "ada", tSaved: true }] },
   },
   {
     id: "phone",
@@ -467,9 +528,10 @@ export const forms: ComponentEntry[] = [
 </div>`,
     thumb: `<div class="w-64">
   <LpFormField label="Phone">
-    <LpPhoneInput model-value="+380 50 123 4567" default-country="UA" />
+    <LpPhoneInput :model-value="tPhone" default-country="UA" />
   </LpFormField>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tPhone: "+380 50 123 4567" }, { tPhone: "+33 1 23 45 67 89" }, { tPhone: "+1 555 123 4567" }] },
   },
   {
     id: "address",
@@ -515,12 +577,13 @@ export const forms: ComponentEntry[] = [
   <div class="absolute inset-0 opacity-60" style="background-image: linear-gradient(var(--color-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-line) 1px, transparent 1px); background-size: 32px 32px" />
   <div class="absolute left-0 right-0 top-1/2 h-2 -rotate-6 bg-surface-raised" />
   <div class="absolute bottom-0 left-1/3 top-0 w-1.5 rotate-12 bg-surface-raised" />
-  <LpIcon name="lucide:map-pin" :size="28" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full text-brand" />
+  <LpIcon name="lucide:map-pin" :size="28" class="absolute -translate-x-1/2 -translate-y-full text-brand transition-[left,top] duration-700 ease-out" :style="{ left: tPin[0] + '%', top: tPin[1] + '%' }" />
   <div class="absolute right-2 top-2 flex flex-col overflow-hidden rounded-control border border-line bg-surface-raised text-muted">
     <span class="grid size-6 place-items-center border-b border-line"><LpIcon name="lucide:plus" :size="13" /></span>
     <span class="grid size-6 place-items-center"><LpIcon name="lucide:minus" :size="13" /></span>
   </div>
 </div>`,
+    thumbLoop: { every: 2000, frames: [{ tPin: [50, 50] }, { tPin: [30, 72] }, { tPin: [68, 36] }] },
   },
   {
     id: "otp",
@@ -538,7 +601,8 @@ export const forms: ComponentEntry[] = [
   </div>
   <p class="text-xs text-muted">Backup code: {{ backup || "—" }}</p>
 </div>`,
-    thumb: `<LpOtpInput model-value="482913" :group="3" />`,
+    thumb: `<LpOtpInput :model-value="tCode" :group="3" />`,
+    thumbLoop: { every: 1400, frames: [{ tCode: "482913" }, { tCode: "" }, { tCode: "48" }, { tCode: "4829" }] },
   },
   {
     id: "colorpicker",
@@ -563,11 +627,12 @@ export const forms: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-3">
-  <LpColorPicker :model-value="brand" />
+  <LpColorPicker :model-value="tColor" />
   <div class="flex gap-2">
     <span v-for="c in ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#ec4899']" :key="c" class="size-6 rounded-control border border-line" :style="{ backgroundColor: c }" />
   </div>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tColor: "#3b82f6" }, { tColor: "#22c55e" }, { tColor: "#a855f7" }, { tColor: "#f59e0b" }] },
   },
   {
     id: "calendar",
@@ -608,9 +673,10 @@ export const forms: ComponentEntry[] = [
     <span v-for="d in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']" :key="d" class="py-0.5">{{ d }}</span>
   </div>
   <div class="grid grid-cols-7 gap-0.5 text-ink">
-    <span v-for="n in 21" :key="n" class="rounded-pill py-1" :class="n + 7 === 18 ? 'bg-brand font-medium text-ink-inverse' : n + 7 === 16 ? 'bg-surface-soft' : ''">{{ n + 7 }}</span>
+    <span v-for="n in 21" :key="n" class="rounded-pill py-1 transition-colors duration-300" :class="n + 7 === tDay ? 'bg-brand font-medium text-ink-inverse' : n + 7 === 16 ? 'bg-surface-soft' : ''">{{ n + 7 }}</span>
   </div>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tDay: 18 }, { tDay: 23 }, { tDay: 12 }] },
   },
   {
     id: "date-range",
@@ -631,12 +697,13 @@ export const forms: ComponentEntry[] = [
     thumb: `<div class="flex w-64 flex-col gap-2">
   <div class="flex h-9 items-center gap-2 rounded-control border border-line bg-surface px-3 text-sm text-ink">
     <LpIcon name="lucide:calendar" :size="15" class="text-muted" />
-    Jun 8, 2026 – Jun 14, 2026
+    Jun {{ tFrom }}, 2026 – Jun {{ tTo }}, 2026
   </div>
   <div class="grid grid-cols-7 gap-y-0.5 text-center text-xs text-ink">
-    <span v-for="n in 14" :key="n" class="py-1" :class="n + 4 === 8 ? 'rounded-l-pill bg-brand text-ink-inverse' : n + 4 === 14 ? 'rounded-r-pill bg-brand text-ink-inverse' : n + 4 > 8 && n + 4 < 14 ? 'bg-brand-soft text-brand' : ''">{{ n + 4 }}</span>
+    <span v-for="n in 14" :key="n" class="py-1 transition-colors duration-300" :class="n + 4 === tFrom ? 'rounded-l-pill bg-brand text-ink-inverse' : n + 4 === tTo ? 'rounded-r-pill bg-brand text-ink-inverse' : n + 4 > tFrom && n + 4 < tTo ? 'bg-brand-soft text-brand' : ''">{{ n + 4 }}</span>
   </div>
 </div>`,
+    thumbLoop: { every: 1800, frames: [{ tFrom: 8, tTo: 14 }, { tFrom: 6, tTo: 10 }, { tFrom: 11, tTo: 17 }] },
   },
   {
     id: "formfield",
@@ -667,13 +734,14 @@ export const forms: ComponentEntry[] = [
   </LpFormField>
 </div>`,
     thumb: `<div class="flex w-64 flex-col gap-3">
-  <LpFormField label="Nickname" hint="Shown on your profile" required>
-    <LpInput model-value="Steve" />
+  <LpFormField label="Nickname" required>
+    <LpInput model-value="Steve" size="sm" />
   </LpFormField>
-  <LpFormField label="Email" error="That doesn't look like an email">
-    <LpInput model-value="steve@" />
+  <LpFormField label="Email" :error="tEmail.includes('.') ? undefined : 'That doesn\\'t look like an email'" :hint="tEmail.includes('.') ? 'We never share it' : undefined">
+    <LpInput :model-value="tEmail" size="sm" />
   </LpFormField>
 </div>`,
+    thumbLoop: { every: 1900, frames: [{ tEmail: "steve@" }, { tEmail: "steve@mail.com" }] },
   },
   {
     id: "numberfield",
@@ -689,9 +757,10 @@ export const forms: ComponentEntry[] = [
   <p class="text-xs text-muted">value: {{ value }}</p>
 </div>`,
     thumb: `<div class="flex w-44 flex-col gap-2">
-  <LpNumberField :model-value="30" :min="0" :max="100" :step="5" />
-  <LpNumberField :model-value="380" unit="mA" />
+  <LpNumberField :model-value="tLevel" :min="0" :max="100" :step="5" />
+  <LpNumberField :model-value="tMilli" unit="mA" />
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tLevel: 30, tMilli: 380 }, { tLevel: 35, tMilli: 420 }, { tLevel: 40, tMilli: 450 }, { tLevel: 35, tMilli: 400 }] },
   },
   {
     id: "timefield",
@@ -706,9 +775,10 @@ export const forms: ComponentEntry[] = [
   <p class="text-xs text-muted">value: {{ at || "—" }} · {{ twelve || "—" }}</p>
 </div>`,
     thumb: `<div class="flex w-40 flex-col gap-2">
-  <LpTimeField model-value="18:30" />
-  <LpTimeField model-value="09:15" :hour-cycle="12" locale="en-US" />
+  <LpTimeField :model-value="tAt" />
+  <LpTimeField :model-value="tMorning" :hour-cycle="12" locale="en-US" />
 </div>`,
+    thumbLoop: { every: 1700, frames: [{ tAt: "18:30", tMorning: "09:15" }, { tAt: "18:45", tMorning: "09:30" }, { tAt: "19:00", tMorning: "10:00" }] },
   },
   {
     id: "slider",
@@ -721,9 +791,10 @@ export const forms: ComponentEntry[] = [
   <p class="mt-2 text-xs text-muted">value: {{ value }}</p>
 </div>`,
     thumb: `<div class="w-64">
-  <LpSlider :model-value="64" :min="0" :max="100" />
-  <p class="mt-2 text-center text-xs text-muted">64</p>
+  <LpSlider :model-value="tValue" :min="0" :max="100" />
+  <p class="mt-2 text-center text-xs text-muted">{{ tValue }}</p>
 </div>`,
+    thumbLoop: { every: 1500, frames: [{ tValue: 64 }, { tValue: 28 }, { tValue: 82 }, { tValue: 45 }] }
   },
   {
     id: "range-slider",
@@ -743,9 +814,10 @@ export const forms: ComponentEntry[] = [
   </div>
 </div>`,
     thumb: `<div class="w-64">
-  <LpRangeSlider :model-value="[20, 80]" :min="0" :max="100" />
-  <p class="mt-2 text-center text-xs text-muted">$20 to $80</p>
+  <LpRangeSlider :model-value="tPrice" :min="0" :max="100" />
+  <p class="mt-2 text-center text-xs text-muted">\${{ tPrice[0] }} to \${{ tPrice[1] }}</p>
 </div>`,
+    thumbLoop: { every: 1600, frames: [{ tPrice: [20, 80] }, { tPrice: [35, 70] }, { tPrice: [10, 55] }, { tPrice: [45, 90] }] },
   },
   {
     id: "dropzone",
@@ -788,8 +860,17 @@ export const forms: ComponentEntry[] = [
   <p v-if="refused.length" class="text-xs text-danger">Refused: {{ refused.join(', ') }}</p>
 </div>`,
     thumb: `<div class="w-72">
-  <LpDropzone accept="image/*" title="Drop photographs here" hint="or click to browse" />
+  <LpDropzone accept="image/*" title="Drop photographs here" hint="or click to browse" links :drag-over="tOver" :linking="tLink" />
 </div>`,
+    thumbLoop: {
+      every: 1800,
+      frames: [
+        { tOver: false, tLink: false },
+        { tOver: true, tLink: false },
+        { tOver: false, tLink: false },
+        { tOver: false, tLink: true },
+      ],
+    },
   },
   {
     id: "imageeditor",

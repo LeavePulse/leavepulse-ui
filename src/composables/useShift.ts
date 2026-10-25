@@ -180,22 +180,16 @@ export function useShift(
     const fromWidth = lastWidth
     const tops = readScroll()
 
-    // Measured with any cap lifted, then the clamp is left to CSS. A `max-*`
-    // from a class makes the element report the clipped figure once the cap
-    // bites, and pinning that would hold the box short of the content it now
-    // has to fit.
-    if (wantsHeight()) {
-      node.style.height = ""
-      node.style.maxHeight = "none"
-    }
-    if (wantsWidth()) {
-      node.style.width = ""
-      node.style.maxWidth = "none"
-    }
+    // Measured where the box will settle: free of the pinned size, but with
+    // its `max-*` in place. The target used to be read with the cap lifted
+    // while the settled size was read with it, so a box whose content is
+    // wider than its cap never matched its own target: every render started
+    // another tween and it never came to rest (a breadcrumb trail too wide for
+    // its bar re-animated some sixty times a second).
+    if (wantsHeight()) node.style.height = ""
+    if (wantsWidth()) node.style.width = ""
     const toHeight = wantsHeight() ? node.offsetHeight : 0
     const toWidth = wantsWidth() ? node.offsetWidth : 0
-    if (wantsHeight()) node.style.maxHeight = ""
-    if (wantsWidth()) node.style.maxWidth = ""
     restoreScroll(tops)
     lastHeight = toHeight
     lastWidth = toWidth
@@ -239,8 +233,8 @@ export function useShift(
       // clearing it let the box spread to the window's edges.
       if (wantsHeight()) node.style.height = ""
       if (wantsWidth()) node.style.width = ""
-      // Re-read rather than trusting the target: a `max-*` may have clamped the
-      // box short of it, and the next tween has to start from where it sits.
+      // Re-read rather than trusting the target: the layout around may have
+      // moved meanwhile, and the next tween has to start from where it sits.
       lastHeight = node.offsetHeight
       lastWidth = node.offsetWidth
     }, wait)

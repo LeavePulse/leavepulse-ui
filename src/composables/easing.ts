@@ -98,3 +98,68 @@ export const easeTravel = (t: number): number => {
   const head = (EDGE * EDGE) / (2 * EDGE) + EDGE * 0.1
   return head + ((t - EDGE) / (1 - 2 * EDGE)) * (1 - 2 * head)
 }
+
+/**
+ * A cubic-bezier as a function of time, solved per call.
+ *
+ * The curves above are hand-shaped stand-ins for tokens a component reaches for
+ * by feel. A tween that has to match a CSS transition running beside it (a
+ * slice's arc easing while its colour and lift move on `--ease-emphasized`)
+ * needs the token's actual curve, and a theme may retune it — so this reads the
+ * four numbers and solves for them rather than approximating one fixed shape.
+ *
+ * Newton's method on x(s) = t, falling back to bisection where the slope is
+ * too flat to step on; a handful of iterations is far below a pixel.
+ */
+export const cubicBezier = (x1: number, y1: number, x2: number, y2: number) => {
+  const cx = 3 * x1
+  const bx = 3 * (x2 - x1) - cx
+  const ax = 1 - cx - bx
+  const cy = 3 * y1
+  const by = 3 * (y2 - y1) - cy
+  const ay = 1 - cy - by
+  const x = (s: number) => ((ax * s + bx) * s + cx) * s
+  const y = (s: number) => ((ay * s + by) * s + cy) * s
+  const dx = (s: number) => (3 * ax * s + 2 * bx) * s + cx
+
+  return (t: number): number => {
+    if (t <= 0) return 0
+    if (t >= 1) return 1
+    let s = t
+    for (let i = 0; i < 6; i++) {
+      const err = x(s) - t
+      if (Math.abs(err) < 1e-5) return y(s)
+      const slope = dx(s)
+      if (Math.abs(slope) < 1e-6) break
+      s -= err / slope
+    }
+    let lo = 0
+    let hi = 1
+    s = t
+    for (let i = 0; i < 20; i++) {
+      const v = x(s)
+      if (Math.abs(v - t) < 1e-5) break
+      if (v < t) lo = s
+      else hi = s
+      s = (lo + hi) / 2
+    }
+    return y(s)
+  }
+}
+
+/**
+ * An easing token as a function, for a value tweened in script.
+ *
+ * Anything the token does not spell as a `cubic-bezier()` (a keyword, a
+ * `linear()` list) falls back to `easeOut`, which has the same "arrives and
+ * settles" intent as every curve the kit defines.
+ */
+export const tokenEase = (
+  name: "ease-emphasized" | "ease-travel" | "ease-settle",
+): ((t: number) => number) => {
+  const match = /cubic-bezier\(([^)]+)\)/.exec(easingToken(name))
+  const n = match?.[1].split(",").map((p) => Number.parseFloat(p))
+  return n && n.length === 4 && n.every(Number.isFinite)
+    ? cubicBezier(n[0], n[1], n[2], n[3])
+    : easeOut
+}

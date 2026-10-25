@@ -6,7 +6,7 @@ export default { inheritAttrs: false }
 import { computed, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
-import LpFormField from "./LpFormField.vue"
+import FieldWrapper from "./FieldWrapper.vue"
 
 const props = defineProps<{
   modelValue?: string
@@ -56,15 +56,15 @@ const textareaClass = computed(() =>
 </script>
 
 <template>
-  <component
-    :is="hasField ? LpFormField : 'div'"
-    :id="hasField ? field.id : undefined"
-    :label="hasField ? label : undefined"
-    :hint="hasField ? hint : undefined"
-    :error="hasField ? error : undefined"
-    :required="hasField ? required : undefined"
-    :class="hasField ? attrs.class : 'contents'"
-    :style="hasField ? attrs.style : undefined"
+  <FieldWrapper
+    :wrapped="hasField"
+    :id="field.id"
+    :label="label"
+    :hint="hint"
+    :error="error"
+    :required="required"
+    :class="attrs.class"
+    :style="attrs.style"
   >
     <textarea
       v-bind="textareaAttrs"
@@ -80,5 +80,5 @@ const textareaClass = computed(() =>
       :style="hasField ? undefined : (attrs.style as never)"
       @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
     />
-  </component>
+  </FieldWrapper>
 </template>

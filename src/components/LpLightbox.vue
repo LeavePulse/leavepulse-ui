@@ -27,6 +27,7 @@ import { useZoomPan } from "../composables/useZoomPan"
 import { fileNameOf, type LightboxItem } from "./lightbox"
 import LpIcon from "./LpIcon.vue"
 import { useModalLayer } from "./modalDepth"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 export type LightboxLabels = {
   viewer: string
@@ -430,11 +431,17 @@ const BTN =
  */
 const ARROW =
   "absolute top-1/2 z-10 flex size-11 -translate-y-1/2 items-center justify-center rounded-pill bg-black/45 text-white/75 ring-1 ring-white/0 outline-none backdrop-blur-sm transition-[background-color,scale,color,box-shadow] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-white/20 hover:text-white hover:ring-white/30 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-0 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
   <DialogRoot :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogPortal>
+    <DialogPortal :to="portalTo">
       <!-- Not `lp-scrim--nested` even over another layer: a lightbox wants its
            full dark backdrop around the picture, not the lighter nested tint.
            The blur is handed up the stack like every scrim's. -->
@@ -444,6 +451,8 @@ const ARROW =
         :style="{ zIndex: layer.scrim }"
       />
       <DialogContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         ref="contentRef"
         class="fixed inset-0 flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
         :style="{ zIndex: layer.panel }"

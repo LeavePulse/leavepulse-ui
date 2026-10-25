@@ -21,6 +21,7 @@ import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
 import { PANEL_SURFACE, POPOVER_ANIM } from "./dropdown"
 import LpButton from "./LpButton.vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -104,10 +105,16 @@ onBeforeUnmount(() => {
 })
 
 const note = computed(() => (openId.value ? props.notes[openId.value] : undefined))
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport :to="portalTo">
     <button
       v-for="spot in spots"
       :key="spot.id"
@@ -126,8 +133,10 @@ const note = computed(() => (openId.value ? props.notes[openId.value] : undefine
     </button>
     <PopoverRoot :open="!!openId" @update:open="(value) => !value && (openId = null)">
       <PopoverAnchor v-if="anchor" :reference="anchor" />
-      <PopoverPortal>
+      <PopoverPortal :to="portalTo">
         <PopoverContent
+          @interact-outside="guardOutside"
+          @escape-key-down="guardOutside"
           side="bottom"
           :side-offset="8"
           :collision-padding="8"

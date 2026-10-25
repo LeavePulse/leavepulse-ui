@@ -11,13 +11,20 @@
  * and the choice survives a reload (anti-flash bootstrap). The component never
  * fetches; it just drives the theme engine.
  */
-import { computed, onMounted, ref } from "vue"
+import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-ui"
+import { computed, onMounted, ref, useId } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 import { presets } from "../theme/presets"
+import { STUDIO_SYSTEM, useThemeStudio } from "../theme/studio"
 import type { TokenSet } from "../theme/tokens"
 import { useTheme } from "../theme/useTheme"
+import { POPOVER_PANEL } from "./dropdown"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
+import LpShift from "./LpShift.vue"
+import LpThemeStudio, { type ThemeStudioPart } from "./LpThemeStudio.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -58,7 +65,19 @@ const props = withDefaults(
      */
     system?: { light: string | TokenSet; dark: string | TokenSet }
     /** Text overrides. `trigger` may contain `{name}`. */
-    labels?: Partial<{ trigger: string; system: string }>
+    labels?: Partial<{ trigger: string; system: string; studio: string; openStudio: string }>
+    /**
+     * The right-click menu ends with "Theme studio…", set apart from the
+     * themes, which opens LpThemeStudio by the trigger: the theme plus brand
+     * colour, corners, control size and motion, remembered under `studioKey`.
+     * Picks and left-click cycling go through the studio then, so a tuned
+     * brand or corner survives the next theme. Rows of the app's own go in
+     * the `#studio-start` / `#studio-end` slots, built-in ones leave with
+     * `studioHide`.
+     */
+    studio?: boolean
+    studioKey?: string
+    studioHide?: ThemeStudioPart[]
   }>(),
   {
     variant: "swatch",
@@ -73,10 +92,46 @@ const emit = defineEmits<{
 }>()
 
 const theme = useTheme()
+const systemNames = () => {
+  const pair = props.system
+  const name = (t: string | TokenSet) => (typeof t === "string" ? t : t.name)
+  return pair ? { light: name(pair.light), dark: name(pair.dark) } : undefined
+}
+const tuner = props.studio
+  ? useThemeStudio({ themes: props.themes, storageKey: props.studioKey, system: systemNames() })
+  : null
+const studioOpen = ref(false)
+const portalTo = usePortalTarget()
+const guardOutside = useOutsideGuard()
+// The trigger is not "outside" the studio: the menu hands focus back to it
+// as the studio opens, and a left-click on it while the studio is open is
+// the next theme, watched in the open panel. Found by a mark rather than a
+// template ref: PopoverAnchor's as-child puts its own ref on the element.
+// Neither is the menu that opened it: it is still fading out when the studio
+// appears, and a real pointer moving over it focuses it, which closed the
+// studio the moment it opened (a synthetic click never moves the pointer).
+const anchorId = `lp-theme-trigger-${useId()}`
+function keepForTrigger(event: Event) {
+  guardOutside(event)
+  const original = (event as CustomEvent<{ originalEvent?: Event }>).detail?.originalEvent
+  const target = (original ?? event).target as Element | null
+  if (
+    target &&
+    typeof target.closest === "function" &&
+    (target.closest(`[data-lp-theme-trigger="${anchorId}"]`) || target.closest('[data-dismissable-layer][data-state="closed"]'))
+  ) {
+    event.preventDefault()
+  }
+}
 
 const text = useLabels(
   "themeSwitcher",
-  { trigger: "Theme: {name}. Click to switch, right-click to choose.", system: "System" },
+  {
+    trigger: "Theme: {name}. Click to switch, right-click to choose.",
+    system: "System",
+    studio: "Theme studio",
+    openStudio: "Theme studio…",
+  },
   () => props.labels,
 )
 
@@ -87,7 +142,7 @@ const list = computed<TokenSet[]>(() =>
 // kit's self-managed `currentName` (so a consumer needs NO ref/bootstrap — the
 // kit remembers the theme like an i18n locale). Falls back to the first theme.
 const activeName = computed(
-  () => props.modelValue ?? (theme.currentName.value || list.value[0]?.name || ""),
+  () => props.modelValue ?? tuner?.state.value.theme ?? (theme.currentName.value || list.value[0]?.name || ""),
 )
 
 // Apply the consumer's default on mount when nothing is cached yet. init()
@@ -113,6 +168,12 @@ const wantsLabel = computed(() => props.showLabel || props.variant === "pill")
 // Apply a theme through the kit's self-managed setter (it persists + updates
 // the shared `current`), then notify. The reveal animates from the click point.
 function applyTheme(t: TokenSet, ev?: MouseEvent) {
+  if (tuner) {
+    tuner.pickTheme(t.name, ev ? { x: ev.clientX, y: ev.clientY } : undefined)
+    emit("update:modelValue", t.name)
+    emit("change", tuner.theme.value)
+    return
+  }
   if (props.transition) {
     theme.setTheme(t, ev ? { x: ev.clientX, y: ev.clientY } : undefined)
   } else {
@@ -163,6 +224,12 @@ const systemPair = computed(() => {
 function followSystem() {
   const pair = systemPair.value
   if (!pair) return
+  // With the studio, "System" is its base theme, so the tuning stays on top.
+  if (tuner) {
+    tuner.pickTheme(STUDIO_SYSTEM)
+    emit("change", tuner.theme.value)
+    return
+  }
   theme.setSystem(pair)
   const next = theme.current.value as TokenSet | null
   if (next) {
@@ -172,7 +239,7 @@ function followSystem() {
 }
 
 const menu = computed<ContextMenuItemDef[]>(() => {
-  const following = theme.system.value
+  const following = tuner ? tuner.state.value.theme === STUDIO_SYSTEM : theme.system.value
   const items: ContextMenuItemDef[] = list.value.map((t) => ({
     label: t.name,
     icon:
@@ -188,6 +255,15 @@ const menu = computed<ContextMenuItemDef[]>(() => {
       label: text.value.system,
       icon: following ? "lucide:check" : "lucide:monitor",
       onSelect: followSystem,
+    })
+  }
+  // Apart from the themes, so it does not read as one more of them.
+  if (tuner) {
+    items.push({
+      label: text.value.openStudio,
+      icon: "lucide:sliders-horizontal",
+      separatorBefore: true,
+      onSelect: () => (studioOpen.value = true),
     })
   }
   return items
@@ -212,7 +288,11 @@ onMounted(() => {
 })
 
 const labelName = computed(() =>
-  hydrated.value ? activeName.value : (list.value[0]?.name ?? ""),
+  hydrated.value
+    ? activeName.value === STUDIO_SYSTEM
+      ? text.value.system
+      : activeName.value
+    : (list.value[0]?.name ?? ""),
 )
 
 const triggerLabel = computed(
@@ -221,46 +301,75 @@ const triggerLabel = computed(
 </script>
 
 <template>
-  <LpContextMenu :items="menu">
-    <button
-      type="button"
-      :aria-label="triggerLabel"
-      :title="triggerLabel"
-      class="inline-flex shrink-0 items-center justify-center gap-2 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
-      :class="
-        wantsLabel
-          ? [
-              HEIGHTS[size],
-              'rounded-full border border-line bg-surface-raised pl-2 pr-3 text-ink hover:border-line-strong hover:bg-surface-soft',
-            ]
-          : [SIZES[size], 'rounded-control text-muted hover:bg-surface-soft hover:text-ink']
-      "
-      @click="cycle"
-    >
-      <!-- A preview of the applied theme: its surface and brand halves. Read from
-           the applied variables rather than the theme object, so the server's
-           render (painted from the cookie) and the client's agree. -->
-      <span
-        v-if="variant !== 'icon'"
-        class="shrink-0 rounded-full shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-ink)_22%,transparent)]"
-        :class="CHIP[size]"
-        style="background: linear-gradient(135deg, var(--color-surface) 50%, var(--color-brand) 50%)"
-      />
-      <!-- sun/moon by mode, chosen by CSS from the applied theme's mode -->
-      <span v-else class="grid shrink-0 place-items-center">
-        <LpIcon
-          name="lucide:moon"
-          :size="ICON_SIZE[size]"
-          class="in-data-[theme-mode=light]:hidden"
-        />
-        <LpIcon
-          name="lucide:sun"
-          :size="ICON_SIZE[size]"
-          class="hidden in-data-[theme-mode=light]:block"
-        />
-      </span>
+  <!-- The studio opens by the trigger, from the last item of its menu. -->
+  <PopoverRoot v-model:open="studioOpen">
+    <PopoverAnchor as-child>
+      <span :data-lp-theme-trigger="anchorId" class="inline-flex shrink-0">
+        <LpContextMenu :items="menu">
+        <button
+          type="button"
+          :aria-label="triggerLabel"
+          :title="triggerLabel"
+          class="inline-flex shrink-0 items-center justify-center gap-2 outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+          :class="
+            wantsLabel
+              ? [
+                  HEIGHTS[size],
+                  'rounded-full border border-line bg-surface-raised pl-2 pr-3 text-ink hover:border-line-strong hover:bg-surface-soft',
+                ]
+              : [SIZES[size], 'rounded-control text-muted hover:bg-surface-soft hover:text-ink']
+          "
+          @click="cycle"
+        >
+          <!-- A preview of the applied theme: its surface and brand halves. Read from
+               the applied variables rather than the theme object, so the server's
+               render (painted from the cookie) and the client's agree. -->
+          <span
+            v-if="variant !== 'icon'"
+            class="shrink-0 rounded-full shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-ink)_22%,transparent)]"
+            :class="CHIP[size]"
+            style="background: linear-gradient(135deg, var(--color-surface) 50%, var(--color-brand) 50%)"
+          />
+          <!-- sun/moon by mode, chosen by CSS from the applied theme's mode -->
+          <span v-else class="grid shrink-0 place-items-center">
+            <LpIcon
+              name="lucide:moon"
+              :size="ICON_SIZE[size]"
+              class="in-data-[theme-mode=light]:hidden"
+            />
+            <LpIcon
+              name="lucide:sun"
+              :size="ICON_SIZE[size]"
+              class="hidden in-data-[theme-mode=light]:block"
+            />
+          </span>
 
-      <span v-if="wantsLabel" class="text-sm font-medium">{{ labelName }}</span>
-    </button>
-  </LpContextMenu>
+          <!-- The name rolls and the pill eases to its width: the studio hangs
+               from this button, and a jump here jumped the whole panel. -->
+          <LpShift v-if="wantsLabel" axis="width">
+            <LpRollingText class="text-sm font-medium" :value="labelName" align="start" />
+          </LpShift>
+        </button>
+        </LpContextMenu>
+      </span>
+    </PopoverAnchor>
+    <PopoverPortal v-if="tuner" :to="portalTo">
+      <PopoverContent
+        :collision-padding="8"
+        side="bottom"
+        align="end"
+        :side-offset="6"
+        :aria-label="text.studio"
+        :class="[POPOVER_PANEL, 'z-(--z-popover) w-96 max-w-[calc(100vw-24px)] rounded-card p-3 text-sm text-ink outline-none']"
+        data-lp-glide-position
+        @interact-outside="keepForTrigger"
+        @escape-key-down="guardOutside"
+      >
+        <LpThemeStudio :studio="tuner" :hide="studioHide">
+          <template #start="scope"><slot name="studio-start" v-bind="scope" /></template>
+          <template #end="scope"><slot name="studio-end" v-bind="scope" /></template>
+        </LpThemeStudio>
+      </PopoverContent>
+    </PopoverPortal>
+  </PopoverRoot>
 </template>

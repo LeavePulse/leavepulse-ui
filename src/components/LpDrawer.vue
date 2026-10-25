@@ -42,6 +42,7 @@ import { usePersisted } from "../composables/usePersisted"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 type Direction = "top" | "bottom" | "left" | "right"
 
@@ -513,6 +514,12 @@ const previewStyle = computed(() => {
     pointerEvents: "none" as const,
   }
 })
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -552,7 +559,7 @@ const previewStyle = computed(() => {
     :close-threshold="closeThreshold"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
-    <DrawerPortal>
+    <DrawerPortal :to="portalTo">
       <DrawerOverlay
         :style="{ zIndex: layer.scrim }"
         @click="guarded && requestClose()"
@@ -560,6 +567,8 @@ const previewStyle = computed(() => {
         :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
       />
       <DrawerContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         ref="contentRef"
         v-bind="description ? {} : { 'aria-describedby': undefined }"
         :class="contentClass"

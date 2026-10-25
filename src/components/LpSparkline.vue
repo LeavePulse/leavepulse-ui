@@ -19,6 +19,7 @@ import LpSkeleton from "./LpSkeleton.vue"
 import { sampleValues } from "./chartSkeleton"
 import { useSample } from "../composables/useSample"
 import { useReveal } from "../composables/useReveal"
+import { mixValues, useTween } from "../composables/useTween"
 import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
 
@@ -87,6 +88,22 @@ const TONE: Record<string, string> = {
 
 const stroke = computed(() => props.color ?? TONE[props.tone])
 
+/*
+ * The sweep is held until the svg is actually on screen. Forty of these sit in
+ * a list, most of them below the fold; started on mount they would all have
+ * finished before the rows carrying them were ever scrolled to.
+ */
+const { el, revealed } = useReveal({ immediate: () => !props.animate })
+
+// The stub holds the place when there is nothing to draw, so the sample can
+// still find the hint it sits in.
+const stub = ref<Element | null>(null)
+const sampling = useSample(
+  computed(() => el.value ?? stub.value),
+  () => !props.loading && !props.data.some((v) => v != null),
+  () => props.sample,
+)
+
 const data = computed(() => (sampling.value ? sampleValues(props.data.length || 12) : props.data))
 
 const series = computed(() => normalise([{ name: "s", data: data.value }]))
@@ -116,32 +133,56 @@ const bounds = computed(() => {
   return { min: props.min ?? auto.min, max: props.max ?? auto.max }
 })
 
+/*
+ * What is DRAWN: each reading as its height in the box, 0 at the bottom and 1
+ * at the top, travelling from the last line to the new one.
+ *
+ * Heights, not raw values, because the range moves with the data. New values
+ * on the old range overshoot the box and old values on the new range redraw the
+ * line at another height, and tweening values and range side by side has a
+ * blind spot of its own: when the new range collapses (a flat series), values
+ * and range shrink in proportion, the line holds its old shape the whole way
+ * and then drops on the last frame. Heights are already on the range, so a
+ * frame partway is a line partway, whatever happened to the scale.
+ */
+const heights = computed(() => {
+  const { min, max } = bounds.value
+  const span = max - min || 1
+  return series.value[0].values.map((v) => (v == null ? null : (v - min) / span))
+})
+
+const shown = useTween(() => heights.value, mixValues, {
+  /*
+   * Only a line already on screen morphs. Before it is revealed the draw-on
+   * is still to come, and while the loading band or the stub stands in (`el`
+   * unset) the line will mount fresh and draw itself in — a morph from
+   * readings nobody saw would only blur that entrance.
+   */
+  enabled: () => props.animate && revealed.value && !!el.value,
+})
+
 const geo = computed(() => ({
-  min: bounds.value.min,
-  max: bounds.value.max,
+  min: 0,
+  max: 1,
   box: box.value,
-  count: data.value.length,
+  count: shown.value.length,
   banded: false,
 }))
 
-const d = computed(() => linePath(series.value[0].values, geo.value, props.smooth))
-const fill = computed(() =>
-  props.area ? areaPath(series.value[0].values, geo.value, props.smooth) : "",
-)
+const d = computed(() => linePath(shown.value, geo.value, props.smooth))
+const fill = computed(() => (props.area ? areaPath(shown.value, geo.value, props.smooth) : ""))
 
 /** Last point that actually has a value — the dot goes there, not on a gap. */
 const lastPoint = computed(() => {
-  const values = series.value[0].values
+  const values = shown.value
   for (let i = values.length - 1; i >= 0; i--) {
     const v = values[i]
     if (v == null) continue
-    const span = bounds.value.max - bounds.value.min || 1
     const w = props.width - PAD * 2
     const h = props.height - PAD * 2
     return {
-      x: data.value.length <= 1 ? PAD + w / 2 : PAD + (w / (data.value.length - 1)) * i,
-      y: PAD + h - ((v - bounds.value.min) / span) * h,
-      v,
+      x: values.length <= 1 ? PAD + w / 2 : PAD + (w / (values.length - 1)) * i,
+      y: PAD + h - v * h,
     }
   }
   return null
@@ -185,22 +226,6 @@ const pathLength = computed(() => {
   const segment = Math.hypot((props.width - PAD * 2) / n, props.height - PAD * 2)
   return Math.ceil(segment * n + 4)
 })
-
-/*
- * The sweep is held until the svg is actually on screen. Forty of these sit in
- * a list, most of them below the fold; started on mount they would all have
- * finished before the rows carrying them were ever scrolled to.
- */
-const { el, revealed } = useReveal({ immediate: () => !props.animate })
-
-// The stub holds the place when there is nothing to draw, so the sample can
-// still find the hint it sits in.
-const stub = ref<Element | null>(null)
-const sampling = useSample(
-  computed(() => el.value ?? stub.value),
-  () => !props.loading && !props.data.some((v) => v != null),
-  () => props.sample,
-)
 
 const revealStyle = computed(() =>
   props.animate

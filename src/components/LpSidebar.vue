@@ -320,6 +320,7 @@ defineOptions({ inheritAttrs: false })
       v-model="query"
       size="sm"
       icon="lucide:search"
+      clearable
       class="mb-2 shrink-0"
       :placeholder="placeholder"
       :aria-label="placeholder"
@@ -380,6 +381,7 @@ defineOptions({ inheritAttrs: false })
         v-model="query"
         size="sm"
         icon="lucide:search"
+        clearable
         class="mb-2 shrink-0"
         :placeholder="placeholder"
         :aria-label="placeholder"

@@ -43,6 +43,7 @@ import {
 } from "../composables/usePillTransition"
 import { PANEL_SURFACE, TOOLTIP_ANIM } from "./dropdown"
 import { prefersReducedMotion } from "../composables/easing"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -223,6 +224,12 @@ watch(
 onBeforeUnmount(() => {
   if (frame) cancelAnimationFrame(frame)
 })
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -250,8 +257,10 @@ onBeforeUnmount(() => {
       >
         <slot />
       </TooltipTrigger>
-      <TooltipPortal>
+      <TooltipPortal :to="portalTo">
         <TooltipContent
+          @interact-outside="guardOutside"
+          @escape-key-down="guardOutside"
           :side="side"
           :side-offset="sideOffset ?? 6"
           :collision-padding="8"

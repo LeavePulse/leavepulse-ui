@@ -4,7 +4,6 @@ import {
   LpAppShell,
   LpButton,
   type Command,
-  LpCodeBlock,
   LpCommandPalette,
   LpConfirmHost,
   LpEmptyState,
@@ -18,14 +17,15 @@ import {
   LpShortcutsDialog,
   LpToaster,
   presets,
+  useThemeStudio,
+  LpThemeSwitcher,
   useHotkeys,
   type PresetName,
   type ShortcutGroup,
   type SidebarSection,
 } from "../src"
-import ThemeStudio from "./ThemeStudio.vue"
-import { PRESETS, useStudio } from "./studio"
 import ComponentPage from "./playground/ComponentPage.vue"
+import ThumbView from "./playground/ThumbView.vue"
 import { registry, sectionOf, sections } from "./playground/registry"
 import { href, navigate, useRoute } from "./playground/router"
 import AppShellDemo from "./pages/AppShellDemo.vue"
@@ -81,9 +81,12 @@ function goHome(e: MouseEvent) {
   navigate({ kind: "home" })
 }
 
-const { studio, pickPreset } = useStudio()
-const theme = computed<PresetName>(() => studio.value.preset)
-const THEMES = PRESETS
+// The site theme is the kit's own studio: the header's switcher cycles it on
+// a click and opens it on a right-click, and the palette's theme rows pick
+// from the same state.
+const studio = useThemeStudio()
+const THEMES = Object.keys(presets) as PresetName[]
+const theme = computed<PresetName>(() => THEMES.find((name) => presets[name].name === studio.state.value.theme) ?? "dark")
 const THEME_ICON: Record<PresetName, string> = {
   dark: "lucide:moon",
   light: "lucide:sun",
@@ -94,7 +97,7 @@ const THEME_ICON: Record<PresetName, string> = {
   nord: "lucide:snowflake",
 }
 function setTheme(name: PresetName) {
-  pickPreset(name)
+  studio.pickTheme(presets[name].name)
 }
 
 /*
@@ -143,12 +146,16 @@ const siteHotkey = computed(() => !(route.value.kind === "component" && route.va
 const pageLink = (id: string) => href({ kind: "page", id })
 
 /*
- * The preview pane for a component: its route, the first sentence as the lead,
- * the rest of the description below it, and the start of its live example in
- * a code block, so the palette answers "what is this and how is it used"
- * before the page is even open.
+ * The preview pane for a component: the component itself, live, the way its
+ * card on the overview shows it, then its route, the first sentence as the
+ * lead and the rest of the description, with `code` in it set as code, so
+ * the palette answers "what does it look like and what is it for" before the
+ * page is open. The start of the example's source used to stand here: a block
+ * of markup said less than the thing it draws.
  */
-const PREVIEW_LINES = 12
+type Prose = { text: string; code: boolean }[]
+const prose = (text: string): Prose =>
+  text.split(/`([^`]+)`/).map((part, i) => ({ text: part, code: i % 2 === 1 })).filter((part) => part.text)
 function themePreview(id: string) {
   const name = id.replace(/^theme\//, "") as PresetName
   return id.startsWith("theme/") && name in presets ? { name, preset: presets[name] } : null
@@ -159,18 +166,16 @@ function componentPreview(id: string) {
   if (!entry) return null
   const text = entry.description.trim()
   const cut = text.search(/[.!?](\s|$)/)
-  const lead = cut > 0 ? text.slice(0, cut + 1) : text
-  const rest = cut > 0 ? text.slice(cut + 1).trim() : ""
-  const lines = entry.template.trim().split("\n")
-  const code = lines.slice(0, PREVIEW_LINES).join("\n") + (lines.length > PREVIEW_LINES ? "\n…" : "")
-  return { entry, lead, rest, code, path: `/component/${entry.id}` }
+  const lead = (cut > 0 ? text.slice(0, cut + 1) : text).replace(/`/g, "")
+  const rest = prose(cut > 0 ? text.slice(cut + 1).trim() : "")
+  return { entry, lead, rest, path: `/component/${entry.id}` }
 }
 
 const commands = computed<Command[]>(() => [
   ...registry.map((entry) => ({
     id: `component/${entry.id}`,
     label: entry.name,
-    description: entry.description,
+    description: entry.description.replace(/`/g, ""),
     preview: entry.description,
     icon: "lucide:box",
     group: "Components",
@@ -277,7 +282,7 @@ const SITE_KEYS: ShortcutGroup[] = [
         <span class="max-sm:hidden">Search</span>
         <LpKeys combo="Ctrl+K" class="max-sm:hidden" />
       </LpButton>
-      <ThemeStudio />
+      <LpThemeSwitcher studio variant="pill" :system="{ light: 'Light', dark: 'Dark' }" />
     </template>
 
     <Layout v-if="!notFound && pageId === 'layout'" class="h-full w-full" />
@@ -314,12 +319,17 @@ const SITE_KEYS: ShortcutGroup[] = [
              way the rows do. -->
         <LpPalettePreview v-if="componentPreview(command.id)">
           <template v-for="p in [componentPreview(command.id)!]" :key="p.entry.id">
-            <LpPaletteHeader eyebrow="Component" :title="highlight(p.entry.name)" icon="lucide:box" :subtitle="p.path" :lead="highlight(p.lead)" />
-            <p v-if="p.rest" class="text-xs leading-relaxed text-muted">{{ p.rest }}</p>
-            <div class="flex flex-col gap-1.5">
-              <span class="text-[11px] font-medium tracking-wide text-muted uppercase">Example</span>
-              <LpCodeBlock :model-value="p.code" lang="html" :copyable="false" class="text-[11px]" />
+            <div class="overflow-hidden rounded-card border border-line">
+              <ThumbView :entry="p.entry" :icon="sectionOf.get(p.entry.id)?.icon" />
             </div>
+            <LpPaletteHeader eyebrow="Component" :title="highlight(p.entry.name)" icon="lucide:box" :subtitle="p.path" :lead="highlight(p.lead)" />
+            <p v-if="p.rest.length" class="text-xs leading-relaxed text-muted">
+              <template v-for="(part, i) in p.rest" :key="i">
+                <code v-if="part.code" class="rounded-sm bg-surface-soft px-1 py-px font-mono text-[11px] text-ink">{{ part.text }}</code>
+                <template v-else>{{ part.text }}</template>
+              </template>
+            </p>
+            <LpKeys combo="Enter" label="opens its page" />
           </template>
         </LpPalettePreview>
         <LpPalettePreview v-else-if="themePreview(command.id)">

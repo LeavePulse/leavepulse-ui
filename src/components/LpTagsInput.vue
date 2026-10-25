@@ -44,11 +44,13 @@ import { useShift } from "../composables/useShift"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import LpFieldNotice from "./LpFieldNotice.vue"
-import LpFormField from "./LpFormField.vue"
+import FieldWrapper from "./FieldWrapper.vue"
 import LpIcon from "./LpIcon.vue"
+import OptionContent from "./OptionContent.vue"
 import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import type { LpOptionBase, OptionSelection } from "./options"
 import { addTags, splitTags, type TagDuplicates, type TagRejection, type TagValidator } from "./tags"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -327,6 +329,7 @@ function choose(opt: LpOptionBase<string>): void {
 
 /** Clicks on the box itself are not "outside" the list: they are typing. */
 function keepOpenInside(event: Event): void {
+  guardOutside(event)
   const target = event.target
   if (target instanceof Node && boxEl.value?.contains(target)) event.preventDefault()
 }
@@ -413,19 +416,25 @@ function onModel(value: (string | Record<string, unknown>)[] | null): void {
 }
 
 defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(value) })
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
-  <component
-    :is="hasField ? LpFormField : 'div'"
+  <FieldWrapper
+    :wrapped="hasField"
     :ref="bindField"
-    :label="hasField ? label : undefined"
-    :hint="hasField ? hint : undefined"
-    :error="hasField ? error : undefined"
-    :required="hasField ? required : undefined"
-    :id="hasField ? field.id : undefined"
-    :class="hasField ? attrs.class : 'contents'"
-    :style="hasField ? attrs.style : undefined"
+    :id="field.id"
+    :label="label"
+    :hint="hint"
+    :error="error"
+    :required="required"
+    :class="attrs.class"
+    :style="attrs.style"
   >
     <div class="relative">
       <TagsInputRoot
@@ -505,7 +514,7 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
       <LpFieldNotice v-if="standalone" :notice="notice" :id="noticeId" />
       <PopoverRoot v-if="options" :open="listOpen" @update:open="(o) => !o && (dismissed = true)">
         <PopoverAnchor v-if="boxEl" :reference="boxEl" class="hidden" />
-        <PopoverPortal>
+        <PopoverPortal :to="portalTo">
           <PopoverContent
             :id="listId"
             role="listbox"
@@ -539,12 +548,7 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
                 @pointermove="activeIndex = i"
                 @click="!opt.disabled && choose(opt)"
               >
-                <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
-                <LpIcon v-else-if="opt.icon" :name="opt.icon" :size="16" class="shrink-0 text-muted" />
-                <span class="flex min-w-0 flex-col">
-                  <span class="truncate">{{ opt.label ?? opt.value }}</span>
-                  <span v-if="opt.description" class="truncate text-xs text-muted">{{ opt.description }}</span>
-                </span>
+                <OptionContent :option="opt" />
               </div>
             </template>
           </PopoverContent>
@@ -552,5 +556,5 @@ defineExpose({ focus: () => inputEl.value?.focus(), add: (value: string) => add(
       </PopoverRoot>
     </div>
     <span class="sr-only" aria-live="polite">{{ announcement }}</span>
-  </component>
+  </FieldWrapper>
 </template>

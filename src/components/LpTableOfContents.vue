@@ -2,11 +2,11 @@
 /*
  * On-this-page table of contents with scroll-spy. Data-driven: pass the heading
  * tree (id + text, optional nested children) and it renders a rail of anchor
- * links, tracking which section is in view via IntersectionObserver and sliding
+ * links, tracking which section is in view from heading positions and sliding
  * a brand indicator to it (motion-v shared layoutId — same feel as Tabs/Sidebar).
  *
  * The kit convention for a docs/article TOC so apps stop re-implementing the
- * observer + active-link math. Clicking a link smooth-scrolls to the heading and
+ * scroll-spy + active-link math. Clicking a link smooth-scrolls to the heading and
  * marks it active immediately (so the pill doesn't lag the scroll).
  */
 import { Motion } from "motion-v"
@@ -27,7 +27,12 @@ const props = withDefaults(
     links: TocLink[]
     /** Heading shown above the list (defaults to the `title` label). */
     title?: string
-    /** px offset from the top used as the scroll-spy trigger line. */
+    /**
+     * The least distance, px from the top, of the scroll-spy trigger line. The
+     * line sits at a quarter of the view when that is lower: a heading a
+     * couple of lines down already starts what is being read, and a fixed line
+     * near the top kept the previous section lit under it.
+     */
     offset?: number
     labels?: Partial<{ title: string }>
     /**
@@ -70,7 +75,7 @@ function flatIds(links: TocLink[]): string[] {
   return links.flatMap((l) => [l.id, ...(l.children ? flatIds(l.children) : [])])
 }
 
-let observer: IntersectionObserver | null = null
+let stopSpy: (() => void) | null = null
 
 // While a click-driven smooth scroll is in flight, freeze scroll-spy so the bar
 // doesn't skip through every heading the page passes on the way to the target.
@@ -78,34 +83,53 @@ let spySuppressed = false
 let rafId: number | null = null
 let safetyTimer: ReturnType<typeof setTimeout> | null = null
 
+/*
+ * The current section is read from positions on every scroll, not from which
+ * headings cross a thin band: a band misses the moment no heading is in it,
+ * and scrolling back to the top then left the second section lit. The active
+ * heading is the last one whose top has passed the offset line; above the
+ * first, the first; at the very end of the scroll, the last, which a short
+ * final section could otherwise never reach. Works for the window and for a
+ * scroll area the headings live in.
+ */
 function setup() {
-  observer?.disconnect()
+  stopSpy?.()
+  stopSpy = null
   const ids = flatIds(props.links)
   if (!ids.length) return
+  const first = document.getElementById(ids[0]!)
+  const scroller = first ? scrollParent(first) : null
+  let frame = 0
 
-  // Track the topmost heading whose top has crossed the offset line. We keep a
-  // set of "currently intersecting" and, on every change, pick the first id in
-  // document order that's visible — falling back to the last one scrolled past.
-  const visible = new Set<string>()
-  observer = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) visible.add(e.target.id)
-        else visible.delete(e.target.id)
-      }
-      if (spySuppressed) return // ignore intermediate sections during a click-scroll
-      const firstVisible = ids.find((id) => visible.has(id))
-      if (firstVisible) activeId.value = firstVisible
-    },
-    { rootMargin: `-${props.offset}px 0px -70% 0px`, threshold: 0 },
-  )
-
-  for (const id of ids) {
-    const el = document.getElementById(id)
-    if (el) observer.observe(el)
+  const measure = () => {
+    frame = 0
+    if (spySuppressed) return
+    const top = scroller ? scroller.getBoundingClientRect().top : 0
+    const headings = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el)
+    if (!headings.length) return
+    let current = headings[0]!.id
+    const view = scroller ? scroller.clientHeight : window.innerHeight
+    const line = Math.max(props.offset, view / 4)
+    for (const el of headings) if (el.getBoundingClientRect().top - top <= line + 1) current = el.id
+    const scrolled = scroller ? scroller.scrollTop : window.scrollY
+    const end = scroller
+      ? scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
+      : window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+    if (scrolled > 0 && end) current = headings[headings.length - 1]!.id
+    activeId.value = current
   }
-  // Seed the initial active id (top-most heading) so the bar isn't empty.
-  if (!activeId.value) activeId.value = ids[0] ?? ""
+  const onScroll = () => {
+    if (!frame) frame = requestAnimationFrame(measure)
+  }
+  const target: HTMLElement | Window = scroller ?? window
+  target.addEventListener("scroll", onScroll, { passive: true })
+  window.addEventListener("resize", onScroll)
+  measure()
+  stopSpy = () => {
+    target.removeEventListener("scroll", onScroll)
+    window.removeEventListener("resize", onScroll)
+    if (frame) cancelAnimationFrame(frame)
+  }
 }
 
 // Suppress scroll-spy until the smooth scroll settles. The unfreeze isn't on a
@@ -157,7 +181,7 @@ function onClick(id: string, ev: MouseEvent) {
 onMounted(setup)
 watch(() => props.links, setup, { deep: true })
 onBeforeUnmount(() => {
-  observer?.disconnect()
+  stopSpy?.()
   unfreeze()
 })
 </script>

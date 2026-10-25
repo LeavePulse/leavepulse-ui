@@ -35,16 +35,17 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, reactive, ref, useAttrs, useId, watch } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import OptionContent from "./OptionContent.vue"
 import LpRollingText from "./LpRollingText.vue"
-import LpShift from "./LpShift.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
 import { fitChips, toggledValues } from "./select"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 export type SelectValue = string | number
 
@@ -143,6 +144,8 @@ const emit = defineEmits<{
   (e: "change", value: V): void
   // Search input text (for `v-model:searchTerm` / server-side search).
   (e: "update:searchTerm", value: string): void
+  /** Focus left the whole field (not into its own list or clear button). */
+  (e: "blur", event: FocusEvent): void
 }>()
 
 // Server-side search is active when the parent binds searchTerm.
@@ -164,9 +167,37 @@ const query = computed<string>({
 // This is not enough on its own: reka seeds the box on *select*, not on open,
 // so the next opening filters before this runs. `reset-search-term-on-select`
 // below is what stops the seeding; this keeps a stale term from surviving.
-function onOpenChange(_open: boolean) {
+const isOpen = ref(false)
+function onOpenChange(open: boolean) {
+  isOpen.value = open
   query.value = ""
 }
+
+// Leaving the field, not moving between its parts: the trigger and the list
+// are marked with one id, because the list is portalled away from the trigger
+// and a check on the trigger alone either missed the search box or took a
+// step into it for leaving.
+const partOf = `lp-select-${useId()}`
+function onFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Element | null
+  const inside = !!next && typeof next.closest === "function" && !!next.closest(`[data-lp-select-part="${partOf}"]`)
+  if (!inside) emit("blur", event)
+}
+
+/*
+ * The trigger's name. reka hard-codes aria-label="Show popup" on it, which hid
+ * the field's label and the chosen value; aria-labelledby outranks aria-label,
+ * so inside a labelled field the name is the label plus the value. On its own,
+ * the consumer's aria-label, else the value or placeholder.
+ */
+const attrs = useAttrs()
+const valueId = `lp-select-${useId()}-value`
+const valueText = computed(() => (chips.value.length ? chipNames.value : displayLabel.value || placeholderText.value))
+const triggerName = computed(() =>
+  field.value.labelId
+    ? { "aria-labelledby": `${field.value.labelId} ${valueId}`, "aria-label": undefined }
+    : { "aria-label": (attrs["aria-label"] as string | undefined) ?? valueText.value },
+)
 
 // reka's Combobox forbids an empty-string item value (it reserves "" for
 // "cleared"). An empty-string option is legitimate for us (e.g. "Any edition"),
@@ -271,6 +302,12 @@ const displayLabel = computed(() => {
   return current.value?.label ?? ""
 })
 
+// What makes the shown pick "another one": its name, hint and picture together.
+const rollKey = computed(() => {
+  const c = current.value
+  return c ? [c.label, c.hint ?? "", c.image ?? c.icon ?? ""].join("\u0000") : `\u0000${placeholderText.value}`
+})
+
 /*
  * Chips collapse to "+N" when the row runs out of room. Every chip is drawn a
  * second time in an invisible probe row at its natural width; the visible row
@@ -334,8 +371,15 @@ function onUpdate(value: unknown) {
 }
 
 function clear() {
+  if (field.value.disabled) return
   emit("update:modelValue", (props.multiple ? [] : undefined) as Model)
 }
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -349,6 +393,7 @@ function clear() {
     :model-value="comboModel"
     :multiple="multiple"
     :disabled="field.disabled"
+    :required="field.required"
     :ignore-filter="true"
     :reset-search-term-on-select="false"
     :reset-search-term-on-blur="false"
@@ -358,9 +403,12 @@ function clear() {
     @update:open="onOpenChange"
   >
     <ComboboxAnchor
+      :data-lp-select-part="partOf"
+      @focusout="onFocusOut"
       :class="[
         anchorHeight,
-        'group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55',
+        'group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2',
+        field.disabled && 'cursor-not-allowed opacity-55',
         field.invalid
           ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft'
           : 'border-line focus-within:border-brand focus-within:ring-ring',
@@ -370,8 +418,10 @@ function clear() {
            will not go narrower than its content without it, so a long
            placeholder stretched the whole field past the viewport instead of
            being cut short. -->
+      <span :id="valueId" hidden>{{ valueText }}</span>
       <ComboboxTrigger
         :id="field.id"
+        v-bind="triggerName"
         :aria-invalid="field.invalid || undefined"
         :aria-describedby="field.describedBy"
         class="flex min-w-0 flex-1 items-center gap-2 outline-none"
@@ -429,52 +479,28 @@ function clear() {
           </span>
         </span>
         <template v-else>
-          <!-- The pick's picture or icon eases in beside the name; the box it
-               sits in grows rather than shoving the name over in one frame. -->
-          <LpShift axis="width" class="shrink-0">
-            <Transition
-              mode="out-in"
-              enter-active-class="transition-[opacity,scale] duration-[var(--duration-fast)] motion-reduce:transition-none"
-              leave-active-class="transition-[opacity,scale] duration-[var(--duration-fast)] motion-reduce:transition-none"
-              enter-from-class="scale-75 opacity-0"
-              leave-to-class="scale-75 opacity-0"
-            >
+          <!-- The pick turns over as one piece: its picture, name and hint
+               leave together and the next ones arrive together. Animated
+               apart (a fading picture, a rolling name, a cross-faded hint)
+               they ran at three speeds, and for a moment the old hint stood
+               beside the new one and shoved the row. -->
+          <LpRollingText :value="rollKey" align="start" class="min-w-0 flex-1">
+            <span class="flex min-w-0 items-center gap-2">
               <img
                 v-if="current?.image"
-                :key="current.image"
                 :src="current.image"
                 alt=""
-                class="block size-5 rounded-full object-cover"
+                class="block size-5 shrink-0 rounded-full object-cover"
               />
-              <LpIcon
-                v-else-if="current?.icon"
-                :key="current.icon"
-                :name="current.icon"
-                :size="16"
-                class="block text-muted"
-              />
-            </Transition>
-          </LpShift>
-          <!-- The choice rolls in rather than swapping, as the kit's other
-               changing labels do. -->
-          <LpRollingText
-            :value="displayLabel || placeholderText"
-            align="start"
-            class="min-w-0"
-            :class="displayLabel ? '' : 'text-muted'"
-          />
-          <Transition
-            enter-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
-            leave-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
-            enter-from-class="opacity-0"
-            leave-to-class="opacity-0"
-          >
-            <span v-if="current?.hint" :key="current.hint" class="min-w-0 truncate text-muted">{{ current.hint }}</span>
-          </Transition>
+              <LpIcon v-else-if="current?.icon" :name="current.icon" :size="16" class="block shrink-0 text-muted" />
+              <span class="min-w-0 truncate" :class="displayLabel ? '' : 'text-muted'">{{ displayLabel || placeholderText }}</span>
+              <span v-if="current?.hint" class="min-w-0 truncate text-muted">{{ current.hint }}</span>
+            </span>
+          </LpRollingText>
         </template>
       </ComboboxTrigger>
       <button
-        v-if="clearable && hasValue"
+        v-if="clearable && hasValue && !field.disabled"
         type="button"
         class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
         :aria-label="labels.clear"
@@ -507,8 +533,12 @@ function clear() {
       </ComboboxTrigger>
     </ComboboxAnchor>
 
-    <ComboboxPortal>
+    <ComboboxPortal :to="portalTo">
       <ComboboxContent
+        :data-lp-select-part="partOf"
+        @focusout="onFocusOut"
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         position="popper"
         :side-offset="6"
         :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"
@@ -538,16 +568,7 @@ function clear() {
             :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
             :class="[OPTION_ITEM, 'justify-between data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
           >
-            <span class="flex min-w-0 items-center gap-2.5">
-              <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
-              <LpIcon v-else-if="opt.icon" :name="opt.icon" :size="16" class="shrink-0 text-muted" />
-              <span class="flex min-w-0 flex-col">
-                <span class="truncate">{{ opt.label }}</span>
-                <span v-if="opt.description" class="truncate text-xs text-muted">
-                  {{ opt.description }}
-                </span>
-              </span>
-            </span>
+            <OptionContent :option="opt" />
             <ComboboxItemIndicator class="flex shrink-0 items-center text-brand">
               <LpIcon name="lucide:check" :size="16" />
             </ComboboxItemIndicator>

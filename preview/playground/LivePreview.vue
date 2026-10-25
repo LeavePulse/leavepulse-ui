@@ -12,7 +12,7 @@
  * Preview-only: the kit package never ships a runtime compiler.
  */
 import { compile, computed, defineComponent, onErrorCaptured, reactive, ref, watch, type Component } from "vue"
-import { LpIcon, LpSegmented, usePersisted } from "../../src"
+import { LpFrame, LpIcon, LpSegmented, usePersisted } from "../../src"
 
 const props = defineProps<{
   template: string
@@ -65,6 +65,10 @@ const Boundary = defineComponent({
 const width = usePersisted<"full" | "tablet" | "phone">("lp-preview-stage-width", "full")
 const backdrop = usePersisted<"plain" | "grid" | "dots">("lp-preview-stage-backdrop", "plain")
 const WIDTHS = { full: "100%", tablet: "768px", phone: "375px" }
+// A device is a screen, not a strip as tall as the demo: a modal centres in
+// it and a tour's sheet sits at its bottom. The full width grows with the
+// demo instead, from a height that still leaves an overlay room.
+const HEIGHTS = { full: undefined, tablet: 720, phone: 667 }
 const error = computed(() => compileError.value ?? runtimeError.value)
 </script>
 
@@ -92,18 +96,27 @@ const error = computed(() => compileError.value ?? runtimeError.value)
         ]"
       />
     </div>
-    <!-- A demo wider than its stage scrolls inside it instead of being cut off
-         or pushing the page sideways; "safe" centring keeps its left edge
-         reachable when it overflows. -->
+    <!-- The demo runs in a frame of its own (LpFrame): its width is the
+         viewport, so the phone width gets the phone layout, overlays open
+         inside it, and using the page around it closes nothing in it. A demo
+         wider than the frame scrolls inside it; "safe" centring keeps its
+         left edge reachable. -->
     <div class="lp-stage relative flex justify-center p-4 sm:p-8" :data-backdrop="backdrop">
       <div
-        class="flex min-h-32 w-full items-center justify-center overflow-x-auto transition-[max-width] duration-(--duration-medium) ease-(--ease-emphasized) [justify-content:safe_center] *:max-w-full *:min-w-0"
+        class="w-full transition-[max-width] duration-(--duration-medium) ease-(--ease-emphasized)"
         :class="width !== 'full' && 'rounded-control outline-1 outline-offset-8 outline-line-strong outline-dashed'"
         :style="{ maxWidth: WIDTHS[width] }"
       >
-        <Boundary :key="good">
-          <component :is="Dynamic" />
-        </Boundary>
+        <LpFrame :height="HEIGHTS[width]" class="min-h-40" title="Example">
+          <div
+            class="flex w-full items-center justify-center overflow-x-auto p-4 [justify-content:safe_center] *:max-w-full *:min-w-0"
+            :class="width === 'full' ? 'min-h-40' : 'min-h-screen'"
+          >
+            <Boundary :key="good">
+              <component :is="Dynamic" />
+            </Boundary>
+          </div>
+        </LpFrame>
       </div>
     </div>
     <p v-if="error" class="flex items-start gap-2 border-t border-danger/30 bg-danger-soft px-4 py-2 font-mono text-xs text-danger">

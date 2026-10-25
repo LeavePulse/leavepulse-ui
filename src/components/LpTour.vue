@@ -67,11 +67,13 @@ import { hints } from "../composables/useHints"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
 import { useMediaQuery } from "../composables/useMediaQuery"
+import { useView, viewDocument, viewWindow } from "../composables/useView"
 import { scrollToElement } from "../composables/scroll"
 import { PANEL_SURFACE } from "./dropdown"
 import TourCard from "./TourCard.vue"
 import type { Box } from "../composables/spatialNav"
 import { holeClip, holeOf, panelsAround } from "./tour"
+import { usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -111,6 +113,10 @@ const SETTLE_MS = 1000
 const CARD_ROOM = 200
 
 const wide = useMediaQuery("(min-width: 640px)")
+// The window the tour walks: the page's, or an LpFrame's when it runs in one.
+const view = useView()
+const win = () => viewWindow(view.value)
+const doc = () => viewDocument(view.value)
 const sampled = ref(false)
 const step = computed<TourStep | undefined>(() => {
   const raw = props.steps[index.value]
@@ -161,7 +167,7 @@ function resolve(raw: TourStep["target"]): Element | null {
   try {
     if (typeof raw === "function") return raw()
     if (typeof raw !== "string") return raw.isConnected ? raw : null
-    return hints.element(raw) ?? document.querySelector(raw)
+    return hints.element(raw) ?? doc().querySelector(raw)
   } catch {
     return null
   }
@@ -185,9 +191,9 @@ function waitFor(raw: TourStep["target"], mine: number): Promise<Element | null>
 // or calc(), which parseFloat would misread (0.5rem → 0.5px), so the browser
 // resolves it on a throwaway element.
 function controlRadius(): number {
-  const probe = document.createElement("div")
+  const probe = doc().createElement("div")
   probe.style.cssText = "position:absolute;visibility:hidden;border-top-left-radius:var(--radius-control)"
-  document.body.append(probe)
+  doc().body.append(probe)
   const px = parseFloat(getComputedStyle(probe).borderTopLeftRadius)
   probe.remove()
   return Number.isFinite(px) ? px : 8
@@ -201,7 +207,7 @@ const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms))
 // to land. Endless animations (a pulse, a spinner) never land and are left out.
 async function settled(el: Element): Promise<void> {
   await new Promise(requestAnimationFrame)
-  const moving = document.getAnimations().filter((animation) => {
+  const moving = doc().getAnimations().filter((animation) => {
     const node = animation.effect instanceof KeyframeEffect ? animation.effect.target : null
     const end = Number(animation.effect?.getComputedTiming().endTime)
     return !!node && (node.contains(el) || el.contains(node)) && Number.isFinite(end)
@@ -239,7 +245,7 @@ function glideTo(el: Element | null) {
 }
 
 function measure() {
-  viewport.value = { width: window.innerWidth, height: window.innerHeight }
+  viewport.value = { width: win().innerWidth, height: win().innerHeight }
   const el = target.value
   if (!el) {
     box.value = null
@@ -371,13 +377,13 @@ watch(
       direction = 1
       box.value = null
       radius.value = controlRadius()
-      document.addEventListener("click", onTargetClick, true)
-      document.addEventListener("contextmenu", onTargetClick, true)
+      doc().addEventListener("click", onTargetClick, true)
+      doc().addEventListener("contextmenu", onTargetClick, true)
       frame ||= requestAnimationFrame(track)
       void show()
     } else {
-      document.removeEventListener("click", onTargetClick, true)
-      document.removeEventListener("contextmenu", onTargetClick, true)
+      doc().removeEventListener("click", onTargetClick, true)
+      doc().removeEventListener("contextmenu", onTargetClick, true)
       end()
     }
   },
@@ -389,8 +395,8 @@ watch(index, () => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener("click", onTargetClick, true)
-  document.removeEventListener("contextmenu", onTargetClick, true)
+  doc().removeEventListener("click", onTargetClick, true)
+  doc().removeEventListener("contextmenu", onTargetClick, true)
   if (open.value) end()
 })
 
@@ -408,10 +414,13 @@ useHotkeys(
 // and reka switches off pointer events on every older one, the card included
 // when it carries over from the step before. The tour sits above all of them.
 const CARD = `${PANEL_SURFACE} pointer-events-auto! rounded-card w-80 max-w-[calc(100vw-24px)] p-4 text-sm text-ink outline-none`
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport :to="portalTo">
     <Transition
       enter-active-class="transition-opacity duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
       leave-active-class="lp-tour-gone transition-opacity duration-[var(--duration-medium)] ease-out motion-reduce:transition-none"
@@ -444,7 +453,7 @@ const CARD = `${PANEL_SURFACE} pointer-events-auto! rounded-card w-80 max-w-[cal
 
     <PopoverRoot v-if="wide" :open="open && ready">
       <PopoverAnchor :reference="reference" />
-      <PopoverPortal>
+      <PopoverPortal :to="portalTo">
         <PopoverContent
           :side="side"
           :side-offset="12"
@@ -452,6 +461,7 @@ const CARD = `${PANEL_SURFACE} pointer-events-auto! rounded-card w-80 max-w-[cal
           update-position-strategy="always"
           :trap-focus="false"
           :class="[CARD, 'z-[calc(var(--z-tour)+1)] data-[state=open]:animate-[popover-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[popover-out_var(--duration-fast)_ease-out] motion-reduce:animate-none']"
+          :data-lp-glide-position="gliding || undefined"
           role="dialog"
           :aria-label="step?.title"
           @pointerdown.stop
@@ -481,3 +491,4 @@ const CARD = `${PANEL_SURFACE} pointer-events-auto! rounded-card w-80 max-w-[cal
     </Transition>
   </Teleport>
 </template>
+

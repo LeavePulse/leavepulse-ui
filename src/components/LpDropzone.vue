@@ -43,6 +43,7 @@ import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-
 import DropzoneLinkField from "./DropzoneLinkField.vue"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -266,7 +267,9 @@ function onPaste(event: ClipboardEvent) {
  * zone back. A click on the zone around the field also only closes it: the
  * file dialog opening under a half-typed address would lose it.
  */
-const linking = ref(false)
+// Bindable (v-model:linking) so a page can open the field itself, a tour
+// step or a demo showing that an address works too.
+const linking = defineModel<boolean>("linking", { default: false })
 const draft = ref("")
 const invalid = ref(false)
 const linkField = ref<InstanceType<typeof DropzoneLinkField> | null>(null)
@@ -280,14 +283,30 @@ const pressTarget = ref<HTMLButtonElement | null>(null)
 // nothing below it moves when an address is being typed.
 const heldHeight = ref<number | null>(null)
 
-function startLink() {
-  if (!props.links || props.disabled) return
+function measure() {
   const zone = revealAnchor.value as HTMLElement | null
   floating.value = (zone?.offsetWidth ?? 0) < IN_PLACE_MIN
   heldHeight.value = floating.value ? null : (zone?.offsetHeight ?? null)
+}
+
+// Focus goes to the field only when the person opened it: one opened by the
+// page must not pull focus away from wherever they are.
+let byUser = false
+function startLink() {
+  if (!props.links || props.disabled) return
+  byUser = true
+  measure()
   linking.value = true
   invalid.value = false
 }
+watch(
+  linking,
+  (open) => {
+    if (open && !byUser) measure()
+    if (!open) byUser = false
+  },
+  { flush: "sync" },
+)
 
 // Released only once the zone's own content is back: between the field fading
 // out and the content fading in the zone is empty, and without the hold it
@@ -299,7 +318,7 @@ function contentBack() {
 // The field arrives only after the zone's content has faded out, later than
 // the next tick, so it takes focus when it is actually there.
 watch(linkField, (field) => {
-  if (field && linking.value) field.focus()
+  if (field && linking.value && byUser) field.focus()
 })
 
 function stopLink(refocus = true) {
@@ -410,6 +429,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
   over.value ? "lp-dropzone--over" : "",
   props.animate && !revealed.value ? "lp-dropzone--waiting" : "",
 ].join(" "))
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -502,8 +527,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
          keeps its picture and opens the field under itself instead. -->
     <PopoverRoot :open="linking && floating" @update:open="(open: boolean) => !open && stopLink(false)">
       <PopoverAnchor :reference="revealAnchor ?? undefined" />
-      <PopoverPortal>
+      <PopoverPortal :to="portalTo">
         <PopoverContent
+          @interact-outside="guardOutside"
+          @escape-key-down="guardOutside"
           :collision-padding="8"
           side="bottom"
           align="start"

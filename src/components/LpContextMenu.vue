@@ -14,6 +14,7 @@ import { HINT_SIGNALS, noteContextTarget } from "../composables/useHintSystem"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
 import { POPOVER_PANEL } from "./dropdown"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 export interface ContextMenuItemDef {
   label: string
@@ -138,6 +139,12 @@ function returnFocus(event: Event) {
   saved.el.focus()
   if (saved.el.value === saved.value) saved.el.setSelectionRange(saved.start, saved.end)
 }
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -156,8 +163,10 @@ function returnFocus(event: Event) {
     >
       <slot />
     </ContextMenuTrigger>
-    <ContextMenuPortal v-if="items.length">
+    <ContextMenuPortal :to="portalTo" v-if="items.length">
       <ContextMenuContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         :collision-padding="8"
         :class="PANEL"
         :aria-label="title"

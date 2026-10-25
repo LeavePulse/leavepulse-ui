@@ -38,7 +38,9 @@ import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { CLOSE_ICON, OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import OptionContent from "./OptionContent.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
+import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 export type AutocompleteOption = LpOptionBase<string>
 
@@ -256,11 +258,18 @@ function choose(opt: AutocompleteOption) {
 }
 
 function clear() {
+  if (field.value.disabled) return
   typing.value = false
   draft.value = null
   emit("update:modelValue", "")
   open.value = false
 }
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
+// What happens in another document (the page around a frame, or a frame in
+// the page) is not "outside" for this layer.
+const guardOutside = useOutsideGuard()
 </script>
 
 <template>
@@ -360,7 +369,7 @@ function clear() {
         </Transition>
       </div>
       <button
-        v-if="clearable && hasValue"
+        v-if="clearable && hasValue && !field.disabled"
         type="button"
         class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
         :aria-label="labels.clear"
@@ -375,8 +384,10 @@ function clear() {
       </button>
     </ComboboxAnchor>
 
-    <ComboboxPortal>
+    <ComboboxPortal :to="portalTo">
       <ComboboxContent
+        @interact-outside="guardOutside"
+        @escape-key-down="guardOutside"
         :collision-padding="8"
         position="popper"
         :side-offset="6"
@@ -400,16 +411,7 @@ function clear() {
             :class="[OPTION_ITEM, 'justify-between data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
             @select.prevent="choose(opt)"
           >
-            <span class="flex min-w-0 items-center gap-2.5">
-              <img v-if="opt.image" :src="opt.image" alt="" class="size-6 shrink-0 rounded-full object-cover" />
-              <LpIcon v-else-if="opt.icon" :name="opt.icon" :size="16" class="shrink-0 text-muted" />
-              <span class="flex min-w-0 flex-col">
-                <span class="truncate">{{ opt.label ?? opt.value }}</span>
-                <span v-if="opt.description" class="truncate text-xs text-muted">
-                  {{ opt.description }}
-                </span>
-              </span>
-            </span>
+            <OptionContent :option="opt" />
           </ComboboxItem>
         </ComboboxViewport>
       </ComboboxContent>

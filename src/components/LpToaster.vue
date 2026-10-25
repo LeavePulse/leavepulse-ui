@@ -18,6 +18,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
+import { usePortalTarget } from "../composables/useView"
 
 const props = defineProps<{ labels?: Partial<{ dismiss: string; copy: string; copied: string }> }>()
 const text = useLabels("toast", { dismiss: "Dismiss", copy: "Copy message", copied: "Copied" }, () => props.labels)
@@ -244,6 +245,9 @@ function runClick(t: ToastItem) {
 function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[number]) {
   return settle(t, action.onClick)
 }
+
+// Overlays open in the window this component renders in (an LpFrame's, inside one).
+const portalTo = usePortalTarget()
 </script>
 
 <template>
@@ -339,7 +343,7 @@ function runAction(t: ToastItem, action: NonNullable<ToastItem["actions"]>[numbe
          consumer's app root creates (e.g. an opaque `#app { z-index }` wrapper).
          Modals portal to body too, so both compare at the same root level and
          --z-toast (200) > --z-modal (110) wins as intended. -->
-    <Teleport to="body">
+    <Teleport :to="portalTo">
       <ToastViewport
         :data-lp-toasts="viewportId"
         class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 outline-none"

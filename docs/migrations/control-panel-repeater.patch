@@ -1,0 +1,110 @@
+--- a/src/components/infra/ServiceSpecCard.vue
++++ b/src/components/infra/ServiceSpecCard.vue
+@@ -49,18 +49,7 @@
+   preview.value = ""
+ }
+ 
+-function addPort() {
+-  draft.value?.ports.push(emptyPort())
+-}
+-function removePort(i: number) {
+-  draft.value?.ports.splice(i, 1)
+-}
+-function addVolume() {
+-  draft.value?.volumes.push({ name: "", mount: "" })
+-}
+-function removeVolume(i: number) {
+-  draft.value?.volumes.splice(i, 1)
+-}
++const emptyVolume = () => ({ name: "", mount: "" })
+ 
+ function toSpec(d: Draft): ServiceSpec {
+   return draftToSpec(d, props.spec)
+@@ -236,18 +225,14 @@
+ 
+         <!-- Ports -->
+         <div>
+-          <div class="mb-1.5 flex items-center justify-between">
+-            <span class="text-xs font-medium text-zinc-400">{{ t("components.serviceSpecCard.ports") }}</span>
+-            <LpButton size="xs" variant="ghost" @click="addPort">
+-              <Icon name="lucide:plus" class="size-3.5" /> {{ t("components.serviceSpecCard.add") }}
+-            </LpButton>
+-          </div>
+-          <div v-if="draft.ports.length" class="space-y-1.5">
+-            <div
+-              v-for="(p, i) in draft.ports"
+-              :key="i"
+-              class="flex items-center gap-1.5"
+-            >
++          <LpRepeater
++            v-model="draft.ports"
++            :create-item="emptyPort"
++            :label="t('components.serviceSpecCard.ports')"
++            :labels="{ add: t('components.serviceSpecCard.add'), remove: t('components.serviceSpecCard.removePort'), empty: t('components.serviceSpecCard.noPublishedPorts') }"
++          >
++            <template #default="{ item: p }">
++              <div class="flex items-center gap-1.5">
+               <LpInput
+                 v-model="p.container"
+                 type="number"
+@@ -275,14 +260,9 @@
+                 ]"
+                 class="w-20"
+               />
+-              <LpTooltip :content="t('components.serviceSpecCard.removePort')" label>
+-                <LpButton size="xs" variant="ghost" square @click="removePort(i)">
+-                  <Icon name="lucide:x" class="size-3.5" />
+-                </LpButton>
+-              </LpTooltip>
+-            </div>
+-          </div>
+-          <p v-else class="text-xs text-zinc-600">{{ t("components.serviceSpecCard.noPublishedPorts") }}</p>
++              </div>
++            </template>
++          </LpRepeater>
+ 
+           <!-- Range error (blocks Save) -->
+           <p v-if="hasInvalidPort" class="mt-1.5 text-xs text-rose-400">
+@@ -304,32 +284,20 @@
+           </p>
+         </div>
+ 
+-        <!-- Volumes -->
+-        <div>
+-          <div class="mb-1.5 flex items-center justify-between">
+-            <span class="text-xs font-medium text-zinc-400">{{ t("components.serviceSpecCard.namedVolumes") }}</span>
+-            <LpButton size="xs" variant="ghost" @click="addVolume">
+-              <Icon name="lucide:plus" class="size-3.5" /> {{ t("components.serviceSpecCard.add") }}
+-            </LpButton>
+-          </div>
+-          <div v-if="draft.volumes.length" class="space-y-1.5">
+-            <div
+-              v-for="(v, i) in draft.volumes"
+-              :key="i"
+-              class="flex items-center gap-1.5"
+-            >
++        <LpRepeater
++          v-model="draft.volumes"
++          :create-item="emptyVolume"
++          :label="t('components.serviceSpecCard.namedVolumes')"
++          :labels="{ add: t('components.serviceSpecCard.add'), remove: t('components.serviceSpecCard.removeVolume'), empty: t('components.serviceSpecCard.noNamedVolumes') }"
++        >
++          <template #default="{ item: v }">
++            <div class="flex items-center gap-1.5">
+               <LpInput v-model="v.name" :placeholder="t('components.serviceSpecCard.namePlaceholder')" class="w-40" />
+               <span class="text-zinc-600">:</span>
+               <LpInput v-model="v.mount" :placeholder="t('components.serviceSpecCard.mountPathPlaceholder')" class="flex-1 min-w-0" />
+-              <LpTooltip :content="t('components.serviceSpecCard.removeVolume')" label>
+-                <LpButton size="xs" variant="ghost" square @click="removeVolume(i)">
+-                  <Icon name="lucide:x" class="size-3.5" />
+-                </LpButton>
+-              </LpTooltip>
+             </div>
+-          </div>
+-          <p v-else class="text-xs text-zinc-600">{{ t("components.serviceSpecCard.noNamedVolumes") }}</p>
+-        </div>
++          </template>
++        </LpRepeater>
+ 
+         <div class="grid grid-cols-3 gap-3">
+           <LpFormField :label="t('components.serviceSpecCard.replicas')">

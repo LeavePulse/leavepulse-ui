@@ -90,6 +90,7 @@ function go(e: MouseEvent, id: string) {
             :component="entry.components[lead]!"
             :meta="meta[lead]!.props"
             :slots="meta[lead]!.slots.map((s) => s.name)"
+            :entry="entry"
           />
         </div>
         <div v-else-if="value === 'api'" class="flex flex-col gap-4 pt-4">

@@ -183,3 +183,40 @@ bun run dev:dist     # rebuild dist on change (for a linked consumer)
 `dist/` is generated, not committed. Releases: `npm run release` (or
 `release:minor`) bumps the version and pushes the tag; CI tests, builds and
 publishes it.
+
+### Repeatable form rows
+
+`LpRepeater` supplies add/remove controls and stable row identity. Its slot owns
+the fields and validation; internal keys never become part of the saved model.
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue"
+import { LpInput, LpRepeater } from "@leavepulse/ui"
+
+const volumes = ref([{ name: "data", mount: "/var/lib/app" }])
+const emptyVolume = () => ({ name: "", mount: "" })
+</script>
+
+<template>
+  <LpRepeater v-model="volumes" :create-item="emptyVolume" label="Volumes">
+    <template #default="{ item, disabled }">
+      <div class="flex gap-2">
+        <LpInput v-model="item.name" label="Name" :disabled="disabled" />
+        <LpInput v-model="item.mount" label="Mount path" :disabled="disabled" />
+      </div>
+    </template>
+  </LpRepeater>
+</template>
+```
+
+For immutable reloads, pass `item-key="id"` (or a function returning a unique
+string/number). Without a business key, rows retain identity while the same
+objects are edited, reordered or removed. The slot also provides `index`,
+`update(nextItem)` for immutable edits and `remove()`. `labels` overrides
+`add`, `remove` (`{index}` is one-based) and `empty`; app-wide labels use the
+`repeater` scope. The `empty` slot replaces the empty-list text.
+
+`LpInput clearable` adds a clear button that keeps focus in the input, respects
+disabled/read-only state, and can be combined with the `trailing` slot. Its
+button text comes from `labels.clear` or the app-wide `input` label scope.

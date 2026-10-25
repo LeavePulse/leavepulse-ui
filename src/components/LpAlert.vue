@@ -7,12 +7,19 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
-import { computed, ref, watch } from "vue"
+import { computed, ref, useSlots, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
+import LpSwap from "./LpSwap.vue"
+import { slotText } from "./slotText"
 
 const alert = tv({
-  base: "flex gap-3 rounded-card border p-4 text-sm",
+  /*
+   * An alert changes while it is read (saving → saved → failed), so the change
+   * shows as one: the tint eases between variants, the icon turns over, and
+   * the message is swapped by LpSwap, its box easing to the new height.
+   */
+  base: "flex gap-3 rounded-card border p-4 text-sm transition-[background-color,border-color,color] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none",
   variants: {
     variant: {
       info: "border-line bg-surface-soft text-ink",
@@ -80,21 +87,35 @@ const role = computed(() => {
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => alert({ variant: props.variant }))
 const resolvedIcon = computed(() => props.icon ?? (props.busy ? "lucide:loader-circle" : ICONS[props.variant ?? "info"]))
 const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
+
+// What counts as another message: the variant, the title and the slot's words
+// when it is plain text. Rich content keeps its key and only eases its height.
+const slots = useSlots()
+const messageKey = () => [props.variant, props.title ?? "", slotText(slots.default) ?? ""].join("\u0000")
 </script>
 
 <template>
   <div :class="rootClass" :role="role" :aria-busy="busy || undefined" v-bind="rest">
-    <LpIcon
-      :name="resolvedIcon"
-      :size="18"
-      :class="['mt-0.5 shrink-0', iconTone, busy ? 'animate-spin motion-reduce:animate-none' : '']"
-      aria-hidden="true"
-    />
-    <div class="min-w-0">
+    <span class="relative mt-0.5 grid size-[18px] shrink-0 place-items-center" aria-hidden="true">
+      <Transition
+        enter-from-class="scale-50 opacity-0"
+        leave-to-class="scale-50 opacity-0"
+        enter-active-class="transition-[scale,opacity] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none"
+        leave-active-class="absolute transition-[scale,opacity] duration-(--duration-fast) ease-out motion-reduce:transition-none"
+      >
+        <LpIcon
+          :key="resolvedIcon"
+          :name="resolvedIcon"
+          :size="18"
+          :class="[iconTone, 'transition-colors duration-(--duration-medium)', busy ? 'animate-spin motion-reduce:animate-none' : '']"
+        />
+      </Transition>
+    </span>
+    <LpSwap :swap-key="messageKey()" class="min-w-0 flex-1">
       <p v-if="title" class="font-semibold text-ink">{{ title }}</p>
       <div :class="['text-muted-strong', title ? 'mt-0.5' : '']">
         <slot />
       </div>
-    </div>
+    </LpSwap>
   </div>
 </template>

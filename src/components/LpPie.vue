@@ -23,6 +23,7 @@ export default { inheritAttrs: false }
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { useReveal } from "../composables/useReveal"
+import { lerp, mixColor, useTween } from "../composables/useTween"
 import { arcPath, calloutLabels, resolveSlices, formatTick, type PieSlice } from "./chart"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
@@ -278,9 +279,25 @@ const inner = computed(() =>
  * from. The pad is taken off each slice's own sweep and only when there is more
  * than one slice — a lone slice with a gap would be a circle with a nick in it.
  */
+/*
+ * A slice is the same slice across data changes when it keeps its label. The
+ * index is no identity: a category inserted at the front would hand every
+ * other slice its neighbour's place, and the arcs would trade colours as they
+ * moved. The occurrence count only separates two slices that share a label.
+ */
+const sliceKeys = computed(() => {
+  const seen = new Map<string, number>()
+  return resolved.value.slices.map((s) => {
+    const n = seen.get(s.label) ?? 0
+    seen.set(s.label, n + 1)
+    return `${s.isOther ? "other" : "slice"}:${s.label}#${n}`
+  })
+})
+
 const arcs = computed(() =>
-  arcAngles.value.map(({ slice, start, end, mid }) => ({
+  arcAngles.value.map(({ slice, start, end, mid, index }) => ({
     ...slice,
+    key: sliceKeys.value[index],
     d: arcPath(cx.value, cy.value, outer.value, inner.value, start, end, props.cornerRadius),
     /*
      * Push along the slice's own bisector, so it moves straight out of the
@@ -365,6 +382,143 @@ const sweepPath = computed(() => {
   const start = -Math.PI / 2
   const radius = outer.value + props.hoverOffset + 4
   return arcPath(cx.value, cy.value, radius, 0, start, start + Math.PI * 2 * sweep.value)
+})
+
+/*
+ * What is DRAWN, as opposed to what is: each slice's span as fractions of the
+ * circle, travelling from the last data to the new.
+ *
+ * Interpolated as cumulative edges, not as sizes. Two neighbours share an edge
+ * at both ends of the move, so they share it at every frame between — a slice
+ * that grows pushes the next one round rather than overlapping it, and the
+ * circle stays closed throughout. A new slice opens from a zero-width sliver at
+ * the edge where it will sit; a removed one closes onto the edge its
+ * neighbours meet at, and is dropped once it has.
+ *
+ * Only the drawing moves. Hit areas, callouts, the legend and every event keep
+ * reading `arcs`, the data as it now is: a click mid-move lands on the slice
+ * the reader is aiming at, which is where it is going, and callouts laid out
+ * per frame would reshuffle their stacked labels as the slices slid.
+ */
+interface Wedge {
+  key: string
+  from: number
+  to: number
+  color: string
+}
+
+const wedges = computed<Wedge[]>(() => {
+  let at = 0
+  return resolved.value.slices.map((s, i) => {
+    const w = { key: sliceKeys.value[i], from: at, to: at + s.fraction, color: s.color }
+    at = w.to
+    return w
+  })
+})
+
+const mixWedges = (from: Wedge[], to: Wedge[], t: number): Wedge[] => {
+  const before = new Map(from.map((w) => [w.key, w]))
+  const after = new Map(to.map((w) => [w.key, w]))
+  const out: Wedge[] = []
+
+  // Entering slices open at the far edge of the nearest earlier slice that was
+  // already drawn — exactly where the slice after them used to start.
+  let edge = 0
+  for (const w of to) {
+    const was = before.get(w.key)
+    const a = was ?? { from: edge, to: edge, color: w.color }
+    if (was) edge = was.to
+    out.push({
+      key: w.key,
+      from: lerp(a.from, w.from, t),
+      to: lerp(a.to, w.to, t),
+      color: mixColor(a.color, w.color, t),
+    })
+  }
+
+  // Leaving slices close onto the edge their surviving predecessor will end
+  // at, and keep their place in the order so the drawing stays in sequence.
+  edge = 0
+  let slot = 0
+  for (const w of from) {
+    const next = after.get(w.key)
+    if (next) {
+      edge = next.to
+      slot = out.findIndex((o) => o.key === w.key) + 1
+      continue
+    }
+    out.splice(slot++, 0, {
+      key: w.key,
+      from: lerp(w.from, edge, t),
+      to: lerp(w.to, edge, t),
+      color: w.color,
+    })
+  }
+  return out
+}
+
+/*
+ * The sweep and the tween never overlap: while the circle is still to open
+ * (not yet scrolled to, or closed again for a load) a change simply lands, and
+ * the data that follows sweeps in like the first.
+ */
+const shownWedges = useTween(() => wedges.value, mixWedges, {
+  enabled: () => props.animate && sweep.value >= 1,
+})
+
+/*
+ * The legend's figures count to their new values, and a figure's text changes
+ * width as it goes ("8.13k" is wider than "12k"): the legend column, and the
+ * circle and everything beside it, shook on every frame. Each figure keeps the
+ * width of the widest text it passes through between the old value and the new
+ * one, measured in characters of its monospace font.
+ */
+const figureChars = ref(0)
+watch(
+  () => arcs.value.map((a) => [a.key, props.showPercent ? a.fraction : a.value] as const),
+  (next, prev) => {
+    const text = props.showPercent ? pct : fmt
+    const before = new Map(prev ?? [])
+    let widest = 0
+    for (const [key, to] of next) {
+      const from = before.get(key) ?? to
+      for (let k = 0; k <= 8; k++) widest = Math.max(widest, text(lerp(from, to, k / 8)).length)
+    }
+    figureChars.value = widest
+  },
+  { immediate: true },
+)
+
+const drawn = computed(() => {
+  const indexOf = new Map(arcs.value.map((a, i) => [a.key, i]))
+  const pad = arcs.value.length > 1 ? (props.padAngle * Math.PI) / 180 : 0
+  const TURN = Math.PI * 2
+  return shownWedges.value
+    .filter((w) => w.to - w.from > 1e-5)
+    .map((w) => {
+      const sweepAngle = (w.to - w.from) * TURN
+      const start = -Math.PI / 2 + w.from * TURN
+      const gap = Math.min(pad, sweepAngle * 0.5)
+      const mid = start + sweepAngle / 2
+      return {
+        key: w.key,
+        /* -1 for a slice on its way out: no longer data, so never lifted. */
+        index: indexOf.get(w.key) ?? -1,
+        color: w.color,
+        d: arcPath(
+          cx.value,
+          cy.value,
+          outer.value,
+          inner.value,
+          start + gap / 2,
+          start + sweepAngle - gap / 2,
+          props.cornerRadius,
+        ),
+        lift: `translate(${(Math.cos(mid) * props.hoverOffset).toFixed(2)} ${(
+          Math.sin(mid) * props.hoverOffset
+        ).toFixed(2)})`,
+      }
+    })
 })
 
 const callouts = computed(() =>
@@ -808,20 +962,20 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                    nothing. -->
               <g :clip-path="animate ? `url(#${sweepId}-sweep)` : undefined">
                 <path
-                  v-for="(a, i) in arcs"
-                  :key="`${i}-${a.label}`"
-                  :d="a.d"
-                  :fill="a.color"
+                  v-for="w in drawn"
+                  :key="w.key"
+                  :d="w.d"
+                  :fill="w.color"
                   class="pointer-events-none transition-[transform,opacity] duration-medium ease-[var(--ease-emphasized)] motion-reduce:transition-none"
-                  :transform="active === i ? a.lift : undefined"
-                  :opacity="dimmed(i) ? 0.28 : 1"
+                  :transform="w.index >= 0 && active === w.index ? w.lift : undefined"
+                  :opacity="dimmed(w.index) ? 0.28 : 1"
                 />
               </g>
 
               <!-- Invisible, unmoving, and on top: the actual hit area. -->
               <path
                 v-for="(a, i) in arcs"
-                :key="`hit-${i}-${a.label}`"
+                :key="`hit-${a.key}`"
                 :d="a.d"
                 fill="transparent"
                 class="cursor-pointer"
@@ -899,34 +1053,43 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
         <!-- The legend is the same control surface as the circle: identical
              modifiers, and slivers too small to hit are reachable here. -->
-        <div v-if="legendShown" class="flex min-w-0 flex-col gap-1.5" @pointerup="endDrag">
-          <button
-            v-for="(a, i) in arcs"
-            :key="`${i}-${a.label}`"
-            type="button"
-            class="group flex cursor-pointer items-center gap-2 rounded-inner px-1 py-0.5 text-xs outline-none transition-[opacity,background-color] duration-fast focus-visible:ring-2 focus-visible:ring-ring"
-            :class="[dimmed(i) ? 'opacity-45' : '', isSelected(i) ? 'bg-surface-soft' : '']"
-            :aria-pressed="isSelected(i)"
-            @pointerenter="onSlicePointerEnter(i)"
-            @pointerleave="onSlicePointerLeave(i)"
-            @pointerdown="onSlicePointerDown(i, $event)"
-            @click="onLegendClick(i, $event)"
-            @focus="active = i"
-            @blur="active === i && (active = -1)"
-            @contextmenu="onSliceContextMenu(i)"
-          >
-            <span
-              class="size-2 shrink-0 rounded-full transition-transform duration-fast group-hover:scale-125"
-              :style="{ backgroundColor: a.color }"
-            />
-            <span class="truncate text-muted-strong group-hover:text-ink">{{ a.label }}</span>
-            <!-- What the bucket stands for, so a fold is never a silent loss. -->
-            <span v-if="a.isOther" class="shrink-0 text-muted">({{ a.count }})</span>
-            <span class="ml-auto shrink-0 pl-2 font-mono tabular-nums text-muted">
-              {{ showPercent ? pct(a.fraction) : fmt(a.value) }}
-            </span>
-          </button>
-        </div>
+        <!-- Eases when the figures need more room or less. -->
+        <LpShift v-if="legendShown" axis="width" class="min-w-0">
+          <div class="flex min-w-0 flex-col gap-1.5" @pointerup="endDrag">
+            <button
+              v-for="(a, i) in arcs"
+              :key="a.key"
+              type="button"
+              class="group flex cursor-pointer items-center gap-2 rounded-inner px-1 py-0.5 text-xs outline-none transition-[opacity,background-color] duration-fast focus-visible:ring-2 focus-visible:ring-ring"
+              :class="[dimmed(i) ? 'opacity-45' : '', isSelected(i) ? 'bg-surface-soft' : '']"
+              :aria-pressed="isSelected(i)"
+              @pointerenter="onSlicePointerEnter(i)"
+              @pointerleave="onSlicePointerLeave(i)"
+              @pointerdown="onSlicePointerDown(i, $event)"
+              @click="onLegendClick(i, $event)"
+              @focus="active = i"
+              @blur="active === i && (active = -1)"
+              @contextmenu="onSliceContextMenu(i)"
+            >
+              <span
+                class="size-2 shrink-0 rounded-full transition-transform duration-fast group-hover:scale-125"
+                :style="{ backgroundColor: a.color }"
+              />
+              <span class="truncate text-muted-strong group-hover:text-ink">{{ a.label }}</span>
+              <!-- What the bucket stands for, so a fold is never a silent loss. -->
+              <span v-if="a.isOther" class="shrink-0 text-muted">({{ a.count }})</span>
+              <!-- Counts to the new figure, on the same beat as its slice resizing. -->
+              <LpNumberFlow
+                class="ml-auto shrink-0 pl-2 text-right font-mono tabular-nums text-muted"
+                :style="{ minWidth: `calc(${figureChars}ch + 0.5rem)` }"
+                :value="showPercent ? a.fraction : a.value"
+                :duration="360"
+                :format="showPercent ? pct : fmt"
+                :animate-on-mount="false"
+              />
+            </button>
+          </div>
+        </LpShift>
       </div>
     </LpContextMenu>
     </LpSwap>

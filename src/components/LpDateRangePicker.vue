@@ -9,15 +9,13 @@ export default { inheritAttrs: false }
  * Picking the second end or a preset fills the field and closes the popover.
  * Two months sit side by side where there is room, one on a phone.
  */
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from "reka-ui"
 import { computed, ref, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
-import { mergeClass } from "../composables/useMergedClass"
 import { useMediaQuery } from "../composables/useMediaQuery"
 import {
-  clampRange,
+  allowedRange,
   type DateRange,
   type DateRangePreset,
   defaultRangePresets,
@@ -25,18 +23,8 @@ import {
   normalizeRange,
   sameRange,
 } from "./dateRange"
-import {
-  type CalendarLabels,
-  PICKER_CLEAR,
-  PICKER_PRESET,
-  PICKER_PRESETS,
-  PICKER_SIZE,
-  PICKER_TRIGGER,
-  pickerTone,
-} from "./calendar"
-import { POPOVER_PANEL } from "./dropdown"
-import LpIcon from "./LpIcon.vue"
-import LpRollingText from "./LpRollingText.vue"
+import type { CalendarLabels } from "./calendar"
+import PickerField from "./PickerField.vue"
 import LpRangeCalendar, { type RangeChange } from "./LpRangeCalendar.vue"
 
 export interface DateRangePickerLabels extends Record<string, string> {
@@ -118,13 +106,21 @@ function pick(range: DateRange, change?: RangeChange) {
   if (!change) open.value = false
 }
 
+const rules = computed(() => ({
+  min: props.min,
+  max: props.max,
+  isDisabled: props.isDisabled,
+  isDateUnavailable: props.isDateUnavailable,
+  maximumDays: props.maximumDays,
+}))
+
 function pickPreset(preset: DateRangePreset) {
-  const range = clampRange(preset.range(), props.min, props.max)
+  const range = allowedRange(preset.range(), rules.value)
   if (range) pick(range)
 }
 
 function presetFits(preset: DateRangePreset): boolean {
-  return !!clampRange(preset.range(), props.min, props.max)
+  return !!allowedRange(preset.range(), rules.value)
 }
 
 const wide = useMediaQuery("(min-width: 640px)")
@@ -137,85 +133,43 @@ const field = useFieldControl(() => ({
   disabled: props.disabled,
 }))
 const showClear = computed(() => props.clearable && !!value.value && !field.value.disabled)
+
+const presetOptions = computed(() => presetList.value.map((preset) => ({
+  label: preset.label,
+  disabled: !presetFits(preset),
+  selected: sameRange(value.value, preset.range()),
+  select: () => pickPreset(preset),
+})))
 </script>
 
 <template>
-  <div :class="mergeClass('relative w-full', attrs.class as string)" :style="attrs.style as never">
-    <PopoverRoot v-model:open="open">
-      <PopoverTrigger as-child>
-        <button
-          v-bind="{ ...attrs, class: undefined, style: undefined }"
-          :id="field.id"
-          type="button"
-          :disabled="field.disabled"
-          :aria-invalid="field.invalid || undefined"
-          :aria-describedby="field.describedBy"
-          :class="[PICKER_TRIGGER, PICKER_SIZE[size], pickerTone(field.invalid)]"
-        >
-          <LpIcon name="lucide:calendar-range" :size="16" class="shrink-0 text-muted" />
-          <LpRollingText
-            :value="display || placeholder || text.placeholder"
-            align="start"
-            class="min-w-0 flex-1"
-            :class="display ? '' : 'text-muted'"
-          />
-          <span v-if="showClear" class="w-[15px] shrink-0" aria-hidden="true" />
-          <LpIcon
-            name="lucide:chevron-down"
-            :size="15"
-            class="shrink-0 text-muted transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[state=open]:rotate-180 motion-reduce:transition-none"
-          />
-        </button>
-      </PopoverTrigger>
-      <PopoverPortal>
-        <PopoverContent
-          :side-offset="6"
-          align="start"
-          :collision-padding="8"
-          :class="[POPOVER_PANEL, 'z-(--z-popover) flex max-w-[calc(100vw-1rem)] flex-col rounded-card p-0 outline-none sm:flex-row']"
-        >
-          <div
-            v-if="presetList.length"
-            role="group"
-            :aria-label="text.presets"
-:class="[PICKER_PRESETS, 'sm:w-40']"
-          >
-            <button
-              v-for="(preset, i) in presetList"
-              :key="`${i}:${preset.label}`"
-              type="button"
-              :disabled="!presetFits(preset)"
-              :aria-pressed="sameRange(value, preset.range())"
-:class="PICKER_PRESET"
-              @click="pickPreset(preset)"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
-          <LpRangeCalendar
-            :model-value="value"
-            :min="min"
-            :max="max"
-            :is-disabled="isDisabled"
-            :is-date-unavailable="isDateUnavailable"
-            :maximum-days="maximumDays"
-            :months="wide ? 2 : 1"
-            :locale="locale"
-            :labels="labels"
-            class="border-0 bg-transparent"
-            @update:model-value="pick"
-          />
-        </PopoverContent>
-      </PopoverPortal>
-    </PopoverRoot>
-    <button
-      v-if="showClear"
-      type="button"
-      :aria-label="text.clear"
-      :class="PICKER_CLEAR"
-      @click="emit('update:modelValue', undefined)"
-    >
-      <LpIcon name="lucide:x" :size="15" />
-    </button>
-  </div>
+  <PickerField
+    v-bind="attrs"
+    v-model:open="open"
+    :field="field"
+    :display="display"
+    :placeholder="placeholder || text.placeholder"
+    icon="lucide:calendar-range"
+    :size="size"
+    :clearable="showClear"
+    :clear-label="text.clear"
+    :presets-label="text.presets"
+    :presets="presetOptions"
+    presets-class="sm:w-40"
+    @clear="emit('update:modelValue', undefined)"
+  >
+    <LpRangeCalendar
+      :model-value="value"
+      :min="min"
+      :max="max"
+      :is-disabled="isDisabled"
+      :is-date-unavailable="isDateUnavailable"
+      :maximum-days="maximumDays"
+      :months="wide ? 2 : 1"
+      :locale="locale"
+      :labels="labels"
+      class="border-0 bg-transparent"
+      @update:model-value="pick"
+    />
+  </PickerField>
 </template>

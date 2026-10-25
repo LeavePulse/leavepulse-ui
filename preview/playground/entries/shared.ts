@@ -15,6 +15,14 @@ export interface ComponentEntry {
   thumb?: string
   /** The thumb does not use `state`, and making it has side effects (timers, a hint system): skip it on the index. */
   thumbState?: false
+  /**
+   * Plays the thumb: every `every` ms the next frame's values are written over
+   * the thumb's scope, so a thumb that binds them (`:model-value="view"`) shows
+   * the component doing what it is for, a Swap trading views, tabs moving
+   * their pill. The first frame is the still one: it is what a card shows
+   * before it is on screen and under reduced motion.
+   */
+  thumbLoop?: { every?: number; frames: Record<string, unknown>[] }
   /** Components in scope for the template. */
   components: Record<string, Component>
   /** Reactive state the template can bind to. */
