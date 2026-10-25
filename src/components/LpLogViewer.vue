@@ -24,6 +24,7 @@ import {
   TransitionGroup,
   watch,
 } from "vue"
+import { usePersisted } from "../composables/usePersisted"
 import { prefersReducedMotion } from "../composables/easing"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
@@ -145,6 +146,12 @@ const props = withDefaults(
      * the chosen levels via `v-model:levels`.
      */
     toolbar?: boolean
+    /**
+     * Remember the level chips across visits under this key (the kit's
+     * storage, see `usePersisted`): someone who only ever reads errors should
+     * not pick them again every time.
+     */
+    persist?: string
     labels?: Partial<LogViewerLabels>
   }>(),
   {
@@ -174,6 +181,17 @@ const emit = defineEmits<{
 const query = defineModel<string>("search", { default: "" })
 /** Levels to show. Empty shows every level. */
 const levels = defineModel<LogLevel[]>("levels", { default: () => [] })
+const storedLevels = usePersisted<string[] | null>(
+  () => props.persist && `lp-log-viewer:${props.persist}:levels`,
+  null,
+  { validate: (value): value is string[] | null => value === null || (Array.isArray(value) && value.every((l) => typeof l === "string")) },
+)
+// The stored choice fills an empty filter once; an app that already passes
+// levels keeps its own.
+if (storedLevels.value?.length && !levels.value.length) levels.value = storedLevels.value as LogLevel[]
+watch(levels, (next) => {
+  if (props.persist) storedLevels.value = [...next]
+})
 const term = computed(() => (props.toolbar && query.value ? query.value : (props.highlight ?? "")).trim())
 
 const text = useLabels<LogViewerLabels>(

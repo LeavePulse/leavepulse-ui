@@ -38,6 +38,7 @@ import LpEmptyState from "./LpEmptyState.vue"
 import LpFileTreeNode from "./LpFileTreeNode.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpSkeleton from "./LpSkeleton.vue"
+import { usePersisted } from "../composables/usePersisted"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 
@@ -72,6 +73,11 @@ const props = withDefaults(
     selected?: string
     /** Expanded directory ids (v-model:expanded). Omit to let the tree own it. */
     expanded?: string[]
+    /**
+     * Remember which folders are open across visits under this key (the
+     * kit's storage, see `usePersisted`), when the tree owns its expansion.
+     */
+    persist?: string
     /** Directory ids currently fetching children — shows a spinner on the row. */
     loadingIds?: string[]
     /**
@@ -134,13 +140,21 @@ defineSlots<{
 // Expansion is optionally controlled: with the `expanded` prop bound we mirror
 // it, otherwise the tree owns the set. Either way the internal ref is the single
 // source the rows read, so uncontrolled use needs no wiring from the caller.
-const openIds = ref<Set<string>>(new Set(props.expanded ?? []))
+const storedOpen = usePersisted<string[] | null>(
+  () => props.expanded === undefined && props.persist && `lp-file-tree:${props.persist}`,
+  null,
+  { validate: (value): value is string[] | null => value === null || (Array.isArray(value) && value.every((id) => typeof id === "string")) },
+)
+const openIds = ref<Set<string>>(new Set(props.expanded ?? storedOpen.value ?? []))
 watch(
   () => props.expanded,
   (ids) => {
     if (ids) openIds.value = new Set(ids)
   },
 )
+watch(openIds, (ids) => {
+  if (props.expanded === undefined && props.persist) storedOpen.value = [...ids]
+})
 
 const text = useLabels<FileTreeLabels>(
   "fileTree",

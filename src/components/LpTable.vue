@@ -17,6 +17,7 @@ import LpScrollArea from "./LpScrollArea.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpTableFilter, { type TableFilterOption } from "./LpTableFilter.vue"
+import { useKitStorage } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useHotkeys } from "../composables/useHotkeys"
 import { usePaintSelect } from "../composables/usePaintSelect"
@@ -231,7 +232,7 @@ const props = withDefaults(
     summary?: boolean
     /**
      * Remember sort, value filters and hidden columns across visits under this
-     * key (localStorage). Only plain filter values (text, numbers) are kept.
+     * key (the kit's storage, see `usePersisted`). Only plain filter values (text, numbers) are kept.
      */
     persist?: string
     /**
@@ -803,15 +804,12 @@ watch(page, () => fetchPage())
 // Read after mount, not during setup: a server render knows nothing of this
 // browser's storage, and restoring earlier would make the first client render
 // disagree with it.
+const store = useKitStorage()
 const storageKey = computed(() => (props.persist ? `lp-table:${props.persist}` : ""))
 const restored = ref(false)
 onMounted(() => {
   if (storageKey.value) {
-    let raw: string | null = null
-    try {
-      raw = localStorage.getItem(storageKey.value)
-    } catch {}
-    const state = parseTableState(raw, props.columns.map((c) => c.key))
+    const state = parseTableState(store.get(storageKey.value), props.columns.map((c) => c.key))
     if (state) {
       if (state.sort !== undefined) {
         ownSort.value = state.sort
@@ -832,9 +830,7 @@ watch([activeSort, hiddenValues, hiddenColumns], () => {
     hidden: Object.fromEntries(Object.entries(hiddenValues.value).map(([k, v]) => [k, [...v]])),
     columns: [...hiddenColumns.value],
   })
-  try {
-    localStorage.setItem(storageKey.value, state)
-  } catch {}
+  store.set(storageKey.value, state)
 })
 watch(() => props.load, () => fetchPage(), { immediate: true })
 

@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from "reka-ui"
 import { computed, nextTick, ref, watch } from "vue"
+import { useKitStorage } from "../composables/usePersisted"
 import { prefersReducedMotion } from "../composables/easing"
 import { useFieldControl } from "../composables/useField"
 import {
@@ -437,23 +438,14 @@ const CHECKERBOARD =
 
 /* ── recent colours ───────────────────────────────
    Persisted per `recentKey`, newest first, de-duplicated by hex so the same
-   colour picked twice moves to the front instead of filling the row. Every
-   storage access is allowed to fail the way useFormDraft's does: a private
+   colour picked twice moves to the front instead of filling the row. Kept in
+   the kit's storage (the app's own, or the browser's made safe): a private
    window or a storage policy must not take the picker down with it. */
-function storage(): Storage | null {
-  try {
-    if (typeof window === "undefined") return null
-    return window.localStorage
-  } catch {
-    return null
-  }
-}
+const store = useKitStorage()
 
 function readRecent(): string[] {
-  const s = storage()
-  if (!s) return []
   try {
-    const raw = JSON.parse(s.getItem(props.recentKey) ?? "[]")
+    const raw = JSON.parse(store.get(props.recentKey) ?? "[]")
     // Whatever is in storage came from outside this run — a stale shape, or
     // another app on the same origin. Take only strings that still parse.
     return Array.isArray(raw)
@@ -476,11 +468,7 @@ function remember(value: string) {
     (c) => formatColor(rgbToHsv(parseColor(c) ?? { r: 0, g: 0, b: 0, a: 1 }), "hex") !== key,
   )
   recentColors.value = [value, ...without].slice(0, props.recentLimit)
-  try {
-    storage()?.setItem(props.recentKey, JSON.stringify(recentColors.value))
-  } catch {
-    // Quota, or storage turned off mid-session. The row still works in memory.
-  }
+  store.set(props.recentKey, JSON.stringify(recentColors.value))
 }
 
 // Remember on close rather than on every commit: the colour a person leaves the

@@ -6,9 +6,11 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
-import { computed, useId, useSlots } from "vue"
+import { computed, getCurrentInstance, ref, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
+import { useToast } from "../composables/useToast"
+import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -24,10 +26,27 @@ const props = withDefaults(
      * pushed to the right edge of the row.
      */
     labelPosition?: "start" | "end"
+    /**
+     * Saves the new state. The switch flips at once and shows a spinner in its
+     * thumb while this runs; if it fails, the switch flips back and the error
+     * becomes a toast (or the `error` event, when the app listens). A setting
+     * stored on a server needs no busy flag or rollback of its own.
+     */
+    action?: (value: boolean) => unknown
   }>(),
   { labelPosition: "end" },
 )
-const emit = defineEmits<{ (e: "update:modelValue", value: boolean): void }>()
+const emit = defineEmits<{
+  (e: "update:modelValue", value: boolean): void
+  /** The `action` finished. */
+  (e: "done", value: boolean): void
+  /** The `action` failed and the switch went back. Listening turns the kit's own toast off. */
+  (e: "error", error: unknown): void
+}>()
+
+const toast = useToast()
+const instance = getCurrentInstance()
+const pending = ref(false)
 
 const slots = useSlots()
 const labelled = computed(() => Boolean(props.label || props.description || slots.default))
@@ -59,8 +78,24 @@ const describedBy = computed(
   () => [props.description && labelled.value ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
 )
 
-function onUpdate(value: boolean) {
+async function onUpdate(value: boolean) {
+  if (!props.action) return emit("update:modelValue", value)
+  // A second flip while saving is ignored: the switch is controlled, so reka
+  // shows whatever `modelValue` says and the click leaves no trace.
+  if (pending.value) return
+  const previous = !value
   emit("update:modelValue", value)
+  pending.value = true
+  try {
+    await props.action(value)
+    emit("done", value)
+  } catch (error) {
+    emit("update:modelValue", previous)
+    if (instance?.vnode.props?.onError) emit("error", error)
+    else toast.error(error instanceof Error ? error : String(error))
+  } finally {
+    pending.value = false
+  }
 }
 </script>
 
@@ -76,10 +111,13 @@ function onUpdate(value: boolean) {
       :model-value="modelValue"
       :disabled="field.disabled"
       :aria-describedby="describedBy"
+      :aria-busy="pending || undefined"
       :class="TRACK"
       @update:model-value="onUpdate"
     >
-      <SwitchThumb :class="THUMB" />
+      <SwitchThumb :class="[THUMB, 'grid place-items-center']">
+        <LpIcon v-if="pending" name="lucide:loader-circle" class="size-2.5 animate-spin text-ink-inverse group-data-[state=checked]/switch:text-ink motion-reduce:animate-none" />
+      </SwitchThumb>
     </SwitchRoot>
     <span v-if="labelPosition === 'end'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
@@ -93,9 +131,12 @@ function onUpdate(value: boolean) {
     :model-value="modelValue"
     :disabled="field.disabled"
     :aria-describedby="describedBy"
+    :aria-busy="pending || undefined"
     :class="rootClass"
     @update:model-value="onUpdate"
   >
-    <SwitchThumb :class="THUMB" />
+    <SwitchThumb :class="[THUMB, 'grid place-items-center']">
+      <LpIcon v-if="pending" name="lucide:loader-circle" class="size-2.5 animate-spin text-ink-inverse group-data-[state=checked]/switch:text-ink motion-reduce:animate-none" />
+    </SwitchThumb>
   </SwitchRoot>
 </template>
