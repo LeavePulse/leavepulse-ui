@@ -3471,9 +3471,9 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     id: "dropzone",
     name: "Dropzone",
     description:
-      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree.",
+      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree. `links` adds an address by the same routes: drag a picture in from another tab (a browser gives its address, not a file), paste a copied link, or press \"or a link\" and type it where the zone was; Enter adds, Escape goes back. Only http(s) is taken, and it arrives as the `link` event; whether it serves a picture is the app's call.",
     components: { LpDropzone, LpSelect },
-    state: () => reactive({ taken: [] as string[], refused: [] as string[], tone: "sunken" }),
+    state: () => reactive({ taken: [] as string[], refused: [] as string[], link: "", tone: "sunken" }),
     template: `<div class="flex w-full max-w-md flex-col gap-3">
   <LpSelect
     v-model="tone"
@@ -3489,12 +3489,18 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     paste-target
     :tone="tone"
     :max-bytes="8 * 1024 * 1024"
+    links
     title="Drop photographs here"
     hint="or click to browse · Ctrl+V pastes a screenshot · 8 MB each"
-    @files="(f) => (taken = f.map((x) => x.name + ' — ' + (x.size / 1024).toFixed(0) + ' KB'))"
+    @files="(f) => ((taken = f.map((x) => x.name + ' — ' + (x.size / 1024).toFixed(0) + ' KB')), (link = ''))"
     @rejected="(r) => (refused = r.map((x) => x.file.name + ' (' + x.cause + ')'))"
+    @link="(url) => ((link = url), (taken = []))"
   />
   <p v-if="taken.length" class="text-xs text-muted">Taken: {{ taken.join(', ') }}</p>
+  <div v-if="link" class="flex items-center gap-2 text-xs text-muted">
+    <img :src="link" alt="" class="size-10 shrink-0 rounded-control bg-surface-soft object-cover" />
+    <span class="min-w-0 truncate">Link: {{ link }}</span>
+  </div>
   <p v-if="refused.length" class="text-xs text-danger">Refused: {{ refused.join(', ') }}</p>
 </div>`,
   },
