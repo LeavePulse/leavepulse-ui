@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { Motion, useReducedMotion } from "motion-v"
+import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
+import { prefersReducedMotion } from "../composables/easing"
+import AttentionDot from "./AttentionDot.vue"
 import LpBadge from "./LpBadge.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
@@ -99,7 +101,7 @@ watch(current, () => {
     const end = start + active.offsetWidth
     if (start >= row.scrollLeft && end <= row.scrollLeft + row.clientWidth) return
     const left = start < row.scrollLeft ? start : end - row.clientWidth
-    row.scrollTo({ left, behavior: reduceMotion.value ? "auto" : "smooth" })
+    row.scrollTo({ left, behavior: prefersReducedMotion() ? "auto" : "smooth" })
   })
 })
 
@@ -120,14 +122,9 @@ const hovered = ref<string | null>(null)
 const pillTransition = usePillTransition()
 
 // Panel height spring: when the active #panel differs in height, the wrapper
-// grows/shrinks smoothly instead of snapping. Same feel as the drag layout in
-// LayoutNode; collapses to instant under reduced motion.
-const reduceMotion = useReducedMotion()
-const panelLayoutTransition = computed(() =>
-  reduceMotion.value
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 },
-)
+// grows/shrinks smoothly instead of snapping. The kit's layout feel, as the
+// drag layout in LayoutNode; collapses to instant under reduced motion.
+const panelLayoutTransition = usePillTransition("layout")
 
 // A bottom bar marks only the active tab: on a phone a tap is the hover, and
 // a bar that chased the mouse across a desktop window would point at a tab
@@ -226,11 +223,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
         />
         <span v-if="item.icon" class="relative z-10 inline-flex">
           <LpIcon :name="item.icon" :size="bottom ? 22 : 14" />
-          <span
-            v-if="item.dot"
-            aria-hidden="true"
-            class="absolute -right-1 -top-0.5 size-2 rounded-full bg-accent"
-          />
+          <AttentionDot v-if="item.dot" corner />
           <!-- On a bottom bar the count rides on the icon's corner, as phone
                navs draw it: the label under the icon has no room beside it. -->
           <Transition name="lp-tab-badge">
@@ -245,11 +238,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
           </Transition>
         </span>
         <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : ''">{{ item.label }}</span>
-        <span
-          v-if="item.dot && !item.icon"
-          aria-hidden="true"
-          class="relative z-10 size-1.5 self-start rounded-full bg-accent"
-        />
+        <AttentionDot v-if="item.dot && !item.icon" />
         <!-- The count rolls when it changes, and the chip scales in and out
              rather than popping. -->
         <Transition name="lp-tab-badge">
@@ -288,7 +277,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
         v-for="item in items"
         :key="item.value"
         :value="item.value"
-        class="outline-none data-[state=active]:animate-[tab-in_200ms_var(--ease-emphasized)]"
+        class="outline-none [--rise:6px] data-[state=active]:animate-[rise-in_200ms_var(--ease-emphasized)]"
       >
         <slot name="panel" :value="item.value" />
       </TabsContent>

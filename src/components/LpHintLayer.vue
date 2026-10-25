@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vu
 import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
 import { PANEL_SURFACE, POPOVER_ANIM } from "./dropdown"
+import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
@@ -143,7 +144,7 @@ const guardOutside = useOutsideGuard()
           :class="[PANEL_SURFACE, POPOVER_ANIM, 'z-(--z-popover) w-72 rounded-card p-3 text-sm text-ink outline-none']"
         >
           <p class="flex items-center gap-2 font-medium">
-            <span class="rounded-full bg-brand/15 px-1.5 text-[11px] text-brand">{{ labels.badge }}</span>
+            <LpBadge tone="brand" size="sm">{{ labels.badge }}</LpBadge>
             {{ note?.title }}
           </p>
           <p v-if="note?.text" class="mt-1.5 text-muted">{{ note.text }}</p>

@@ -31,9 +31,9 @@
  * card still says it is an example.
  */
 import { computed, watch } from "vue"
-import { durationToken, easingToken, prefersReducedMotion } from "../composables/easing"
 import { hints } from "../composables/useHints"
 import HintSampleTag from "./HintSampleTag.vue"
+import LpCollapse from "./LpCollapse.vue"
 
 const props = defineProps<{
   /** The hint id this stands in for, as in `v-hint`, or several for a sample with parts. */
@@ -59,26 +59,10 @@ watch(
 
 const visible = computed(() => absent.value.some((id) => hints.showingExample(id)))
 
-// The block grows from nothing and shrinks back, so what sits below it glides
-// instead of jumping. It exists only while shown: an always-present wrapper
-// would take a gap in the parent's flex column even when empty.
-
-function grow(el: Element, done: () => void, opening: boolean) {
-  if (prefersReducedMotion()) return done()
-  const box = el as HTMLElement
-  const frames = [
-    { height: "0px", opacity: 0 },
-    { height: `${box.scrollHeight}px`, opacity: 1 },
-  ]
-  box.style.overflow = "hidden"
-  box.animate(opening ? frames : frames.reverse(), {
-    duration: durationToken("duration-medium"),
-    easing: easingToken("ease-emphasized"),
-  }).onfinish = () => {
-    box.style.overflow = ""
-    done()
-  }
-}
+// The block folds open from nothing and shut again (LpCollapse), so what sits
+// below it glides instead of jumping. It exists only while shown (the collapse
+// unmounts it once folded): an always-present wrapper would take a gap in the
+// parent's flex column even when empty.
 </script>
 
 <template>
@@ -93,15 +77,8 @@ function grow(el: Element, done: () => void, opening: boolean) {
       <slot />
     </span>
   </Transition>
-  <Transition
-    v-else
-    :css="false"
-    @enter="(el, done) => grow(el, done, true)"
-    @leave="(el, done) => grow(el, done, false)"
-  >
-    <div v-if="visible" :data-lp-hint-example="ids.join(' ')" inert aria-hidden="true" class="relative">
-      <slot />
-      <HintSampleTag :labels="labels" />
-    </div>
-  </Transition>
+  <LpCollapse v-else :open="visible" :data-lp-hint-example="ids.join(' ')" inert aria-hidden="true" class="relative">
+    <slot />
+    <HintSampleTag :labels="labels" />
+  </LpCollapse>
 </template>

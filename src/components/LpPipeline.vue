@@ -30,11 +30,13 @@ import { prefersReducedMotion } from "../composables/easing"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useNow } from "../composables/useNow"
+import LpCollapse from "./LpCollapse.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpStepMark from "./LpStepMark.vue"
 import LpTooltip from "./LpTooltip.vue"
+import StepConnector from "./StepConnector.vue"
 import {
   childProgress,
   connectorFilled,
@@ -45,6 +47,7 @@ import {
   type StepStatus,
 } from "./pipeline"
 import { DEFAULT_UNIT_LABELS, formatElapsed, toEpoch, type TimeUnitLabels } from "./timeSpan"
+import { TONES } from "./tone"
 
 export type PipelineLabels = Record<StepStatus, string> & {
   showDetails: string
@@ -147,7 +150,7 @@ function toggle(step: PipelineStep, i: number) {
  * run stopped or has not reached.
  */
 const FILL: Partial<Record<StepStatus, string>> = {
-  success: "bg-action",
+  success: TONES.success.bg,
   skipped: "bg-line-strong",
 }
 
@@ -237,17 +240,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               :icon="step.icon"
               :class="compact ? 'mt-0.5' : 'mt-px'"
             />
-            <span
+            <StepConnector
               v-if="i < steps.length - 1"
-              class="relative my-1 w-0.5 min-h-3 flex-1 overflow-hidden rounded-pill bg-line"
-              aria-hidden="true"
-            >
-              <span
-                class="absolute inset-0 origin-top transition-[scale,background-color] duration-(--duration-slow) ease-(--ease-emphasized) motion-reduce:transition-none"
-                :class="[FILL[step.status] ?? 'bg-action', connectorFilled(step.status) ? 'scale-y-100' : 'scale-y-0']"
-              />
-              <span v-if="step.status === 'running'" class="lp-pipe-flow lp-pipe-flow--down absolute inset-x-0 h-1/2 bg-linear-to-b from-transparent via-brand to-transparent" />
-            </span>
+              orientation="vertical"
+              :filled="connectorFilled(step.status)"
+              :fill="FILL[step.status] ?? TONES.success.bg"
+              :flowing="step.status === 'running'"
+              class="my-1 min-h-3"
+            />
           </div>
 
           <div class="min-w-0" :class="i < steps.length - 1 ? (compact ? 'pb-2' : 'pb-4') : ''">
@@ -272,7 +272,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               </span>
               <span
                 class="flex shrink-0 items-center gap-2 font-mono text-xs tabular-nums"
-                :class="step.status === 'failed' ? 'text-danger' : 'text-muted'"
+                :class="step.status === 'failed' ? TONES.danger.text : 'text-muted'"
                 aria-hidden="true"
               >
                 <span v-if="progressText(step)" class="text-muted">{{ progressText(step) }}</span>
@@ -289,12 +289,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               </span>
             </component>
 
-            <LpShift axis="height">
-              <div
-                v-if="expandable(step) && isOpen(step, i)"
-                :id="`${uid}-${i}`"
-                class="flex flex-col gap-2 pt-2 animate-[fade-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none"
-              >
+            <LpCollapse :open="expandable(step) && isOpen(step, i)">
+              <div :id="`${uid}-${i}`" class="flex flex-col gap-2 pt-2">
                 <LpPipeline
                   v-if="step.steps?.length"
                   :steps="step.steps"
@@ -306,7 +302,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
                 />
                 <slot name="detail" :step="step" :index="i" />
               </div>
-            </LpShift>
+            </LpCollapse>
           </div>
         </template>
 
@@ -343,7 +339,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               </span>
               <span
                 class="flex h-4 items-center gap-1.5 font-mono text-[11px] tabular-nums"
-                :class="step.status === 'failed' ? 'text-danger' : 'text-muted'"
+                :class="step.status === 'failed' ? TONES.danger.text : 'text-muted'"
                 aria-hidden="true"
               >
                 <LpShift axis="width">
@@ -353,18 +349,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               </span>
             </span>
           </template>
-          <span
+          <StepConnector
             v-if="i < steps.length - 1"
-            class="relative h-0.5 min-w-4 flex-1 self-start overflow-hidden rounded-pill bg-line"
+            :filled="connectorFilled(step.status)"
+            :fill="FILL[step.status] ?? TONES.success.bg"
+            :flowing="step.status === 'running'"
+            class="min-w-4 self-start"
             :class="compact ? 'mt-[7px]' : 'mt-[11px]'"
-            aria-hidden="true"
-          >
-            <span
-              class="absolute inset-0 origin-left transition-[scale,background-color] duration-(--duration-slow) ease-(--ease-emphasized) motion-reduce:transition-none rtl:origin-right"
-              :class="[FILL[step.status] ?? 'bg-action', connectorFilled(step.status) ? 'scale-x-100' : 'scale-x-0']"
-            />
-            <span v-if="step.status === 'running'" class="lp-pipe-flow lp-pipe-flow--across absolute inset-y-0 w-1/2 bg-linear-to-r from-transparent via-brand to-transparent" />
-          </span>
+          />
         </template>
       </li>
     </ol>
@@ -372,29 +364,3 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   </div>
 </template>
 
-<style>
-/*
- * A light running along the line out of a running step: the work is moving
- * towards the next one. Unscoped and namespaced, for the keyframe names.
- */
-.lp-pipe-flow--across {
-  animation: lp-pipe-across 1.3s ease-in-out infinite;
-}
-.lp-pipe-flow--down {
-  animation: lp-pipe-down 1.3s ease-in-out infinite;
-}
-@keyframes lp-pipe-across {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(200%); }
-}
-@keyframes lp-pipe-down {
-  from { transform: translateY(-100%); }
-  to { transform: translateY(200%); }
-}
-.lp-pipe-flow--across:dir(rtl) {
-  animation-direction: reverse;
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-pipe-flow { animation: none; opacity: 0.5; transform: none; }
-}
-</style>

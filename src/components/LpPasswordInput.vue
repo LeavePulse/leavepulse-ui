@@ -14,8 +14,8 @@ export interface PasswordInputLabels extends Record<string, string> {
 // again on a timer) and puts its copy button in `actions`.
 import { ref } from "vue"
 import { useLabels } from "../composables/useLpConfig"
-import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
+import RevealToggle from "./RevealToggle.vue"
 
 const props = defineProps<{
   modelValue?: string
@@ -68,31 +68,16 @@ defineExpose({
     <template v-if="$slots.leading" #leading><slot name="leading" /></template>
     <template #trailing>
       <slot name="actions" />
-      <button
-        type="button"
-        class="group rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:text-ink"
-        :aria-label="visible ? text.hide : text.show"
-        @click="visible = !visible"
-      >
-        <!-- Both eyes stay mounted and morph in place (lp-glyph-swap), the
-             same as LpSecretField's, so the toggle answers instead of redrawing. -->
-        <span
-          class="grid place-items-center transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:scale-90 motion-reduce:group-active:scale-100"
-        >
-          <LpIcon
-            name="lucide:eye"
-            :size="size === 'sm' ? 14 : 16"
-            class="lp-glyph-swap col-start-1 row-start-1"
-            :data-on="!visible || undefined"
-          />
-          <LpIcon
-            name="lucide:eye-off"
-            :size="size === 'sm' ? 14 : 16"
-            class="lp-glyph-swap col-start-1 row-start-1"
-            :data-on="visible || undefined"
-          />
-        </span>
-      </button>
+      <!-- Sized to the icon with a hair of padding, as the field's other
+           trailing controls are, rather than to a full square button. -->
+      <RevealToggle
+        v-model="visible"
+        :icon-size="size === 'sm' ? 14 : 16"
+        :show-label="text.show"
+        :hide-label="text.hide"
+        :disabled="disabled"
+        class="size-auto rounded-inner p-1 hover:bg-transparent"
+      />
     </template>
   </LpInput>
 </template>

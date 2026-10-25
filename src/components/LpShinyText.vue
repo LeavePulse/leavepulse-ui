@@ -28,13 +28,14 @@ export default { inheritAttrs: false }
 import { computed } from "vue"
 import { useInView } from "../composables/useInView"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { toneLook, type ToneName } from "./tone"
 
 const props = withDefaults(
   defineProps<{
     /** `shine` sweeps a band over toned text; `gradient` paints it with drifting theme colours. */
     variant?: "shine" | "gradient"
     /** Base colour for `shine`. `ink` sweeps the brand colour over plain text. */
-    tone?: "brand" | "accent" | "action" | "ink"
+    tone?: ToneName | "ink"
     /** Seconds per sweep. Slower reads as ambient; under ~1.5 s it starts to nag. */
     speed?: number
     /** Stop the motion (keeps the look). For a word that should only shine while something is happening. */
@@ -48,15 +49,8 @@ const props = withDefaults(
 const { el, inView } = useInView()
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => `lp-shiny lp-shiny--${props.variant}`)
 
-const TONES = {
-  brand: "var(--color-brand)",
-  accent: "var(--color-accent)",
-  action: "var(--color-action)",
-  ink: "var(--color-ink)",
-} as const
-
 const style = computed(() => {
-  const base = TONES[props.tone]
+  const base = props.tone === "ink" ? "var(--color-ink)" : toneLook(props.tone).color
   return {
     "--lp-shiny-base": base,
     // Toward ink, so the band is the contrast direction in either theme; plain

@@ -25,6 +25,7 @@ import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { useReveal } from "../composables/useReveal"
 import { lerp, mixColor, useTween } from "../composables/useTween"
 import { arcPath, calloutLabels, resolveSlices, formatTick, type PieSlice } from "./chart"
+import LegendSwatch from "./LegendSwatch.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
@@ -1071,10 +1072,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               @blur="active === i && (active = -1)"
               @contextmenu="onSliceContextMenu(i)"
             >
-              <span
-                class="size-2 shrink-0 rounded-full transition-transform duration-fast group-hover:scale-125"
-                :style="{ backgroundColor: a.color }"
-              />
+              <LegendSwatch :color="a.color" />
               <span class="truncate text-muted-strong group-hover:text-ink">{{ a.label }}</span>
               <!-- What the bucket stands for, so a fold is never a silent loss. -->
               <span v-if="a.isOther" class="shrink-0 text-muted">({{ a.count }})</span>

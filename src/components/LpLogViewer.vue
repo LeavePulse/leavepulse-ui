@@ -28,6 +28,7 @@ import { usePersisted } from "../composables/usePersisted"
 import { durationToken, prefersReducedMotion, tokenEase } from "../composables/easing"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
+import LpBadge from "./LpBadge.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
@@ -36,7 +37,9 @@ import LpInput from "./LpInput.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import { countLevels, matchPositions, ringWindow, stepMatch } from "./logSearch"
+import { TONES, toneLook, type ToneName } from "./tone"
 
 export interface LogViewerLabels {
   [key: string]: string
@@ -227,16 +230,21 @@ const text = useLabels<LogViewerLabels>(
 // red (fatal gets a filled chip to stand apart from plain error).
 // `sel` tints ::selection in the row's semantic colour (info→brand, warn→accent,
 // error/fatal→danger) via Tailwind's `selection:` variant — the highlight then
-// matches the level instead of the browser default. Static classes (not built
-// from a var) so Tailwind emits them from the @source scan.
+// matches the level instead of the browser default. The toned levels read the
+// kit's tones (tone.ts, where the classes are spelled out whole for Tailwind's
+// scan); trace and debug are quieter than any tone, two steps of grey.
+const toned = (tone: ToneName) => {
+  const look = toneLook(tone)
+  return { rail: look.bg, text: "text-ink", chip: look.text, sel: look.selection }
+}
 const levelMeta: Record<LogLevel, { rail: string; text: string; chip: string; sel: string }> = {
-  trace: { rail: "bg-line-strong", text: "text-muted", chip: "text-muted", sel: "selection:bg-muted/40" },
+  trace: { rail: "bg-line-strong", text: "text-muted", chip: "text-muted", sel: TONES.neutral.selection },
   debug: { rail: "bg-line-strong", text: "text-muted-strong", chip: "text-muted-strong", sel: "selection:bg-muted-strong/40" },
-  info: { rail: "bg-brand", text: "text-ink", chip: "text-brand", sel: "selection:bg-brand/40" },
-  success: { rail: "bg-action", text: "text-ink", chip: "text-action", sel: "selection:bg-action/40" },
-  warn: { rail: "bg-accent", text: "text-ink", chip: "text-accent", sel: "selection:bg-accent/40" },
-  error: { rail: "bg-danger", text: "text-ink", chip: "text-danger", sel: "selection:bg-danger/40" },
-  fatal: { rail: "bg-danger", text: "text-ink", chip: "rounded-xs bg-danger px-1 text-ink-inverse", sel: "selection:bg-danger/40" },
+  info: toned("info"),
+  success: toned("success"),
+  warn: toned("warning"),
+  error: toned("error"),
+  fatal: { ...toned("error"), chip: `rounded-xs px-1 text-ink-inverse ${TONES.danger.bg}` },
 }
 
 function metaFor(level?: LogLevel) {
@@ -958,12 +966,11 @@ const showJump = computed(() => props.tail && !pinned.value && props.lines.lengt
 // collapsed to a single row, so there was nothing to scroll, and `onScroll` —
 // the only other place that refreshed the height — could never fire to correct
 // it. The list looked stuck and wouldn't scroll at all.
-let viewportResize: ResizeObserver | null = null
-
 function measureViewport() {
   const el = viewport()
   if (el) viewportHeight.value = el.clientHeight
 }
+useResizeObserver(viewport, measureViewport)
 
 onMounted(() => {
   measureViewport()
@@ -971,17 +978,11 @@ onMounted(() => {
   // A tailing viewer opens on its newest lines. Opening at the top left the
   // first pushed line to haul the whole history past in one go.
   if (el && props.tail) el.scrollTop = el.scrollHeight
-  if (el && typeof ResizeObserver !== "undefined") {
-    viewportResize = new ResizeObserver(measureViewport)
-    viewportResize.observe(el)
-  }
 })
 
 onBeforeUnmount(() => {
   stopGlide()
   release()
-  viewportResize?.disconnect()
-  viewportResize = null
 })
 
 /*
@@ -1274,12 +1275,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               enter-active-class="transition duration-[var(--duration-medium)] ease-[var(--ease-emphasized)]"
               enter-from-class="scale-50 opacity-0"
             >
-              <span
+              <LpBadge
                 v-if="count > 1"
                 :key="count"
-                class="ml-2 inline-block select-none rounded-pill bg-surface-soft px-1.5 align-[1px] text-[10px] font-semibold tabular-nums text-muted-strong"
+                size="sm"
+                class="ml-2 select-none tabular-nums"
                 :title="text.identical.replace('{n}', String(count))"
-              >×{{ count }}</span>
+              >×{{ count }}</LpBadge>
             </Transition>
           </span>
         </li>
@@ -1327,9 +1329,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
  * while it leaves, and an unlayered rule is also what lets them outrank the
  * row's own `transition-colors` utility (see `transitionProps`).
  */
+/* Rises into place from just below, the direction a tail grows in (the kit's rise-in). */
 .lp-log-row-enter-active,
 .lp-log-row-fresh {
-  animation: lp-log-row-in var(--duration-medium) var(--ease-emphasized);
+  --rise: 6px;
+  animation: rise-in var(--duration-medium) var(--ease-emphasized);
 }
 
 .lp-log-row-leave-active {
@@ -1339,14 +1343,6 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 
 .lp-log-row-move {
   transition: transform var(--duration-medium) var(--ease-emphasized);
-}
-
-/* Rises into place from just below, the direction a tail grows in. */
-@keyframes lp-log-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
 }
 
 @keyframes lp-log-row-out {

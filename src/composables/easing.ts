@@ -27,7 +27,7 @@
  *
  * A plain function, not a reactive composable: it is read at the moment an
  * animation starts, and a component that also needs to RE-RENDER when the
- * setting changes mid-session should use motion-v's `useReducedMotion`.
+ * setting changes mid-session should use `usePrefersReducedMotion`.
  */
 export const prefersReducedMotion = (): boolean =>
   typeof window !== "undefined" &&

@@ -42,6 +42,7 @@ import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import MenuShortcut from "./MenuShortcut.vue"
+import { staggerDelay } from "./reveal"
 import { usePersisted } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
@@ -947,9 +948,8 @@ const paneDescription = computed(() => {
   return body.startsWith(description) ? undefined : description
 })
 
-/** Stagger between paragraphs, capped so a long section does not trickle in. */
-const STAGGER_MS = 45
-const STAGGER_MAX = 10
+/** Stagger between paragraphs (after the description), capped so a long section does not trickle in. */
+const paraDelay = (index: number) => `${staggerDelay(index + 1, 0, 45, 10)}ms`
 
 /*
  * A preview is opened for the match, so the pane lands on it: the first
@@ -1470,7 +1470,7 @@ const guardOutside = useOutsideGuard()
                       v-for="(para, i) in paragraphs"
                       :key="i"
                       class="lp-cmd-para mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
-                      :style="{ animationDelay: `${Math.min(i + 1, STAGGER_MAX) * STAGGER_MS}ms` }"
+                      :style="{ animationDelay: paraDelay(i) }"
                     >
                       <template v-for="(p, pi) in highlight(para, paneBody.highlight)" :key="`p${pi}`">
                         <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
@@ -1572,13 +1572,8 @@ const guardOutside = useOutsideGuard()
   transform: translateX(40%);
 }
 .lp-cmd-para {
-  animation: lp-cmd-para-in 260ms ease-out both;
-}
-@keyframes lp-cmd-para-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
+  --rise: 4px;
+  animation: rise-in 260ms ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-cmd-split,
@@ -1597,13 +1592,8 @@ const guardOutside = useOutsideGuard()
 }
 /* Each result eases in; honours reduced motion. */
 .lp-cmd-item {
-  animation: lp-cmd-in 140ms ease-out both;
-}
-@keyframes lp-cmd-in {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
+  --rise: 3px;
+  animation: rise-in 140ms ease-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-cmd-item {

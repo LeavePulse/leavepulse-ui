@@ -1,5 +1,7 @@
-import { useReducedMotion } from "motion-v"
 import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
+import { usePointerFrame } from "./usePointerFrame"
+import { usePrefersReducedMotion } from "./useReducedMotion"
+import { spotlightPoint } from "./useSpotlight"
 
 /*
  * useTilt — pointer-reactive 3D tilt for a "tactile" surface (a card, a tile, a
@@ -8,9 +10,14 @@ import { computed, ref, toValue, type ComputedRef, type CSSProperties, type Mayb
  *
  * Bind the returned handlers to the element and the returned `style` to it (it
  * needs a shared `perspective` on an ANCESTOR — see LpTilt, which supplies one).
- * Rotation eases to rest via CSS transition; the handlers only write the target
- * transform, so there's no rAF loop. SSR-safe (no window access at setup) and
- * collapses to a flat, no-tilt style when the OS prefers reduced motion.
+ * Rotation eases to rest via CSS transition. The pointer is not reactive
+ * state: once per animation frame (usePointerFrame, shared with LpMagnetic and
+ * the spotlight) its position is written to custom properties on the element,
+ * `--lp-tilt-x`/`--lp-tilt-y` from -1 to 1 for the lean and the spotlight's own
+ * `--lp-spot-x`/`--lp-spot-y` for the glare, and the style reads them. It
+ * re-renders on enter and leave, not on every move. SSR-safe (no window access
+ * at setup) and collapses to a flat, no-tilt style when the OS prefers reduced
+ * motion.
  */
 export interface UseTiltOptions {
   /** Max rotation toward the pointer, in degrees (per axis). Default 10. */
@@ -35,22 +42,33 @@ export interface UseTilt {
   active: Ref<boolean>
 }
 
+const TILT_VARS = ["--lp-tilt-x", "--lp-tilt-y", "--lp-spot-x", "--lp-spot-y"]
+
 export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt {
   const options = computed(() => toValue(source))
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = usePrefersReducedMotion()
 
   const active = ref(false)
-  // Pointer position within the element, normalized to [-1, 1] from center.
-  const nx = ref(0)
-  const ny = ref(0)
+  // The element the handlers are bound to, learnt from the events themselves.
+  let target: HTMLElement | null = null
+
+  const pointer = usePointerFrame({
+    anyPointer: true,
+    paint: (x, y) => {
+      if (!target || !active.value) return
+      const r = target.getBoundingClientRect()
+      // Pointer position within the element, normalized to [-1, 1] from center.
+      target.style.setProperty("--lp-tilt-x", (((x - r.left) / r.width) * 2 - 1).toFixed(3))
+      target.style.setProperty("--lp-tilt-y", (((y - r.top) / r.height) * 2 - 1).toFixed(3))
+      const spot = spotlightPoint(r, x, y)
+      target.style.setProperty("--lp-spot-x", spot.x)
+      target.style.setProperty("--lp-spot-y", spot.y)
+    },
+  })
 
   function onPointerMove(e: PointerEvent): void {
-    if (reduceMotion.value) return
-    const el = e.currentTarget as HTMLElement | null
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    nx.value = ((e.clientX - r.left) / r.width) * 2 - 1
-    ny.value = ((e.clientY - r.top) / r.height) * 2 - 1
+    if (e.currentTarget instanceof HTMLElement) target = e.currentTarget
+    pointer.move(e)
   }
 
   function onPointerEnter(): void {
@@ -59,8 +77,8 @@ export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt 
 
   function onPointerLeave(): void {
     active.value = false
-    nx.value = 0
-    ny.value = 0
+    pointer.cancel()
+    for (const name of TILT_VARS) target?.style.removeProperty(name)
   }
 
   const style = computed<CSSProperties>(() => {
@@ -71,12 +89,12 @@ export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt 
     // horizontal one. Only tilt while active so it rests flat when the pointer
     // leaves (nx/ny are already zeroed on leave).
     const { max = 10, lift = 8, scale = 1.03 } = options.value
-    const rx = active.value ? -ny.value * max : 0
-    const ry = active.value ? nx.value * max : 0
+    const rx = active.value ? `calc(var(--lp-tilt-y, 0) * ${-max}deg)` : "0deg"
+    const ry = active.value ? `calc(var(--lp-tilt-x, 0) * ${max}deg)` : "0deg"
     const z = active.value ? lift : 0
     const s = active.value ? scale : 1
     return {
-      transform: `translate3d(0, ${-z}px, 0) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`,
+      transform: `translate3d(0, ${-z}px, 0) rotateX(${rx}) rotateY(${ry}) scale(${s})`,
       transformStyle: "preserve-3d",
       transition: active.value
         ? "transform 0.12s ease-out"
@@ -88,12 +106,11 @@ export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt 
     if (!options.value.glare || reduceMotion.value || !active.value) {
       return { opacity: 0 }
     }
-    // Bright spot tracks the pointer; map [-1,1] → [0%,100%].
-    const px = (nx.value + 1) * 50
-    const py = (ny.value + 1) * 50
+    // Bright spot tracks the pointer, at the spotlight's own position
+    // properties, which the tilting element carries and the glare inherits.
     return {
       opacity: 1,
-      background: `radial-gradient(circle at ${px}% ${py}%, rgba(255,255,255,0.35), transparent 55%)`,
+      background: "radial-gradient(circle at var(--lp-spot-x, 50%) var(--lp-spot-y, 50%), rgba(255,255,255,0.35), transparent 55%)",
       transition: "opacity 0.2s ease",
     }
   })

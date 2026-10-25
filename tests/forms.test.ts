@@ -54,6 +54,10 @@ test("otp groups break between blocks and never after the last cell", () => {
   expect(groupBreaks(6, undefined).size).toBe(0)
   expect(groupBreaks(6, 6).size).toBe(0)
   expect(groupBreaks(6, 0).size).toBe(0)
+  // Exact sizes split like LpCodeDisplay's groups; the remainder is one block.
+  expect([...groupBreaks(15, [4, 6, 5])]).toEqual([3, 9])
+  expect([...groupBreaks(10, [2, 3])]).toEqual([1, 4])
+  expect(groupBreaks(6, []).size).toBe(0)
 })
 
 test("hsl output round-trips within one step per channel", () => {

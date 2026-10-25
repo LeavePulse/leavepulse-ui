@@ -96,9 +96,9 @@ describe("quotaSegments", () => {
 
 describe("formatAmount", () => {
   test("bytes scale in binary steps", () => {
-    expect(formatAmount(512, "bytes", "en")).toBe("512 byte")
-    expect(formatAmount(1536, "bytes", "en")).toBe("1.5 kB")
-    expect(formatAmount(10 * 1024 ** 3, "bytes", "en")).toBe("10 GB")
+    expect(formatAmount(512, "bytes", "en")).toBe("512\u00a0B")
+    expect(formatAmount(1536, "bytes", "en")).toBe("1.5\u00a0kB")
+    expect(formatAmount(10 * 1024 ** 3, "bytes", "en")).toBe("10\u00a0GB")
   })
   test("a string unit is a suffix, a function is used as is", () => {
     expect(formatAmount(3, "seats", "en")).toBe("3 seats")

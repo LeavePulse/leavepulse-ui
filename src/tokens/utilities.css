@@ -135,3 +135,39 @@
     transition: none;
   }
 }
+
+/*
+ * A bar running out: the time left before something goes away on its own (a
+ * toast dismissing, a revealed secret hiding again). Set the run's length as
+ * `animation-duration` on the element; a toast that pauses while hovered sets
+ * `data-paused`, and the run resumes with exactly the time it had left, which
+ * is what the toast's own timer does. Driven by CSS rather than a ticking
+ * clock, so it is smooth at any frame rate and costs nothing while it runs.
+ * Shrinks toward the inline start, so in a right-to-left layout it drains
+ * from the left.
+ */
+.lp-drain {
+  transform-origin: left center;
+  animation-name: lp-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.lp-drain:dir(rtl) {
+  transform-origin: right center;
+}
+.lp-drain[data-paused] {
+  animation-play-state: paused;
+}
+@keyframes lp-drain {
+  from {
+    scale: 1 1;
+  }
+  to {
+    scale: 0 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-drain {
+    animation: none;
+  }
+}

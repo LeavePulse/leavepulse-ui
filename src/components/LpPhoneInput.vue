@@ -53,7 +53,7 @@ import { useFieldNotice, type FieldNoticeOptions } from "../composables/useField
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { type Country, filterCountries, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
-import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
+import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpIcon from "./LpIcon.vue"
 import {
@@ -436,7 +436,7 @@ const guardOutside = useOutsideGuard()
               v-for="(c, i) in filtered"
               :key="c.iso2"
               :value="c.iso2"
-              :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
+              :style="optionStagger(i)"
               :class="[OPTION_ITEM, 'gap-2.5']"
               @select.prevent="chooseCountry(c)"
             >

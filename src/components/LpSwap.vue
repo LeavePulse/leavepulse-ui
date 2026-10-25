@@ -11,7 +11,7 @@
  *   </LpSwap>
  *
  * The outgoing content fades out quickly, the incoming one rises in the way
- * LpTabs panels do (`tab-in`), and the box eases between the two heights
+ * LpTabs panels do (`rise-in`), and the box eases between the two heights
  * through LpShift, so what sits under it glides instead of jolting.
  *
  * `swapKey` is what decides that the content is "another one". Change it per
@@ -33,7 +33,7 @@ defineProps<{
     <Transition
       mode="out-in"
       :css="!disabled"
-      enter-active-class="animate-[tab-in_220ms_var(--ease-emphasized)] motion-reduce:animate-none"
+      enter-active-class="animate-[rise-in_220ms_var(--ease-emphasized)] [--rise:6px] motion-reduce:animate-none"
       leave-active-class="transition-opacity duration-[var(--duration-fast)] ease-out motion-reduce:transition-none"
       leave-to-class="opacity-0"
     >

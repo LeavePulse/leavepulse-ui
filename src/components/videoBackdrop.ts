@@ -3,6 +3,8 @@
  * so they can be tested without a media element.
  */
 
+import { splitTime } from "./timeSpan"
+
 /** The stretch of a clip that loops, and how long two passes overlap at the seam. */
 export interface LoopPlan {
   /** Where every pass starts, in seconds of media time. */
@@ -63,11 +65,10 @@ export function isNativeLoop(plan: LoopPlan, duration: number): boolean {
 
 /** "1:05", "0:07.5": a position on a clip as a range slider labels it. */
 export function formatClipTime(seconds: number, precise = false): string {
-  const safe = Math.max(0, Number.isFinite(seconds) ? seconds : 0)
-  const minutes = Math.floor(safe / 60)
-  const rest = safe - minutes * 60
-  const whole = Math.floor(rest)
-  const tenth = Math.floor((rest - whole) * 10)
-  const secs = String(whole).padStart(2, "0")
+  const t = splitTime(Number.isFinite(seconds) ? seconds * 1000 : 0)
+  // Hours fold into minutes: a slider over a clip reads "75:00", not "1:15:00".
+  const minutes = (t.days * 24 + t.hours) * 60 + t.minutes
+  const secs = String(t.seconds).padStart(2, "0")
+  const tenth = Math.floor(t.ms / 100)
   return precise && tenth ? `${minutes}:${secs}.${tenth}` : `${minutes}:${secs}`
 }

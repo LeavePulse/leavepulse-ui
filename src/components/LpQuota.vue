@@ -15,18 +15,20 @@ export default { inheritAttrs: false }
  * exceeded quota has to SHOW the excess. Here the bar stretches to hold what is
  * used and the limit becomes a mark along it, so 12 of 10 GB reads as a bar
  * running past a line instead of as a full bar indistinguishable from 10 of 10.
- * The tone scale is LpProgress's (meter.ts), so the two agree on one disk.
+ * The tone scale, the track and the header row are LpProgress's (meter.ts), so
+ * the two agree on one disk and look like one family.
  */
-import { computed, ref, watch } from "vue"
+import { computed } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useLocale } from "../composables/useLocale"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { useReveal } from "../composables/useReveal"
+import { useRevealedValue } from "../composables/useRevealedValue"
 import LpIcon from "./LpIcon.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
-import { TONE_COLOR } from "./meter"
+import { METER_HEADER, METER_TRACK } from "./meter"
 import { formatAmount, quotaSegments, quotaState, type QuotaPart, type QuotaUnit } from "./quota"
+import { toneLook } from "./tone"
 
 export type QuotaLabels = {
   /** `{amount}` is what remains. */
@@ -65,7 +67,7 @@ const props = withDefaults(
     locale?: string
     labels?: Partial<QuotaLabels>
   }>(),
-  { limit: null, warnAt: 0.8, dangerAt: 0.95, hideLegend: false, animateOnMount: true },
+  { limit: null, warnAt: 0.8, dangerAt: 0.9, hideLegend: false, animateOnMount: true },
 )
 
 const text = useLabels<QuotaLabels>(
@@ -81,6 +83,7 @@ const text = useLabels<QuotaLabels>(
 const locale = useLocale(() => props.locale)
 
 const state = computed(() => quotaState(props.used, props.limit, props.warnAt, props.dangerAt))
+const look = computed(() => toneLook(state.value.tone))
 const fmt = (v: number) => formatAmount(v, props.unit, locale.value)
 
 /*
@@ -89,20 +92,15 @@ const fmt = (v: number) => formatAmount(v, props.unit, locale.value)
  */
 const layout = computed(() =>
   quotaSegments(
-    props.parts?.length ? props.parts : [{ label: props.label ?? "", value: props.used, color: TONE_COLOR[state.value.tone] }],
+    props.parts?.length ? props.parts : [{ label: props.label ?? "", value: props.used, color: look.value.color }],
     props.limit,
   ),
 )
 
-const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animateOnMount })
-const shownUsed = ref(props.animateOnMount ? 0 : props.used)
-watch(
-  [revealed, () => props.used],
-  ([seen, used]) => {
-    if (seen) shownUsed.value = used
-  },
-  { immediate: true },
-)
+// The bar's segments ease in CSS and the figure rolls in LpNumberFlow, so only the held value is needed here.
+const { el: revealAnchor, revealed, target: shownUsed } = useRevealedValue(() => props.used, {
+  animateOnMount: () => props.animateOnMount,
+})
 
 const footer = computed(() => {
   const s = state.value
@@ -118,9 +116,8 @@ const valueText = computed(() =>
     : `${fmt(props.used)}, ${text.value.unlimited}`,
 )
 
-const readingTone = computed(() =>
-  state.value.tone === "danger" ? "text-danger" : state.value.tone === "warning" ? "text-accent" : "text-ink",
-)
+// Ink while the reading is fine: a calm quota should not be coloured at all.
+const readingTone = computed(() => (state.value.tone === "ok" ? "text-ink" : look.value.text))
 
 const { class: rootClass, attrs: rest } = useMergedAttrs("flex w-full flex-col gap-1.5")
 </script>
@@ -137,7 +134,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs("flex w-full flex-col g
     :class="rootClass"
     v-bind="rest"
   >
-    <div class="flex items-baseline justify-between gap-3 text-sm">
+    <div :class="METER_HEADER" class="gap-3 text-sm">
       <span v-if="label" class="truncate text-ink">{{ label }}</span>
       <span class="ml-auto shrink-0 font-mono text-xs tabular-nums text-muted">
         <LpNumberFlow
@@ -156,7 +153,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs("flex w-full flex-col g
 
     <div
       v-if="state.limited || parts?.length"
-      class="relative h-1.5 w-full rounded-pill bg-surface-soft"
+      class="relative"
+      :class="METER_TRACK"
       aria-hidden="true"
     >
       <div class="flex h-full w-full gap-px overflow-hidden rounded-pill">
@@ -177,7 +175,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs("flex w-full flex-col g
 
     <div
       class="flex items-center gap-1 text-xs transition-colors duration-(--duration-medium)"
-      :class="state.over > 0 ? 'text-danger' : 'text-muted'"
+      :class="state.over > 0 ? look.text : 'text-muted'"
     >
       <LpIcon
         name="lucide:triangle-alert"

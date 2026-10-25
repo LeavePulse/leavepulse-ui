@@ -22,6 +22,7 @@ import { useReveal } from "../composables/useReveal"
 import { mixValues, useTween } from "../composables/useTween"
 import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
+import { toneLook, type ToneName } from "./tone"
 
 const props = withDefaults(
   defineProps<{
@@ -33,7 +34,7 @@ const props = withDefaults(
     /** Any CSS colour. Defaults to the brand token. */
     color?: string
     /** Named theme tones, for callers that don't want to spell a var(). */
-    tone?: "brand" | "action" | "danger" | "accent" | "muted"
+    tone?: ToneName
     /** Fill under the line. */
     area?: boolean
     /** Curve tension, as in LpChart. 0 draws a polyline. */
@@ -78,15 +79,7 @@ const props = withDefaults(
   { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900, sample: true },
 )
 
-const TONE: Record<string, string> = {
-  brand: "var(--color-brand)",
-  action: "var(--color-action)",
-  danger: "var(--color-danger)",
-  accent: "var(--color-accent)",
-  muted: "var(--color-muted)",
-}
-
-const stroke = computed(() => props.color ?? TONE[props.tone])
+const stroke = computed(() => props.color ?? toneLook(props.tone).color)
 
 /*
  * The sweep is held until the svg is actually on screen. Forty of these sit in

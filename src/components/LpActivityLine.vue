@@ -133,7 +133,7 @@ const fadeDelay = computed(() => (phase.value === "finishing" ? "var(--duration-
     <!-- The sweep: a short bright segment crossing the edge. Faded rather than
          cut when the work turns determinate or ends. -->
     <span
-      class="lp-activity-sweep absolute inset-y-0 left-0 w-2/5 rounded-pill transition-opacity duration-(--duration-medium)"
+      class="lp-sweep lp-activity-sweep absolute inset-y-0 left-0 w-2/5 rounded-pill transition-opacity duration-(--duration-medium)"
       :class="determinate || phase === 'finishing' ? 'opacity-0' : 'opacity-100'"
     />
     <!-- The fill, scaled rather than sized, so it eases on the compositor. A
@@ -150,20 +150,11 @@ const fadeDelay = computed(() => (phase.value === "finishing" ? "var(--duration-
 <style>
 /*
  * Unscoped and namespaced, like the other kit animations: the keyframes are
- * shared by every line on the page.
+ * shared by every line on the page. The sweep's travel is the kit's own
+ * (.lp-sweep in tokens.css); this paints it, soft at both ends.
  */
 .lp-activity-sweep {
   background: linear-gradient(90deg, transparent, var(--lp-al-color) 35%, var(--lp-al-color) 65%, transparent);
-  animation: lp-activity-sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-@keyframes lp-activity-sweep {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(250%);
-  }
 }
 
 .lp-activity-shimmer {
@@ -183,11 +174,8 @@ const fadeDelay = computed(() => (phase.value === "finishing" ? "var(--duration-
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* No travel: the sweep becomes a steady full-width tint, which still says busy. */
+  /* The sweep lies still across the line (tokens.css); a solid tint rather than its soft ends. */
   .lp-activity-sweep {
-    animation: none;
-    width: 100%;
-    opacity: 0.5;
     background: var(--lp-al-color);
   }
   .lp-activity-shimmer {

@@ -19,6 +19,11 @@ export default { inheritAttrs: false }
  *
  * Decorative by default (the text next to it says the state); pass `label`
  * when the mark is all there is.
+ *
+ * `variant="step"` is the same mark as a wizard draws it (LpStepper): the
+ * step you are on is a brand ring with its number (`status="current"`), a
+ * finished one is filled with the brand colour rather than the "passed"
+ * green, and the ones ahead are a quiet ring with no fill of their own.
  */
 import { computed } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -26,10 +31,16 @@ import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import LpRollingText from "./LpRollingText.vue"
 import type { StepStatus } from "./pipeline"
+import { TONES } from "./tone"
+
+/** A job's state, plus `current`: the step a person is on in a flow they drive. */
+export type StepMarkStatus = StepStatus | "current"
 
 const props = withDefaults(
   defineProps<{
-    status: StepStatus
+    status: StepMarkStatus
+    /** `status` (default) colours a job's outcome; `step` is a wizard's step (see above). */
+    variant?: "status" | "step"
     size?: "sm" | "md" | "lg"
     /** Shown inside a pending mark: the step's number in a numbered flow. */
     number?: number | string
@@ -38,22 +49,32 @@ const props = withDefaults(
     /** Accessible name; without it the mark is hidden from assistive tech. */
     label?: string
   }>(),
-  { size: "md" },
+  { variant: "status", size: "md" },
 )
 
 const BOX = { sm: "size-4 text-[9px]", md: "size-6 text-[11px]", lg: "size-8 text-xs" }
 const GLYPH = { sm: 10, md: 14, lg: 18 }
 
-const TONE: Record<StepStatus, string> = {
+// Outcomes in the kit's tones (tone.ts): a ring for what is under way, a solid
+// disc for what is decided. The quiet states are greys, not tones.
+const TONE: Record<StepMarkStatus, string> = {
   pending: "border-line-strong bg-surface text-muted",
-  running: "border-brand bg-brand-soft text-brand",
-  success: "border-transparent bg-action text-ink-inverse",
-  failed: "border-transparent bg-danger text-ink-inverse",
+  current: `bg-surface ${TONES.brand.border} ${TONES.brand.text}`,
+  running: `${TONES.brand.border} ${TONES.brand.chip}`,
+  success: `border-transparent text-ink-inverse ${TONES.success.bg}`,
+  failed: `border-transparent text-ink-inverse ${TONES.danger.bg}`,
   skipped: "border-dashed border-line-strong bg-surface text-muted",
   cancelled: "border-line-strong bg-surface-soft text-muted-strong",
 }
 
-const ICON: Partial<Record<StepStatus, string>> = {
+// A wizard's step sits on whatever surface the form has, so only its ring and number are its own.
+const STEP_TONE: Partial<Record<StepMarkStatus, string>> = {
+  pending: "border-line text-muted",
+  current: `${TONES.brand.border} ${TONES.brand.text}`,
+  success: `border-transparent text-ink-inverse ${TONES.brand.bg}`,
+}
+
+const ICON: Partial<Record<StepMarkStatus, string>> = {
   success: "lucide:check",
   failed: "lucide:x",
   skipped: "lucide:minus",
@@ -65,13 +86,14 @@ const ICON: Partial<Record<StepStatus, string>> = {
  * it, a pending step's number changing (a reordered flow) flips it too.
  */
 const glyph = computed(() => {
-  if (props.status !== "pending") return props.status
+  // Pending and current show the same thing, so arriving at a step keeps its number in place.
+  if (props.status !== "pending" && props.status !== "current") return props.status
   if (props.icon) return "icon"
   return props.number !== undefined ? `n:${props.number}` : "pending"
 })
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
-  `relative inline-flex shrink-0 items-center justify-center rounded-pill border font-semibold tabular-nums transition-[color,background-color,border-color] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none ${BOX[props.size]} ${TONE[props.status]}`,
+  `relative inline-flex shrink-0 items-center justify-center rounded-pill border font-semibold tabular-nums transition-[color,background-color,border-color] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none ${BOX[props.size]} ${(props.variant === "step" && STEP_TONE[props.status]) || TONE[props.status]}`,
 )
 </script>
 
@@ -94,8 +116,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           size="inline"
           :class="size === 'sm' ? 'text-[10px]' : size === 'md' ? 'text-sm' : 'text-lg'"
         />
-        <LpIcon v-else-if="ICON[value as StepStatus]" :name="ICON[value as StepStatus]!" :size="GLYPH[size]" />
-        <LpIcon v-else-if="value === 'icon' && icon" :name="icon" :size="GLYPH[size] - 2" />
+        <LpIcon v-else-if="ICON[value as StepMarkStatus]" :name="ICON[value as StepMarkStatus]!" :size="GLYPH[size]" />
+        <LpIcon v-else-if="value === 'icon' && icon" :name="icon" :size="variant === 'step' ? GLYPH[size] : GLYPH[size] - 2" />
         <template v-else-if="String(value).startsWith('n:')">{{ number }}</template>
         <!-- An empty slot would fall back to printing the raw key. -->
         <span v-else class="block size-0" />
@@ -105,13 +127,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 </template>
 
 <style>
-/* A ring that swells off the mark and fades: "this one is happening now". */
+/* The kit's halo (tokens.css), swelling less: this ring already starts at the mark's own size. */
 .lp-step-halo {
-  animation: lp-step-halo 1.6s var(--ease-emphasized, ease-out) infinite;
-}
-@keyframes lp-step-halo {
-  0% { transform: scale(1); opacity: 0.55; }
-  70%, 100% { transform: scale(1.6); opacity: 0; }
+  --halo-scale: 1.6;
+  animation: lp-halo 1.6s var(--ease-emphasized, ease-out) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-step-halo { animation: none; opacity: 0; }

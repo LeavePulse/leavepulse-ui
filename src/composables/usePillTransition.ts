@@ -1,5 +1,5 @@
-import { useReducedMotion } from "motion-v"
 import { computed, type ComputedRef } from "vue"
+import { usePrefersReducedMotion } from "./useReducedMotion"
 
 /*
  * Shared motion-v transition for an element that FLIES to a new position rather
@@ -8,27 +8,32 @@ import { computed, type ComputedRef } from "vue"
  * tooltip trailing the cursor. One spring per feel keeps them consistent, and
  * every preset collapses to an instant move when the OS prefers reduced motion.
  *
- * Two feels, because the two jobs want opposite things:
+ * Three feels, because the jobs want different things:
  *
- *   "pill"  — snappy. The move is a direct answer to a click, so it should read
- *             as already-arrived: high stiffness, almost no visible travel.
- *   "float" — trailing. The element chases a continuously moving pointer, so it
- *             wants perceptible lag and a soft landing; a pill-stiff spring
- *             tracks the cursor so exactly that it reads as jitter, not motion.
+ *   "pill"   — snappy. The move is a direct answer to a click, so it should read
+ *              as already-arrived: high stiffness, almost no visible travel.
+ *   "float"  — trailing. The element chases a continuously moving pointer, so it
+ *              wants perceptible lag and a soft landing; a pill-stiff spring
+ *              tracks the cursor so exactly that it reads as jitter, not motion.
+ *   "layout" — a box resizing or a block moving to a new place (motion-v
+ *              `layout`): LpTabs' panel height, a block dropped in LayoutCanvas.
+ *              As quick as the pill, a touch more damped and lighter, so a
+ *              large box lands without a wobble at its edge.
  */
 export type PillTransition =
   | { duration: number }
-  | { type: "spring"; stiffness: number; damping: number }
+  | { type: "spring"; stiffness: number; damping: number; mass?: number }
 
-export type PillFeel = "pill" | "float"
+export type PillFeel = "pill" | "float" | "layout"
 
-const SPRING: Record<PillFeel, { type: "spring"; stiffness: number; damping: number }> = {
+const SPRING: Record<PillFeel, { type: "spring"; stiffness: number; damping: number; mass?: number }> = {
   pill: { type: "spring", stiffness: 520, damping: 40 },
   float: { type: "spring", stiffness: 210, damping: 26 },
+  layout: { type: "spring", stiffness: 520, damping: 42, mass: 0.9 },
 }
 
 export function usePillTransition(feel: PillFeel = "pill"): ComputedRef<PillTransition> {
-  const reduceMotion = useReducedMotion()
+  const reduceMotion = usePrefersReducedMotion()
   return computed<PillTransition>(() =>
     reduceMotion.value ? { duration: 0 } : SPRING[feel],
   )
@@ -51,7 +56,10 @@ export function usePillTransition(feel: PillFeel = "pill"): ComputedRef<PillTran
  * matched by feel and kept beside their motion-v counterparts so that a change
  * to one is an obvious prompt to check the other.
  */
-const STEP_SPRING: Record<PillFeel, { stiffness: number; damping: number }> = {
+/** The feels a pointer follower uses; "layout" is a motion-v layout move only. */
+export type StepFeel = Exclude<PillFeel, "layout">
+
+const STEP_SPRING: Record<StepFeel, { stiffness: number; damping: number }> = {
   // Critically damped: reaches the target quickly, never past it.
   pill: { stiffness: 420, damping: 41 },
   float: { stiffness: 260, damping: 32 },
@@ -67,7 +75,7 @@ export interface SpringState {
 export function springStep(
   state: SpringState,
   target: number,
-  feel: PillFeel = "float",
+  feel: StepFeel = "float",
   /** Frame time in seconds; clamped so a backgrounded tab can't explode it. */
   dt = 1 / 60,
 ): SpringState {

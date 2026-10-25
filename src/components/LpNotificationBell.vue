@@ -8,18 +8,21 @@
  * `select`. Mirrors the kit convention (cf. LpSidebar): data in, events out,
  * no data fetching inside.
  */
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, getCurrentInstance } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import { useNow } from "../composables/useNow"
 import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
 import LpPopover from "./LpPopover.vue"
+import LpRelativeTime from "./LpRelativeTime.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpShift from "./LpShift.vue"
+import { toneLook, type ToneName } from "./tone"
 
 export interface NotificationItem {
   id: string
@@ -35,7 +38,7 @@ export interface NotificationItem {
    * consumers were mapping their own types onto raw palette classes, which is
    * the one place a theme cannot follow them.
    */
-  tone?: "brand" | "action" | "danger" | "accent" | "muted"
+  tone?: ToneName
   /** Optional deep link; the row becomes clickable when set. */
   link?: string
   /** ISO-8601 creation time; rendered as a relative label. */
@@ -63,10 +66,17 @@ export interface NotificationLabels {
   unread?: string
   /** Screen-reader marker on an unread row. */
   unreadItem?: string
-  /** Relative times; `{n}` is filled in. */
+  /**
+   * No longer read: times are worded by Intl in the app's locale. Still
+   * accepted so existing label objects keep type-checking.
+   * @deprecated
+   */
   justNow?: string
+  /** @deprecated See `justNow`. */
   minutes?: string
+  /** @deprecated See `justNow`. */
   hours?: string
+  /** @deprecated See `justNow`. */
   days?: string
 }
 
@@ -85,8 +95,9 @@ const props = withDefaults(
     /** Translations for the strings the bell renders itself. */
     labels?: NotificationLabels
     /**
-     * Formats `item.createdAt` for display. Defaults to a compact English
-     * relative time ("just now", "5m", "3h"); pass your own to localise it.
+     * Formats `item.createdAt` for display. Defaults to a narrow relative time
+     * in the app's locale ("now", "5m ago", "3h ago"); pass your own to word
+     * it differently.
      */
     formatTime?: (iso: string) => string
   }>(),
@@ -109,10 +120,6 @@ const text = useLabels(
     ariaLabel: "",
     unread: "{count} unread",
     unreadItem: "Unread",
-    justNow: "just now",
-    minutes: "{n}m",
-    hours: "{n}h",
-    days: "{n}d",
   },
   () => props.labels,
 )
@@ -152,14 +159,6 @@ const buttonLabel = computed(() =>
   hasUnread.value ? `${l.value.ariaLabel}, ${l.value.unread.replace("{count}", String(unread.value))}` : l.value.ariaLabel,
 )
 
-/** Icon tints for an unread row, keyed by the item's category tone. */
-const TONE_CLASS: Record<string, string> = {
-  brand: "bg-brand-soft text-brand",
-  action: "bg-action-soft text-action",
-  danger: "bg-danger-soft text-danger",
-  accent: "bg-accent-soft text-accent",
-  muted: "bg-surface-soft text-muted-strong",
-}
 
 /*
  * Which optional actions the consumer actually handles. A button for an event
@@ -242,35 +241,14 @@ function rowMenu(item: NotificationItem): ContextMenuItemDef[] {
   return actions
 }
 
-// Compact relative time ("just now", "5m", "3h", "2d"); falls back to a date.
-// A `formatTime` prop takes over entirely — that's the localisation seam.
-//
-// The clock is only read after mount and then ticks, so a server render and the
-// hydrating client agree (both print nothing) and "just now" does not stay
-// "just now" for the life of the page.
-const now = ref<number | null>(null)
-let clock: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
-  now.value = Date.now()
-  clock = setInterval(() => (now.value = Date.now()), 30_000)
-})
-onBeforeUnmount(() => clearInterval(clock))
-
-function timeAgo(iso?: string): string {
-  if (!iso || now.value === null) return ""
-  if (props.formatTime) return props.formatTime(iso)
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ""
-  const secs = Math.max(0, Math.round((now.value - then) / 1000))
-  const n = (template: string, value: number) => template.replace("{n}", String(value))
-  if (secs < 45) return l.value.justNow
-  const mins = Math.round(secs / 60)
-  if (mins < 60) return n(l.value.minutes, mins)
-  const hrs = Math.round(mins / 60)
-  if (hrs < 24) return n(l.value.hours, hrs)
-  const days = Math.round(hrs / 24)
-  if (days < 7) return n(l.value.days, days)
-  return new Date(then).toLocaleDateString()
+// A `formatTime` prop takes over the row's time entirely; it is re-asked twice
+// a minute so its "5m" keeps moving. Without one, the row renders
+// LpRelativeTime, which words the time through Intl in the app's locale and
+// wakes only when its own text would change.
+const customNow = useNow(() => !!props.formatTime, { nextIn: () => 30_000 })
+function customTime(iso: string): string {
+  void customNow.value
+  return props.formatTime ? props.formatTime(iso) : ""
 }
 </script>
 
@@ -374,7 +352,7 @@ function timeAgo(iso?: string): string {
                  it is still unread. -->
             <span
               class="grid size-7 shrink-0 place-items-center rounded-control"
-              :class="item.read ? 'bg-surface-soft text-muted' : TONE_CLASS[item.tone ?? 'brand']"
+              :class="item.read ? 'bg-surface-soft text-muted' : toneLook(item.tone, 'brand').chip"
             >
               <LpIcon :name="item.icon || 'lucide:bell'" :size="15" />
             </span>
@@ -390,7 +368,10 @@ function timeAgo(iso?: string): string {
                 {{ item.body }}
               </span>
               <span v-if="item.createdAt" class="mt-0.5 block text-[11px] text-muted/70">
-                {{ timeAgo(item.createdAt) }}
+                <template v-if="formatTime">{{ customTime(item.createdAt) }}</template>
+                <!-- The row is itself a button or link, so the exact date goes
+                     to the native title rather than a focusable tooltip. -->
+                <LpRelativeTime v-else :date="item.createdAt" format="narrow" :tooltip="false" />
               </span>
             </span>
           </component>

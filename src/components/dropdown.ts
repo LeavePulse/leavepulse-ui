@@ -13,6 +13,9 @@
  * the right way when the list flips above the trigger.
  */
 
+
+import { staggerDelay } from "./reveal"
+
 /** Enter/exit animation for state-open panels (Select, Popover, Dropdown, …). */
 export const POPOVER_ANIM =
   "data-[state=open]:animate-[popover-in_140ms_var(--ease-emphasized)] " +
@@ -46,13 +49,22 @@ export const POPOVER_PANEL = PANEL_SURFACE + " " + POPOVER_ANIM
  * A selectable option row: layout, highlight state, and the staggered cascade.
  * Cascades downward by default and upward when the panel is flipped above the
  * trigger (group-data-[side=top]). Pair with an inline animationDelay for the
- * stagger. `flex` + gap are included; add justify/extra layout if needed.
+ * stagger (optionStagger). `flex` + gap are included; add justify/extra layout if needed.
  */
 export const OPTION_ITEM =
   "flex cursor-pointer items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm text-ink outline-none " +
-  "animate-[option-in_180ms_var(--ease-emphasized)_both] " +
-  "group-data-[side=top]:animate-[option-in-up_180ms_var(--ease-emphasized)_both] " +
+  "animate-[rise-in_180ms_var(--ease-emphasized)_both] [--rise:-6px] group-data-[side=top]:[--rise:6px] " +
   "data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand"
+
+/**
+ * The cascade's delay for the option at `index`, as an inline style for the
+ * row: 22 ms apart, and from the 12th on every option arrives together, so a
+ * long list still lands at once. Select, Autocomplete, PhoneInput and
+ * TagsInput each had this formula written out.
+ */
+export const optionStagger = (index: number): { animationDelay: string } => ({
+  animationDelay: `${staggerDelay(index, 0, 22, 12)}ms`,
+})
 
 /**
  * Micro-animation for a close / clear "✕" icon: a quarter-turn on hover and a

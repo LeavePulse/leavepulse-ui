@@ -14,6 +14,7 @@ import LpNumberFlow from "./LpNumberFlow.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpStatus from "./LpStatus.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { TONES } from "./tone"
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +79,7 @@ const trendIcon = computed(() =>
 const trendColor = computed(() => {
   if (dir.value === "flat") return "text-muted"
   const good = props.invertTrend ? dir.value === "down" : dir.value === "up"
-  return good ? "text-action" : "text-danger"
+  return good ? TONES.success.text : TONES.danger.text
 })
 
 // Numeric delta gets an explicit sign; string deltas are shown as given.

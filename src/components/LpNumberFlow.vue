@@ -28,7 +28,8 @@
  */
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { easeOut, prefersReducedMotion } from "../composables/easing"
-import { useReveal } from "../composables/useReveal"
+import { useRevealedValue } from "../composables/useRevealedValue"
+import { compactNumber } from "./format"
 
 const props = withDefaults(
   defineProps<{
@@ -213,39 +214,13 @@ const travel = (to: number) => {
  * page is news, and it should roll whether or not it is in view — the reveal
  * governs the FIRST reading only.
  */
-const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animateOnMount })
+const { el: revealAnchor, target } = useRevealedValue(() => props.value, {
+  animateOnMount: () => props.animateOnMount,
+  holdChanges: false,
+})
 
-watch(revealed, (visible) => {
-  if (visible && props.animateOnMount) travel(props.value)
-}, { immediate: true })
-
-watch(() => props.value, travel)
+watch(target, travel)
 onBeforeUnmount(stop)
-
-const UNITS = [
-  { limit: 1e9, suffix: "B" },
-  { limit: 1e6, suffix: "M" },
-  { limit: 1e3, suffix: "k" },
-] as const
-
-const scaleFor = (v: number) => {
-  const abs = Math.abs(v)
-  let at = UNITS.findIndex((u) => abs >= u.limit)
-  // 999 950 at one place reads "1000.0k"; that is the next unit up.
-  if (at > 0 && Math.abs(Number((v / UNITS[at].limit).toFixed(1))) >= 1000) at--
-  if (at === -1 && abs >= 999.5) at = UNITS.length - 1
-  const unit = UNITS[at]
-  if (!unit) return { divisor: 1, suffix: "", decimals: 0 }
-  // One decimal is what makes 1.2k readable; a value that lands exactly on the
-  // unit (5M) keeps none, matching how these are written by hand.
-  const scaled = v / unit.limit
-  return {
-    divisor: unit.limit,
-    suffix: unit.suffix,
-    decimals: Number.isInteger(scaled) ? 0 : 1,
-  }
-}
-
 
 const formatted = computed(() => formatAt(round(displayed.value), !settled.value))
 
@@ -264,10 +239,10 @@ function formatAt(v: number, padded: boolean): string {
      *
      * The decimal count is what stays fixed: one place whenever a unit is in
      * play, so the row's shape only changes at a rollover, not on every frame.
+     * No locale here: the cells below find the fraction by its ".", and a
+     * locale's "," would turn the fraction's columns into integer ones.
      */
-    const { divisor, suffix } = scaleFor(v)
-    const places = divisor === 1 ? 0 : 1
-    return `${(v / divisor).toFixed(places)}${suffix}`
+    return compactNumber(v, { plainDecimals: 0, fixed: true })
   }
   const pad = padded ? Math.max(1, padTo.value) : 1
   if (props.grouped)

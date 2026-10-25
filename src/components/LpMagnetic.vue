@@ -14,14 +14,15 @@ export default { inheritAttrs: false }
  * target. On every button it turns a toolbar into jelly, so keep it rare.
  *
  * The field reaches `reach` px past the element's edge. The position is read
- * once per animation frame from a single listener on its window and written to the
- * `translate` property directly, so nothing re-renders. Mouse only; reduced
+ * once per animation frame from a single listener on its window
+ * (usePointerFrame) and written to the `translate` property directly, so
+ * nothing re-renders. Mouse only; reduced
  * motion leaves the element still. Layout is untouched: the wrapper keeps its
  * place and only its paint moves.
  */
 import { onBeforeUnmount, onMounted, ref } from "vue"
-import { prefersReducedMotion } from "../composables/easing"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { usePointerFrame } from "../composables/usePointerFrame"
 import { magneticOffset } from "./dock"
 
 const props = withDefaults(
@@ -39,13 +40,9 @@ const props = withDefaults(
 const { class: classes, attrs: rest } = useMergedAttrs(() => "inline-block")
 
 const el = ref<HTMLElement | null>(null)
-let frame = 0
-let lastX = 0
-let lastY = 0
 let held = false
 
-function paint() {
-  frame = 0
+function paint(lastX: number, lastY: number) {
   const node = el.value
   if (!node) return
   const rect = node.getBoundingClientRect()
@@ -66,19 +63,16 @@ function paint() {
   node.style.translate = pulling ? `${x.toFixed(1)}px ${y.toFixed(1)}px` : ""
 }
 
-function onMove(event: PointerEvent) {
-  if (event.pointerType !== "mouse" || prefersReducedMotion()) return
-  lastX = event.clientX
-  lastY = event.clientY
-  if (!frame) frame = requestAnimationFrame(paint)
-}
+// `disabled` is not a dropped move here: the paint turns the pull off, so an
+// element held when it is disabled still springs back.
+const pointer = usePointerFrame({ paint })
+const onMove = (event: PointerEvent) => void pointer.move(event)
 
 // The pointer leaving the window sends no further moves, so the element would
 // stay leaning toward a cursor that is gone.
 function onOut(event: PointerEvent) {
   if (event.relatedTarget || !held) return
-  lastX = lastY = Number.POSITIVE_INFINITY
-  if (!frame) frame = requestAnimationFrame(paint)
+  pointer.moveTo(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)
 }
 
 // The window the element actually lives in: inside LpFrame that is the
@@ -93,7 +87,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   host?.removeEventListener("pointermove", onMove)
   host?.removeEventListener("pointerout", onOut)
-  if (frame) cancelAnimationFrame(frame)
 })
 </script>
 

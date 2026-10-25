@@ -26,8 +26,9 @@ test("a locked, ticked child still counts", () => {
 })
 
 test("sizes roll over at the unit boundary", () => {
-  expect(formatSize(1023)).toBe("1023 B")
-  expect(formatSize(1048000)).toBe("1023 KB")
-  expect(formatSize(1048575)).toBe("1.0 MB")
-  expect(formatSize(2.5 * 1024 * 1024)).toBe("2.5 MB")
+  expect(formatSize(1023, "en")).toBe("1023\u00a0B")
+  expect(formatSize(1048000, "en")).toBe("1023\u00a0kB")
+  expect(formatSize(1048575, "en")).toBe("1.0\u00a0MB")
+  expect(formatSize(2.5 * 1024 * 1024, "en")).toBe("2.5\u00a0MB")
+  expect(formatSize(-1)).toBe("—")
 })

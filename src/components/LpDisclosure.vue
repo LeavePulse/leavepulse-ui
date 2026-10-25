@@ -154,7 +154,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         -->
         <div
           class="grid gap-2.5 px-3 pt-1 pb-3 motion-reduce:animate-none"
-          :class="drift ? 'animate-[disclosure-body-in_300ms_var(--ease-emphasized)]' : ''"
+          :class="drift ? 'animate-[rise-in_300ms_var(--ease-emphasized)] [--rise:-4px]' : ''"
         >
           <slot />
         </div>

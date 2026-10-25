@@ -17,7 +17,6 @@ export default { inheritAttrs: false }
  * Tab enters the tree once, arrows move within it. The parent owns that state.
  */
 import { computed } from "vue"
-import { easingToken, prefersReducedMotion } from "../composables/easing"
 import {
   fileIcon,
   formatModified,
@@ -26,10 +25,14 @@ import {
   type FileNode,
   type NodeStats,
 } from "./fileTree"
+import LpBadge from "./LpBadge.vue"
 import LpCheckbox from "./LpCheckbox.vue"
+import LpCollapse from "./LpCollapse.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
+import { staggerDelay } from "./reveal"
+import { useLocale } from "../composables/useLocale"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = defineProps<{
@@ -89,10 +92,14 @@ const checkState = computed(() =>
 
 // A directory shows the rolled-up size of what's under it, so a backup picker
 // can answer "how much is this folder" without expanding it.
+// The app's locale (reka's ConfigProvider), so sizes and dates read the way
+// the rest of its interface does.
+const locale = useLocale()
+
 const sizeLabel = computed(() => {
   if (!props.showSize) return ""
   const bytes = stat.value?.size
-  return bytes === undefined ? "" : formatSize(bytes)
+  return bytes === undefined ? "" : formatSize(bytes, locale.value)
 })
 
 /**
@@ -108,7 +115,7 @@ const countLabel = computed(() => {
 
 const modifiedLabel = computed(() =>
   props.showModified && props.node.modified !== undefined
-    ? formatModified(props.node.modified)
+    ? formatModified(props.node.modified, locale.value)
     : "",
 )
 
@@ -117,34 +124,7 @@ const modifiedLabel = computed(() =>
  * spend a second unfolding — past the cap every remaining row comes in together.
  */
 function rowDelay(index: number): string {
-  return `${Math.min(index * 18, 180)}ms`
-}
-
-// Expand/collapse the branch by animating from 0 to its measured height. The
-// Web Animations API is used directly (rather than a CSS class) because the
-// target height isn't known until the rows are in the DOM.
-function onBranchEnter(el: Element, done: () => void) {
-  if (prefersReducedMotion()) return done()
-  const height = (el as HTMLElement).scrollHeight
-  el.animate(
-    [
-      { height: "0px", opacity: 0 },
-      { height: `${height}px`, opacity: 1 },
-    ],
-    { duration: 220, easing: easingToken("ease-emphasized") },
-  ).onfinish = () => done()
-}
-
-function onBranchLeave(el: Element, done: () => void) {
-  if (prefersReducedMotion()) return done()
-  const height = (el as HTMLElement).scrollHeight
-  el.animate(
-    [
-      { height: `${height}px`, opacity: 1 },
-      { height: "0px", opacity: 0 },
-    ],
-    { duration: 180, easing: easingToken("ease-emphasized") },
-  ).onfinish = () => done()
+  return `${staggerDelay(index, 0, 18, 10)}ms`
 }
 
 function onActivate() {
@@ -255,12 +235,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
         <!-- Partial-selection counter: says outright how much of the folder is
              ticked, which a half-state checkbox alone doesn't convey. -->
-        <span
-          v-if="countLabel"
-          class="shrink-0 rounded-pill bg-brand-soft px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-brand"
-        >
-          {{ countLabel }}
-        </span>
+        <LpBadge v-if="countLabel" tone="brand" size="sm" class="tabular-nums">{{ countLabel }}</LpBadge>
 
         <!-- Metadata columns: tabular figures so sizes line up down the tree.
              `meta` is free text, so it truncates rather than pushing the size
@@ -283,14 +258,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </div>
     </LpContextMenu>
 
-    <!-- Height is only known at runtime, so the expand/collapse is measured in
-         JS hooks rather than a keyframe. Rows inside stagger themselves in. -->
-    <Transition
-      :css="false"
-      @enter="onBranchEnter"
-      @leave="onBranchLeave"
-    >
-      <ul v-if="isOpen && hasChildren" role="group" class="flex min-w-0 flex-col overflow-hidden">
+    <!-- The branch folds open and shut (LpCollapse); a toggle mid-way reverses
+         from where it is. Rows inside stagger themselves in. -->
+    <LpCollapse :open="isOpen && hasChildren">
+      <ul role="group" class="flex min-w-0 flex-col overflow-hidden">
         <LpFileTreeNode
           v-for="(child, i) in children"
           :key="child.id"
@@ -319,6 +290,6 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           </template>
         </LpFileTreeNode>
       </ul>
-    </Transition>
+    </LpCollapse>
   </li>
 </template>

@@ -18,13 +18,11 @@ export default { inheritAttrs: false }
  * The arithmetic both need (fraction of a range, tone at a reading) lives in
  * meter.ts and is shared rather than copied.
  */
-import { computed, ref, watch } from "vue"
-import { easeOut } from "../composables/easing"
+import { computed } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useLocale } from "../composables/useLocale"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { useReveal } from "../composables/useReveal"
-import { lerp, useTween } from "../composables/useTween"
+import { useRevealedValue } from "../composables/useRevealedValue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
 import {
@@ -33,11 +31,11 @@ import {
   GAUGE_SWEEP,
   meterFraction,
   polar,
-  TONE_COLOR,
   toneAt,
   type MeterThreshold,
   type MeterTone,
 } from "./meter"
+import { toneLook } from "./tone"
 
 export type GaugeLabels = {
   /** Appended to the spoken value when the reading is in a warning step. */
@@ -119,23 +117,11 @@ const locale = useLocale(() => props.locale)
  * two animations of the same length still drift apart through the middle,
  * because they ease on different curves.
  */
-const target = ref(props.animateOnMount ? props.min : props.value)
-const shown = useTween(() => target.value, lerp, { duration: () => props.duration, ease: easeOut })
-
-const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animateOnMount })
-watch(
-  revealed,
-  (seen) => {
-    if (seen) target.value = props.value
-  },
-  { immediate: true },
-)
-watch(
-  () => props.value,
-  (v) => {
-    if (revealed.value) target.value = v
-  },
-)
+const { el: revealAnchor, shown } = useRevealedValue(() => props.value, {
+  from: () => props.min,
+  animateOnMount: () => props.animateOnMount,
+  duration: () => props.duration,
+})
 
 const steps = computed(() => props.thresholds ?? capacityThresholds(props.min, props.max))
 
@@ -180,7 +166,7 @@ const notches = computed(() => {
       const deg = from + (to - from) * meterFraction(s.at, props.min, props.max)
       const a = polar(cx.value, cy.value, inner, deg)
       const b = polar(cx.value, cy.value, outer, deg)
-      return { key: `${s.at}-${s.tone}`, a, b, color: TONE_COLOR[s.tone] }
+      return { key: `${s.at}-${s.tone}`, a, b, color: toneLook(s.tone).color }
     })
 })
 
@@ -239,7 +225,7 @@ const figureSize = computed(() => `${Math.max(14, Math.round(props.size * 0.19))
           :d="track"
           fill="none"
           pathLength="1000"
-          :stroke="TONE_COLOR[paintedTone]"
+          :stroke="toneLook(paintedTone).color"
           :stroke-width="thick"
           stroke-linecap="round"
           :stroke-dasharray="dash"

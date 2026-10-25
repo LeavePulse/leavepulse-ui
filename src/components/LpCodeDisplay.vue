@@ -30,20 +30,23 @@ export interface CodeDisplayLabels extends Record<string, string> {
  * rather than being swapped, so it is plain that it changed; revealing a
  * masked code turns the dots over the same way.
  *
- * `expiresAt` adds a countdown with a draining bar; at zero the code dims and
+ * `expiresAt` adds a countdown with a draining bar (LpCountdown); at zero the code dims and
  * can no longer be copied, and `expired` fires so the app can fetch a new one.
  * `ack` adds "I've saved this", for codes shown once (recovery keys) where the
  * app should not let the person continue before they have kept it.
  */
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useNow } from "../composables/useNow"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpCopyButton from "./LpCopyButton.vue"
+import LpCountdown from "./LpCountdown.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
-import LpTooltip from "./LpTooltip.vue"
-import { formatRemaining, groupCode } from "./fieldText"
+import RevealToggle from "./RevealToggle.vue"
+import { groupCode } from "./fieldText"
+import { ceilToSecond, formatTime, msToNextSecond, toEpoch } from "./timeSpan"
 
 const props = withDefaults(
   defineProps<{
@@ -102,34 +105,37 @@ const copyText = computed(() =>
 const spoken = computed(() => parts.value.map((g) => Array.from(g).join(" ")).join(", "))
 
 // ── countdown ────────────────────────────────────────────────
-const toMs = (t: Date | number | string | undefined) => (t === undefined ? undefined : new Date(t).getTime())
-const now = ref(Date.now())
-let ticker: ReturnType<typeof setInterval> | undefined
-const end = computed(() => toMs(props.expiresAt))
-const start = ref<number | undefined>(undefined)
+// The default expiry row IS LpCountdown. The clock here only feeds the slot's
+// props and the `expired` event, which must work when the slot is replaced
+// too; useNow wakes on the second boundary and sleeps in a hidden tab.
+const end = computed(() => {
+  const at = toEpoch(props.expiresAt)
+  return Number.isNaN(at) ? undefined : at
+})
+// Without `issuedAt` the bar starts full the moment the code first appears.
+const start = ref(Date.now())
 watch(
   [end, () => props.issuedAt],
-  ([until]) => {
-    clearInterval(ticker)
-    now.value = Date.now()
-    start.value = toMs(props.issuedAt) ?? now.value
-    if (until === undefined) return
-    ticker = setInterval(() => {
-      now.value = Date.now()
-      if (now.value >= until) clearInterval(ticker)
-    }, 1000)
+  () => {
+    const issued = toEpoch(props.issuedAt)
+    start.value = Number.isNaN(issued) ? Date.now() : issued
   },
   { immediate: true },
 )
-onBeforeUnmount(() => clearInterval(ticker))
+const now = useNow(() => end.value !== undefined && end.value > Date.now(), {
+  nextIn: (at) => msToNextSecond((end.value ?? at) - at),
+  restartOn: end,
+})
 
 const remaining = computed(() => (end.value === undefined ? undefined : Math.max(0, end.value - now.value)))
 const expired = computed(() => remaining.value === 0)
 const fraction = computed(() => {
-  if (end.value === undefined || start.value === undefined) return 1
+  if (end.value === undefined) return 1
   const total = end.value - start.value
   return total > 0 ? Math.min(1, (remaining.value ?? 0) / total) : 0
 })
+// The last fifth of the wait is urgent, as the bar has always turned there.
+const urgentAt = computed(() => (end.value === undefined ? undefined : Math.max(0, end.value - start.value) * 0.2 / 1000))
 watch(expired, (out) => out && emit("expired"))
 
 const SIZE = {
@@ -171,19 +177,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => "inline-flex max-
       </div>
 
       <div class="flex items-center gap-0.5">
-        <LpTooltip v-if="masked" :content="revealed ? text.hide : text.show" label>
-          <button
-            type="button"
-            :aria-pressed="revealed"
-            class="grid size-8 place-items-center rounded-control text-muted outline-none transition-colors duration-(--duration-fast) hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            @click="revealed = !revealed"
-          >
-            <span class="grid place-items-center">
-              <LpIcon name="lucide:eye" :size="SIZE[size].icon" class="lp-glyph-swap col-start-1 row-start-1" :data-on="!revealed || undefined" />
-              <LpIcon name="lucide:eye-off" :size="SIZE[size].icon" class="lp-glyph-swap col-start-1 row-start-1" :data-on="revealed || undefined" />
-            </span>
-          </button>
-        </LpTooltip>
+        <RevealToggle
+          v-if="masked"
+          v-model="revealed"
+          :icon-size="SIZE[size].icon"
+          :show-label="text.show"
+          :hide-label="text.hide"
+        />
         <LpCopyButton
           v-if="copyable"
           :value="copyText"
@@ -199,25 +199,27 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => "inline-flex max-
       v-if="remaining !== undefined"
       name="expiry"
       :remaining="remaining"
-      :formatted="formatRemaining(remaining)"
+      :formatted="formatTime(ceilToSecond(remaining), 'clock')"
       :expired="expired"
       :fraction="fraction"
     >
-      <div class="flex max-w-64 flex-col gap-1.5">
-        <span role="timer" class="flex items-center gap-1.5 text-xs" :class="expired ? 'text-danger' : 'text-muted'">
-          <LpIcon :name="expired ? 'lucide:timer-off' : 'lucide:timer'" :size="12" />
-          <LpRollingText :value="expired ? text.expired : text.expiresIn" align="start" />
-          <span v-if="!expired" class="tabular-nums text-ink">{{ formatRemaining(remaining) }}</span>
-        </span>
-        <span class="h-1 overflow-hidden rounded-pill bg-ink/[0.08]" aria-hidden="true">
-          <!-- One second per step, eased linearly across it, so the bar drains
-               continuously rather than ticking. -->
-          <span
-            class="block h-full origin-left rounded-pill transition-[scale,background-color] duration-1000 ease-linear motion-reduce:transition-none"
-            :class="fraction < 0.2 ? 'bg-danger' : 'bg-brand'"
-            :style="{ scale: `${fraction} 1` }"
-          />
-        </span>
+      <!-- LpCountdown lays its digits and its bar out itself; `contents` lets
+           them join this row instead, so the label sits beside the digits and
+           the bar wraps onto a line of its own under all three. -->
+      <div class="flex max-w-64 flex-wrap items-center gap-1.5 text-xs" :class="expired ? 'text-danger' : 'text-muted'">
+        <LpIcon :name="expired ? 'lucide:timer-off' : 'lucide:timer'" :size="12" />
+        <LpRollingText :value="expired ? text.expired : text.expiresIn" align="start" />
+        <LpCountdown
+          :to="end"
+          :from="start"
+          progress="bar"
+          :urgent-at="urgentAt"
+          :labels="{ done: text.expired }"
+          class="contents text-ink"
+        >
+          <!-- Nothing in place of 0:00: the label already says it is over. -->
+          <template #done />
+        </LpCountdown>
       </div>
     </slot>
 

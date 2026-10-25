@@ -20,7 +20,7 @@
  * name rather than `alertdialog` — it is a landmark you can Tab into, not a
  * thing demanding an answer before anything else can happen.
  */
-import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
+import { computed, ref, useSlots, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useBarStack } from "./actionBar"
 import { CLOSE_ICON } from "./dropdown"
@@ -28,6 +28,7 @@ import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import { usePortalTarget } from "../composables/useView"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 export interface ActionBarAction {
   label: string
@@ -172,8 +173,6 @@ const stackOffset = computed(() => {
  * rotation, or content swapped while the bar is up, changes it, and the bars
  * above would overlap this one.
  */
-let observer: ResizeObserver | null = null
-
 watch(
   () => props.open,
   (isOpen) => {
@@ -189,17 +188,7 @@ watch(
   { immediate: true },
 )
 
-watch(root, (el) => {
-  observer?.disconnect()
-  observer = null
-  if (!el) return
-  setHeight(el.getBoundingClientRect().height)
-  if (typeof ResizeObserver === "undefined") return
-  observer = new ResizeObserver(() => setHeight(el.getBoundingClientRect().height))
-  observer.observe(el)
-})
-
-onBeforeUnmount(() => observer?.disconnect())
+useResizeObserver(root, (_, el) => setHeight(el.getBoundingClientRect().height), { immediate: true })
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
 const portalTo = usePortalTarget()

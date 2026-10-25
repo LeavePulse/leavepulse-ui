@@ -678,15 +678,20 @@
   "props": [
    {
     "name": "tone",
-    "type": "\"danger\" | \"brand\" | \"warning\" | \"neutral\" | \"success\" | \"action\" | \"outline\" | undefined",
+    "type": "\"danger\" | \"brand\" | \"ok\" | \"warning\" | \"neutral\" | \"info\" | \"success\" | \"muted\" | \"action\" | \"accent\" | \"error\" | \"outline\" | undefined",
     "required": false,
     "choices": [
      "danger",
      "brand",
+     "ok",
      "warning",
      "neutral",
+     "info",
      "success",
+     "muted",
      "action",
+     "accent",
+     "error",
      "outline"
     ]
    },
@@ -705,13 +710,35 @@
     "name": "dot",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "removable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A ✕ after the content that emits `remove`: a tag, a filter chip."
+   },
+   {
+    "name": "removeLabel",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Accessible name of the ✕, e.g. \"Remove tag alpha\"."
    }
   ],
-  "events": [],
+  "events": [
+   {
+    "name": "remove",
+    "type": "[]"
+   }
+  ],
   "slots": [
    {
     "name": "default",
-    "type": "{}"
+    "type": "any"
+   },
+   {
+    "name": "remove",
+    "type": "any",
+    "description": "Replaces the ✕ (with `removable`), for a chip whose remove control is another primitive's."
    }
   ]
  },
@@ -746,17 +773,17 @@
   "props": [
    {
     "name": "variant",
-    "type": "\"danger\" | \"soft\" | \"action\" | \"outline\" | \"solid\" | \"light\" | \"ghost\" | \"muted\" | undefined",
+    "type": "\"danger\" | \"soft\" | \"muted\" | \"action\" | \"outline\" | \"solid\" | \"light\" | \"ghost\" | undefined",
     "required": false,
     "choices": [
      "danger",
      "soft",
+     "muted",
      "action",
      "outline",
      "solid",
      "light",
-     "ghost",
-     "muted"
+     "ghost"
     ]
    },
    {
@@ -1678,13 +1705,13 @@
    },
    {
     "name": "align",
-    "type": "\"center\" | \"start\" | \"end\" | undefined",
+    "type": "\"center\" | \"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"start\"",
     "choices": [
      "center",
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    },
    {
@@ -2093,17 +2120,17 @@
    },
    {
     "name": "variant",
-    "type": "\"soft\" | \"action\" | \"outline\" | \"solid\" | \"ghost\" | \"muted\" | undefined",
+    "type": "\"soft\" | \"muted\" | \"action\" | \"outline\" | \"solid\" | \"ghost\" | undefined",
     "required": false,
     "default": "\"ghost\"",
     "description": "LpButton's look. `ghost` by default: a copy button is a helper beside something, not a call to action.",
     "choices": [
      "soft",
+     "muted",
      "action",
      "outline",
      "solid",
-     "ghost",
-     "muted"
+     "ghost"
     ]
    },
    {
@@ -3775,13 +3802,13 @@
    },
    {
     "name": "align",
-    "type": "\"center\" | \"start\" | \"end\" | undefined",
+    "type": "\"center\" | \"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"center\"",
     "choices": [
      "center",
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    },
    {
@@ -5092,13 +5119,13 @@
    },
    {
     "name": "navSide",
-    "type": "\"start\" | \"end\" | undefined",
+    "type": "\"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"start\"",
     "description": "Stand the rail to the right of the dialog instead of the left.",
     "choices": [
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    },
    {
@@ -5196,7 +5223,7 @@
     "name": "formatTime",
     "type": "((iso: string) => string) | undefined",
     "required": false,
-    "description": "Formats `item.createdAt` for display. Defaults to a compact English\nrelative time (\"just now\", \"5m\", \"3h\"); pass your own to localise it."
+    "description": "Formats `item.createdAt` for display. Defaults to a narrow relative time\nin the app's locale (\"now\", \"5m ago\", \"3h ago\"); pass your own to word\nit differently."
    },
    {
     "name": "open",
@@ -5472,9 +5499,9 @@
    },
    {
     "name": "group",
-    "type": "number | undefined",
+    "type": "number | number[] | undefined",
     "required": false,
-    "description": "Draw a separator after every `group` cells (e.g. 3 for \"123-456\")."
+    "description": "Draw a separator after every `group` cells (e.g. 3 for \"123-456\"), or\nafter blocks of the exact sizes given (`[4, 6, 5]`), as LpCodeDisplay's\n`groups` splits the printed code."
    },
    {
     "name": "invalid",
@@ -6175,13 +6202,13 @@
    },
    {
     "name": "align",
-    "type": "\"center\" | \"start\" | \"end\" | undefined",
+    "type": "\"center\" | \"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"center\"",
     "choices": [
      "center",
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    },
    {
@@ -6241,17 +6268,10 @@
    },
    {
     "name": "tone",
-    "type": "\"danger\" | \"brand\" | \"action\" | \"accent\" | \"auto\" | undefined",
+    "type": "\"auto\" | ToneName | undefined",
     "required": false,
     "default": "\"brand\"",
-    "description": "`\"auto\"` colours by how full the bar is — calm up to `warnAt`, accent\npast it, danger past `dangerAt`.\n\nA gauge of a finite resource (disk, memory, quota) means something\ndifferent at 92% than at 12%, and consumers were each re-deriving that\nwith their own palette — which also put raw colours back into components\nthe theme can no longer reach.",
-    "choices": [
-     "danger",
-     "brand",
-     "action",
-     "accent",
-     "auto"
-    ]
+    "description": "`\"auto\"` colours by how full the bar is — calm up to `warnAt`, accent\npast it, danger past `dangerAt`.\n\nA gauge of a finite resource (disk, memory, quota) means something\ndifferent at 92% than at 12%, and consumers were each re-deriving that\nwith their own palette — which also put raw colours back into components\nthe theme can no longer reach.\n\nAny of the kit's tone names works (tone.ts): `success`/`warning` read the\nsame as `action`/`accent`."
    },
    {
     "name": "warnAt",
@@ -6371,7 +6391,7 @@
     "name": "dangerAt",
     "type": "number | undefined",
     "required": false,
-    "default": "0.95",
+    "default": "0.9",
     "description": "Share of the limit where it turns danger. Over the limit is always danger."
    },
    {
@@ -6803,14 +6823,14 @@
    },
    {
     "name": "align",
-    "type": "\"center\" | \"start\" | \"end\" | undefined",
+    "type": "\"center\" | \"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"center\"",
     "description": "Alignment inside the clipped box, for when the two values differ in\nwidth — a value that grows shouldn't shove its neighbours.",
     "choices": [
      "center",
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    }
   ],
@@ -7415,16 +7435,10 @@
    },
    {
     "name": "tone",
-    "type": "\"brand\" | \"action\" | \"accent\" | \"ink\" | undefined",
+    "type": "\"ink\" | ToneName | undefined",
     "required": false,
     "default": "\"brand\"",
-    "description": "Base colour for `shine`. `ink` sweeps the brand colour over plain text.",
-    "choices": [
-     "brand",
-     "action",
-     "accent",
-     "ink"
-    ]
+    "description": "Base colour for `shine`. `ink` sweeps the brand colour over plain text."
    },
    {
     "name": "speed",
@@ -7871,17 +7885,10 @@
    },
    {
     "name": "tone",
-    "type": "\"danger\" | \"brand\" | \"action\" | \"muted\" | \"accent\" | undefined",
+    "type": "ToneName | undefined",
     "required": false,
     "default": "\"brand\"",
-    "description": "Named theme tones, for callers that don't want to spell a var().",
-    "choices": [
-     "danger",
-     "brand",
-     "action",
-     "muted",
-     "accent"
-    ]
+    "description": "Named theme tones, for callers that don't want to spell a var()."
    },
    {
     "name": "area",
@@ -8132,7 +8139,7 @@
     "type": "\"inline\" | \"pill\" | undefined",
     "required": false,
     "default": "\"inline\"",
-    "description": "`inline` (default) is a light and a word in running text or a table cell; `pill` puts them on a tinted chip.",
+    "description": "`inline` (default) is a light and a word in running text or a table cell;\n`pill` puts them on a chip, which is LpBadge's own: the chip is the\nbadge, the state (light, word, pulse, tone) is what this adds to it.",
     "choices": [
      "inline",
      "pill"
@@ -8175,8 +8182,19 @@
   "props": [
    {
     "name": "status",
-    "type": "StepStatus",
+    "type": "StepMarkStatus",
     "required": true
+   },
+   {
+    "name": "variant",
+    "type": "\"step\" | \"status\" | undefined",
+    "required": false,
+    "default": "\"status\"",
+    "description": "`status` (default) colours a job's outcome; `step` is a wizard's step (see above).",
+    "choices": [
+     "step",
+     "status"
+    ]
    },
    {
     "name": "size",
@@ -8282,13 +8300,13 @@
    },
    {
     "name": "labelPosition",
-    "type": "\"start\" | \"end\" | undefined",
+    "type": "\"end\" | \"start\" | undefined",
     "required": false,
     "default": "\"end\"",
     "description": "Where the text sits. `end` (default) reads like LpCheckbox: switch, then\ntext. `start` is the settings-row shape: text on the left, the switch\npushed to the right edge of the row.",
     "choices": [
-     "start",
-     "end"
+     "end",
+     "start"
     ]
    },
    {

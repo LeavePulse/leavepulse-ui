@@ -1,5 +1,6 @@
 import { CHART_PALETTE } from "./chart"
-import { toneAt, type MeterTone } from "./meter"
+import { formatBytes } from "./format"
+import { capacityThresholds, toneAt, type MeterTone } from "./meter"
 
 /*
  * The arithmetic behind LpQuota, kept free of Vue so it can be tested and so an
@@ -36,27 +37,23 @@ export interface QuotaState {
 }
 
 /**
- * Where a quota stands. Thresholds are shares of the limit, like LpProgress's
- * `warnAt`/`dangerAt`; anything past the limit is danger whatever they say,
- * because "over" is the one state a quota must never paint as merely amber.
+ * Where a quota stands. Thresholds are shares of the limit, read on the same
+ * capacity scale (and with the same defaults) as LpProgress's `auto` tone and
+ * LpGauge, so a quota and a gauge of one disk turn red together; anything past
+ * the limit is danger whatever they say, because "over" is the one state a
+ * quota must never paint as merely amber.
  */
 export function quotaState(
   used: number,
   limit: number | null | undefined,
   warnAt = 0.8,
-  dangerAt = 0.95,
+  dangerAt = 0.9,
 ): QuotaState {
   const safeUsed = Number.isFinite(used) ? Math.max(0, used) : 0
   const limited = limit != null && Number.isFinite(limit) && limit > 0
   if (!limited) return { ratio: 0, remaining: Infinity, over: 0, limited, tone: "ok" }
   const ratio = safeUsed / limit
-  const tone =
-    ratio > 1
-      ? "danger"
-      : toneAt(ratio, [
-          { at: warnAt, tone: "warning" },
-          { at: dangerAt, tone: "danger" },
-        ])
+  const tone = ratio > 1 ? "danger" : toneAt(ratio, capacityThresholds(0, 1, warnAt, dangerAt))
   return {
     ratio,
     remaining: Math.max(0, limit - safeUsed),
@@ -66,28 +63,14 @@ export function quotaState(
   }
 }
 
-const BYTE_UNITS = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte", "petabyte"] as const
-
 /**
- * An amount in its unit, locale-aware. Bytes go through Intl's own unit names
- * so a Russian app reads "1,5 ГБ" without a translation table of its own.
+ * An amount in its unit, locale-aware. Bytes go through `formatBytes`, whose
+ * unit names come from Intl, so a Russian app reads "1,5 ГБ" without a
+ * translation table of its own.
  */
 export function formatAmount(value: number, unit?: QuotaUnit, locale?: string): string {
   if (typeof unit === "function") return unit(value)
-  if (unit === "bytes") {
-    let scaled = Math.max(0, value)
-    let step = 0
-    while (scaled >= 1024 && step < BYTE_UNITS.length - 1) {
-      scaled /= 1024
-      step += 1
-    }
-    return new Intl.NumberFormat(locale, {
-      style: "unit",
-      unit: BYTE_UNITS[step],
-      unitDisplay: "short",
-      maximumFractionDigits: scaled < 10 && step > 0 ? 1 : 0,
-    }).format(scaled)
-  }
+  if (unit === "bytes") return formatBytes(Math.max(0, value), locale)
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: value < 10 ? 1 : 0 }).format(value)
   return unit ? `${number} ${unit}` : number
 }

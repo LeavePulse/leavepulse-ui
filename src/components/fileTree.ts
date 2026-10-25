@@ -5,6 +5,7 @@
  */
 
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
+import { formatBytes } from "./format"
 
 export interface FileNode {
   /** Stable identity — use the full path when you have one. */
@@ -119,33 +120,30 @@ export function sortNodes(nodes: FileNode[]): FileNode[] {
   })
 }
 
-/** Human-readable byte size — binary units, matching what file managers show. */
-export function formatSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—"
-  if (bytes < 1024) return `${bytes} B`
-  const units = ["KB", "MB", "GB", "TB", "PB"]
-  let value = bytes / 1024
-  let i = 0
-  // Compare the value as it will print, so 1 048 575 B is "1.0 MB", not "1024 KB".
-  while (Math.round(value) >= 1024 && i < units.length - 1) {
-    value /= 1024
-    i++
-  }
-  // One decimal below 10 (2.4 MB), none above (240 MB) — keeps the column tidy.
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`
+/**
+ * Human-readable byte size for the size column (`formatBytes`, binary units,
+ * matching what file managers show). The decimal is kept even when it is zero
+ * ("1.0 MB") so the column holds one shape from row to row.
+ */
+export function formatSize(bytes: number, locale?: string): string {
+  return formatBytes(bytes, locale, { fixed: true })
 }
 
+const modifiedFormats = new Map<string, Intl.DateTimeFormat>()
+
 /** Short local date-time for the modified column; passes strings through. */
-export function formatModified(value: Date | number | string): string {
+export function formatModified(value: Date | number | string, locale?: string): string {
   if (typeof value === "string") return value
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  // Built once per locale: the column formats a date on every row.
+  const key = locale ?? ""
+  let format = modifiedFormats.get(key)
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+    modifiedFormats.set(key, format)
+  }
+  return format.format(date)
 }
 
 /**

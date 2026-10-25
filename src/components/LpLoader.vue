@@ -36,10 +36,12 @@ import { useLoadingGate } from "../composables/useLoadingGate"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LoaderMark from "./LoaderMark.vue"
 import LpSwap from "./LpSwap.vue"
+import { toneLook, type ToneName } from "./tone"
 
 export type LoaderVariant = "spinner" | "dots" | "bar"
 export type LoaderSize = "inline" | "sm" | "md" | "lg"
-export type LoaderTone = "current" | "muted" | "brand" | "action" | "accent" | "danger"
+/** `current` inherits the text colour around it; the rest are the kit's tones (tone.ts). */
+export type LoaderTone = "current" | ToneName
 export type LoaderLabels = { loading: string }
 
 const props = withDefaults(
@@ -104,14 +106,6 @@ const shown = useLoadingGate(() => props.active, {
 const slots = useSlots()
 const wraps = computed(() => !!slots.default)
 
-const TONE: Record<LoaderTone, string> = {
-  current: "",
-  muted: "text-muted",
-  brand: "text-brand",
-  action: "text-action",
-  accent: "text-accent",
-  danger: "text-danger",
-}
 
 /*
  * The consumer's class lands on the indicator's own box (the status element),
@@ -119,7 +113,7 @@ const TONE: Record<LoaderTone, string> = {
  * loader, rather than styling a wrapper around them.
  */
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => {
-  const tone = TONE[props.tone]
+  const tone = props.tone === "current" ? "" : toneLook(props.tone).text
   if (props.variant === "bar") {
     return `flex w-full min-w-12 flex-col gap-1.5 ${tone}`
   }

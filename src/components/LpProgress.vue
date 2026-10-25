@@ -17,13 +17,12 @@ export default { inheritAttrs: false }
  * value either way).
  */
 import { ProgressIndicator, ProgressRoot } from "reka-ui"
-import { computed, ref, watch } from "vue"
-import { easeOut } from "../composables/easing"
+import { computed } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { useReveal } from "../composables/useReveal"
-import { lerp, useTween } from "../composables/useTween"
+import { useRevealedValue } from "../composables/useRevealedValue"
 import LpNumberFlow from "./LpNumberFlow.vue"
-import { capacityThresholds, meterFraction, toneAt, type MeterTone } from "./meter"
+import { capacityThresholds, METER_HEADER, METER_TRACK, meterFraction, toneAt } from "./meter"
+import { toneLook, type ToneName } from "./tone"
 
 const props = withDefaults(
   defineProps<{
@@ -37,8 +36,11 @@ const props = withDefaults(
      * different at 92% than at 12%, and consumers were each re-deriving that
      * with their own palette — which also put raw colours back into components
      * the theme can no longer reach.
+     *
+     * Any of the kit's tone names works (tone.ts): `success`/`warning` read the
+     * same as `action`/`accent`.
      */
-    tone?: "brand" | "action" | "danger" | "accent" | "auto"
+    tone?: ToneName | "auto"
     /** `auto` tone: the fill fraction, 0–1, where the bar turns accent. */
     warnAt?: number
     /** `auto` tone: the fill fraction, 0–1, where it turns danger. */
@@ -107,10 +109,9 @@ const props = withDefaults(
  * gap to the other end. Interpolating here and handing both the same number
  * keeps them exactly level, because there is only one number.
  */
-const target = ref(props.animateOnMount ? 0 : props.value)
-const shown = useTween(() => target.value, lerp, {
+const { el: revealAnchor, shown } = useRevealedValue(() => props.value, {
+  animateOnMount: () => props.animateOnMount,
   duration: () => props.duration,
-  ease: easeOut,
 })
 
 /*
@@ -122,25 +123,9 @@ const shown = useTween(() => target.value, lerp, {
  * reka's ProgressRoot is a component, so the ref holds an instance; take its
  * host element to observe.
  */
-const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animateOnMount })
-
 const bindReveal = (instance: unknown) => {
   revealAnchor.value = (instance as { $el?: Element } | null)?.$el ?? null
 }
-
-watch(
-  revealed,
-  (visible) => {
-    if (visible && props.animateOnMount && typeof window !== "undefined") target.value = props.value
-  },
-  { immediate: true },
-)
-
-/* A later change eases to the new value from wherever the bar stands. */
-watch(
-  () => [props.value, props.max],
-  () => { target.value = props.value },
-)
 
 // A zero or missing max (no quota known yet) reads as empty, not as NaN%.
 const pct = computed(() => {
@@ -157,39 +142,16 @@ const pct = computed(() => {
  * bar does not change colour partway through its own sweep — it fills in the
  * colour its reading warrants.
  */
-// The meter's semantic tones in the bar's own palette: "fine" is the action colour.
-const AUTO_TONE: Record<MeterTone, "brand" | "action" | "danger" | "accent"> = {
-  ok: "action",
-  warning: "accent",
-  danger: "danger",
-  brand: "brand",
-  neutral: "brand",
-}
-
 const paintedTone = computed(() => {
-  if (props.tone !== "auto") return props.tone
+  if (props.tone !== "auto") return toneLook(props.tone)
   const fraction = meterFraction(props.value, 0, props.max)
-  return AUTO_TONE[toneAt(fraction, capacityThresholds(0, 1, props.warnAt, props.dangerAt))]
+  return toneLook(toneAt(fraction, capacityThresholds(0, 1, props.warnAt, props.dangerAt)))
 })
 
 const captionText = computed(() => {
   if (props.caption === undefined || props.caption === false) return ""
   return typeof props.caption === "string" ? props.caption : `${Math.round(pct.value)}%`
 })
-
-const bar: Record<string, string> = {
-  brand: "bg-brand",
-  action: "bg-action",
-  danger: "bg-danger",
-  accent: "bg-accent",
-}
-
-const stroke: Record<string, string> = {
-  brand: "var(--color-brand)",
-  action: "var(--color-action)",
-  danger: "var(--color-danger)",
-  accent: "var(--color-accent)",
-}
 
 /*
  * The arc is drawn by dashing the circumference: one dash as long as the filled
@@ -211,7 +173,7 @@ const dash = computed(() => {
   return Math.min(raw, full - props.thickness * 1.5)
 })
 
-const BAR_TRACK = "h-1.5 w-full overflow-hidden rounded-pill bg-surface-soft"
+const BAR_TRACK = `${METER_TRACK} overflow-hidden`
 
 /*
  * The consumer's class lands on whichever element is the outside of the
@@ -256,7 +218,7 @@ const staticCaption = computed(() =>
         :cy="size / 2"
         :r="radius"
         fill="none"
-        :stroke="stroke[paintedTone]"
+        :stroke="paintedTone.color"
         :stroke-width="thickness"
         stroke-linecap="round"
         :stroke-dasharray="`${dash} ${circumference - dash}`"
@@ -283,7 +245,7 @@ const staticCaption = computed(() =>
   <!-- Wrapped only when there is a header to carry. A bare bar stays the single
        element it has always been, so an existing caller's layout is untouched. -->
   <div v-else-if="title || captionText" :class="rootClass" v-bind="rest">
-    <div class="flex items-baseline justify-between gap-2 text-xs">
+    <div :class="METER_HEADER" class="gap-2 text-xs">
       <span class="text-muted">{{ title }}</span>
       <!-- Tabular, so a figure ticking upward doesn't shuffle its own width. -->
       <span class="font-mono tabular-nums text-muted-strong">{{ captionText }}</span>
@@ -296,7 +258,7 @@ const staticCaption = computed(() =>
     >
       <ProgressIndicator
         class="h-full rounded-pill transition-colors duration-medium"
-        :class="bar[paintedTone]"
+        :class="paintedTone.bg"
         :style="{ width: `${pct}%` }"
       />
     </ProgressRoot>
@@ -312,7 +274,7 @@ const staticCaption = computed(() =>
   >
     <ProgressIndicator
       class="h-full rounded-pill transition-colors duration-medium"
-      :class="bar[paintedTone]"
+      :class="paintedTone.bg"
       :style="{ width: `${pct}%` }"
     />
   </ProgressRoot>

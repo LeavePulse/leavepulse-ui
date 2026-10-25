@@ -25,8 +25,9 @@ export default { inheritAttrs: false }
  *
  * A truncated value becomes focusable, so the tip is reachable by keyboard too.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import LpCopyButton from "./LpCopyButton.vue"
 import LpTooltip from "./LpTooltip.vue"
 import { middleTruncate } from "./fieldText"
@@ -81,15 +82,12 @@ function measure() {
   truncated.value = props.lines > 1 ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 0.5
 }
 
-let observer: ResizeObserver | undefined
+useResizeObserver(box, () => measure())
 onMounted(() => {
   measure()
-  observer = new ResizeObserver(() => measure())
-  if (box.value) observer.observe(box.value)
   // Web fonts land after mount and change every width.
   void document.fonts?.ready.then(() => measure())
 })
-onBeforeUnmount(() => observer?.disconnect())
 watch(
   () => [props.text, props.lines, props.middle, props.tail],
   async () => {

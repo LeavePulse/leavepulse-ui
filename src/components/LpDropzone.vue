@@ -585,19 +585,13 @@ const guardOutside = useOutsideGuard()
 
 /* The dashes fade in and the block settles up a few pixels. */
 .lp-dropzone {
-  animation: lp-dropzone-in var(--duration-slow) var(--ease-settle) both;
+  --rise: 6px;
+  animation: rise-in var(--duration-slow) var(--ease-settle) both;
 }
 
 .lp-dropzone--waiting {
   opacity: 0;
   animation: none;
-}
-
-@keyframes lp-dropzone-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

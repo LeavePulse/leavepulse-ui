@@ -19,6 +19,7 @@ import { ref, useId } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { usePillTransition } from "../composables/usePillTransition"
+import AttentionDot from "./AttentionDot.vue"
 import LpIcon from "./LpIcon.vue"
 import type { LpOptionBase } from "./options"
 
@@ -140,18 +141,10 @@ function releaseFocusAfterPointer(event: PointerEvent) {
       />
       <span v-if="opt.icon" class="relative z-10 inline-flex shrink-0">
         <LpIcon :name="opt.icon" :size="size === 'lg' ? 16 : 14" />
-        <span
-          v-if="opt.dot && !opt.label"
-          aria-hidden="true"
-          class="absolute -right-1 -top-0.5 size-2 rounded-full bg-accent"
-        />
+        <AttentionDot v-if="opt.dot && !opt.label" corner />
       </span>
       <span v-if="opt.label" class="relative z-10">{{ opt.label }}</span>
-      <span
-        v-if="opt.dot && opt.label"
-        aria-hidden="true"
-        class="relative z-10 size-1.5 self-start mt-1.5 rounded-full bg-accent"
-      />
+      <AttentionDot v-if="opt.dot && opt.label" class="mt-1.5" />
     </ToggleGroupItem>
   </ToggleGroupRoot>
 </template>

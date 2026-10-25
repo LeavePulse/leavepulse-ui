@@ -223,11 +223,54 @@
   }
 }
 /* For panels a flex/grid parent already centres, so the animation only has to
-   supply the rise — no -50% to preserve. LpModal uses these. */
+   supply the rise — no -50% to preserve. LpModal uses these.
+ *
+ * rise-in is also THE "arrive from a little below" entrance for everything
+ * smaller: a tab panel, an option, a log row, a dropzone, a palette line. Those
+ * were seven keyframes that differed only in the distance, so the distance is a
+ * variable: `--rise` (10px, the dialog's, when unset). A list sets 6px, a line of
+ * text 3-4px, and a negative distance arrives from above (an option cascading
+ * down from its trigger). Registered as non-inheriting so a distance set on a
+ * list does not leak into a dialog opened from inside it. */
+@property --rise {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 10px;
+}
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(var(--rise, 10px));
+  }
+}
+/*
+ * Names apps reach for in their own `animate-[…]` classes (the panel's option
+ * cascades and cards use them). The kit itself draws every entrance with
+ * `rise-in` and a `--rise` distance; these stay as the same motion under the
+ * names that were published, so an app's class keeps animating.
+ */
+@keyframes option-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes option-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes disclosure-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 @keyframes rise-out {
@@ -277,27 +320,6 @@
   to {
     opacity: 0;
     transform: scale(0.85);
-  }
-}
-/* Option cascade: items slide in top→down on open. */
-@keyframes option-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-/* Cascade upward when the list opens above the trigger (data-side=top), so the
-   options drift toward where the list actually is — mirror of option-in. */
-@keyframes option-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-@keyframes tab-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
   }
 }
 @keyframes toast-in {
@@ -359,16 +381,6 @@
     transform: scale(0.6);
   }
 }
-@keyframes disclosure-body-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 /*
  * Tree/list row reveal: a row fades in while sliding from its parent's indent,
  * so an expanding branch reads as unfolding outward rather than popping. Used by
@@ -399,6 +411,75 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+/*
+ * A ring that swells off a live light and fades: "this one is happening now".
+ * LpStatus's light and a running LpStepMark breathe it; how far it swells is
+ * `--halo-scale` (each sets its own, the ring around a step mark is already
+ * the size of the mark), the pace is each one's own `animation`. One name keeps
+ * every live light on a page breathing in phase, since CSS animations are timed
+ * against the document rather than against when each one mounted.
+ */
+@property --halo-scale {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 2.6;
+}
+@keyframes lp-halo {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  70%,
+  100% {
+    transform: scale(var(--halo-scale, 2.6));
+    opacity: 0;
+  }
+}
+
+/*
+ * A short bright segment crossing a line: work in flight whose length is not
+ * known (LpLoader's bar, LpActivityLine) or work moving along a connector
+ * (LpPipeline's running step). The element paints itself (colour, gradient,
+ * width); the class only moves it, from just before its start to past the end.
+ * `--sweep-to` is how far, as a share of its own length: a segment 2/5 of its
+ * track clears it at 250%, a half-length one at 200%. `.lp-sweep--y` runs it
+ * down instead of across. Across follows the reading direction.
+ */
+.lp-sweep {
+  animation: lp-sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.lp-sweep--y {
+  --sweep-x: 0;
+  --sweep-y: 1;
+}
+.lp-sweep:not(.lp-sweep--y):dir(rtl) {
+  animation-direction: reverse;
+}
+@keyframes lp-sweep {
+  from {
+    translate: calc(var(--sweep-x, 1) * -100%) calc(var(--sweep-y, 0) * -100%);
+  }
+  to {
+    translate: calc(var(--sweep-x, 1) * var(--sweep-to, 250%)) calc(var(--sweep-y, 0) * var(--sweep-to, 250%));
+  }
+}
+/* No travel: the segment lies along the whole line, dimmed, which still says busy. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-sweep {
+    animation: none;
+    translate: none;
+    opacity: 0.5;
+  }
+  .lp-sweep:not(.lp-sweep--y) {
+    left: 0;
+    width: 100%;
+  }
+  .lp-sweep--y {
+    top: 0;
+    height: 100%;
   }
 }
 
@@ -742,7 +823,7 @@
    CSS transitions/animate-pulse used across the kit collapse to a near-instant
    state change — content still mounts/unmounts, it just doesn't travel. This is
    the CSS half; motion-v springs (Tabs/Layout) opt out in JS via
-   useReducedMotion(). */
+   usePrefersReducedMotion() (usePillTransition). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

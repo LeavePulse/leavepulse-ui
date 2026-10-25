@@ -20,13 +20,14 @@ export default { inheritAttrs: false }
  * layer first and swaps the tile pyramid only once the animation lands, which
  * is how the zoom reads as continuous instead of as a hard cut between levels.
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 const props = withDefaults(
   defineProps<{
@@ -539,26 +540,19 @@ watch(
   },
 )
 
-let observer: ResizeObserver | undefined
-
-onMounted(() => {
-  const el = viewport.value
-  if (!el) return
-  observer = new ResizeObserver(([entry]) => {
-    viewWidth.value = entry.contentRect.width
-    viewHeight.value = entry.contentRect.height
-    if (!layers.value.length) {
-      pushLayer()
-      return
-    }
-    reanchor()
-    refreshTiles()
-  })
-  observer.observe(el)
+useResizeObserver(viewport, (entry) => {
+  if (!entry) return
+  viewWidth.value = entry.contentRect.width
+  viewHeight.value = entry.contentRect.height
+  if (!layers.value.length) {
+    pushLayer()
+    return
+  }
+  reanchor()
+  refreshTiles()
 })
 
 onBeforeUnmount(() => {
-  observer?.disconnect()
   clearTimeout(zoomTimer)
   clearTimeout(pruneTimer)
   stopGlide()

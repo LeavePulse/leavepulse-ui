@@ -3,7 +3,9 @@
  * LpActivityLine. A reading against a range, the tone it earns, and the colour
  * that tone paints in. Kept in one place so a gauge and a quota showing the same
  * disk agree on when it turns amber, instead of each picking its own breakpoints.
+ * The colours themselves are tone.ts's: a meter tone is one of its aliases.
  */
+import { TONE_ALIASES, TONES, type ToneLook } from "./tone"
 
 /**
  * The semantic tones a meter speaks in. They name what the reading MEANS, not
@@ -18,23 +20,15 @@ export interface MeterThreshold {
   tone: MeterTone
 }
 
+const METER_TONES: readonly MeterTone[] = ["ok", "warning", "danger", "brand", "neutral"]
+const byMeterTone = (pick: (look: ToneLook) => string) =>
+  Object.fromEntries(METER_TONES.map((t) => [t, pick(TONES[TONE_ALIASES[t]])])) as Record<MeterTone, string>
+
 /** The solid colour of a tone, as a CSS value a style or an SVG stroke takes. */
-export const TONE_COLOR: Record<MeterTone, string> = {
-  ok: "var(--color-action)",
-  warning: "var(--color-accent)",
-  danger: "var(--color-danger)",
-  brand: "var(--color-brand)",
-  neutral: "var(--color-muted)",
-}
+export const TONE_COLOR: Record<MeterTone, string> = byMeterTone((look) => look.color)
 
 /** The tinted background of a tone, for pills and highlighted rows. */
-export const TONE_SOFT: Record<MeterTone, string> = {
-  ok: "var(--color-action-soft)",
-  warning: "var(--color-accent-soft)",
-  danger: "var(--color-danger-soft)",
-  brand: "var(--color-brand-soft)",
-  neutral: "var(--color-surface-soft)",
-}
+export const TONE_SOFT: Record<MeterTone, string> = byMeterTone((look) => look.soft)
 
 /**
  * Where `value` sits between `min` and `max`, as 0–1. An empty or inverted
@@ -82,6 +76,18 @@ export function toneAt(value: number, thresholds: readonly MeterThreshold[], bas
   }
   return tone
 }
+
+/* ── Bar (LpProgress, LpQuota) ──────────────────────────────────────────── */
+
+/**
+ * The track a bar meter fills, shared so LpProgress's bar and LpQuota's read as
+ * one family. Each adds its own clipping: a progress bar clips its fill, a
+ * quota lets its limit mark stand out past the track.
+ */
+export const METER_TRACK = "h-1.5 w-full rounded-pill bg-surface-soft"
+
+/** The row above a bar: what is measured at the start, the reading at the end. Each sets its own size and gap. */
+export const METER_HEADER = "flex items-baseline justify-between"
 
 /* ── Arc geometry (LpGauge) ─────────────────────────────────────────────── */
 

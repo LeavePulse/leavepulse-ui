@@ -1,18 +1,15 @@
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
-import { prefersReducedMotion } from "./easing"
+import { usePointerFrame } from "./usePointerFrame"
 
 /*
  * Drives the `.lp-spotlight` glow (tokens/effects.css): writes the pointer
  * position into custom properties on the element and marks it while the
  * pointer is inside.
  *
- * Writes go straight to the element's style, not through a reactive binding:
- * pointermove fires faster than frames, and a re-render per event for a
- * decoration is the kind of cost the launcher on WebKitGTK actually feels. One
- * write per animation frame, the latest position wins.
- *
- * Touch and pen are ignored: there is no hover to follow, and a glow that
- * jumps to wherever a finger landed reads as a pressed state that is not one.
+ * Writes go straight to the element's style, not through a reactive binding,
+ * one per animation frame with the latest position (usePointerFrame, shared
+ * with LpMagnetic and useTilt). Touch and pen are ignored: a glow that jumps
+ * to wherever a finger landed reads as a pressed state that is not one.
  * Reduced motion turns it off rather than freezing it.
  */
 
@@ -33,25 +30,20 @@ export function spotlightPoint(rect: { left: number; top: number }, clientX: num
 
 export function useSpotlight(options: UseSpotlightOptions = {}): UseSpotlight {
   const el = ref<HTMLElement | null>(null)
-  let frame = 0
-  let lastX = 0
-  let lastY = 0
 
-  function paint() {
-    frame = 0
-    const node = el.value
-    if (!node) return
-    const { x, y } = spotlightPoint(node.getBoundingClientRect(), lastX, lastY)
-    node.style.setProperty("--lp-spot-x", x)
-    node.style.setProperty("--lp-spot-y", y)
-  }
+  const pointer = usePointerFrame({
+    disabled: options.disabled,
+    paint: (clientX, clientY) => {
+      const node = el.value
+      if (!node) return
+      const { x, y } = spotlightPoint(node.getBoundingClientRect(), clientX, clientY)
+      node.style.setProperty("--lp-spot-x", x)
+      node.style.setProperty("--lp-spot-y", y)
+    },
+  })
 
   function onMove(event: PointerEvent) {
-    if (event.pointerType !== "mouse" || toValue(options.disabled) || prefersReducedMotion()) return
-    lastX = event.clientX
-    lastY = event.clientY
-    el.value?.setAttribute("data-lp-spot", "")
-    if (!frame) frame = requestAnimationFrame(paint)
+    if (pointer.move(event)) el.value?.setAttribute("data-lp-spot", "")
   }
 
   function onLeave() {
@@ -83,7 +75,6 @@ export function useSpotlight(options: UseSpotlightOptions = {}): UseSpotlight {
   )
 
   onBeforeUnmount(() => {
-    if (frame) cancelAnimationFrame(frame)
     if (el.value) detach(el.value)
   })
 

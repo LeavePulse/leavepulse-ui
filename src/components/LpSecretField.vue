@@ -35,6 +35,7 @@ export interface SecretFieldLabels extends Record<string, string> {
  */
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
+import { useScramble } from "../composables/useScramble"
 import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
@@ -44,6 +45,7 @@ import LpIcon from "./LpIcon.vue"
 import LpPasswordInput from "./LpPasswordInput.vue"
 import LpShift from "./LpShift.vue"
 import LpTooltip from "./LpTooltip.vue"
+import RevealToggle from "./RevealToggle.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -105,6 +107,11 @@ const text = useLabels<SecretFieldLabels>(
 )
 
 const secret = computed(() => (props.input ? props.modelValue : props.value) ?? "")
+
+// Revealing decrypts the value into place, and a new value (a regenerated key)
+// decrypts over the old one: the change is seen happening, not just swapped.
+// Fed nothing while hidden, so every reveal plays from empty again.
+const decrypt = useScramble(() => (revealed.value ? secret.value : ""), { onChange: true, duration: 650 })
 const mask = computed(() => "•".repeat(props.maskLength))
 
 // ── auto-hide ────────────────────────────────────────────────
@@ -240,12 +247,10 @@ const shell = computed(() =>
               key="empty"
               class="block truncate font-sans text-muted"
             >{{ placeholder ?? text.empty }}</span>
-            <span
-              v-else-if="revealed"
-              :key="`shown:${secret}`"
-              class="block select-all"
-              :class="wrap ? 'break-all whitespace-pre-wrap' : 'truncate'"
-            >{{ secret }}</span>
+            <span v-else-if="revealed" key="shown" class="block select-all" :class="wrap ? 'break-all whitespace-pre-wrap' : 'truncate'">
+              <span aria-hidden="true">{{ decrypt.running.value ? decrypt.text.value : secret }}</span>
+              <span class="sr-only">{{ secret }}</span>
+            </span>
             <span v-else key="hidden" class="block truncate tracking-[0.12em] text-muted select-none" aria-hidden="true">{{ mask }}</span>
           </Transition>
           <span v-if="secret && !revealed" class="sr-only">{{ text.hidden }}</span>
@@ -253,21 +258,16 @@ const shell = computed(() =>
       </LpShift>
 
       <div class="flex shrink-0 items-center gap-0.5" :class="wrap ? 'self-start' : 'self-center'">
-        <LpTooltip v-if="revealable && secret" :content="revealed ? text.hide : text.show" label>
-          <button
-            type="button"
-            :disabled="disabled"
-            :aria-pressed="revealed"
-            :aria-controls="id"
-            class="group grid size-7 place-items-center rounded-control text-muted outline-none transition-colors duration-(--duration-fast) hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
-            @click="revealed = !revealed"
-          >
-            <span class="relative grid place-items-center">
-              <LpIcon name="lucide:eye" :size="iconSize" class="lp-glyph-swap col-start-1 row-start-1" :data-on="!revealed || undefined" />
-              <LpIcon name="lucide:eye-off" :size="iconSize" class="lp-glyph-swap col-start-1 row-start-1" :data-on="revealed || undefined" />
-            </span>
-          </button>
-        </LpTooltip>
+        <RevealToggle
+          v-if="revealable && secret"
+          v-model="revealed"
+          :icon-size="iconSize"
+          :show-label="text.show"
+          :hide-label="text.hide"
+          :disabled="disabled"
+          :controls="id"
+          class="size-7"
+        />
         <LpCopyButton
           v-if="copyable && secret"
           :value="secret"
@@ -301,7 +301,7 @@ const shell = computed(() =>
         <span
           v-if="revealed && autoHide"
           :key="run"
-          class="lp-secret-timer pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left bg-brand/70"
+          class="lp-drain pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-brand/70"
           :style="{ animationDuration: `${autoHide}s` }"
           :title="text.hidesIn"
           aria-hidden="true"
@@ -311,23 +311,3 @@ const shell = computed(() =>
   </FieldWrapper>
 </template>
 
-<style>
-.lp-secret-timer {
-  animation-name: lp-secret-drain;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-@keyframes lp-secret-drain {
-  from {
-    scale: 1 1;
-  }
-  to {
-    scale: 0 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-secret-timer {
-    animation: none;
-  }
-}
-</style>

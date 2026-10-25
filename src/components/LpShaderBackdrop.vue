@@ -39,8 +39,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { parseColor } from "./color"
 import { approach, frameDue, FRAGMENT_HEADER, PRESETS, tooSlow, VERTEX_SHADER, type ShaderPreset, type Vec3 } from "./shaderBackdrop"
 import { isBrokenBackdropEngine } from "../theme/backdrop"
-import { durationToken, prefersReducedMotion } from "../composables/easing"
+import { durationToken } from "../composables/easing"
+import { useInView } from "../composables/useInView"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { usePrefersReducedMotion } from "../composables/useReducedMotion"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 const props = withDefaults(
   defineProps<{
@@ -64,20 +67,23 @@ const emit = defineEmits<{
   (e: "fallback", reason: "unavailable" | "slow" | "lost" | "compile"): void
 }>()
 
-const root = ref<HTMLElement | null>(null)
+/*
+ * Whether anyone can see it (on screen, in a visible tab) and whether the OS
+ * asks for less motion are the kit's own questions (useInView,
+ * usePrefersReducedMotion); the root element is the one watched.
+ */
+const { el: root, inView } = useInView()
+const reduced = usePrefersReducedMotion()
 const canvas = ref<HTMLCanvasElement | null>(null)
 /** Bumped whenever a context is released: a canvas whose context was lost cannot get a new one. */
 const canvasKey = ref(0)
 
-const reduced = ref(prefersReducedMotion())
-const onScreen = ref(true)
-const pageHidden = ref(typeof document !== "undefined" && document.hidden)
 const failed = ref(false)
 /** The canvas holds a finished frame of the current look and is faded in over the still. */
 const shown = ref(false)
 
 const wantGl = computed(() => !props.still && !reduced.value && !failed.value)
-const animating = computed(() => !props.paused && onScreen.value && !pageHidden.value)
+const animating = computed(() => !props.paused && inView.value)
 
 /*
  * WebKitGTK composites on the CPU more often than not. There the canvas is
@@ -336,30 +342,18 @@ function sync() {
 
 // ── Observers ───────────────────────────────────────────────────────────────
 
-let io: IntersectionObserver | undefined
-let ro: ResizeObserver | undefined
 let themeObserver: MutationObserver | undefined
-let motionQuery: MediaQueryList | undefined
 let schemeQuery: MediaQueryList | undefined
 
-const onMotion = () => (reduced.value = prefersReducedMotion())
-const onVisibility = () => (pageHidden.value = document.hidden)
+useResizeObserver(root, () => {
+  sizeCanvas()
+  drawFrame()
+})
 
 onMounted(() => {
   probe = document.createElement("span")
   probe.style.display = "none"
   root.value?.appendChild(probe)
-
-  io = new IntersectionObserver((entries) => {
-    onScreen.value = entries.some((e) => e.isIntersecting)
-  })
-  if (root.value) io.observe(root.value)
-
-  ro = new ResizeObserver(() => {
-    sizeCanvas()
-    drawFrame()
-  })
-  if (root.value) ro.observe(root.value)
 
   // Themes are applied as variables and attributes on <html>; a scheme switch can also come from the OS.
   themeObserver = new MutationObserver(() => {
@@ -368,9 +362,6 @@ onMounted(() => {
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class", "data-theme", "data-theme-mode"] })
   schemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
   schemeQuery?.addEventListener("change", refreshPalette)
-  motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)")
-  motionQuery?.addEventListener("change", onMotion)
-  document.addEventListener("visibilitychange", onVisibility)
 
   if (wantGl.value) start()
 })
@@ -413,12 +404,8 @@ watch(
 onBeforeUnmount(() => {
   window.clearTimeout(swapTimer)
   release()
-  io?.disconnect()
-  ro?.disconnect()
   themeObserver?.disconnect()
   schemeQuery?.removeEventListener("change", refreshPalette)
-  motionQuery?.removeEventListener("change", onMotion)
-  document.removeEventListener("visibilitychange", onVisibility)
   probe?.remove()
 })
 

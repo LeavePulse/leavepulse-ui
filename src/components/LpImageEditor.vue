@@ -48,6 +48,7 @@ import LpButton from "./LpButton.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 const props = withDefaults(
   defineProps<{
@@ -144,23 +145,20 @@ const viewport = ref<HTMLElement | null>(null)
 const zoom = useZoomPan({ min: 1, max: 6 })
 
 const frameSize = ref<{ width: number; height: number } | null>(null)
-let frameObserver: ResizeObserver | null = null
 
-watch(viewport, (el) => {
-  zoom.setViewport(el)
-  frameObserver?.disconnect()
-  frameObserver = null
-  if (!el) return
-  // Fractional, not clientWidth: a rounded-down frame left a hairline of
-  // background showing along the edges of a turned picture.
-  frameSize.value = { width: el.clientWidth, height: el.clientHeight }
-  if (typeof ResizeObserver !== "undefined") {
-    frameObserver = new ResizeObserver(([entry]) => {
-      frameSize.value = { width: entry.contentRect.width, height: entry.contentRect.height }
-    })
-    frameObserver.observe(el)
-  }
-})
+watch(viewport, (el) => zoom.setViewport(el))
+// Fractional, not clientWidth: a rounded-down frame left a hairline of
+// background showing along the edges of a turned picture. The first, rounded
+// reading only holds the frame until the observer's first report.
+useResizeObserver(
+  viewport,
+  (entry, el) => {
+    frameSize.value = entry
+      ? { width: entry.contentRect.width, height: entry.contentRect.height }
+      : { width: el.clientWidth, height: el.clientHeight }
+  },
+  { immediate: true },
+)
 
 /** Which way up it ends, 0-270, whatever the accumulated angle. */
 const upright = computed(() => ((rotation.value % 360) + 360) % 360)
@@ -296,7 +294,6 @@ function revoke() {
 onBeforeUnmount(() => {
   generation++
   revoke()
-  frameObserver?.disconnect()
 })
 
 function rotate(by: number) {

@@ -9,6 +9,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAtt
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
+import LpBadge from "./LpBadge.vue"
 import LpIcon from "./LpIcon.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpPagination from "./LpPagination.vue"
@@ -24,6 +25,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import { usePaintSelect } from "../composables/usePaintSelect"
 import { useRovingFocus } from "../composables/useRovingFocus"
 import { useLabels } from "../composables/useLpConfig"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import { compareValues } from "./tableSort"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
@@ -493,18 +495,10 @@ const hiddenColumns = ref<Set<string>>(new Set())
 // while the table itself widens with whatever it overflows by.
 const tableEl = ref<HTMLElement | null>(null)
 const tableWidth = ref(Number.POSITIVE_INFINITY)
-let widthObserver: ResizeObserver | undefined
-watch(
-  tableEl,
-  (table) => {
-    widthObserver?.disconnect()
-    const el = table?.closest<HTMLElement>("[data-reka-scroll-area-viewport]") ?? table?.parentElement
-    if (!el || typeof ResizeObserver === "undefined") return
-    widthObserver = new ResizeObserver(() => (tableWidth.value = el.clientWidth))
-    widthObserver.observe(el)
-    tableWidth.value = el.clientWidth
-  },
-  { flush: "post" },
+useResizeObserver(
+  () => tableEl.value?.closest<HTMLElement>("[data-reka-scroll-area-viewport]") ?? tableEl.value?.parentElement,
+  (_, el) => (tableWidth.value = el.clientWidth),
+  { immediate: true },
 )
 
 const visibleColumns = computed(() =>
@@ -1063,26 +1057,18 @@ function onRowKeydown(event: KeyboardEvent) {
 // starts below the header. Tracked live (density/content can change it).
 const headEl = ref<HTMLElement | null>(null)
 const headHeight = ref(0)
-let ro: ResizeObserver | undefined
+useResizeObserver(
+  () => (props.stickyHeader ? headEl.value : null),
+  (_, el) => (headHeight.value = (el as HTMLElement).offsetHeight),
+  { immediate: true },
+)
 watch(
-  [headEl, () => props.stickyHeader],
-  ([el, sticky]) => {
-    ro?.disconnect()
-    if (!el || !sticky || typeof ResizeObserver === "undefined") {
-      headHeight.value = 0
-      return
-    }
-    ro = new ResizeObserver(() => {
-      headHeight.value = el.offsetHeight
-    })
-    ro.observe(el)
-    headHeight.value = el.offsetHeight
+  () => props.stickyHeader,
+  (sticky) => {
+    if (!sticky) headHeight.value = 0
   },
-  { immediate: true, flush: "post" },
 )
 onBeforeUnmount(() => {
-  ro?.disconnect()
-  widthObserver?.disconnect()
   if (motionTimer) clearTimeout(motionTimer)
 })
 
@@ -1110,21 +1096,17 @@ const barInsetTop = computed(() =>
   <LpShift class="-mb-3">
     <div v-if="showBar" class="flex min-h-8 items-center gap-x-3 pb-3 text-xs">
       <div v-if="activeFilters.length" class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-        <span
+        <LpBadge
           v-for="f in activeFilters"
           :key="f.col.key"
-          class="inline-flex max-w-72 animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] items-center gap-1 rounded-pill bg-brand-soft py-0.5 pr-1 pl-2.5 text-ink motion-reduce:animate-none"
+          tone="brand"
+          removable
+          :remove-label="text.clearFilter.replace('{column}', f.col.label)"
+          class="max-w-72 animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] font-normal text-ink motion-reduce:animate-none"
+          @remove="showAllValues(f.col.key)"
         >
           <span class="truncate"><span class="text-muted">{{ f.col.label }}:</span> {{ f.text }}</span>
-          <button
-            type="button"
-            class="grid size-4 shrink-0 place-items-center rounded-pill text-muted outline-none transition-colors duration-fast hover:bg-ink/10 hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            :aria-label="text.clearFilter.replace('{column}', f.col.label)"
-            @click="showAllValues(f.col.key)"
-          >
-            <LpIcon name="lucide:x" :size="12" />
-          </button>
-        </span>
+        </LpBadge>
         <button
           v-if="activeFilters.length > 1"
           type="button"

@@ -49,7 +49,8 @@ withDefaults(
 }
 .lp-palette-preview > * {
   min-width: 0;
-  animation: lp-palette-in 260ms var(--ease-emphasized, ease-out) both;
+  --rise: 4px;
+  animation: rise-in 260ms var(--ease-emphasized, ease-out) both;
 }
 .lp-palette-preview > :nth-child(2) {
   animation-delay: 40ms;
@@ -62,12 +63,6 @@ withDefaults(
 }
 .lp-palette-preview > :nth-child(n + 5) {
   animation-delay: 160ms;
-}
-@keyframes lp-palette-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-palette-preview > * {

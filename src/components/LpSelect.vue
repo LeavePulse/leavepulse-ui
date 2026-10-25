@@ -35,17 +35,18 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, nextTick, onBeforeUnmount, reactive, ref, useAttrs, useId, watch } from "vue"
+import { computed, nextTick, reactive, ref, useAttrs, useId, watch } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
+import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
 import LpRollingText from "./LpRollingText.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
 import { fitChips, toggledValues } from "./select"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 export type SelectValue = string | number
 
@@ -333,16 +334,8 @@ function measure() {
   )
 }
 
-let rowObserver: ResizeObserver | null = null
-watch(chipRow, (row) => {
-  rowObserver?.disconnect()
-  rowObserver = null
-  if (!row || typeof ResizeObserver === "undefined") return
-  rowObserver = new ResizeObserver(() => measure())
-  rowObserver.observe(row)
-})
+useResizeObserver(chipRow, () => measure())
 watch(chips, () => void nextTick(measure), { flush: "post", deep: true })
-onBeforeUnmount(() => rowObserver?.disconnect())
 
 const shownChips = computed(() => chips.value.slice(0, fit.value))
 const hiddenCount = computed(() => modelList.value.length - shownChips.value.length)
@@ -565,7 +558,7 @@ const guardOutside = useOutsideGuard()
             :key="String(opt.value)"
             :value="encode(opt.value)"
             :disabled="opt.disabled"
-            :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
+            :style="optionStagger(i)"
             :class="[OPTION_ITEM, 'justify-between data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
           >
             <OptionContent :option="opt" />

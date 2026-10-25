@@ -13,6 +13,7 @@ import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import LpSwap from "./LpSwap.vue"
 import { slotText } from "./slotText"
+import { TONES, toneLook } from "./tone"
 
 const alert = tv({
   /*
@@ -22,11 +23,13 @@ const alert = tv({
    */
   base: "flex gap-3 rounded-card border p-4 text-sm transition-[background-color,border-color,color] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none",
   variants: {
+    // The tint is the tone's quiet panel (tone.ts); an info alert is a plain
+    // neutral panel whose meaning is carried by its brand-coloured icon alone.
     variant: {
-      info: "border-line bg-surface-soft text-ink",
-      success: "border-action/30 bg-action/10 text-ink",
-      warning: "border-accent/30 bg-accent/10 text-ink",
-      danger: "border-danger/30 bg-danger/10 text-ink",
+      info: `${TONES.neutral.panel} text-ink`,
+      success: `${TONES.success.panel} text-ink`,
+      warning: `${TONES.warning.panel} text-ink`,
+      danger: `${TONES.danger.panel} text-ink`,
     },
   },
   defaultVariants: { variant: "info" },
@@ -39,13 +42,6 @@ const ICONS: Record<NonNullable<AlertVariants["variant"]>, string> = {
   success: "lucide:circle-check",
   warning: "lucide:triangle-alert",
   danger: "lucide:octagon-alert",
-}
-
-const ICON_TONE: Record<NonNullable<AlertVariants["variant"]>, string> = {
-  info: "text-brand",
-  success: "text-action",
-  warning: "text-accent",
-  danger: "text-danger",
 }
 
 const props = withDefaults(
@@ -88,7 +84,7 @@ const role = computed(() => {
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => alert({ variant: props.variant }))
 const spinning = computed(() => props.busy && !props.icon)
 const resolvedIcon = computed(() => props.icon ?? ICONS[props.variant ?? "info"])
-const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
+const iconTone = computed(() => toneLook(props.variant ?? "info").text)
 
 // What counts as another message: the variant, the title and the slot's words
 // when it is plain text. Rich content keeps its key and only eases its height.

@@ -7,8 +7,8 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { computed } from "vue"
-import LpIcon from "./LpIcon.vue"
-import LpRollingText from "./LpRollingText.vue"
+import LpStepMark from "./LpStepMark.vue"
+import StepConnector from "./StepConnector.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 export interface Step {
@@ -65,27 +65,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :aria-current="isCurrent(i) ? 'step' : undefined"
     >
       <div class="flex min-w-0 items-center">
-        <span
-          class="flex size-7 shrink-0 items-center justify-center rounded-pill border text-xs font-semibold transition-colors duration-[var(--duration-medium)]"
-          :class="isCompleted(step, i)
-            ? 'border-transparent bg-brand text-ink-inverse'
-            : isCurrent(i)
-              ? 'border-brand text-brand'
-              : 'border-line text-muted'"
-        >
-          <!-- The number turns into the tick rather than swapping for it. -->
-          <LpRollingText
-            mode="flip"
-            :duration="260"
-            :value="isCompleted(step, i) ? 'done' : step.icon ? 'icon' : String(i + 1)"
-          >
-            <template #default="{ value }">
-              <LpIcon v-if="value === 'done'" name="lucide:check" :size="14" />
-              <LpIcon v-else-if="value === 'icon' && step.icon" :name="step.icon" :size="14" />
-              <template v-else>{{ value }}</template>
-            </template>
-          </LpRollingText>
-        </span>
+        <!-- The kit's step mark, as a wizard draws it: the number turns into the
+             tick rather than swapping for it. -->
+        <LpStepMark
+          variant="step"
+          :status="isCompleted(step, i) ? 'success' : isCurrent(i) ? 'current' : 'pending'"
+          :number="i + 1"
+          :icon="step.icon"
+          class="size-7 text-xs"
+        />
         <!-- Where only the current step has room for its name (a narrow
              container), the others fold their label to nothing rather than
              dropping it in one frame: the row slides instead of jumping when
@@ -114,12 +102,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </div>
       <!-- The connector fills from the step it leaves towards the next one,
            so finishing a step reads as moving forward. -->
-      <span v-if="i < steps.length - 1" class="relative h-px flex-1 overflow-hidden bg-line">
-        <span
-          class="absolute inset-0 origin-left bg-brand transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none rtl:origin-right"
-          :class="isCompleted(step, i) ? 'scale-x-100' : 'scale-x-0'"
-        />
-      </span>
+      <StepConnector v-if="i < steps.length - 1" :filled="isCompleted(step, i)" class="h-px" />
     </li>
   </ol>
 </template>

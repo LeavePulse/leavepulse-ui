@@ -18,6 +18,7 @@ import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
 import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
+import { toneLook } from "./tone"
 import { usePortalTarget } from "../composables/useView"
 
 const props = defineProps<{ labels?: Partial<{ dismiss: string; copy: string; copied: string }> }>()
@@ -111,78 +112,59 @@ const variantIcon: Record<ToastItem["variant"], string> = {
   error: "lucide:circle-x",
 }
 
-// One token color drives icon + progress per variant.
-const variantColor: Record<ToastItem["variant"], string> = {
-  info: "text-brand",
-  success: "text-action",
-  warning: "text-accent",
-  error: "text-danger",
-}
-const variantBar: Record<ToastItem["variant"], string> = {
-  info: "bg-brand",
-  success: "bg-action",
-  warning: "bg-accent",
-  error: "bg-danger",
-}
 
-// reka pauses its own auto-dismiss timer while a toast is hovered/focused; mirror
-// that on the visual bar by carrying each toast's dismissAt forward over the
-// paused span, so the countdown matches when it actually closes.
-const pausedAt = new Map<number, number>()
+/*
+ * The countdown bar is the shared drain (.lp-drain): a CSS animation as long as
+ * the toast's duration. reka pauses its own auto-dismiss timer while a toast
+ * is hovered or focused and resumes it with the time that was left; pausing
+ * the animation alongside it does exactly the same, so the bar empties at the
+ * moment the toast actually closes, with no clock ticking in the meantime.
+ */
+const paused = ref<Set<string>>(new Set())
 
-// Ticking clock so the progress bar animates smoothly. Runs only while there's
-// at least one auto-dismissing toast on screen — no idle interval otherwise.
-const now = ref(Date.now())
-let timer: ReturnType<typeof setInterval> | null = null
-
-function startTimer() {
-  if (timer === null) timer = setInterval(() => (now.value = Date.now()), 80)
-}
-function stopTimer() {
-  if (timer !== null) {
-    clearInterval(timer)
-    timer = null
+/*
+ * How far into its run a toast already was when its bar first rendered (a
+ * Toaster mounted after toasts were queued). Remembered per rendered toast,
+ * because the style is re-evaluated on every render and a delay that changed
+ * under a running animation would jump the bar.
+ */
+const startOffsets = new Map<string, number>()
+function drainStyle(t: ToastItem) {
+  const at = tag(t)
+  let offset = startOffsets.get(at)
+  if (offset === undefined) {
+    offset = t.dismissAt === null ? 0 : Math.max(0, t.duration - (t.dismissAt - Date.now()))
+    startOffsets.set(at, offset)
   }
+  return { animationDuration: `${t.duration}ms`, animationDelay: `${-offset}ms` }
 }
 
+// Keyed by every rendered toast, not the count: a toast replaced through its
+// `key` leaves the same length behind.
 watch(
-  () => queue.length,
+  () => queue.map(tag).join("|"),
   () => {
-    // Drop pause state for toasts that have left the queue (e.g. dismissed
-    // while hovered) so the map can't grow unbounded over a long session.
-    for (const id of pausedAt.keys()) {
-      if (!queue.some((t) => t.id === id)) pausedAt.delete(id)
-    }
-    // Same for the closing set — a toast evicted by the queue cap or clear()
-    // leaves without an animationend, so prune dead ids here.
+    // Drop per-toast state for toasts that have left the queue (e.g. dismissed
+    // while hovered) so it can't grow unbounded over a long session. A toast
+    // evicted by the queue cap or clear() leaves without an animationend, so
+    // the closing set is pruned here too.
+    const live = (at: string) => queue.some((t) => tag(t) === at)
+    for (const at of startOffsets.keys()) if (!live(at)) startOffsets.delete(at)
+    if ([...paused.value].some((at) => !live(at))) paused.value = new Set([...paused.value].filter(live))
     if (closing.value.size) {
-      const live = new Set([...closing.value].filter((at) => queue.some((t) => tag(t) === at)))
-      if (live.size !== closing.value.size) closing.value = live
+      const next = new Set([...closing.value].filter(live))
+      if (next.size !== closing.value.size) closing.value = next
     }
-    if (queue.some((t) => t.dismissAt !== null)) startTimer()
-    else stopTimer()
   },
-  { immediate: true },
 )
-onBeforeUnmount(stopTimer)
 
 function onPause(t: ToastItem) {
-  pausedAt.set(t.id, now.value)
+  paused.value = new Set(paused.value).add(tag(t))
 }
 function onResume(t: ToastItem) {
-  const since = pausedAt.get(t.id)
-  if (since !== undefined && t.dismissAt !== null) {
-    t.dismissAt += Date.now() - since
-  }
-  pausedAt.delete(t.id)
-}
-
-function progress(t: ToastItem): number {
-  if (!t.dismissAt || t.duration <= 0) return 0
-  // While paused, freeze the bar at the moment hover started.
-  const at = pausedAt.get(t.id) ?? now.value
-  const remaining = t.dismissAt - at
-  return Math.max(0, Math.min(100, (remaining / t.duration) * 100))
+  const next = new Set(paused.value)
+  next.delete(tag(t))
+  paused.value = next
 }
 
 /*
@@ -264,7 +246,7 @@ const portalTo = usePortalTarget()
           :name="variantIcon[t.variant]"
           :size="18"
           class="mt-0.5 shrink-0"
-          :class="variantColor[t.variant]"
+          :class="toneLook(t.variant).text"
         />
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <ToastTitle v-if="t.title" class="text-sm font-semibold text-ink">
@@ -326,9 +308,10 @@ const portalTo = usePortalTarget()
       <!-- Countdown progress bar -->
       <div
         v-if="t.dismissAt"
-        class="absolute inset-x-0 bottom-0 h-0.5 origin-left transition-transform duration-100 ease-linear motion-reduce:transition-none"
-        :class="variantBar[t.variant]"
-        :style="{ transform: `scaleX(${progress(t) / 100})` }"
+        class="lp-drain absolute inset-x-0 bottom-0 h-0.5"
+        :class="toneLook(t.variant).bg"
+        :style="drainStyle(t)"
+        :data-paused="paused.has(tag(t)) || undefined"
       />
     </ToastRoot>
 

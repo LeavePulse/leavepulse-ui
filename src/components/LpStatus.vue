@@ -19,9 +19,10 @@ export default { inheritAttrs: false }
 import { computed } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import LpBadge from "./LpBadge.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
-import { TONE_COLOR, TONE_SOFT, type MeterTone } from "./meter"
+import { TONE_COLOR, type MeterTone } from "./meter"
 import { STATUS_LABELS, STATUS_LOOK, type StatusKind } from "./status"
 
 const props = withDefaults(
@@ -33,7 +34,11 @@ const props = withDefaults(
     tone?: MeterTone
     /** Overrides whether the light pulses. */
     pulse?: boolean
-    /** `inline` (default) is a light and a word in running text or a table cell; `pill` puts them on a tinted chip. */
+    /**
+     * `inline` (default) is a light and a word in running text or a table cell;
+     * `pill` puts them on a chip, which is LpBadge's own: the chip is the
+     * badge, the state (light, word, pulse, tone) is what this adds to it.
+     */
     variant?: "inline" | "pill"
     size?: "sm" | "md"
     /**
@@ -60,33 +65,25 @@ const pulsing = computed(() => props.pulse ?? look.value.pulse)
 const word = computed(() => props.label ?? names.value[props.state] ?? props.state)
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
-  [
-    "inline-flex shrink-0 items-center align-middle font-medium leading-[1.2] whitespace-nowrap",
-    "transition-[color,background-color] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none",
-    props.size === "sm" ? "gap-1.5 text-[11px]" : "gap-2 text-xs",
-    props.variant === "pill" ? (props.size === "sm" ? "h-[18px] rounded-pill px-1.5" : "rounded-pill px-2.5 py-0.5") : "",
-  ].join(" "),
+  props.variant === "pill"
+    ? ""
+    : [
+        "inline-flex shrink-0 items-center align-middle font-medium leading-[1.2] whitespace-nowrap text-muted-strong",
+        props.size === "sm" ? "gap-1.5 text-[11px]" : "gap-2 text-xs",
+      ].join(" "),
 )
 
-const rootStyle = computed(() =>
-  props.variant === "pill"
-    ? {
-        backgroundColor: TONE_SOFT[tone.value],
-        color: tone.value === "neutral" ? "var(--color-muted-strong)" : TONE_COLOR[tone.value],
-      }
-    : { color: "var(--color-muted-strong)" },
-)
 
 const dotSize = computed(() => (props.size === "sm" ? "size-1.5" : "size-2"))
 </script>
 
 <template>
-  <span
+  <component
+    :is="variant === 'pill' ? LpBadge : 'span'"
     :role="announce ? 'status' : undefined"
     :title="hideLabel ? word : undefined"
     :class="rootClass"
-    :style="rootStyle"
-    v-bind="rest"
+    v-bind="variant === 'pill' ? { ...rest, tone, size } : rest"
   >
     <span class="relative inline-flex shrink-0" :class="dotSize" aria-hidden="true">
       <!-- The halo is the same colour as the light and scales out from it, so
@@ -102,33 +99,23 @@ const dotSize = computed(() => (props.size === "sm" ? "size-1.5" : "size-2"))
       />
     </span>
     <span v-if="hideLabel" class="sr-only">{{ word }}</span>
+    <LpRollingText v-else-if="variant === 'pill'" :value="word" align="start" />
     <LpShift v-else axis="width">
       <LpRollingText :value="word" align="start" />
     </LpShift>
-  </span>
+  </component>
 </template>
 
 <style>
 /*
- * Unscoped and namespaced, like LpSkeleton's pulse: one animation name keeps
- * every live light on a page breathing in phase, because CSS animations are
- * timed against the document rather than against when each one mounted. A
- * column of servers pulsing out of step reads as flicker.
+ * Unscoped and namespaced, like LpSkeleton's pulse. The keyframe is the kit's
+ * halo (tokens.css): one animation name keeps every live light on a page
+ * breathing in phase, because CSS animations are timed against the document
+ * rather than against when each one mounted. A column of servers pulsing out
+ * of step reads as flicker. A small light swells to 2.6x, the halo's default.
  */
 .lp-status-halo--on {
-  animation: lp-status-halo 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-@keyframes lp-status-halo {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  70%,
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
-  }
+  animation: lp-halo 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

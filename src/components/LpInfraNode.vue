@@ -10,6 +10,8 @@
  */
 import { Handle, Position } from "@vue-flow/core"
 import { computed } from "vue"
+import LpBadge from "./LpBadge.vue"
+import LpStatus from "./LpStatus.vue"
 
 export interface InfraNodeData {
   name: string
@@ -174,10 +176,12 @@ const accentLine = computed(
       <div class="flex items-center gap-[7px]">
         <span class="text-[13px] text-[var(--accent)]">{{ icon }}</span>
         <span class="flex-1 truncate text-[13px] font-semibold text-ink">{{ data.name }}</span>
-        <span
+        <!-- The kit's status light: a live host breathes, a lost one is a steady red. -->
+        <LpStatus
           v-if="data.online !== undefined"
-          class="size-[7px] rounded-full"
-          :class="data.online ? 'bg-action shadow-[0_0_6px_var(--color-action)]' : 'bg-danger'"
+          :state="data.online ? 'online' : 'down'"
+          :pulse="data.online"
+          hide-label
         />
       </div>
       <div class="mt-1.5 flex items-center justify-between">
@@ -190,32 +194,39 @@ const accentLine = computed(
         v-if="data.firewallCount || data.serviceCount !== undefined || data.staleFor"
         class="mt-1.5 flex items-center gap-1.5"
       >
-        <span
+        <!-- LpBadge's small chip, with the card's own 9px type: at the badge's
+             11px three of them (a firewall count, a service count, an age)
+             overflow a 168px card. -->
+        <LpBadge
           v-if="data.firewallCount"
-          class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
+          tone="danger"
+          size="sm"
+          class="text-[9px]"
           :title="fill(text.firewallRules, { n: data.firewallCount! })"
         >
-          <span>⛨</span>{{ data.firewallCount }}
-        </span>
-        <span
+          ⛨ {{ data.firewallCount }}
+        </LpBadge>
+        <LpBadge
           v-if="data.serviceCount !== undefined"
-          class="inline-flex items-center gap-1 rounded-pill bg-surface-soft px-1.5 py-0.5 text-[9px] font-medium text-muted"
-          :class="data.staleFor ? 'line-through decoration-danger/70' : ''"
+          size="sm"
+          class="text-[9px] text-muted"
           :title="
             data.staleFor
               ? fill(text.servicesStale, { n: data.serviceCount!, age: data.staleFor })
               : fill(text.services, { n: data.serviceCount! })
           "
         >
-          <span>◇</span>{{ data.serviceCount }}
-        </span>
-        <span
+          <span :class="data.staleFor ? 'line-through decoration-danger/70' : ''">◇ {{ data.serviceCount }}</span>
+        </LpBadge>
+        <LpBadge
           v-if="data.staleFor"
-          class="inline-flex items-center gap-1 rounded-pill bg-danger-soft px-1.5 py-0.5 text-[9px] font-medium text-danger"
+          tone="danger"
+          size="sm"
+          class="text-[9px]"
           :title="fill(text.noContact, { age: data.staleFor })"
         >
-          <span>⚠</span>{{ data.staleFor }} {{ text.old }}
-        </span>
+          ⚠ {{ data.staleFor }} {{ text.old }}
+        </LpBadge>
       </div>
     </div>
   </div>

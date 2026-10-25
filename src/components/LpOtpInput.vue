@@ -42,8 +42,12 @@ const props = withDefaults(
      * compared without regard to case; pass `false` for a case-sensitive code.
      */
     uppercase?: boolean
-    /** Draw a separator after every `group` cells (e.g. 3 for "123-456"). */
-    group?: number
+    /**
+     * Draw a separator after every `group` cells (e.g. 3 for "123-456"), or
+     * after blocks of the exact sizes given (`[4, 6, 5]`), as LpCodeDisplay's
+     * `groups` splits the printed code.
+     */
+    group?: number | number[]
     /** Error state — tints the cells red (e.g. wrong code). */
     invalid?: boolean
     size?: "sm" | "md" | "lg"

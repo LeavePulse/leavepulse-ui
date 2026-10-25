@@ -12,6 +12,7 @@ import LpRollingText from "./LpRollingText.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
 import LpTooltip from "./LpTooltip.vue"
+import { TONES } from "./tone"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 
@@ -64,11 +65,11 @@ const props = withDefaults(
  * made the whole row look faded rather than calm.)
  */
 const defaultColor: Record<UptimeStatus, string> = {
-  operational: "var(--color-action)",
-  degraded: "var(--color-accent)",
-  down: "var(--color-danger)",
-  maintenance: "var(--color-brand)",
-  empty: "var(--color-surface-soft)",
+  operational: TONES.success.color,
+  degraded: TONES.warning.color,
+  down: TONES.danger.color,
+  maintenance: TONES.brand.color,
+  empty: TONES.neutral.soft,
 }
 
 /* Only "no data yet" is held back; a real reading is always full strength. */

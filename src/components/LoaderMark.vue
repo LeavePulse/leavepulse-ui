@@ -26,7 +26,7 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
     <template v-if="variant === 'bar'">
       <span v-if="label" class="text-xs text-muted">{{ label }}</span>
       <span class="lp-loader-bar relative block w-full overflow-hidden rounded-pill bg-current/15" :class="BAR[size]" aria-hidden="true">
-        <span class="lp-loader-bar__run absolute inset-y-0 left-0 w-2/5 rounded-pill bg-current" />
+        <span class="lp-sweep absolute inset-y-0 left-0 w-2/5 rounded-pill bg-current" />
       </span>
     </template>
     <template v-else>
@@ -70,19 +70,9 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
   40% { transform: scale(1); opacity: 1; }
 }
 
-/* The run enters from the left edge and leaves past the right, wider in the
-   middle of its travel, so the bar never sits still and never looks full. */
-.lp-loader-bar__run {
-  animation: lp-loader-run 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-@keyframes lp-loader-run {
-  0% { transform: translateX(-100%) scaleX(0.6); }
-  50% { transform: translateX(80%) scaleX(1); }
-  100% { transform: translateX(260%) scaleX(0.6); }
-}
-.lp-loader-bar__run:dir(rtl) {
-  animation-direction: reverse;
-}
+/* The bar's run is the kit's sweep (.lp-sweep in tokens.css), the same one
+   LpActivityLine draws: it enters past one edge and leaves past the other,
+   so the bar never sits still and never looks full. */
 
 @media (prefers-reduced-motion: reduce) {
   .lp-loader-spin,
@@ -92,12 +82,6 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
     transform: none;
   }
   .lp-loader-dot { opacity: 1; }
-  .lp-loader-bar__run {
-    animation: none;
-    transform: none;
-    width: 100%;
-    opacity: 0.6;
-  }
   @keyframes lp-loader-breathe {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }

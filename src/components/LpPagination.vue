@@ -18,11 +18,12 @@ export default { inheritAttrs: false }
  * motion-v's shared layoutId with zero list-animation conflicts.
  */
 import { Motion } from "motion-v"
-import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue"
+import { computed, ref, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
+import { useResizeObserver } from "../composables/useResizeObserver"
 
 const props = withDefaults(
   defineProps<{
@@ -81,7 +82,6 @@ const root = ref<HTMLElement | null>(null)
 const room = ref(Infinity)
 const slotWidth = ref(32)
 const gap = ref(6)
-let observer: ResizeObserver | null = null
 function measure() {
   const nav = root.value
   if (!nav || !nav.children.length) return
@@ -90,16 +90,13 @@ function measure() {
   const used = [...nav.children].reduce((sum, el) => sum + (el as HTMLElement).offsetWidth, 0)
   slotWidth.value = used / items
 }
-onMounted(() => {
-  const parent = root.value?.parentElement
-  if (!parent || typeof ResizeObserver === "undefined") return
-  observer = new ResizeObserver(([entry]) => {
+useResizeObserver(
+  () => root.value?.parentElement,
+  (entry) => {
     measure()
     if (entry) room.value = entry.contentRect.width
-  })
-  observer.observe(parent)
-})
-onBeforeUnmount(() => observer?.disconnect())
+  },
+)
 
 const siblings = computed(() => {
   for (let n = props.siblings; n > 0; n--) {

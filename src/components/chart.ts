@@ -4,6 +4,8 @@
  * pixel box, return paths and tick positions.
  */
 
+import { compactNumber } from "./format"
+
 export interface ChartPoint {
   /** Numeric value. `null` breaks the line — a real gap, not a zero. */
   y: number | null
@@ -761,26 +763,9 @@ export const calloutLabels = (
   return out
 }
 
-/** Compact default tick formatting: 1.2k, 3.4M — never 1200.0000001 or 1000k. */
-export const formatTick = (v: number): string => {
-  if (!Number.isFinite(v)) return String(v)
-  const units: [number, string][] = [
-    [1e3, "k"],
-    [1e6, "M"],
-    [1e9, "B"],
-    [1e12, "T"],
-  ]
-  const abs = Math.abs(v)
-  let i = units.length - 1
-  while (i >= 0 && abs < units[i][0]) i--
-  if (i < 0) {
-    const plain = Number(v.toFixed(2))
-    return Math.abs(plain) >= 1000 ? formatTick(Math.sign(v) * 1000) : String(plain)
-  }
-  const scaled = Number((v / units[i][0]).toFixed(1))
-  // 999 950 rounds to "1000k"; it reads as the next unit up.
-  if (Math.abs(scaled) >= 1000 && i < units.length - 1) {
-    return `${Number((v / units[i + 1][0]).toFixed(1))}${units[i + 1][1]}`
-  }
-  return `${scaled}${units[i][1]}`
-}
+/**
+ * Compact default tick formatting: 1.2k, 3.4M — never 1200.0000001 or 1000k.
+ * One argument on purpose: it is handed around as a formatter, and an index
+ * passed by `map` must not land in an options slot.
+ */
+export const formatTick = (v: number): string => compactNumber(v)

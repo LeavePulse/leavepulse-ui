@@ -45,9 +45,11 @@ import { useLabels } from "../composables/useLpConfig"
 import { mergeClass } from "../composables/useMergedClass"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import FieldWrapper from "./FieldWrapper.vue"
+import { BADGE_REMOVE } from "./badge"
+import LpBadge from "./LpBadge.vue"
 import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
-import { OPTION_ITEM, POPOVER_PANEL } from "./dropdown"
+import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
 import type { LpOptionBase, OptionSelection } from "./options"
 import { addTags, splitTags, type TagDuplicates, type TagRejection, type TagValidator } from "./tags"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
@@ -467,29 +469,39 @@ const guardOutside = useOutsideGuard()
           enter-active-class="animate-[chip-in_var(--duration-fast)_var(--ease-emphasized)] motion-reduce:animate-none"
           leave-active-class="animate-[chip-out_var(--duration-fast)_ease] motion-reduce:animate-none"
         >
+        <!-- The chip is the kit's removable badge; reka's item and delete
+             primitives ride on it (as-child, the #remove slot) because they
+             own the keyboard: arrows between tags, Backspace to remove. -->
         <TagsInputItem
           v-for="{ tag, key, shown } in keyed"
           :key="key"
-          :data-tag-key="key"
+          as-child
           :value="tag"
-          class="inline-flex max-w-full items-center gap-1 rounded-pill bg-surface-raised py-0.5 pr-1 text-xs font-medium text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
-          :class="shown?.image ? 'pl-0.5' : 'pl-2.5'"
         >
-          <img v-if="shown?.image" :src="shown.image" alt="" class="size-4 shrink-0 rounded-full object-cover" />
-          <TagsInputItemText class="flex min-w-0 items-baseline gap-1">
-            <template v-if="shown">
-              <span class="truncate">{{ shown.label }}</span>
-              <span v-if="shown.hint" class="truncate font-normal text-muted">{{ shown.hint }}</span>
-            </template>
-            <span v-else class="truncate">{{ tag }}</span>
-          </TagsInputItemText>
-          <TagsInputItemDelete
-            :aria-labelledby="undefined"
-            :aria-label="text.remove.replace('{tag}', shown?.label ?? tag)"
-            class="grid size-4 shrink-0 place-items-center rounded-pill text-muted transition-colors hover:bg-ink/10 hover:text-ink"
+          <LpBadge
+            removable
+            :data-tag-key="key"
+            class="max-w-full bg-surface-raised text-ink outline-none data-[state=active]:ring-2 data-[state=active]:ring-ring"
+            :class="shown?.image ? 'pl-0.5' : ''"
           >
-            <LpIcon name="lucide:x" :size="12" />
-          </TagsInputItemDelete>
+            <img v-if="shown?.image" :src="shown.image" alt="" class="size-4 shrink-0 rounded-full object-cover" />
+            <TagsInputItemText class="flex min-w-0 items-baseline gap-1">
+              <template v-if="shown">
+                <span class="truncate">{{ shown.label }}</span>
+                <span v-if="shown.hint" class="truncate font-normal text-muted">{{ shown.hint }}</span>
+              </template>
+              <span v-else class="truncate">{{ tag }}</span>
+            </TagsInputItemText>
+            <template #remove>
+              <TagsInputItemDelete
+                :aria-labelledby="undefined"
+                :aria-label="text.remove.replace('{tag}', shown?.label ?? tag)"
+                :class="BADGE_REMOVE"
+              >
+                <LpIcon name="lucide:x" :size="12" />
+              </TagsInputItemDelete>
+            </template>
+          </LpBadge>
         </TagsInputItem>
         </TransitionGroup>
         <TagsInputInput
@@ -542,7 +554,7 @@ const guardOutside = useOutsideGuard()
                 :aria-disabled="opt.disabled || undefined"
                 :data-highlighted="i === activeIndex ? '' : undefined"
                 :data-disabled="opt.disabled ? '' : undefined"
-                :style="{ animationDelay: `${Math.min(i, 12) * 22}ms` }"
+                :style="optionStagger(i)"
                 :class="[OPTION_ITEM, 'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50']"
                 @pointerdown.prevent
                 @pointermove="activeIndex = i"

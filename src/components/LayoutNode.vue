@@ -1,19 +1,15 @@
 <script setup lang="ts">
-import { Motion, useReducedMotion } from "motion-v"
+import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, ref } from "vue"
+import { usePillTransition } from "../composables/usePillTransition"
 import type { LayoutNode, Leaf, Side, Split } from "../layout/tree"
 import type { BlockRegistry } from "../layout/registry"
 import { blockTitle } from "../layout/registry"
 import LpIcon from "./LpIcon.vue"
 
-// Same spring as LpTabs' panel height; instant under reduced motion, which
-// motion-v does not apply on its own.
-const reduceMotion = useReducedMotion()
-const layoutTransition = computed(() =>
-  reduceMotion.value
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 },
-)
+// The kit's layout spring, the same as LpTabs' panel height; instant under
+// reduced motion, which motion-v does not apply on its own.
+const layoutTransition = usePillTransition("layout")
 
 const props = defineProps<{
   node: LayoutNode

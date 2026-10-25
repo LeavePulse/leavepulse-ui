@@ -17,7 +17,7 @@ export default { inheritAttrs: false }
  * hover per line.
  */
 import { Motion } from "motion-v"
-import { computed, ref, shallowRef, watch, onMounted, onBeforeUnmount } from "vue"
+import { computed, ref, shallowRef, watch, onMounted } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { usePillTransition } from "../composables/usePillTransition"
@@ -47,6 +47,8 @@ import {
   type ChartSeries,
   type ChartThreshold,
 } from "./chart"
+import { PANEL_SURFACE } from "./dropdown"
+import LegendSwatch from "./LegendSwatch.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpShift from "./LpShift.vue"
@@ -56,6 +58,7 @@ import { sampleValues, skeletonHeights, skeletonWave } from "./chartSkeleton"
 import HintSampleTag from "./HintSampleTag.vue"
 import { useSample } from "../composables/useSample"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import { backgroundOf, downloadFile, fileStem, resolveCssColor, svgToPng, toCsv, type CsvOptions } from "./exportData"
 
 export interface ChartText {
@@ -197,7 +200,6 @@ const emit = defineEmits<{
 // simply have nothing to draw until the observer reports a real box.
 const root = ref<HTMLElement | null>(null)
 const width = ref(0)
-let ro: ResizeObserver | null = null
 
 /*
  * The wipe waits for the chart to be scrolled to. A chart is tall, so it is the
@@ -217,17 +219,9 @@ onMounted(() => {
   // wrapping the chart in a spare div just to carry a second ref.
   revealAnchor.value = root.value
   reduced.value = prefersReducedMotion()
-  if (!root.value || typeof ResizeObserver === "undefined") return
-  ro = new ResizeObserver(([entry]) => {
-    width.value = entry.contentRect.width
-  })
-  ro.observe(root.value)
-  width.value = root.value.clientWidth
 })
-
-onBeforeUnmount(() => {
-  ro?.disconnect()
-  ro = null
+useResizeObserver(root, (entry, el) => (width.value = entry ? entry.contentRect.width : el.clientWidth), {
+  immediate: true,
 })
 
 // ── data ───────────────────────────────────────
@@ -1176,10 +1170,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :aria-pressed="!hidden.has(s.id)"
         @click="toggleSeries(s.id)"
       >
-        <span
-          class="size-2 shrink-0 rounded-full transition-transform duration-fast group-hover:scale-125"
-          :style="{ backgroundColor: s.color }"
-        />
+        <LegendSwatch :color="s.color" />
         <span class="text-muted-strong group-hover:text-ink">{{ s.name }}</span>
         <span
           v-if="hasRightAxis && s.axis === 'right'"
@@ -1528,7 +1519,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <Motion
           v-if="active >= 0 && ready"
           as="div"
-          class="pointer-events-none absolute left-0 top-0 z-(--z-tooltip) min-w-32 rounded-control border border-line bg-surface-overlay px-2.5 py-2 shadow-panel backdrop-blur group-data-[state=open]/plot:hidden"
+          class="pointer-events-none absolute left-0 top-0 z-(--z-tooltip) min-w-32 px-2.5 py-2 group-data-[state=open]/plot:hidden"
+          :class="PANEL_SURFACE"
           :initial="{ opacity: 0, scale: 0.96 }"
           :animate="{
             opacity: 1,

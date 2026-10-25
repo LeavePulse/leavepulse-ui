@@ -26,6 +26,7 @@ export default { inheritAttrs: false }
  * single tab stop.
  */
 import { computed, ref, watch } from "vue"
+import { useLocale } from "../composables/useLocale"
 import {
   ancestorIds,
   computeStats,
@@ -207,6 +208,9 @@ const byId = computed(() => index.value.byId)
 // its temporal dead zone when the watcher first runs.
 const stats = computed(() => computeStats(props.nodes, checkedIds.value))
 
+// Read by `summary` below, so declared ahead of it for the same reason.
+const locale = useLocale()
+
 /**
  * What the ticked set adds up to. Directories are counted but not sized — their
  * bytes arrive through the files inside them, so summing both would double-count.
@@ -263,7 +267,7 @@ const summary = computed<FileTreeSummary>(() => {
     files,
     dirs,
     bytes: sized ? bytes : undefined,
-    sizeLabel: sized ? formatSize(bytes) : "—",
+    sizeLabel: sized ? formatSize(bytes, locale.value) : "—",
   }
 })
 

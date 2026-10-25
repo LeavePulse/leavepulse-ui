@@ -1,9 +1,10 @@
 /*
  * Pure text helpers behind the "fields and text" components: grouping a code
- * for reading aloud (LpCodeDisplay), a countdown's wording (LpCodeDisplay),
- * and cutting a string out of its middle (LpTruncate). Kept apart from the
+ * for reading aloud (LpCodeDisplay, LpOtpInput) and cutting a string out of its middle (LpTruncate). Kept apart from the
  * components so the rules can be tested without a DOM.
  */
+
+import { ceilToSecond, formatTime } from "./timeSpan"
 
 /**
  * Splits a code into the groups a person reads it in.
@@ -48,16 +49,13 @@ export function normalizeCode(code: string): string {
 
 /**
  * A remaining time the way a countdown shows it: `0:42`, `4:05`, `1:02:03`.
- * Rounded UP to the second, so "0:00" only ever appears once time is out —
- * rounding down would show 0:00 for most of the last second.
+ * Rounded UP to the second, so "0:00" only ever appears once time is out.
+ *
+ * @deprecated LpCountdown's own formatting, kept for apps that imported it:
+ * use `formatTime(ceilToSecond(ms), "clock")` from the time-span helpers.
  */
 export function formatRemaining(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000))
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  const ss = String(s).padStart(2, "0")
-  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`
+  return formatTime(ceilToSecond(ms), "clock")
 }
 
 /**
