@@ -2796,6 +2796,8 @@ export const registry: ComponentEntry[] = [
   <LpAlert variant="warning" title="Action needed">Verify your billing address to continue.</LpAlert>
   <LpAlert variant="danger" title="Payment failed">We couldn't charge your card.</LpAlert>
   <p class="-mt-1.5 text-xs text-muted">Screen reader: interrupts and reads it at once (role="alert").</p>
+  <LpAlert busy>Collecting data from every source…</LpAlert>
+  <p class="-mt-1.5 text-xs text-muted">busy: the icon spins and the alert is announced politely.</p>
   <LpShift>
     <Transition enter-from-class="opacity-0 -translate-y-1" leave-to-class="opacity-0 -translate-y-1" enter-active-class="transition duration-200" leave-active-class="transition duration-150">
       <div v-if="saved" class="flex flex-col gap-1.5">

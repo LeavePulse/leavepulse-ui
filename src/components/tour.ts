@@ -29,6 +29,37 @@ export function panelsAround(hole: Box, viewport: Size): Box[] {
   ]
 }
 
+const CORNER_STEPS = 6
+
+/**
+ * The dimmed, blurred layer as one clip: the whole viewport with the hole cut
+ * out (evenodd), corners rounded like the ring drawn around it. One layer
+ * instead of the four panels, because each panel blurred the page on its own
+ * and the blur's edges showed as seams where they met. The point count never
+ * changes, so the clip eases between steps on every engine; with no target
+ * the hole shrinks to a dot in the middle.
+ */
+export function holeClip(hole: Box | null, viewport: Size, radius: number): string {
+  const h = hole ?? { x: viewport.width / 2, y: viewport.height / 2, width: 0, height: 0 }
+  const r = Math.max(0, Math.min(radius, h.width / 2, h.height / 2))
+  const px = (n: number) => `${Math.round(n * 100) / 100}px`
+  const corners: [number, number, number][] = [
+    [h.x + h.width - r, h.y + r, -90],
+    [h.x + h.width - r, h.y + h.height - r, 0],
+    [h.x + r, h.y + h.height - r, 90],
+    [h.x + r, h.y + r, 180],
+  ]
+  const points: string[] = []
+  for (const [cx, cy, start] of corners) {
+    for (let i = 0; i <= CORNER_STEPS; i++) {
+      const angle = ((start + (90 * i) / CORNER_STEPS) * Math.PI) / 180
+      points.push(`${px(cx + r * Math.cos(angle))} ${px(cy + r * Math.sin(angle))}`)
+    }
+  }
+  const outer = [`0px 0px`, `${px(viewport.width)} 0px`, `${px(viewport.width)} ${px(viewport.height)}`, `0px ${px(viewport.height)}`, `0px 0px`]
+  return `polygon(evenodd, ${[...outer, ...points, points[0]].join(", ")})`
+}
+
 /**
  * Open the context menu of an element as a right-click would, at its centre.
  * Lets a tour step show a row's menu without the user hunting for it; the menu

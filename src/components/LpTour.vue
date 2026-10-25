@@ -37,9 +37,11 @@ export interface TourStep {
  * scrim, a card beside it says what it is, and the user steps through with the
  * buttons or the arrow keys.
  *
- * The scrim is four panels around a hole rather than a mask, so the target
- * stays clickable (a `try` step waits for exactly that click) and the hole can
- * glide between targets on any engine, WebKitGTK included. The card is a reka
+ * The dim is one blurred layer clipped around the hole (`holeClip`), so the
+ * blur has no seams; four transparent panels around the hole take the clicks,
+ * so the target stays clickable (a `try` step waits for exactly that click).
+ * Both glide between targets on any engine, WebKitGTK included. Closing fades
+ * the whole layer out instead of dropping it. The card is a reka
  * popover anchored to the hole, so flipping and sliding to stay on screen is
  * floating-ui's job; on a phone it becomes a sheet at the bottom instead.
  *
@@ -59,7 +61,7 @@ import { scrollToElement } from "../composables/scroll"
 import { PANEL_SURFACE } from "./dropdown"
 import TourCard from "./TourCard.vue"
 import type { Box } from "../composables/spatialNav"
-import { holeOf, panelsAround } from "./tour"
+import { holeClip, holeOf, panelsAround } from "./tour"
 
 const props = withDefaults(
   defineProps<{
@@ -113,6 +115,8 @@ const panels = computed(() =>
     ? panelsAround(hole.value, viewport.value)
     : [{ x: 0, y: 0, width: viewport.value.width, height: viewport.value.height }],
 )
+const radius = ref(8)
+const clip = computed(() => holeClip(hole.value, viewport.value, radius.value))
 const reference = {
   getBoundingClientRect: () => {
     const h = hole.value
@@ -244,7 +248,6 @@ function end() {
   cancelAnimationFrame(frame)
   frame = 0
   target.value = null
-  box.value = null
   runAll(cleanups)
 }
 
@@ -269,6 +272,8 @@ watch(
   (value) => {
     if (value) {
       direction = 1
+      box.value = null
+      radius.value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--radius-control")) || 8
       document.addEventListener("click", onTargetClick, true)
       document.addEventListener("contextmenu", onTargetClick, true)
       frame ||= requestAnimationFrame(track)
@@ -307,11 +312,21 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
 
 <template>
   <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+      leave-active-class="transition-opacity duration-[var(--duration-medium)] ease-out motion-reduce:transition-none"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
     <div v-if="open" class="lp-tour pointer-events-none fixed inset-0 z-(--z-tour)" @pointerdown.stop>
+      <div
+        class="lp-scrim absolute inset-0 transition-[clip-path] duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+        :style="{ clipPath: clip }"
+      />
       <div
         v-for="(panel, i) in panels"
         :key="i"
-        class="lp-scrim pointer-events-auto absolute left-0 top-0 transition-[transform,width,height] duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
+        class="pointer-events-auto absolute left-0 top-0"
         :style="{ transform: `translate(${panel.x}px, ${panel.y}px)`, width: `${panel.width}px`, height: `${panel.height}px` }"
       />
       <div
@@ -321,8 +336,9 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
         :style="{ transform: `translate(${hole.x}px, ${hole.y}px)`, width: `${hole.width}px`, height: `${hole.height}px` }"
       />
     </div>
+    </Transition>
 
-    <PopoverRoot v-if="open && wide" :open="ready">
+    <PopoverRoot v-if="wide" :open="open && ready">
       <PopoverAnchor :reference="reference" />
       <PopoverPortal>
         <PopoverContent
@@ -331,7 +347,7 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
           :collision-padding="12"
           update-position-strategy="always"
           :trap-focus="false"
-          :class="[CARD, 'z-[calc(var(--z-tour)+1)] data-[state=open]:animate-[popover-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none']"
+          :class="[CARD, 'z-[calc(var(--z-tour)+1)] data-[state=open]:animate-[popover-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[popover-out_var(--duration-fast)_ease-out] motion-reduce:animate-none']"
           role="dialog"
           :aria-label="step?.title"
           @pointerdown.stop
@@ -346,6 +362,7 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
       </PopoverPortal>
     </PopoverRoot>
 
+    <Transition leave-active-class="animate-[rise-out_var(--duration-fast)_ease-out] motion-reduce:animate-none">
     <div
       v-if="open && !wide && ready"
       :class="[CARD, 'pointer-events-auto fixed inset-x-3 bottom-3 z-[calc(var(--z-tour)+1)] w-auto animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none']"
@@ -357,5 +374,6 @@ const CARD = `${PANEL_SURFACE} rounded-card w-80 max-w-[calc(100vw-24px)] p-4 te
             <TourCard :step="step" :index="index" :last="last" :progress="progress" :labels="labels" @next="next" @back="back" @perform="perform" @dismiss="dismiss" />
           </slot>
     </div>
+    </Transition>
   </Teleport>
 </template>

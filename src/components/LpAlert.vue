@@ -45,23 +45,34 @@ const props = withDefaults(
      * of the page from the start should not be shouted on load.
      */
     live?: "assertive" | "polite" | false
+    /**
+     * Work is under way: the icon becomes a spinning loader (unless `icon` is
+     * given, which then spins instead) and the alert is announced politely.
+     * A loader drawn as a still icon read as a frozen page.
+     */
+    busy?: boolean
   }>(),
-  { variant: "info", live: undefined },
+  { variant: "info", live: undefined, busy: false },
 )
 
 const role = computed(() => {
-  const live = props.live ?? (props.variant === "danger" ? "assertive" : false)
+  const live = props.live ?? (props.variant === "danger" ? "assertive" : props.busy ? "polite" : false)
   return live === "assertive" ? "alert" : live === "polite" ? "status" : undefined
 })
 
 const classes = computed(() => alert({ variant: props.variant }))
-const resolvedIcon = computed(() => props.icon ?? ICONS[props.variant ?? "info"])
+const resolvedIcon = computed(() => props.icon ?? (props.busy ? "lucide:loader-circle" : ICONS[props.variant ?? "info"]))
 const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
 </script>
 
 <template>
-  <div :class="classes" :role="role">
-    <LpIcon :name="resolvedIcon" :size="18" :class="['mt-0.5 shrink-0', iconTone]" aria-hidden="true" />
+  <div :class="classes" :role="role" :aria-busy="busy || undefined">
+    <LpIcon
+      :name="resolvedIcon"
+      :size="18"
+      :class="['mt-0.5 shrink-0', iconTone, busy ? 'animate-spin motion-reduce:animate-none' : '']"
+      aria-hidden="true"
+    />
     <div class="min-w-0">
       <p v-if="title" class="font-semibold text-ink">{{ title }}</p>
       <div :class="['text-muted-strong', title ? 'mt-0.5' : '']">
