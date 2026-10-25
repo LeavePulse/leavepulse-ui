@@ -129,3 +129,50 @@ describe("useForm", () => {
     expect(form.field("email").error).toBeUndefined()
   })
 })
+
+describe("useForm keeps what it checked", () => {
+  test("an edit during an async check is checked again, and what passed is what is sent", async () => {
+    let release: () => void = () => {}
+    let first = true
+    const form = useForm({
+      initial: { name: "valid" },
+      rules: {
+        name: async (v: string) => {
+          if (first) {
+            first = false
+            await new Promise<void>((done) => (release = done))
+          }
+          return v ? undefined : "Required"
+        },
+      },
+    })
+    const sent: { name: string }[] = []
+    const submit = form.handleSubmit((v) => {
+      sent.push(v)
+    })
+    const running = submit()
+    await tick()
+    form.set("name", "")
+    await tick()
+    release()
+    await running
+    expect(sent).toEqual([])
+    expect(form.errors.value.name).toBe("Required")
+  })
+
+  test("fixing a field clears a form-level error it caused", async () => {
+    const form = useForm({
+      initial: { a: "x", b: "y" },
+      validate: (v) => (v.a === v.b ? {} : { form: "Mismatch" }),
+    })
+    const submit = form.handleSubmit(() => {})
+    await submit()
+    expect(form.errors.value.form).toBe("Mismatch")
+    expect(form.valid.value).toBe(false)
+    form.set("b", "x")
+    await tick()
+    await tick()
+    expect(form.errors.value.form).toBeUndefined()
+    expect(form.valid.value).toBe(true)
+  })
+})

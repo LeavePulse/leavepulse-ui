@@ -66,22 +66,33 @@ export function usePersisted<T>(
   options: PersistedOptions<T> = {},
 ): Ref<T> {
   const storage = useKitStorage()
-  const value = ref(initial) as Ref<T>
+  // A copy taken now: an object initial edited in place under one key must
+  // not come back edited as the starting value of the next.
+  const pristine = initial === undefined ? undefined : JSON.stringify(initial)
+  const fresh = (): T => (pristine === undefined ? initial : (JSON.parse(pristine) as T))
+  const value = ref(fresh()) as Ref<T>
 
-  function read(name: string | false | null | undefined) {
-    if (!name) return
+  function stored(name: string): { ok: true; value: T } | { ok: false } {
     const raw = storage.get(name)
-    if (raw == null) return
+    if (raw == null) return { ok: false }
     try {
       const parsed: unknown = JSON.parse(raw)
-      if (options.validate && !options.validate(parsed)) return
-      value.value = parsed as T
+      return options.validate && !options.validate(parsed) ? { ok: false } : { ok: true, value: parsed as T }
     } catch {
-      // A broken entry reads as nothing stored.
+      return { ok: false }
     }
   }
 
-  watch(() => toValue(key), read, { immediate: true })
+  // Nothing usable under the new key (never written, broken, rejected) starts
+  // from the initial value, not from what the previous key held.
+  function read(name: string | false | null | undefined, previous?: string | false | null) {
+    if (!name) return
+    const found = stored(name)
+    if (found.ok) value.value = found.value
+    else if (previous) value.value = fresh()
+  }
+
+  watch(() => toValue(key), (name, previous) => read(name, previous), { immediate: true })
   watch(
     value,
     (next) => {

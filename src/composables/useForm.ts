@@ -120,6 +120,9 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   const submitting = ref(false)
   const submitCount = ref(0)
   const runs = new Map<keyof T | "form", number>()
+  // What the form-level check set last, so its next run can take back what no
+  // longer holds without touching an error a field rule set on the same key.
+  const fromForm = new Map<keyof T | "form", string>()
   const baseVersion = ref(0)
 
   const keys = (): (keyof T)[] => Object.keys(plain()) as (keyof T)[]
@@ -160,11 +163,15 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
     runs.set("form", run)
     const found = (await options.validate(plain())) ?? {}
     if (runs.get("form") !== run) return true
+    for (const [name, text] of fromForm) if (errors[name] === text) delete errors[name]
+    fromForm.clear()
     let ok = true
     for (const [name, text] of Object.entries(found) as [keyof T | "form", string | undefined][]) {
       if (!text) continue
       ok = false
-      if (!errors[name]) errors[name] = text
+      if (errors[name]) continue
+      errors[name] = text
+      fromForm.set(name, text)
     }
     return ok
   }
@@ -173,7 +180,6 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
     validating.value = true
     try {
       if (name !== undefined) return await runField(name)
-      if (errors.form) delete errors.form
       const fields = await Promise.all(keys().map(runField))
       const form = await runForm()
       return fields.every(Boolean) && form && !Object.values(external).some(Boolean)
@@ -200,6 +206,7 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
     for (const k of Object.keys(external)) delete external[k as keyof T]
     for (const k of Object.keys(touched)) delete touched[k as keyof T]
     runs.clear()
+    fromForm.clear()
     submitCount.value = 0
   }
 
@@ -231,18 +238,27 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
     { deep: true },
   )
 
-  // An edit re-checks a field already touched, and drops an external error on it.
+  // An edit re-checks a field already touched, drops an external error on it,
+  // and runs the form-level check again once it has run: a cross-field error
+  // ("passwords differ") must clear when either field is fixed.
+  async function recheck(names: (keyof T)[]): Promise<void> {
+    await Promise.all(names.map((name) => validate(name)))
+    if (fromForm.size || submitCount.value) await runForm()
+  }
+
   let snapshot = clone(plain())
   watch(
     plain,
     () => {
       const now = clone(plain())
+      const changed: (keyof T)[] = []
       for (const name of Object.keys(now) as (keyof T)[]) {
         if (deepEqual(now[name], snapshot[name])) continue
         if (external[name]) delete external[name]
-        if (touched[name] || submitCount.value) void validate(name)
+        if (touched[name] || submitCount.value) changed.push(name)
       }
       snapshot = now
+      if (changed.length) void recheck(changed)
     },
     { deep: true },
   )
@@ -278,8 +294,13 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
       try {
         submitCount.value++
         for (const name of keys()) touched[name] = true
-        if (!(await validate())) return
-        const submitted = clone(plain())
+        // The values that passed are the values sent: an edit made while an
+        // async rule was running is checked again before anything goes out.
+        let submitted: T
+        do {
+          submitted = clone(plain())
+          if (!(await validate())) return
+        } while (!deepEqual(plain(), submitted))
         await fn(submitted)
         if (deepEqual(plain(), submitted)) {
           baseline = submitted
