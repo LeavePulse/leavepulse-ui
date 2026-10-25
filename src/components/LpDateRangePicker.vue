@@ -25,6 +25,15 @@ import {
   normalizeRange,
   sameRange,
 } from "./dateRange"
+import {
+  type CalendarLabels,
+  PICKER_CLEAR,
+  PICKER_PRESET,
+  PICKER_PRESETS,
+  PICKER_SIZE,
+  PICKER_TRIGGER,
+  pickerTone,
+} from "./calendar"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
@@ -61,7 +70,11 @@ const props = withDefaults(
     locale?: string
     /** Intl format for the displayed ends. */
     format?: Intl.DateTimeFormatOptions
-    labels?: Partial<DateRangePickerLabels>
+    /**
+     * The picker's own text, plus `previous` / `next` handed on to the
+     * calendar inside (whose app-wide scope is "rangeCalendar").
+     */
+    labels?: Partial<DateRangePickerLabels & CalendarLabels>
   }>(),
   { size: "md" },
 )
@@ -116,12 +129,6 @@ function presetFits(preset: DateRangePreset): boolean {
 
 const wide = useMediaQuery("(min-width: 640px)")
 
-const shellSize = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
-
 const attrs = useAttrs()
 const field = useFieldControl(() => ({
   wrapped: false,
@@ -143,11 +150,7 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
           :disabled="field.disabled"
           :aria-invalid="field.invalid || undefined"
           :aria-describedby="field.describedBy"
-          class="group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
-          :class="[
-            shellSize[size],
-            field.invalid ? 'border-danger focus-visible:ring-danger-soft' : 'border-line focus-visible:border-brand',
-          ]"
+          :class="[PICKER_TRIGGER, PICKER_SIZE[size], pickerTone(field.invalid)]"
         >
           <LpIcon name="lucide:calendar-range" :size="16" class="shrink-0 text-muted" />
           <LpRollingText
@@ -175,7 +178,7 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
             v-if="presetList.length"
             role="group"
             :aria-label="text.presets"
-            class="flex gap-1 overflow-x-auto border-b border-line p-2 sm:w-40 sm:flex-col sm:overflow-visible sm:border-r sm:border-b-0"
+:class="[PICKER_PRESETS, 'sm:w-40']"
           >
             <button
               v-for="(preset, i) in presetList"
@@ -183,7 +186,7 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
               type="button"
               :disabled="!presetFits(preset)"
               :aria-pressed="sameRange(value, preset.range())"
-              class="shrink-0 rounded-control px-2.5 py-1.5 text-left text-sm whitespace-nowrap text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-surface-soft hover:text-ink focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-brand-soft aria-pressed:text-ink"
+:class="PICKER_PRESET"
               @click="pickPreset(preset)"
             >
               {{ preset.label }}
@@ -198,6 +201,7 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
             :maximum-days="maximumDays"
             :months="wide ? 2 : 1"
             :locale="locale"
+            :labels="labels"
             class="border-0 bg-transparent"
             @update:model-value="pick"
           />
@@ -208,7 +212,7 @@ const showClear = computed(() => props.clearable && !!value.value && !field.valu
       v-if="showClear"
       type="button"
       :aria-label="text.clear"
-      class="absolute top-1/2 right-[calc(0.75rem+15px+0.5rem)] flex -translate-y-1/2 items-center rounded-sm text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+      :class="PICKER_CLEAR"
       @click="emit('update:modelValue', undefined)"
     >
       <LpIcon name="lucide:x" :size="15" />

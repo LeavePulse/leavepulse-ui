@@ -1,5 +1,10 @@
 <script lang="ts">
 export default { inheritAttrs: false }
+
+export interface PasswordInputLabels extends Record<string, string> {
+  show: string
+  hide: string
+}
 </script>
 
 <script setup lang="ts">
@@ -10,7 +15,7 @@ import { useLabels } from "../composables/useLpConfig"
 import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 
-defineProps<{
+const props = defineProps<{
   modelValue?: string
   placeholder?: string
   invalid?: boolean
@@ -21,10 +26,17 @@ defineProps<{
   hint?: string
   error?: string
   required?: boolean
+  /** Control height, as on LpInput. */
+  size?: "sm" | "md" | "lg"
+  labels?: Partial<PasswordInputLabels>
 }>()
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
-const text = useLabels("passwordInput", { show: "Show password", hide: "Hide password" })
+const text = useLabels<PasswordInputLabels>(
+  "passwordInput",
+  { show: "Show password", hide: "Hide password" },
+  () => props.labels,
+)
 const visible = ref(false)
 const inner = ref<InstanceType<typeof LpInput> | null>(null)
 defineExpose({
@@ -47,6 +59,7 @@ defineExpose({
     :hint="hint"
     :error="error"
     :required="required"
+    :size="size"
     @update:model-value="(v) => $emit('update:modelValue', v)"
   >
     <template v-if="$slots.leading" #leading><slot name="leading" /></template>
@@ -59,7 +72,7 @@ defineExpose({
       >
         <LpIcon
           :name="visible ? 'lucide:eye-off' : 'lucide:eye'"
-          :size="16"
+          :size="size === 'sm' ? 14 : 16"
           class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active:scale-90 motion-reduce:group-active:scale-100"
         />
       </button>

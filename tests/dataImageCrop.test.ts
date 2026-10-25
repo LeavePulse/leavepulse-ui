@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { coverScale, cropGeometry, isSideways, uprightToSource } from "../src/components/imageCrop"
+import { coverScale, cropGeometry, exportType, imageTypeFromUrl, isSideways, uprightToSource } from "../src/components/imageCrop"
 
 const close = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(1e-6)
 
@@ -60,4 +60,18 @@ test("only near-quarter turns count as sideways", () => {
   expect(isSideways(-90)).toBe(true)
   expect(isSideways(97)).toBe(true)
   expect(isSideways(180)).toBe(false)
+})
+
+test("an address's type comes from its extension, ignoring the query", () => {
+  expect(imageTypeFromUrl("https://x.test/a/photo.JPG?w=200#top")).toBe("image/jpeg")
+  expect(imageTypeFromUrl("https://x.test/logo.svg")).toBe("image/svg+xml")
+  expect(imageTypeFromUrl("https://x.test/render?id=4")).toBe("")
+  expect(imageTypeFromUrl("data:image/webp;base64,AAAA")).toBe("image/webp")
+})
+
+test("a source export keeps an encodable type and falls back to PNG", () => {
+  expect(exportType("image/jpeg", "image/png")).toBe("image/jpeg")
+  expect(exportType("source", "image/webp")).toBe("image/webp")
+  expect(exportType("source", "image/gif")).toBe("image/png")
+  expect(exportType("source", "")).toBe("image/png")
 })

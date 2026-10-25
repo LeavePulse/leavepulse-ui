@@ -39,7 +39,7 @@ import LpScrollArea from "./LpScrollArea.vue"
 import LpShift from "./LpShift.vue"
 import LpSidebar from "./LpSidebar.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
-import { useMergedAttrs } from "../composables/useMergedClass"
+import { mergeClass, useMergedAttrs } from "../composables/useMergedClass"
 
 export type { SidebarItem, SidebarSection } from "./sidebar"
 
@@ -303,7 +303,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           v-else
           ref="scrollArea"
           class="min-h-0 flex-1"
-          :content-class="`px-4 py-6 md:px-6 ${contentClass}`"
+          :content-class="mergeClass('px-4 py-6 md:px-6', contentClass)"
         >
           <slot />
         </LpScrollArea>

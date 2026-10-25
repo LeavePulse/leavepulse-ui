@@ -5,9 +5,11 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui"
+import { computed } from "vue"
+import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     side?: "top" | "right" | "bottom" | "left"
     align?: "start" | "center" | "end"
@@ -23,6 +25,12 @@ withDefaults(
 // Controllable open state (v-model:open). Left unbound the popover stays
 // uncontrolled and reka manages open/close on trigger interaction.
 const open = defineModel<boolean>("open")
+
+// Merged rather than appended, so `panelClass="w-80 p-0"` replaces the default
+// width and padding instead of racing them in stylesheet order.
+const panel = computed(() =>
+  mergeClass(POPOVER_PANEL, "z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none", props.panelClass),
+)
 </script>
 
 <template>
@@ -37,7 +45,7 @@ const open = defineModel<boolean>("open")
         :align="align"
         :side-offset="sideOffset"
         :aria-label="ariaLabel"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none', panelClass]"
+        :class="panel"
       >
         <slot />
       </PopoverContent>

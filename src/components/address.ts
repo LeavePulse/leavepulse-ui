@@ -166,7 +166,7 @@ function toSuggestion(result: NominatimResult, field: AddressField): AddressSugg
  * without the kit taking an i18n dependency. Pass a partial — anything absent
  * keeps the English default.
  */
-export interface AddressLabels {
+export interface AddressLabels extends Record<string, string> {
   line: string
   linePlaceholder: string
   secondLine: string

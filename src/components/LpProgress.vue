@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * One determinate value, drawn as a bar or as a ring. Both are the same data —
@@ -12,6 +19,7 @@
 import { ProgressIndicator, ProgressRoot } from "reka-ui"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { easeOut, prefersReducedMotion } from "../composables/easing"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import LpNumberFlow from "./LpNumberFlow.vue"
 
@@ -227,6 +235,21 @@ const dash = computed(() => {
   return Math.min(raw, full - props.thickness * 1.5)
 })
 
+const BAR_TRACK = "h-1.5 w-full overflow-hidden rounded-pill bg-surface-soft"
+
+/*
+ * The consumer's class lands on whichever element is the outside of the
+ * progress: the ring, the header wrapper, or the bare bar. `h-2` on a bare bar
+ * or `w-40` on a titled one then replaces the default instead of racing it.
+ */
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  props.variant === "ring"
+    ? "relative inline-flex shrink-0 items-center justify-center"
+    : props.title || captionText.value
+      ? "flex w-full flex-col gap-1"
+      : BAR_TRACK,
+)
+
 /* A string label is verbatim — it isn't a number and has nothing to count. */
 const staticCaption = computed(() =>
   typeof props.label === "string" ? props.label : null,
@@ -239,8 +262,9 @@ const staticCaption = computed(() =>
     :ref="bindReveal"
     :model-value="value"
     :max="max"
-    class="relative inline-flex shrink-0 items-center justify-center"
+    :class="rootClass"
     :style="{ width: `${size}px`, height: `${size}px` }"
+    v-bind="rest"
   >
     <svg :width="size" :height="size" class="-rotate-90">
       <circle
@@ -282,7 +306,7 @@ const staticCaption = computed(() =>
 
   <!-- Wrapped only when there is a header to carry. A bare bar stays the single
        element it has always been, so an existing caller's layout is untouched. -->
-  <div v-else-if="title || captionText" class="flex w-full flex-col gap-1">
+  <div v-else-if="title || captionText" :class="rootClass" v-bind="rest">
     <div class="flex items-baseline justify-between gap-2 text-xs">
       <span class="text-muted">{{ title }}</span>
       <!-- Tabular, so a figure ticking upward doesn't shuffle its own width. -->
@@ -292,7 +316,7 @@ const staticCaption = computed(() =>
       :ref="bindReveal"
       :model-value="value"
       :max="max"
-      class="h-1.5 w-full overflow-hidden rounded-pill bg-surface-soft"
+      :class="BAR_TRACK"
     >
       <ProgressIndicator
         class="h-full rounded-pill transition-colors duration-medium"
@@ -307,7 +331,8 @@ const staticCaption = computed(() =>
     :ref="bindReveal"
     :model-value="value"
     :max="max"
-    class="h-1.5 w-full overflow-hidden rounded-pill bg-surface-soft"
+    :class="rootClass"
+    v-bind="rest"
   >
     <ProgressIndicator
       class="h-full rounded-pill transition-colors duration-medium"

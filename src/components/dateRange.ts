@@ -132,3 +132,55 @@ export function reshapeRange(anchor: string, moving: string, rules: ReshapeRules
   }
   return { start: start.toString(), end: end.toString() }
 }
+
+/*
+ * Single-day shortcuts for LpDatePicker, the counterpart of the range presets.
+ * A preset is a function rather than a date so "Today" stays today in a tab
+ * left open past midnight, and an app can add "Next Monday" or "End of
+ * quarter" without the kit knowing about it.
+ */
+export interface DatePreset {
+  label: string
+  date: () => string
+}
+
+export interface DatePresetLabels {
+  today: string
+  tomorrow: string
+  inWeek: string
+}
+
+/** The default single-day presets. `now` is injectable so the set can be tested. */
+export function defaultDatePresets(
+  labels: DatePresetLabels,
+  now: () => CalendarDate = () => today(getLocalTimeZone()),
+): DatePreset[] {
+  return [
+    { label: labels.today, date: () => now().toString() },
+    { label: labels.tomorrow, date: () => now().add({ days: 1 }).toString() },
+    { label: labels.inWeek, date: () => now().add({ weeks: 1 }).toString() },
+  ]
+}
+
+export interface DayRules {
+  min?: string
+  max?: string
+  isDisabled?: (iso: string) => boolean
+  isDateUnavailable?: (iso: string) => boolean
+}
+
+/**
+ * Whether a single day may be picked under the calendar's rules. A preset that
+ * lands outside them is shown disabled rather than clamped: unlike a range, a
+ * day has nothing to trim, and "Tomorrow" quietly becoming another day would be
+ * a lie.
+ */
+export function dayAllowed(iso: string, rules: DayRules = {}): boolean {
+  const day = parseIsoDay(iso)
+  if (!day) return false
+  const value = day.toString()
+  if (rules.min && value < rules.min.slice(0, 10)) return false
+  if (rules.max && value > rules.max.slice(0, 10)) return false
+  if (rules.isDisabled?.(value)) return false
+  return !rules.isDateUnavailable?.(value)
+}

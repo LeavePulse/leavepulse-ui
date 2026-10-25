@@ -105,3 +105,52 @@ export function isSideways(rotation: number): boolean {
   const quarters = Math.round(rotation / 90)
   return ((quarters % 2) + 2) % 2 === 1
 }
+
+/**
+ * Why the editor could not do its job, as its `error` event reports it:
+ * - "decode": the file is not a picture the browser can open;
+ * - "load": an address that did not answer with a picture at all;
+ * - "cors": the picture showed, but its server did not allow it to be read
+ *   back, so the browser refuses to export the crop. The fix is on that server
+ *   (an Access-Control-Allow-Origin header), or in uploading the file instead.
+ */
+export type ImageEditorErrorCause = "decode" | "load" | "cors"
+
+export interface ImageEditorError {
+  cause: ImageEditorErrorCause
+  message: string
+  /** The address, when the picture came as one. */
+  url?: string
+}
+
+const ENCODABLE = new Set(["image/png", "image/jpeg", "image/webp"])
+
+const EXTENSION_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  avif: "image/avif",
+}
+
+/**
+ * The type a picture given by address probably has, from its extension. An
+ * address carries no type of its own until it is fetched, and the export only
+ * needs a guess good enough to keep a PNG's transparency: an unknown or
+ * extension-less address reads as "", which exports as PNG.
+ */
+export function imageTypeFromUrl(url: string): string {
+  if (url.startsWith("data:")) return /^data:([^;,]+)/.exec(url)?.[1]?.toLowerCase() ?? ""
+  const path = url.split(/[?#]/)[0] ?? ""
+  const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase()
+  return (ext && EXTENSION_TYPES[ext]) || ""
+}
+
+/** The encoding an export uses: the requested one, or for "source" the picture's own where a canvas can write it. */
+export function exportType(requested: string, sourceType: string): string {
+  if (requested !== "source") return requested
+  return ENCODABLE.has(sourceType) ? sourceType : "image/png"
+}

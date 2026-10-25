@@ -41,6 +41,8 @@ import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 import LpModal from "./LpModal.vue"
 import LpSelect from "./LpSelect.vue"
+import { useFieldControl } from "../composables/useField"
+import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const LpMapPicker = defineAsyncComponent(() => import("./LpMapPicker.vue"))
@@ -64,6 +66,8 @@ const props = withDefaults(
     /** Accept-Language for the geocoder. */
     language?: string
     disabled?: boolean
+    /** Mark every part of the address invalid (also set by a surrounding LpFormField's error). */
+    invalid?: boolean
     size?: "sm" | "md" | "lg"
     /** Hide the map button when picking a point makes no sense. */
     hideMap?: boolean
@@ -105,7 +109,8 @@ const DEFAULT_LABELS: AddressLabels = {
   nothingHere: "No address found here",
 }
 
-const text = computed<AddressLabels>(() => ({ ...DEFAULT_LABELS, ...props.labels }))
+// The app-wide config reaches the form too, not only the `labels` prop.
+const text = useLabels<AddressLabels>("addressInput", DEFAULT_LABELS, () => props.labels)
 
 // One provider instance for the component's lifetime, so a parent that passes
 // none doesn't get a new Nominatim client on every render.
@@ -277,6 +282,15 @@ function confirmPoint() {
   mapOpen.value = false
 }
 
+/*
+ * The address is a group of fields, each with its own label, so a surrounding
+ * LpFormField cannot point its label at one input. Its label names the group
+ * instead, its message describes it, and its invalid and disabled states reach
+ * every part: each inner field provides its own context, which would otherwise
+ * hide the outer one from the controls.
+ */
+const field = useFieldControl(() => ({ wrapped: false, invalid: props.invalid, disabled: props.disabled }))
+
 // The group stacks its fields on a fixed gap that a tighter form has to close.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex flex-col gap-3",
@@ -285,6 +299,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
 <template>
   <div
+    role="group"
+    :aria-labelledby="field.labelId"
+    :aria-describedby="field.describedBy"
+    :aria-invalid="field.invalid || undefined"
     :class="rootClass"
     v-bind="rest">
     <LpFormField :label="text.line">
@@ -298,7 +316,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :loading="lineSuggestions.loading.value"
           :filter="false"
           :min-chars="minChars"
-          :disabled="disabled"
+          :disabled="field.disabled"
+          :invalid="field.invalid"
           :size="size"
           :placeholder="text.linePlaceholder"
           :empty-text="text.noSuggestions"
@@ -312,7 +331,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           variant="soft"
           :size="size"
           square
-          :disabled="disabled"
+          :disabled="field.disabled"
           :title="text.pickOnMap"
           :aria-label="text.pickOnMap"
           @click="mapOpen = true"
@@ -327,7 +346,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :model-value="value.line2 ?? ''"
       :label="text.secondLine"
       :placeholder="text.secondLinePlaceholder"
-      :disabled="disabled"
+      :disabled="field.disabled"
+      :invalid="field.invalid"
       :size="size"
       autocomplete="address-line2"
       @update:model-value="(next: string) => patch({ line2: next })"
@@ -341,7 +361,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :loading="citySuggestions.loading.value"
           :filter="false"
           :min-chars="minChars"
-          :disabled="disabled"
+          :disabled="field.disabled"
+          :invalid="field.invalid"
           :size="size"
           :placeholder="text.cityPlaceholder"
           :empty-text="text.noSuggestions"
@@ -355,7 +376,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :model-value="value.postalCode"
         :label="text.postalCode"
         :placeholder="text.postalCodePlaceholder"
-        :disabled="disabled"
+        :disabled="field.disabled"
+        :invalid="field.invalid"
         :size="size"
         autocomplete="postal-code"
         @update:model-value="(next: string) => edit({ postalCode: next })"
@@ -368,7 +390,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :options="countryOptions"
         :placeholder="text.countryPlaceholder"
         :search-placeholder="text.countrySearch"
-        :disabled="disabled"
+        :disabled="field.disabled"
+        :invalid="field.invalid"
         :size="size"
         searchable
         @update:model-value="(next) => edit({ country: String(next ?? '') })"
@@ -376,7 +399,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </LpFormField>
 
     <div v-if="!hideMap" class="flex items-center gap-2">
-      <LpButton variant="soft" :size="size === 'lg' ? 'md' : 'sm'" :disabled="disabled" @click="mapOpen = true">
+      <LpButton variant="soft" :size="size === 'lg' ? 'md' : 'sm'" :disabled="field.disabled" @click="mapOpen = true">
         <LpIcon name="lucide:map" :size="15" />
         {{ text.pickOnMap }}
       </LpButton>
