@@ -27,6 +27,10 @@ const SEEN_MS = 800
 const SEEN_RATIO = 0.5
 
 const mounted = shallowReactive(new Map<string, Set<HTMLElement>>())
+// Samples (LpHintExample) are kept apart from `mounted`: a sample is not the
+// real control, so it must never count as present, seen or used.
+const examples = shallowReactive(new Map<string, number>())
+const showing = shallowReactive(new Set<string>())
 const listeners: Record<HintEvent, Set<Listener>> = { seen: new Set(), used: new Set(), hover: new Set() }
 const idOf = new WeakMap<HTMLElement, string>()
 const timers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>()
@@ -142,6 +146,34 @@ export const hints = {
   on(event: HintEvent, listener: Listener): () => void {
     listeners[event].add(listener)
     return () => listeners[event].delete(listener)
+  },
+  /** Whether the page offers a sample of this id (an LpHintExample is mounted). Reactive. */
+  hasExample(id: string): boolean {
+    return (examples.get(id) ?? 0) > 0
+  },
+  /** Whether a sample of this id is asked to show right now. Reactive. */
+  showingExample(id: string): boolean {
+    return showing.has(id)
+  },
+  /** Ask the samples of this id to show; returns the way to hide them again. */
+  showExample(id: string): () => void {
+    showing.add(id)
+    return () => {
+      showing.delete(id)
+    }
+  },
+  /** The shown sample's element, the tour's target while it stands in. */
+  exampleElement(id: string): HTMLElement | null {
+    return document.querySelector<HTMLElement>(`[data-lp-hint-example="${CSS.escape(id)}"]`)
+  },
+  /** Called by LpHintExample: count a sample in while it is mounted. */
+  registerExample(id: string): () => void {
+    examples.set(id, (examples.get(id) ?? 0) + 1)
+    return () => {
+      const left = (examples.get(id) ?? 1) - 1
+      if (left > 0) examples.set(id, left)
+      else examples.delete(id)
+    }
   },
   /** Report use that is not a click on the element. */
   use(id: string): void {

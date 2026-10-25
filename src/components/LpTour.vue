@@ -26,6 +26,8 @@ export interface TourStep {
   try?: boolean
   /** With `try`, a "do it for me" button runs this instead. */
   perform?: () => void | Promise<void>
+  /** The target is a sample (LpHintExample), not the real thing: the card says so. */
+  example?: boolean
   /** Runs before the step shows: open the dialog or tab its target lives in. */
   enter?: (context: TourContext) => void | Promise<void>
 }
@@ -91,6 +93,7 @@ const DEFAULT_LABELS = {
   progress: "{n} of {total}",
   perform: "Do it for me",
   tryIt: "Try it: press the highlighted control.",
+  example: "This is an example: there are none right now.",
 }
 const labels = useLabels("tour", DEFAULT_LABELS, () => props.labels)
 

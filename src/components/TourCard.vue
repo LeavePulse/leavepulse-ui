@@ -9,7 +9,7 @@ defineProps<{
   index: number
   last: boolean
   progress: string
-  labels: { next: string; back: string; done: string; close: string; perform: string; tryIt: string }
+  labels: { next: string; back: string; done: string; close: string; perform: string; tryIt: string; example: string }
 }>()
 
 defineEmits<{
@@ -30,6 +30,7 @@ defineEmits<{
   <p v-if="step?.text" class="mt-1.5 text-muted">{{ step.text }}</p>
   <LpKeys v-if="step?.keys" :combo="step.keys" size="sm" class="mt-2" />
   <p v-if="step?.try" class="mt-2 text-xs text-brand">{{ labels.tryIt }}</p>
+  <p v-if="step?.example" class="mt-2 text-xs text-muted">{{ labels.example }}</p>
   <div class="mt-4 flex items-center justify-between gap-2">
     <span class="text-xs tabular-nums text-muted">{{ progress }}</span>
     <div class="flex gap-2">

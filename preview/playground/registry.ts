@@ -93,6 +93,7 @@ import {
   LpTour,
   LpHintLayer,
   LpHints,
+  LpHintExample,
   contextMenuTip,
   createHintSystem,
   HINT_SIGNALS,
@@ -2512,8 +2513,8 @@ export const registry: ComponentEntry[] = [
     id: "hints",
     name: "Hints",
     description:
-      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions. A feature that is absent right now (nothing flagged, nobody left) can pass `example`: the tour and \"what changed\" draw a sample for the step and remove it afterwards.",
-    components: { LpHints, LpButton, LpContextMenu },
+      "The whole onboarding in one component: hand <LpHints> a system made by createHintSystem (features tied to `v-hint` elements, the current page, a storage) and it offers a first-visit tour, shows quiet \"new\" dots, announces what changed and nudges toward unused features, spending one attention budget: at most one interruption per session, never over a dialog, while typing or right after navigation. State only climbs (seen, explained, used), so what someone uses is never explained again. A page met for the first time is baselined, so existing users do not get every control lit at rollout. Errors inside switch the layer off instead of breaking the page. Storage defaults to localStorage; pass your own to keep it per person on a server. Tips cover habits rather than features: contextMenuTip() speaks up for someone who keeps opening \"…\" menus marked `rightClickToo` but never right-clicks, paletteTip() for someone who walks the menu and never opens the palette; kit components report that usage themselves (HINT_SIGNALS). The command palette also lights up its Tab key for a user who never opened an item's actions. A feature that is absent right now (nothing flagged, nobody left) gets a sample the way LpSkeleton gets a layout: wrap the app's own markup with made-up data in <LpHintExample hint=\"id\">; it shows only while a tour step or \"what changed\" reaches that id with the real thing absent, eases in, is inert and tagged \"Example\", and leaves with the step. Nothing to add to the registry.",
+    components: { LpHints, LpButton, LpContextMenu, LpHintExample },
     state: () => {
       const storage = localHintStorage("lp-preview-hints")
       const features = {
@@ -2522,15 +2523,9 @@ export const registry: ComponentEntry[] = [
         "demo.archive": { page: "demo", order: 3, title: "Archive", text: "Done items live here.", rev: 1 },
         "demo.flagged": {
           page: "demo", order: 4, conditional: true, title: "Flagged", text: "A message someone marked for you shows up here.",
-          example: () => {
-            state.sample = true
-            return () => (state.sample = false)
-          },
         },
       }
-      const state = reactive({ sample: false })
       return reactive({
-        state,
         system: createHintSystem({
           features,
           pages: { demo: { title: "this demo" } },
@@ -2558,8 +2553,10 @@ export const registry: ComponentEntry[] = [
     <LpButton v-hint="'demo.inbox'" variant="outline" size="sm">Inbox</LpButton>
     <LpButton v-hint="'demo.compose'" variant="outline" size="sm">Compose</LpButton>
     <LpButton v-hint="'demo.archive'" variant="outline" size="sm">Archive</LpButton>
-    <LpButton v-if="state.sample" v-hint="'demo.flagged'" variant="outline" size="sm">Flagged (sample)</LpButton>
   </div>
+  <LpHintExample hint="demo.flagged">
+    <div class="w-72 rounded-control border border-line px-3 py-2 text-sm">Flagged: "Can you check the invoice?"</div>
+  </LpHintExample>
   <LpContextMenu :items="[{ label: 'Reply', icon: 'lucide:reply' }, { label: 'Archive', icon: 'lucide:archive' }]">
     <div class="w-72 rounded-control border border-line px-3 py-2 text-sm">A message row: it has a right-click menu</div>
   </LpContextMenu>
