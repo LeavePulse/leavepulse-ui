@@ -9,6 +9,7 @@ import {
   type InjectionKey,
   type MaybeRefOrGetter,
 } from "vue"
+import { pseudoLocalize, type PseudoOptions } from "./pseudoLocale"
 
 /*
  * App-wide kit configuration, said once at the root instead of on every call
@@ -33,6 +34,15 @@ export interface LpConfig {
    * desktop shell can hand in its own store. See `usePersisted`.
    */
   storage?: KitStorage
+  /**
+   * Show every kit label pseudo-localised ("Next" → "[Ñééẋţ]"): accented,
+   * about a third longer, and bracketed. A development switch for checking a
+   * screen before any translation exists: plain English left on it is text
+   * that never went through the labels, and anything clipped or overflowing
+   * will be in a real language too. `true` uses the defaults; an object tunes
+   * them (see `pseudoLocalize`).
+   */
+  pseudoLocale?: boolean | PseudoOptions
 }
 
 /**
@@ -82,6 +92,7 @@ export function mergeConfig(outer: LpConfig, inner: LpConfig): LpConfig {
     ...inner,
     linkComponent: inner.linkComponent ?? outer.linkComponent,
     storage: inner.storage ?? outer.storage,
+    pseudoLocale: inner.pseudoLocale ?? outer.pseudoLocale,
     labels,
   }
 }
@@ -101,7 +112,15 @@ export function useLabels<T extends LabelScope>(
   own?: () => Partial<T> | undefined,
 ): ComputedRef<T> {
   const config = useLpConfig()
-  return computed(() => ({ ...defaults, ...config.value.labels?.[scope], ...own?.() }) as T)
+  return computed(() => {
+    const labels = { ...defaults, ...config.value.labels?.[scope], ...own?.() } as T
+    const pseudo = config.value.pseudoLocale
+    if (!pseudo) return labels
+    const options = pseudo === true ? undefined : pseudo
+    return Object.fromEntries(
+      Object.entries(labels).map(([key, text]) => [key, typeof text === "string" ? pseudoLocalize(text, options) : text]),
+    ) as T
+  })
 }
 
 /** The link component to render for an internal destination. */

@@ -9,6 +9,7 @@ export default { inheritAttrs: false }
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
 import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { useFieldControl } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -85,11 +86,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       >
         <LpIcon :name="indeterminate ? 'lucide:minus' : 'lucide:check'" :size="13" :class="pending && 'opacity-0'" />
       </CheckboxIndicator>
-      <LpIcon
+      <!-- At once, since the check already gave way to it, and hidden from
+           screen readers: the box says aria-busy, and a "Loading…" inside it
+           would become part of its name. -->
+      <LpLoader
         v-if="pending"
-        name="lucide:loader-circle"
-        :size="12"
-        class="absolute animate-spin motion-reduce:animate-none"
+        size="inline"
+        :delay="0"
+        aria-hidden="true"
+        class="absolute text-[12px]"
         :class="modelValue ? 'text-ink-inverse' : 'text-muted'"
       />
     </CheckboxRoot>

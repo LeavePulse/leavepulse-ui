@@ -100,6 +100,69 @@
    }
   ]
  },
+ "LpActivityLine": {
+  "props": [
+   {
+    "name": "active",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Work is in flight. Going false finishes the line and fades it out."
+   },
+   {
+    "name": "value",
+    "type": "number | null | undefined",
+    "required": false,
+    "default": "null",
+    "description": "Known progress. Unset or null: the length of the work is unknown, and the line sweeps."
+   },
+   {
+    "name": "max",
+    "type": "number | undefined",
+    "required": false,
+    "default": "100"
+   },
+   {
+    "name": "tone",
+    "type": "MeterTone | undefined",
+    "required": false,
+    "default": "\"brand\""
+   },
+   {
+    "name": "placement",
+    "type": "\"top\" | \"bottom\" | \"inline\" | undefined",
+    "required": false,
+    "default": "\"top\"",
+    "description": "Where it lies. `top` and `bottom` are absolute, over the edge of the\nnearest positioned ancestor (give the card `relative`), so showing it\nmoves nothing; `inline` takes its own line in the flow.",
+    "choices": [
+     "top",
+     "bottom",
+     "inline"
+    ]
+   },
+   {
+    "name": "height",
+    "type": "number | undefined",
+    "required": false,
+    "default": "2",
+    "description": "Thickness in px."
+   },
+   {
+    "name": "delay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "150",
+    "description": "Ms to wait before showing. Work that finishes within it never shows the\nline at all: a flash of activity for a 90 ms request is noise."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ busy: string; }> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
  "LpAddressInput": {
   "props": [
    {
@@ -208,14 +271,14 @@
   "props": [
    {
     "name": "variant",
-    "type": "\"danger\" | \"info\" | \"success\" | \"warning\" | undefined",
+    "type": "\"danger\" | \"warning\" | \"info\" | \"success\" | undefined",
     "required": false,
     "default": "\"info\"",
     "choices": [
      "danger",
+     "warning",
      "info",
-     "success",
-     "warning"
+     "success"
     ]
    },
    {
@@ -240,7 +303,7 @@
     "type": "boolean | undefined",
     "required": false,
     "default": "false",
-    "description": "Work is under way: the icon becomes a spinning loader (unless `icon` is\ngiven, which then spins instead) and the alert is announced politely.\nA loader drawn as a still icon read as a frozen page."
+    "description": "Work is under way: the icon becomes LpLoader's spinner (unless `icon` is\ngiven, which then spins instead) and the alert is announced politely.\nA loader drawn as a still icon read as a frozen page."
    }
   ],
   "events": [],
@@ -546,6 +609,12 @@
     "description": "An icon shown while there is no picture, instead of initials. For things\nthat have no name worth abbreviating (a world, a mod, a file), where two\nletters read as noise. `fallback` text still wins when both are given."
    },
    {
+    "name": "identicon",
+    "type": "string | boolean | undefined",
+    "required": false,
+    "description": "Draw an identicon while there is no picture, instead of initials: a\npattern and colour derived from a string, so accounts that never set an\navatar still look different from each other. `true` derives it from\n`alt`; a string is the seed itself (an id outlives a rename). `fallback`\ntext and `icon` still win when given."
+   },
+   {
     "name": "size",
     "type": "\"md\" | \"sm\" | \"lg\" | \"xl\" | \"xs\" | undefined",
     "required": false,
@@ -609,14 +678,14 @@
   "props": [
    {
     "name": "tone",
-    "type": "\"danger\" | \"success\" | \"warning\" | \"neutral\" | \"brand\" | \"action\" | \"outline\" | undefined",
+    "type": "\"danger\" | \"brand\" | \"warning\" | \"neutral\" | \"success\" | \"action\" | \"outline\" | undefined",
     "required": false,
     "choices": [
      "danger",
-     "success",
+     "brand",
      "warning",
      "neutral",
-     "brand",
+     "success",
      "action",
      "outline"
     ]
@@ -935,6 +1004,18 @@
     "type": "string | undefined",
     "required": false,
     "description": "Width of the `accent` stripe."
+   },
+   {
+    "name": "spotlight",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A soft glow follows the mouse inside the card. For a grid of cards the\nuser scans with the pointer (a launcher's library, a gallery of builds):\nthe lit one is the one about to be clicked. Same effect as LpSpotlight."
+   },
+   {
+    "name": "glow",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A gradient runs round the edge — for the one card that must be noticed\nfirst (\"new\", \"recommended\"). Same effect as LpGlowBorder; static where\nthe browser cannot animate it, still under reduced motion."
    }
   ],
   "events": [],
@@ -1329,6 +1410,190 @@
   ],
   "slots": []
  },
+ "LpCodeDisplay": {
+  "props": [
+   {
+    "name": "code",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "groups",
+    "type": "number | number[] | undefined",
+    "required": false,
+    "description": "One size for every group, or exact sizes in order. Unset picks 3s or 4s by length."
+   },
+   {
+    "name": "separator",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"\"",
+    "description": "Drawn between groups: `\"\"` (a gap, the default), `\"-\"`, `\"·\"`, `\" \"`."
+   },
+   {
+    "name": "copyAs",
+    "type": "\"raw\" | \"grouped\" | undefined",
+    "required": false,
+    "default": "\"raw\"",
+    "description": "Copy with separators (`grouped`) or the characters alone (`raw`, default).",
+    "choices": [
+     "raw",
+     "grouped"
+    ]
+   },
+   {
+    "name": "masked",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Hidden until revealed (v-model:revealed). Copy still works while hidden."
+   },
+   {
+    "name": "copyable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "expiresAt",
+    "type": "string | number | Date | undefined",
+    "required": false,
+    "description": "When the code stops working; shows a countdown."
+   },
+   {
+    "name": "issuedAt",
+    "type": "string | number | Date | undefined",
+    "required": false,
+    "description": "When it was issued, for the countdown bar's full length. Unset, the bar\nstarts full at the moment it first appears."
+   },
+   {
+    "name": "ack",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Add the \"I've saved this\" confirmation (v-model:saved)."
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "labels",
+    "type": "Partial<CodeDisplayLabels> | undefined",
+    "required": false
+   },
+   {
+    "name": "revealed",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   },
+   {
+    "name": "saved",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   }
+  ],
+  "events": [
+   {
+    "name": "copied",
+    "type": "[text: string]"
+   },
+   {
+    "name": "expired",
+    "type": "[]"
+   },
+   {
+    "name": "update:revealed",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "update:saved",
+    "type": "[value: boolean]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "expiry",
+    "type": "{ remaining: number; formatted: string; expired: boolean; fraction: number; }"
+   }
+  ]
+ },
+ "LpCollapse": {
+  "props": [
+   {
+    "name": "axis",
+    "type": "\"width\" | \"height\" | \"both\" | undefined",
+    "required": false,
+    "default": "\"height\"",
+    "description": "Which dimension folds: `height` for a section, `width` for a side panel or a toolbar group, `both` for a corner pop-out.",
+    "choices": [
+     "width",
+     "height",
+     "both"
+    ]
+   },
+   {
+    "name": "fade",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Fade the content along with the fold, so it does not show sliced while the box is small."
+   },
+   {
+    "name": "keepMounted",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Keep the content in the DOM while closed (hidden), so its state survives:\na half-filled form, a scroll position, a playing preview. Off, it is\nunmounted once folded away, like `v-if`."
+   },
+   {
+    "name": "lazy",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "With `keepMounted`, do not mount the content until it is first opened: an expensive body costs nothing until asked for."
+   },
+   {
+    "name": "duration",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Length of the fold in ms. Defaults to the kit's `--duration-medium`."
+   },
+   {
+    "name": "open",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "opened",
+    "type": "[]"
+   },
+   {
+    "name": "closed",
+    "type": "[]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpColorPicker": {
   "props": [
    {
@@ -1400,13 +1665,13 @@
    },
    {
     "name": "side",
-    "type": "\"bottom\" | \"top\" | \"right\" | \"left\" | undefined",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
     "required": false,
     "default": "\"bottom\"",
     "description": "Popover side, as LpPopover.",
     "choices": [
-     "bottom",
      "top",
+     "bottom",
      "right",
      "left"
     ]
@@ -1799,6 +2064,246 @@
    }
   ]
  },
+ "LpCopyButton": {
+  "props": [
+   {
+    "name": "value",
+    "type": "CopyValue",
+    "required": true,
+    "description": "The text to copy, or a (possibly async) function that returns it on click."
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | \"xs\" | undefined",
+    "required": false,
+    "default": "\"sm\"",
+    "description": "LpButton's sizes, so it sits in a toolbar of buttons at the same height.",
+    "choices": [
+     "md",
+     "sm",
+     "lg",
+     "xs"
+    ]
+   },
+   {
+    "name": "iconSize",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Glyph size in px, for a toolbar whose other icons are drawn at their\nown size (the lightbox's 18px row). Defaults to what suits `size`."
+   },
+   {
+    "name": "variant",
+    "type": "\"soft\" | \"action\" | \"outline\" | \"solid\" | \"ghost\" | \"muted\" | undefined",
+    "required": false,
+    "default": "\"ghost\"",
+    "description": "LpButton's look. `ghost` by default: a copy button is a helper beside something, not a call to action.",
+    "choices": [
+     "soft",
+     "action",
+     "outline",
+     "solid",
+     "ghost",
+     "muted"
+    ]
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Visible text beside the icon. Without it the button is a square icon\nbutton and the tip names it."
+   },
+   {
+    "name": "toast",
+    "type": "string | false | undefined",
+    "required": false,
+    "default": "false",
+    "description": "A toast on success too, for a copy whose button is about to leave the screen (a menu, a closing dialog)."
+   },
+   {
+    "name": "copied",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Show the tick now, for a copy made some other way: a Ctrl+C shortcut on\nthe row, a \"Copy\" item in its menu. The button then confirms it too, so\nthere is one place that says the clipboard holds this value."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "side",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
+    "required": false,
+    "default": "\"top\"",
+    "description": "Where the tip opens.",
+    "choices": [
+     "top",
+     "bottom",
+     "right",
+     "left"
+    ]
+   },
+   {
+    "name": "labels",
+    "type": "Partial<CopyButtonLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "error",
+    "type": "[error: unknown]"
+   },
+   {
+    "name": "copied",
+    "type": "[text: string, blob?: Blob | undefined]"
+   }
+  ],
+  "slots": []
+ },
+ "LpCountdown": {
+  "props": [
+   {
+    "name": "to",
+    "type": "string | number | Date | undefined",
+    "required": false,
+    "description": "The moment to count down to. Takes precedence over `seconds`."
+   },
+   {
+    "name": "seconds",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Count down this many seconds from when the countdown mounts — or from\nwhen this value changes, or `restart()` is called. For \"try again in 45\ns\", where the app has a wait rather than a moment."
+   },
+   {
+    "name": "from",
+    "type": "string | number | Date | undefined",
+    "required": false,
+    "description": "`to` only: when the wait began, so the ring or bar can show how much of\nit is left. Without it a `to` countdown draws no progress."
+   },
+   {
+    "name": "format",
+    "type": "TimeFormat | undefined",
+    "required": false,
+    "default": "\"auto\"",
+    "description": "`auto` is a clock under an hour and units above it."
+   },
+   {
+    "name": "places",
+    "type": "number | undefined",
+    "required": false,
+    "default": "2",
+    "description": "Units format: how many places to keep (\"2d 3h\" is 2)."
+   },
+   {
+    "name": "paused",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Freeze the count. A `seconds` countdown resumes where it stopped; a `to`\ncountdown is tied to a real moment, so it resumes at the true time left."
+   },
+   {
+    "name": "progress",
+    "type": "\"ring\" | \"bar\" | undefined",
+    "required": false,
+    "description": "Draw the time left as a ring around the digits, or a bar under them.",
+    "choices": [
+     "ring",
+     "bar"
+    ]
+   },
+   {
+    "name": "ringSize",
+    "type": "number | undefined",
+    "required": false,
+    "default": "56",
+    "description": "Ring only: outer diameter in px."
+   },
+   {
+    "name": "urgentAt",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Seconds left at which it turns danger: the end is close enough to act on."
+   },
+   {
+    "name": "announce",
+    "type": "boolean | number[] | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Announce the time left at these marks (ms remaining) and at the end.\n`false` keeps it silent apart from what the timer role itself offers."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<CountdownLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "done",
+    "type": "[]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "done",
+    "type": "any",
+    "description": "Replaces the digits once the time is up: a \"Resend\" button, \"Live now\"."
+   }
+  ]
+ },
+ "LpDataList": {
+  "props": [
+   {
+    "name": "items",
+    "type": "DataListItem[]",
+    "required": true
+   },
+   {
+    "name": "layout",
+    "type": "\"stacked\" | \"auto\" | \"horizontal\" | undefined",
+    "required": false,
+    "default": "\"auto\"",
+    "description": "`auto` (default) is side by side, stacking when the list itself is\nnarrower than ~20rem. `horizontal` and `stacked` fix one.",
+    "choices": [
+     "stacked",
+     "auto",
+     "horizontal"
+    ]
+   },
+   {
+    "name": "divided",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Hairlines between rows, for a long list read as a table."
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm"
+    ]
+   },
+   {
+    "name": "labels",
+    "type": "Partial<DataListLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "value",
+    "type": "{ item: DataListItem; value: string | number | null | undefined; }"
+   },
+   {
+    "name": "label",
+    "type": "{ item: DataListItem; }"
+   }
+  ]
+ },
  "LpDatePicker": {
   "props": [
    {
@@ -2078,6 +2583,84 @@
    {
     "name": "default",
     "type": "{}"
+   }
+  ]
+ },
+ "LpDock": {
+  "props": [
+   {
+    "name": "items",
+    "type": "DockItem[]",
+    "required": true
+   },
+   {
+    "name": "active",
+    "type": "string | string[] | undefined",
+    "required": false,
+    "description": "Ids marked with a dot: running, open, or the current section."
+   },
+   {
+    "name": "orientation",
+    "type": "\"horizontal\" | \"vertical\" | undefined",
+    "required": false,
+    "default": "\"horizontal\"",
+    "description": "Lay the bar out in a row or a column.",
+    "choices": [
+     "horizontal",
+     "vertical"
+    ]
+   },
+   {
+    "name": "size",
+    "type": "number | undefined",
+    "required": false,
+    "default": "44",
+    "description": "Resting icon size in px."
+   },
+   {
+    "name": "magnify",
+    "type": "number | undefined",
+    "required": false,
+    "default": "72",
+    "description": "Size of the icon right under the pointer, in px. Equal to `size` turns magnification off."
+   },
+   {
+    "name": "reach",
+    "type": "number | undefined",
+    "required": false,
+    "default": "150",
+    "description": "How far, in px, the swell reaches to either side of the pointer."
+   },
+   {
+    "name": "tooltipSide",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
+    "required": false,
+    "description": "Which side the tooltips open on; defaults to away from the bar's edge.",
+    "choices": [
+     "top",
+     "bottom",
+     "right",
+     "left"
+    ]
+   },
+   {
+    "name": "focusAt",
+    "type": "number | null | undefined",
+    "required": false,
+    "default": "null",
+    "description": "Drive the swell from outside — a pointer position along the bar, in px\nfrom its start. For demos and guided tours; `null` hands it back to the\npointer."
+   }
+  ],
+  "events": [
+   {
+    "name": "select",
+    "type": "[id: string, item: DockItem]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "icon",
+    "type": "{ item: DockItem; active: boolean; }"
    }
   ]
  },
@@ -2449,6 +3032,114 @@
    }
   ]
  },
+ "LpEditable": {
+  "props": [
+   {
+    "name": "modelValue",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"\""
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "What the text is, for assistive tech (\"Server name\")."
+   },
+   {
+    "name": "placeholder",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Shown when the text is empty; clicking it starts editing."
+   },
+   {
+    "name": "multiline",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A textarea; Enter adds a line and Ctrl/⌘+Enter commits."
+   },
+   {
+    "name": "save",
+    "type": "((value: string) => unknown) | undefined",
+    "required": false,
+    "description": "Persists the new text. May be async and may throw: a throw reopens the\nfield with the typed text and shows the error's message."
+   },
+   {
+    "name": "validate",
+    "type": "((value: string) => string | true | void | null | undefined) | undefined",
+    "required": false,
+    "description": "Checks the text before saving. Return an error message to refuse it\n(the field stays open with the message under it), anything else to accept."
+   },
+   {
+    "name": "trim",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Trim spaces around the text on commit."
+   },
+   {
+    "name": "required",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Refuse an empty commit (with the `required` message) instead of saving \"\"."
+   },
+   {
+    "name": "maxlength",
+    "type": "number | undefined",
+    "required": false
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "readonly",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Shown as text, never editable — for a viewer without the right to change it."
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "labels",
+    "type": "Partial<EditableLabels & { required: string; }> | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "cancel",
+    "type": "[]"
+   },
+   {
+    "name": "update:modelValue",
+    "type": "[value: string]"
+   },
+   {
+    "name": "edit",
+    "type": "[]"
+   },
+   {
+    "name": "error",
+    "type": "[error: unknown]"
+   },
+   {
+    "name": "saved",
+    "type": "[value: string]"
+   }
+  ],
+  "slots": []
+ },
  "LpEmptyState": {
   "props": [
    {
@@ -2818,6 +3509,179 @@
    }
   ]
  },
+ "LpGauge": {
+  "props": [
+   {
+    "name": "value",
+    "type": "number",
+    "required": true
+   },
+   {
+    "name": "min",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0"
+   },
+   {
+    "name": "max",
+    "type": "number | undefined",
+    "required": false,
+    "default": "100"
+   },
+   {
+    "name": "thresholds",
+    "type": "MeterThreshold[] | undefined",
+    "required": false,
+    "description": "Steps of the scale, in the gauge's own units: from each `at` upward the\narc takes that tone. Unset, the capacity scale applies (warning from 80%\nof the range, danger from 90%), which is what a resource gauge wants. A\nscore where higher is better lists its own steps:\n`[{ at: 0, tone: 'danger' }, { at: 50, tone: 'warning' }, { at: 80, tone: 'ok' }]`."
+   },
+   {
+    "name": "tone",
+    "type": "MeterTone | undefined",
+    "required": false,
+    "description": "A fixed tone instead of the scale. For a gauge whose reading is neither\ngood nor bad (a temperature, a position), where colouring it by\nthresholds would invent a judgement."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "What is measured, printed under the figure (\"CPU\", \"Disk\"). Also the accessible name."
+   },
+   {
+    "name": "unit",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Printed after the figure, smaller (\"%\", \"°C\", \"ms\")."
+   },
+   {
+    "name": "decimals",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0",
+    "description": "Decimal places of the figure."
+   },
+   {
+    "name": "format",
+    "type": "((value: number) => string) | undefined",
+    "required": false,
+    "description": "Says the figure differently (\"1.2k\", \"3/8\"). Overrides `decimals`; the\nfigure still rolls, since the formatted string is what LpNumberFlow animates."
+   },
+   {
+    "name": "variant",
+    "type": "\"full\" | \"semi\" | undefined",
+    "required": false,
+    "default": "\"semi\"",
+    "description": "`semi` (default) sweeps across the top; `full` is a 270° dial open at the bottom.",
+    "choices": [
+     "full",
+     "semi"
+    ]
+   },
+   {
+    "name": "size",
+    "type": "number | undefined",
+    "required": false,
+    "default": "160",
+    "description": "Width in px. The height follows from the shape."
+   },
+   {
+    "name": "thickness",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Arc thickness in px. Defaults to a share of `size`."
+   },
+   {
+    "name": "showRange",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Print `min` and `max` under the ends of the arc. On by default for `semi`, where they sit naturally."
+   },
+   {
+    "name": "showThresholds",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Notch the track where each threshold starts, so the reader sees how far the next step is."
+   },
+   {
+    "name": "animateOnMount",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Sweep up from the floor when first seen, instead of appearing already\nat the reading. Later changes always ease from where the needle is."
+   },
+   {
+    "name": "duration",
+    "type": "number | undefined",
+    "required": false,
+    "default": "900",
+    "description": "Sweep length in ms, shared by the arc and the figure."
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<GaugeLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpGlowBorder": {
+  "props": [
+   {
+    "name": "from",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Leading colour of the gradient. Defaults to the brand colour."
+   },
+   {
+    "name": "to",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Trailing colour of the gradient. Defaults to the action colour."
+   },
+   {
+    "name": "width",
+    "type": "number | undefined",
+    "required": false,
+    "default": "1.5",
+    "description": "Ring thickness in px."
+   },
+   {
+    "name": "speed",
+    "type": "number | undefined",
+    "required": false,
+    "default": "4",
+    "description": "Seconds per revolution. Slower reads as calm, faster as urgent."
+   },
+   {
+    "name": "active",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Light the ring. Off keeps the wrapper (so the layout does not change when\nan item stops being \"new\") and removes only the ring."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"div\"",
+    "description": "Element to render as."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpHintExample": {
   "props": [
    {
@@ -2883,7 +3747,7 @@
   "props": [
    {
     "name": "system",
-    "type": "{ state: { records: Map<string, { state: HintLevel; dismissed: boolean; count: number; assigned?: boolean | undefined; updatedAt: string; }> & Omit<Map<string, HintRecord>, keyof Map<any, any>>; loaded: boolean; page: string; overlay: string | null; tour: { open: boolean; step: number; steps: { target?: string | Element | (() => Element | null) | undefined; title: string; text?: string | undefined; keys?: string | undefined; side?: \"bottom\" | \"top\" | \"right\" | \"left\" | undefined; try?: boolean | undefined; perform?: (() => void | Promise<void>) | undefined; example?: boolean | undefined; hint?: string | undefined; enter?: ((context: TourContext) => void | Promise<void>) | undefined; }[]; ids: string[]; page: string; }; offer: { kind: \"tour\" | \"assigned\"; page: string; } | { kind: \"news\"; page: string; items: { id: string; date: string; page: string; text: string; feature?: string | undefined; }[]; } | { kind: \"nudge\"; page: string; nudge: { id: string; feature: string; text: string; }; } | { kind: \"tip\"; page: string; tip: { id: string; title: string; text: string; keys?: string | undefined; max?: number | undefined; when: (count: (signal: string) => number) => boolean; step?: (() => TourStep | null) | undefined; }; step: { target?: string | Element | (() => Element | null) | undefined; title: string; text?: string | undefined; keys?: string | undefined; side?: \"bottom\" | \"top\" | \"right\" | \"left\" | undefined; try?: boolean | undefined; perform?: (() => void | Promise<void>) | undefined; example?: boolean | undefined; hint?: string | undefined; enter?: ((context: TourContext) => void | Promise<void>) | undefined; } | null; } | null; candidate: { id: string; feature: string; text: string; page: string; } | null; settledAt: number; intent: boolean; }; fresh: ComputedRef<string[]>; notes: ComputedRef<Record<string, HintNote>>; start: () => void; stop: () => void; hasTour: (page?: string) => boolean; startTour: (page?: string, only?: string[] | undefined) => void; load(): Promise<void>; nudge(n: HintNudge): void; overlay(page: string | null): void; count: (name: string) => number; markIntent(): void; unreadNews: (page?: string | undefined) => HintNews[]; readNews: (page: string) => void; showNews: (id: string) => void; pageTitle: (page: string) => string; readFresh(id: string): void; tourShown(index: number): void; tourEnded(finished: boolean): void; answer(choice: \"show\" | \"later\" | \"never\"): void; }",
+    "type": "{ state: { records: Map<string, { state: HintLevel; dismissed: boolean; count: number; assigned?: boolean | undefined; updatedAt: string; }> & Omit<Map<string, HintRecord>, keyof Map<any, any>>; loaded: boolean; page: string; overlay: string | null; tour: { open: boolean; step: number; steps: { target?: string | Element | (() => Element | null) | undefined; title: string; text?: string | undefined; keys?: string | undefined; side?: \"top\" | \"bottom\" | \"right\" | \"left\" | undefined; try?: boolean | undefined; perform?: (() => void | Promise<void>) | undefined; example?: boolean | undefined; hint?: string | undefined; enter?: ((context: TourContext) => void | Promise<void>) | undefined; }[]; ids: string[]; page: string; }; offer: { kind: \"tour\" | \"assigned\"; page: string; } | { kind: \"news\"; page: string; items: { id: string; date: string; page: string; text: string; feature?: string | undefined; }[]; } | { kind: \"nudge\"; page: string; nudge: { id: string; feature: string; text: string; }; } | { kind: \"tip\"; page: string; tip: { id: string; title: string; text: string; keys?: string | undefined; max?: number | undefined; when: (count: (signal: string) => number) => boolean; step?: (() => TourStep | null) | undefined; }; step: { target?: string | Element | (() => Element | null) | undefined; title: string; text?: string | undefined; keys?: string | undefined; side?: \"top\" | \"bottom\" | \"right\" | \"left\" | undefined; try?: boolean | undefined; perform?: (() => void | Promise<void>) | undefined; example?: boolean | undefined; hint?: string | undefined; enter?: ((context: TourContext) => void | Promise<void>) | undefined; } | null; } | null; candidate: { id: string; feature: string; text: string; page: string; } | null; settledAt: number; intent: boolean; }; fresh: ComputedRef<string[]>; notes: ComputedRef<Record<string, HintNote>>; start: () => void; stop: () => void; hasTour: (page?: string) => boolean; startTour: (page?: string, only?: string[] | undefined) => void; load(): Promise<void>; nudge(n: HintNudge): void; overlay(page: string | null): void; count: (name: string) => number; markIntent(): void; unreadNews: (page?: string | undefined) => HintNews[]; readNews: (page: string) => void; showNews: (id: string) => void; pageTitle: (page: string) => string; readFresh(id: string): void; tourShown(index: number): void; tourEnded(finished: boolean): void; answer(choice: \"show\" | \"later\" | \"never\"): void; }",
     "required": true
    },
    {
@@ -2894,6 +3758,113 @@
   ],
   "events": [],
   "slots": []
+ },
+ "LpHoverCard": {
+  "props": [
+   {
+    "name": "side",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
+    "required": false,
+    "default": "\"bottom\"",
+    "choices": [
+     "top",
+     "bottom",
+     "right",
+     "left"
+    ]
+   },
+   {
+    "name": "align",
+    "type": "\"center\" | \"start\" | \"end\" | undefined",
+    "required": false,
+    "default": "\"center\"",
+    "choices": [
+     "center",
+     "start",
+     "end"
+    ]
+   },
+   {
+    "name": "sideOffset",
+    "type": "number | undefined",
+    "required": false,
+    "default": "8"
+   },
+   {
+    "name": "openDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "500",
+    "description": "Milliseconds the pointer rests before the card opens. Longer than a\ntooltip's on purpose: a card is big, and one that opens while the\npointer is only passing by covers what the reader was heading for."
+   },
+   {
+    "name": "closeDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "200",
+    "description": "Milliseconds after the pointer leaves before it closes: room to cross the gap to the card."
+   },
+   {
+    "name": "arrow",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "A small pointer from the card to its trigger, for a trigger in a dense row where the card could belong to a neighbour."
+   },
+   {
+    "name": "touch",
+    "type": "\"none\" | \"hold\" | undefined",
+    "required": false,
+    "default": "\"hold\"",
+    "description": "Touch: `hold` opens on press-and-hold; `none` leaves touch to the trigger.",
+    "choices": [
+     "none",
+     "hold"
+    ]
+   },
+   {
+    "name": "holdDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "450",
+    "description": "How long a touch must be held to open, in ms."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Turn the card off: the trigger stays and behaves as itself."
+   },
+   {
+    "name": "panelClass",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Extra classes for the card (width, padding). Merged, so `w-80 p-0` replaces the defaults."
+   },
+   {
+    "name": "open",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[value: boolean]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "trigger",
+    "type": "{}"
+   },
+   {
+    "name": "default",
+    "type": "{ close: () => boolean; }"
+   }
+  ]
  },
  "LpIcon": {
   "props": [
@@ -2912,11 +3883,54 @@
   "events": [],
   "slots": []
  },
+ "LpIdenticon": {
+  "props": [
+   {
+    "name": "seed",
+    "type": "string",
+    "required": true,
+    "description": "What the picture is derived from. Use something stable: an id outlives a renamed username."
+   },
+   {
+    "name": "grid",
+    "type": "number | undefined",
+    "required": false,
+    "default": "5",
+    "description": "Cells per side: 5 is the familiar look, 7 gives busier shapes for large sizes."
+   },
+   {
+    "name": "background",
+    "type": "\"none\" | \"tint\" | undefined",
+    "required": false,
+    "default": "\"tint\"",
+    "description": "`tint` lays a pale wash of the shape's own hue behind it, mixed into the\ntheme's soft surface so it sits right on dark and light alike; `none`\nleaves the box behind it showing.",
+    "choices": [
+     "none",
+     "tint"
+    ]
+   },
+   {
+    "name": "padding",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.14",
+    "description": "Empty margin around the grid as a share of the side; more for a round crop."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Accessible name. Unset, the picture is decorative: the name is usually written next to it."
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
  "LpImageEditor": {
   "props": [
    {
     "name": "file",
-    "type": "string | File | Blob",
+    "type": "string | Blob | File",
     "required": true,
     "description": "The picture to work on: a file, or an http(s)/data address."
    },
@@ -3294,12 +4308,12 @@
    },
    {
     "name": "tone",
-    "type": "\"soft\" | \"brand\" | \"muted\" | \"ink\" | undefined",
+    "type": "\"brand\" | \"soft\" | \"muted\" | \"ink\" | undefined",
     "required": false,
     "description": "\"brand\" — the accent link colour (default).\n\"ink\"   — inherits body text colour; for links that sit inside prose or\n  chrome where an accent would shout (breadcrumbs, footers, nav).\n\"muted\" / \"soft\" — progressively quieter, both resolving to ink on hover.",
     "choices": [
-     "soft",
      "brand",
+     "soft",
      "muted",
      "ink"
     ]
@@ -3332,6 +4346,77 @@
      "group",
      "self"
     ]
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
+ "LpLoader": {
+  "props": [
+   {
+    "name": "variant",
+    "type": "LoaderVariant | undefined",
+    "required": false,
+    "default": "\"spinner\"",
+    "description": "`spinner` for a spot (a button, a row, a field); `dots` for something\nconversational (typing, connecting); `bar` for a region across its width\n(the top of a card or a page)."
+   },
+   {
+    "name": "size",
+    "type": "LoaderSize | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "description": "`inline` sizes the mark from the font (a 1em spinner), so it fits a\nbutton or a line of text at whatever size that text is."
+   },
+   {
+    "name": "tone",
+    "type": "LoaderTone | undefined",
+    "required": false,
+    "default": "\"current\"",
+    "description": "`current` takes the surrounding text colour, which is what a loader\ninside a button or a coloured badge wants; the others pin a kit tone."
+   },
+   {
+    "name": "active",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Whether work is under way. Off, the loader is not shown (or, with a\ndefault slot, the content is). Leave it on and mount the loader with\n`v-if` when it has nothing to swap with."
+   },
+   {
+    "name": "delay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "150",
+    "description": "Ms of loading before anything appears. Most requests finish inside 150\nms; a spinner for those is a blink, not information. 0 shows at once —\nthe right call where the trigger already acknowledged the click (a\nbutton that faded its label)."
+   },
+   {
+    "name": "minVisible",
+    "type": "number | undefined",
+    "required": false,
+    "default": "400",
+    "description": "Ms the loader stays once shown, so a load ending just after it appeared does not blink it away."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Visible text beside the indicator. Without it the indicator is still\nannounced, with the `loading` label, to screen readers only."
+   },
+   {
+    "name": "track",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Spinner only: draw the faint full circle the arc runs along."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<LoaderLabels> | undefined",
+    "required": false
    }
   ],
   "events": [],
@@ -3510,6 +4595,38 @@
   ],
   "slots": []
  },
+ "LpMagnetic": {
+  "props": [
+   {
+    "name": "reach",
+    "type": "number | undefined",
+    "required": false,
+    "default": "60",
+    "description": "How far past the element's edge, in px, the pull is felt."
+   },
+   {
+    "name": "strength",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.25",
+    "description": "Fraction of the pointer's distance the element travels, 0–1. Small is better."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Keep the wrapper, turn the pull off."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpMapPicker": {
   "props": [
    {
@@ -3593,6 +4710,61 @@
   ],
   "slots": []
  },
+ "LpMasonry": {
+  "props": [
+   {
+    "name": "items",
+    "type": "T[]",
+    "required": true
+   },
+   {
+    "name": "itemKey",
+    "type": "keyof T | ((item: T, index: number) => string | number) | undefined",
+    "required": false,
+    "description": "Field (or function) giving each item a stable identity, so it keeps its element across changes."
+   },
+   {
+    "name": "columns",
+    "type": "number | Record<number, number> | undefined",
+    "required": false,
+    "description": "Fixed column count, or a table of minimum container widths to counts\n(`{ 0: 1, 560: 2, 900: 3 }`). Omit to fit as many `minColumnWidth`\ncolumns as the container allows — the right default, because a masonry\nusually lives in a panel whose width the viewport does not decide."
+   },
+   {
+    "name": "minColumnWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "240",
+    "description": "Narrowest a column may get when the count is derived from the width."
+   },
+   {
+    "name": "maxColumns",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Upper bound for the derived count."
+   },
+   {
+    "name": "gap",
+    "type": "number | undefined",
+    "required": false,
+    "default": "16",
+    "description": "Space between items, in px, both ways."
+   },
+   {
+    "name": "entrance",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Play the entrance when the block is first seen. Off shows it as is."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{ item: T; index: number; }"
+   }
+  ]
+ },
  "LpMediaGallery": {
   "props": [
    {
@@ -3610,21 +4782,21 @@
    },
    {
     "name": "gap",
-    "type": "0 | 1 | 2 | 3 | 4 | 0.5 | 1.5 | undefined",
+    "type": "0 | 1 | 2 | 3 | 4 | 1.5 | 0.5 | undefined",
     "required": false,
     "default": "2",
     "description": "Space between thumbnails, as a Tailwind gap step."
    },
    {
     "name": "aspect",
-    "type": "\"square\" | \"video\" | \"auto\" | undefined",
+    "type": "\"square\" | \"auto\" | \"video\" | undefined",
     "required": false,
     "default": "\"square\"",
     "description": "Shape of each cell. `auto` lets the image decide its own height.",
     "choices": [
      "square",
-     "video",
-     "auto"
+     "auto",
+     "video"
     ]
    },
    {
@@ -4597,17 +5769,32 @@
     "name": "labels",
     "type": "Partial<PasswordInputLabels> | undefined",
     "required": false
+   },
+   {
+    "name": "visible",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Whether the text shows; bind it to reveal or hide from outside."
    }
   ],
   "events": [
    {
     "name": "update:modelValue",
     "type": "[value: string]"
+   },
+   {
+    "name": "update:visible",
+    "type": "[value: boolean]"
    }
   ],
   "slots": [
    {
     "name": "leading",
+    "type": "{}"
+   },
+   {
+    "name": "actions",
     "type": "{}"
    }
   ]
@@ -4895,16 +6082,93 @@
    }
   ]
  },
+ "LpPipeline": {
+  "props": [
+   {
+    "name": "steps",
+    "type": "PipelineStep[]",
+    "required": true
+   },
+   {
+    "name": "orientation",
+    "type": "\"horizontal\" | \"vertical\" | undefined",
+    "required": false,
+    "default": "\"vertical\"",
+    "description": "`vertical` (default) is the job list: room for descriptions, durations\nand folded sub-steps. `horizontal` is the strip across a card or a\nheader, where the run is read at a glance.",
+    "choices": [
+     "horizontal",
+     "vertical"
+    ]
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Smaller marks, no descriptions. Horizontal and compact is marks and\nlines only, each step named in a tooltip — a run in a table cell."
+   },
+   {
+    "name": "numbered",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Number the pending marks, for a run whose order is part of its meaning."
+   },
+   {
+    "name": "follow",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Keep the current step (see `currentStepIndex`) scrolled into view as the\nrun advances: a long job list, or a horizontal strip wider than its box."
+   },
+   {
+    "name": "autoExpand",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Open a step on its own when it starts running or fails, if it has\nsomething inside, and fold it again when it passes. That is the step the\nviewer would open next anyway; a step the viewer opened stays open."
+   },
+   {
+    "name": "announce",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Announce status changes to screen readers. A nested pipeline turns it off so its parent speaks once."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<PipelineLabels> | undefined",
+    "required": false
+   },
+   {
+    "name": "expanded",
+    "type": "string[] | undefined",
+    "required": false,
+    "default": "[]",
+    "description": "Keys of the open steps. Works uncontrolled; bind it to keep it in the app."
+   }
+  ],
+  "events": [
+   {
+    "name": "update:expanded",
+    "type": "[value: string[]]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "detail",
+    "type": "{ step: PipelineStep; index: number; }",
+    "description": "Inside an expanded step, under its sub-steps: a log tail, a link to the run, an error."
+   }
+  ]
+ },
  "LpPopover": {
   "props": [
    {
     "name": "side",
-    "type": "\"bottom\" | \"top\" | \"right\" | \"left\" | undefined",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
     "required": false,
     "default": "\"bottom\"",
     "choices": [
-     "bottom",
      "top",
+     "bottom",
      "right",
      "left"
     ]
@@ -5059,6 +6323,80 @@
     "required": false,
     "default": "900",
     "description": "How long the fill takes, in ms. The counter in a ring matches it."
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpQuota": {
+  "props": [
+   {
+    "name": "used",
+    "type": "number",
+    "required": true
+   },
+   {
+    "name": "limit",
+    "type": "number | null | undefined",
+    "required": false,
+    "default": "null",
+    "description": "Unset, zero or Infinity means unlimited: the reading stays, the bar and \"left\" go."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "What is counted (\"Storage\", \"Seats\"). Also the accessible name."
+   },
+   {
+    "name": "unit",
+    "type": "QuotaUnit | undefined",
+    "required": false,
+    "description": "`\"bytes\"`, a plain suffix (\"seats\"), or a formatter. See `formatAmount`."
+   },
+   {
+    "name": "parts",
+    "type": "QuotaPart[] | undefined",
+    "required": false,
+    "description": "What the used amount is made of. The bar stacks them and a legend names\nthem; their sum need not equal `used` (a part can be left unlisted), but\nthe bar shows the parts, so list them all if the bar should add up."
+   },
+   {
+    "name": "warnAt",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.8",
+    "description": "Share of the limit (0–1) where the quota turns warning."
+   },
+   {
+    "name": "dangerAt",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.95",
+    "description": "Share of the limit where it turns danger. Over the limit is always danger."
+   },
+   {
+    "name": "hideLegend",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Hide the legend under a stacked bar, for a compact row where the tooltip of the page says enough."
+   },
+   {
+    "name": "animateOnMount",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Fill from empty when first seen."
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<QuotaLabels> | undefined",
+    "required": false
    }
   ],
   "events": [],
@@ -5257,6 +6595,50 @@
   ],
   "slots": []
  },
+ "LpRelativeTime": {
+  "props": [
+   {
+    "name": "date",
+    "type": "string | number | Date",
+    "required": true,
+    "description": "A Date, an ISO string or epoch milliseconds."
+   },
+   {
+    "name": "format",
+    "type": "Intl.RelativeTimeFormatStyle | undefined",
+    "required": false,
+    "default": "\"long\"",
+    "description": "Intl's width: `long` \"3 minutes ago\", `short` \"3 min. ago\", `narrow` \"3m ago\"."
+   },
+   {
+    "name": "nowWithin",
+    "type": "number | undefined",
+    "required": false,
+    "default": "45000",
+    "description": "Within this many ms of now it reads \"now\" rather than counting seconds."
+   },
+   {
+    "name": "tooltip",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Show the exact date on hover and focus. Off, it moves to the native\n`title` instead, for a dense log where tooltips would get in the way of\nreading; it is never shown both ways at once, which would stack two\nhints on one hover."
+   },
+   {
+    "name": "absolute",
+    "type": "Intl.DateTimeFormatOptions | undefined",
+    "required": false,
+    "description": "How the exact date is written. Defaults to the full date with the time."
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
  "LpRepeater": {
   "props": [
    {
@@ -5307,6 +6689,80 @@
    {
     "name": "empty",
     "type": "any"
+   }
+  ]
+ },
+ "LpRevealOnScroll": {
+  "props": [
+   {
+    "name": "preset",
+    "type": "RevealPreset | undefined",
+    "required": false,
+    "default": "\"rise\"",
+    "description": "How the content appears. `rise` suits most blocks; `fade` is the quietest."
+   },
+   {
+    "name": "direction",
+    "type": "RevealDirection | undefined",
+    "required": false,
+    "default": "\"up\"",
+    "description": "The way the content travels for `rise` and `blur`: `up` comes from below."
+   },
+   {
+    "name": "distance",
+    "type": "number | undefined",
+    "required": false,
+    "default": "16",
+    "description": "Travel distance in px."
+   },
+   {
+    "name": "delay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0",
+    "description": "Milliseconds to wait after the block is seen."
+   },
+   {
+    "name": "duration",
+    "type": "number | undefined",
+    "required": false,
+    "default": "520",
+    "description": "Milliseconds per entrance."
+   },
+   {
+    "name": "stagger",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0",
+    "description": "Milliseconds between consecutive direct children. 0 animates the block\nas one piece. The steps stop growing after ten children, so long lists\nstill finish quickly."
+   },
+   {
+    "name": "immediate",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Show at once, without waiting or animating — for content already known to be on screen."
+   },
+   {
+    "name": "threshold",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.15",
+    "description": "Fraction of the block that must be visible before it plays."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"div\"",
+    "description": "Element to render as."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
    }
   ]
  },
@@ -5366,6 +6822,74 @@
    }
   ]
  },
+ "LpScramble": {
+  "props": [
+   {
+    "name": "value",
+    "type": "string",
+    "required": true,
+    "description": "The value the text settles on."
+   },
+   {
+    "name": "trigger",
+    "type": "\"hover\" | \"none\" | \"reveal\" | \"mount\" | undefined",
+    "required": false,
+    "default": "\"reveal\"",
+    "description": "What starts a scramble besides a change of `value`:\n`reveal` the first time it is on screen (a key below the fold decrypts\nwhen it is scrolled to), `mount` at once, `hover` each time the pointer\ncomes in (a teaser), `none` only on changes and `play()`.",
+    "choices": [
+     "hover",
+     "none",
+     "reveal",
+     "mount"
+    ]
+   },
+   {
+    "name": "duration",
+    "type": "number | undefined",
+    "required": false,
+    "default": "900",
+    "description": "Scramble travel time in ms."
+   },
+   {
+    "name": "order",
+    "type": "\"sequential\" | \"together\" | undefined",
+    "required": false,
+    "default": "\"sequential\"",
+    "description": "`sequential` decodes left to right; `together` lands every position at the end.",
+    "choices": [
+     "sequential",
+     "together"
+    ]
+   },
+   {
+    "name": "glyphs",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Glyph pool to churn through. Defaults to upper case, digits and a few symbols."
+   },
+   {
+    "name": "animateChanges",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Scramble when `value` changes. Off: a new value lands at once."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"span\"",
+    "description": "Element to render."
+   }
+  ],
+  "events": [
+   {
+    "name": "done",
+    "type": "[]"
+   }
+  ],
+  "slots": []
+ },
  "LpScrollArea": {
   "props": [
    {
@@ -5400,6 +6924,139 @@
   "slots": [
    {
     "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
+ "LpSecretField": {
+  "props": [
+   {
+    "name": "value",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The secret, for the read-only display."
+   },
+   {
+    "name": "modelValue",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The secret, for the `input` form (v-model)."
+   },
+   {
+    "name": "input",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Editable field instead of a display."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "hint",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "placeholder",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "copyable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Show the copy button. On by default: copying is what a secret is shown for."
+   },
+   {
+    "name": "revealable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Offer the eye button. Off for a value that should only ever be copied, never shown."
+   },
+   {
+    "name": "autoHide",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Seconds after which a revealed value hides itself again. Unset keeps it\nshown until the person hides it."
+   },
+   {
+    "name": "regenerate",
+    "type": "(() => unknown) | undefined",
+    "required": false,
+    "description": "Rotates the secret. The button spins while it runs and a failure is\ntoasted (LpButton's `action`); the new value arrives through `value`.\nFor a custom action (with a confirm, say) use the `actions` slot."
+   },
+   {
+    "name": "wrap",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Let a long value wrap onto more lines instead of staying on one. Display form only."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "maskLength",
+    "type": "number | undefined",
+    "required": false,
+    "default": "24",
+    "description": "How many dots stand for the value while hidden."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<SecretFieldLabels> | undefined",
+    "required": false
+   },
+   {
+    "name": "revealed",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Shown or hidden; bind it to drive the reveal from outside."
+   }
+  ],
+  "events": [
+   {
+    "name": "update:modelValue",
+    "type": "[value: string]"
+   },
+   {
+    "name": "copied",
+    "type": "[text: string]"
+   },
+   {
+    "name": "update:revealed",
+    "type": "[value: boolean]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "leading",
+    "type": "{}"
+   },
+   {
+    "name": "actions",
     "type": "{}"
    }
   ]
@@ -5660,6 +7317,58 @@
   "events": [],
   "slots": []
  },
+ "LpShaderBackdrop": {
+  "props": [
+   {
+    "name": "preset",
+    "type": "ShaderPreset | undefined",
+    "required": false,
+    "default": "\"aurora\""
+   },
+   {
+    "name": "intensity",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.7",
+    "description": "How strongly the theme colours show over the surface, 0–1. Lower for a backdrop under body text."
+   },
+   {
+    "name": "speed",
+    "type": "number | undefined",
+    "required": false,
+    "default": "1",
+    "description": "Motion speed; 1 is a calm drift, 0.5 half as fast."
+   },
+   {
+    "name": "fps",
+    "type": "number | undefined",
+    "required": false,
+    "default": "30",
+    "description": "Frame cap. 30 is smooth for slow motion and half the work of 60."
+   },
+   {
+    "name": "paused",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Hold the current frame."
+   },
+   {
+    "name": "still",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Always show the CSS still, never start WebGL: for a low-power mode or a screenshot."
+   }
+  ],
+  "events": [
+   {
+    "name": "fallback",
+    "type": "[reason: \"unavailable\" | \"slow\" | \"lost\" | \"compile\"]"
+   }
+  ],
+  "slots": []
+ },
  "LpShift": {
   "props": [
    {
@@ -5688,6 +7397,62 @@
    {
     "name": "default",
     "type": "{ resizing: boolean; }"
+   }
+  ]
+ },
+ "LpShinyText": {
+  "props": [
+   {
+    "name": "variant",
+    "type": "\"shine\" | \"gradient\" | undefined",
+    "required": false,
+    "default": "\"shine\"",
+    "description": "`shine` sweeps a band over toned text; `gradient` paints it with drifting theme colours.",
+    "choices": [
+     "shine",
+     "gradient"
+    ]
+   },
+   {
+    "name": "tone",
+    "type": "\"brand\" | \"action\" | \"accent\" | \"ink\" | undefined",
+    "required": false,
+    "default": "\"brand\"",
+    "description": "Base colour for `shine`. `ink` sweeps the brand colour over plain text.",
+    "choices": [
+     "brand",
+     "action",
+     "accent",
+     "ink"
+    ]
+   },
+   {
+    "name": "speed",
+    "type": "number | undefined",
+    "required": false,
+    "default": "3",
+    "description": "Seconds per sweep. Slower reads as ambient; under ~1.5 s it starts to nag."
+   },
+   {
+    "name": "paused",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Stop the motion (keeps the look). For a word that should only shine while something is happening."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"span\"",
+    "description": "Element to render."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
    }
   ]
  },
@@ -6190,6 +7955,51 @@
   "events": [],
   "slots": []
  },
+ "LpSpotlight": {
+  "props": [
+   {
+    "name": "color",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Any CSS colour. Defaults to the brand colour, so it follows the theme."
+   },
+   {
+    "name": "size",
+    "type": "number | undefined",
+    "required": false,
+    "default": "280",
+    "description": "Diameter of the lit circle, in px. Larger reads as ambient, smaller as a torch."
+   },
+   {
+    "name": "strength",
+    "type": "number | undefined",
+    "required": false,
+    "default": "18",
+    "description": "How much of the colour mixes in, 0–100. Keep it low on text-heavy surfaces."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Keep the wrapper but draw nothing — for a tile that is disabled or busy."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"div\"",
+    "description": "Element to render as."
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
  "LpStat": {
   "props": [
    {
@@ -6290,6 +8100,116 @@
     "type": "{}"
    }
   ]
+ },
+ "LpStatus": {
+  "props": [
+   {
+    "name": "state",
+    "type": "StatusKind",
+    "required": true
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The word shown, when the state's own name is not the right one (\"Ready\", \"In a match\")."
+   },
+   {
+    "name": "tone",
+    "type": "MeterTone | undefined",
+    "required": false,
+    "description": "Overrides the state's tone, for an app whose \"offline\" is an alarm rather than a rest state."
+   },
+   {
+    "name": "pulse",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Overrides whether the light pulses."
+   },
+   {
+    "name": "variant",
+    "type": "\"inline\" | \"pill\" | undefined",
+    "required": false,
+    "default": "\"inline\"",
+    "description": "`inline` (default) is a light and a word in running text or a table cell; `pill` puts them on a tinted chip.",
+    "choices": [
+     "inline",
+     "pill"
+    ]
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm"
+    ]
+   },
+   {
+    "name": "hideLabel",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Light only. The word is still there for screen readers and as a native\nhint on hover, so a dense list can drop it visually without going silent."
+   },
+   {
+    "name": "announce",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Speak changes as they happen (`role=\"status\"`). Off by default: a table\nof twenty servers announcing each flip would drown everything else.\nTurn it on for the one status the user is waiting on."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<Record<StatusKind, string>> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpStepMark": {
+  "props": [
+   {
+    "name": "status",
+    "type": "StepStatus",
+    "required": true
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "number",
+    "type": "string | number | undefined",
+    "required": false,
+    "description": "Shown inside a pending mark: the step's number in a numbered flow."
+   },
+   {
+    "name": "icon",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Shown inside a pending mark instead of the number."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Accessible name; without it the mark is hidden from assistive tech."
+   }
+  ],
+  "events": [],
+  "slots": []
  },
  "LpStepper": {
   "props": [
@@ -6695,14 +8615,14 @@
    },
    {
     "name": "variant",
-    "type": "\"contained\" | \"plain\" | \"bottom\" | \"underline\" | undefined",
+    "type": "\"contained\" | \"bottom\" | \"plain\" | \"underline\" | undefined",
     "required": false,
     "default": "\"contained\"",
     "description": "\"contained\" (default) wraps the triggers in a bordered, filled bar.\n\"plain\" drops the container chrome — a flat row of tabs with only the\nsliding pill marking the active one (for nav bars over a custom surface).\n\"underline\" is a flat row over a hairline baseline, marking the active\ntab with a sliding bottom bar instead of a pill (page-section nav style).\n\"bottom\" is a phone's bottom navigation: full width, equal-share tabs\nwith the icon over the label, a sliding bar along the top edge marking\nthe active one, and padding for the gesture strip and side insets of an\nedge-to-edge screen. Place it as the last row of the layout.",
     "choices": [
      "contained",
-     "plain",
      "bottom",
+     "plain",
      "underline"
     ]
    },
@@ -6893,6 +8813,81 @@
    {
     "name": "reject",
     "type": "[rejected: TagRejection[]]"
+   }
+  ],
+  "slots": []
+ },
+ "LpTextReveal": {
+  "props": [
+   {
+    "name": "text",
+    "type": "string",
+    "required": true,
+    "description": "The text. A change animates only the words that changed."
+   },
+   {
+    "name": "by",
+    "type": "\"word\" | \"letter\" | undefined",
+    "required": false,
+    "default": "\"word\"",
+    "description": "The unit that animates. Letters suit a short heading; words read better on a sentence.",
+    "choices": [
+     "word",
+     "letter"
+    ]
+   },
+   {
+    "name": "stagger",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Delay between pieces in ms. Defaults to 70 for words, 22 for letters."
+   },
+   {
+    "name": "duration",
+    "type": "number | undefined",
+    "required": false,
+    "default": "560",
+    "description": "Each piece's entrance in ms."
+   },
+   {
+    "name": "rise",
+    "type": "number | undefined",
+    "required": false,
+    "default": "8",
+    "description": "How far a piece rises, in px. 0 for a pure fade."
+   },
+   {
+    "name": "blur",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Start out of focus and sharpen. Off for long text on a slow machine, where a blur per piece costs frames."
+   },
+   {
+    "name": "play",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Hold the text hidden until true. Leave unset to play the first time the\ntext is on screen."
+   },
+   {
+    "name": "replayKey",
+    "type": "unknown",
+    "required": false,
+    "description": "Changing this plays the whole text again (the old one fades out first)."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"span\"",
+    "description": "Element to render: `h1`…`h6` or `p` for a heading or a paragraph."
+   }
+  ],
+  "events": [
+   {
+    "name": "done",
+    "type": "[]"
    }
   ],
   "slots": []
@@ -7299,13 +9294,13 @@
    },
    {
     "name": "side",
-    "type": "\"bottom\" | \"top\" | \"right\" | \"left\" | undefined",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
     "required": false,
     "default": "\"top\"",
     "description": "Which edge to prefer; flips automatically when there is no room.",
     "choices": [
-     "bottom",
      "top",
+     "bottom",
      "right",
      "left"
     ]
@@ -7439,7 +9434,7 @@
    },
    {
     "name": "legendLabels",
-    "type": "Partial<Record<\"network\" | \"structural\" | \"pending\" | \"drift\", string>> | undefined",
+    "type": "Partial<Record<\"pending\" | \"network\" | \"structural\" | \"drift\", string>> | undefined",
     "required": false,
     "description": "Rename legend rows to match what this graph's edges actually mean."
    },
@@ -7569,6 +9564,145 @@
     "type": "{ step: TourStep | undefined; index: number; next: () => void; back: () => void; dismiss: () => void; }"
    }
   ]
+ },
+ "LpTruncate": {
+  "props": [
+   {
+    "name": "text",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "lines",
+    "type": "number | undefined",
+    "required": false,
+    "default": "1",
+    "description": "Lines before the cut. Ignored with `middle`, which is one line by nature."
+   },
+   {
+    "name": "middle",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Cut from the middle, keeping both ends."
+   },
+   {
+    "name": "tail",
+    "type": "number | undefined",
+    "required": false,
+    "description": "With `middle`: how many characters the end keeps. Unset splits evenly."
+   },
+   {
+    "name": "copyable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A copy button after the text, for values people paste elsewhere."
+   },
+   {
+    "name": "side",
+    "type": "\"top\" | \"bottom\" | \"right\" | \"left\" | undefined",
+    "required": false,
+    "default": "\"top\"",
+    "description": "Where the tip opens.",
+    "choices": [
+     "top",
+     "bottom",
+     "right",
+     "left"
+    ]
+   },
+   {
+    "name": "noTooltip",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Never show the tip, even when cut (the full text is shown elsewhere)."
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpTypewriter": {
+  "props": [
+   {
+    "name": "text",
+    "type": "string | string[]",
+    "required": true,
+    "description": "One string, or several to cycle through."
+   },
+   {
+    "name": "speed",
+    "type": "number | undefined",
+    "required": false,
+    "default": "55",
+    "description": "Ms per character, before the natural unevenness."
+   },
+   {
+    "name": "eraseSpeed",
+    "type": "number | undefined",
+    "required": false,
+    "default": "28",
+    "description": "Ms per erased character."
+   },
+   {
+    "name": "hold",
+    "type": "number | undefined",
+    "required": false,
+    "default": "1800",
+    "description": "Ms a finished string stays before it is erased."
+   },
+   {
+    "name": "startDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0",
+    "description": "Ms before the first keystroke, once it is on screen."
+   },
+   {
+    "name": "loop",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "After the last string, start over from the first. Without it the last string stays."
+   },
+   {
+    "name": "caret",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Show the caret."
+   },
+   {
+    "name": "reserve",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Reserve the longest string's size so the surroundings hold still."
+   },
+   {
+    "name": "play",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Hold it until true. Leave unset to start the first time it is on screen."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"span\"",
+    "description": "Element to render."
+   }
+  ],
+  "events": [
+   {
+    "name": "typed",
+    "type": "[index: number, text: string]"
+   },
+   {
+    "name": "finished",
+    "type": "[]"
+   }
+  ],
+  "slots": []
  },
  "LpUptimeBar": {
   "props": [

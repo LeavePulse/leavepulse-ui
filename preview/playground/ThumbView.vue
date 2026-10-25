@@ -10,7 +10,7 @@
  * Under reduced motion the first frame stays.
  */
 import { computed, defineComponent, onBeforeUnmount, onErrorCaptured, reactive, ref, watch, type Component } from "vue"
-import { LpIcon, prefersReducedMotion, useReveal } from "../../src"
+import { LpIcon, prefersReducedMotion, useInView, useReveal } from "../../src"
 import type { ComponentEntry } from "./registry"
 
 const props = defineProps<{ entry: ComponentEntry; icon?: string }>()
@@ -43,28 +43,17 @@ const Boundary = defineComponent({
   },
 })
 
-const onScreen = ref(false)
-const pageVisible = ref(typeof document === "undefined" || document.visibilityState === "visible")
-const onVisibility = () => (pageVisible.value = document.visibilityState === "visible")
-let observer: IntersectionObserver | null = null
+/*
+ * Whether the loop plays: the same card element, watched live (useReveal only
+ * flips once). Only cards that loop are observed.
+ */
+const { el: loopEl, inView } = useInView({ threshold: 0.3 })
+watch(el, (node) => (loopEl.value = props.entry.thumbLoop ? node : null), { immediate: true })
 let timer: ReturnType<typeof setInterval> | undefined
 let frame = 0
 
 watch(
-  el,
-  (node) => {
-    observer?.disconnect()
-    observer = null
-    if (!node || !props.entry.thumbLoop || typeof IntersectionObserver === "undefined") return
-    observer = new IntersectionObserver(([entry]) => (onScreen.value = !!entry?.isIntersecting), { threshold: 0.3 })
-    observer.observe(node)
-    document.addEventListener("visibilitychange", onVisibility)
-  },
-  { flush: "post", immediate: true },
-)
-
-watch(
-  () => !!props.entry.thumbLoop && revealed.value && onScreen.value && pageVisible.value && !failed.value,
+  () => !!props.entry.thumbLoop && revealed.value && inView.value && !failed.value,
   (play) => {
     clearInterval(timer)
     timer = undefined
@@ -77,11 +66,7 @@ watch(
   },
 )
 
-onBeforeUnmount(() => {
-  clearInterval(timer)
-  observer?.disconnect()
-  document.removeEventListener("visibilitychange", onVisibility)
-})
+onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>

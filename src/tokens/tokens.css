@@ -168,15 +168,18 @@
 
 /* ── layering scale ──────────────────────────────
    One ladder so overlays never fight. Toasts sit ABOVE modals on purpose:
-   a notification must remain visible even while a dialog is open. */
+   a notification must remain visible even while a dialog is open. Tooltips
+   top the ladder: a tip only exists under the pointer or focus that asked
+   for it, and below the toasts one on a toast's own button (the error
+   toast's copy) opened underneath the toast stacked above it. */
 @theme {
   --z-dropdown: 50;
   --z-overlay: 100;
   --z-modal: 110;
   --z-popover: 120;
-  --z-tooltip: 130;
   --z-tour: 140;
   --z-toast: 200;
+  --z-tooltip: 210;
 
 }
 
@@ -646,9 +649,17 @@
   pointer-events: none;
 }
 
-.lp-skin-panel > * {
-  position: relative;
-  z-index: 1;
+/*
+ * Content above the overlay, in the base layer so a child's own utilities win:
+ * unlayered, this beat every Tailwind class, and an `absolute` line or badge
+ * placed as a card's direct child became `relative` and collapsed (an activity
+ * line on a card's edge drew at zero width).
+ */
+@layer base {
+  .lp-skin-panel > * {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 /*

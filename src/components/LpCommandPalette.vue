@@ -39,6 +39,7 @@ import {
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
 import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import MenuShortcut from "./MenuShortcut.vue"
 import { usePersisted } from "../composables/usePersisted"
@@ -1263,7 +1264,15 @@ const guardOutside = useOutsideGuard()
             :size="18"
             class="shrink-0 text-muted"
           />
-          <LpIcon v-else name="lucide:loader-circle" :size="18" class="shrink-0 animate-spin text-muted" />
+          <!-- At once, since it takes the search icon's place. It is the only
+               thing that tells a screen reader a search went out, so it speaks. -->
+          <LpLoader
+            v-else
+            size="inline"
+            :delay="0"
+            :labels="{ loading: text.searching }"
+            class="shrink-0 text-[18px] text-muted"
+          />
 
           <button
             v-for="(step, i) in trail"

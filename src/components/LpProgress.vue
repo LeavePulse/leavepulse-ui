@@ -23,6 +23,7 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import { lerp, useTween } from "../composables/useTween"
 import LpNumberFlow from "./LpNumberFlow.vue"
+import { capacityThresholds, meterFraction, toneAt, type MeterTone } from "./meter"
 
 const props = withDefaults(
   defineProps<{
@@ -148,19 +149,27 @@ const pct = computed(() => {
 })
 
 /*
- * The tone actually painted. `auto` reads the fill and crosses two thresholds;
- * every other value passes straight through.
+ * The tone actually painted. `auto` reads the fill against the capacity scale
+ * LpGauge and LpQuota use (meter.ts), so a bar and a gauge showing one disk
+ * turn amber at the same point; every other value passes straight through.
  *
  * Thresholds are compared against the TARGET, not the animated position, so a
  * bar does not change colour partway through its own sweep — it fills in the
  * colour its reading warrants.
  */
+// The meter's semantic tones in the bar's own palette: "fine" is the action colour.
+const AUTO_TONE: Record<MeterTone, "brand" | "action" | "danger" | "accent"> = {
+  ok: "action",
+  warning: "accent",
+  danger: "danger",
+  brand: "brand",
+  neutral: "brand",
+}
+
 const paintedTone = computed(() => {
   if (props.tone !== "auto") return props.tone
-  const fraction = props.max > 0 ? props.value / props.max : 0
-  if (fraction >= props.dangerAt) return "danger"
-  if (fraction >= props.warnAt) return "accent"
-  return "action"
+  const fraction = meterFraction(props.value, 0, props.max)
+  return AUTO_TONE[toneAt(fraction, capacityThresholds(0, 1, props.warnAt, props.dangerAt))]
 })
 
 const captionText = computed(() => {

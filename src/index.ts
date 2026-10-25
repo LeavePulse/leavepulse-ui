@@ -423,3 +423,123 @@ export type { LinkTarget, ResolvedLink } from "./components/link"
 
 export { default as LpRepeater } from "./components/LpRepeater.vue"
 export type { RepeaterItemKey } from "./composables/useRepeater"
+
+// ── Status and data (group: status) ──
+export { default as LpGauge } from "./components/LpGauge.vue"
+export type { GaugeLabels } from "./components/LpGauge.vue"
+export { default as LpQuota } from "./components/LpQuota.vue"
+export type { QuotaLabels } from "./components/LpQuota.vue"
+export { default as LpStatus } from "./components/LpStatus.vue"
+export { default as LpRelativeTime } from "./components/LpRelativeTime.vue"
+export { default as LpActivityLine } from "./components/LpActivityLine.vue"
+export {
+  arcPath,
+  capacityThresholds,
+  meterFraction,
+  toneAt,
+  TONE_COLOR,
+  TONE_SOFT,
+} from "./components/meter"
+export type { MeterThreshold, MeterTone } from "./components/meter"
+export { formatAmount, quotaSegments, quotaState } from "./components/quota"
+export type { QuotaPart, QuotaSegment, QuotaState, QuotaUnit } from "./components/quota"
+export { STATUS_LABELS, STATUS_LOOK } from "./components/status"
+export type { StatusKind, StatusLook } from "./components/status"
+export { formatRelativeTime } from "./components/relativeTime"
+export type { RelativeTime, RelativeTimeOptions, RelativeUnit } from "./components/relativeTime"
+
+// ── Processes (group: process) ──
+export { default as LpPipeline } from "./components/LpPipeline.vue"
+export type { PipelineLabels } from "./components/LpPipeline.vue"
+export { default as LpStepMark } from "./components/LpStepMark.vue"
+export {
+  childProgress,
+  connectorFilled,
+  currentStepIndex,
+  isSettled,
+  overallStatus,
+  stepElapsed,
+} from "./components/pipeline"
+export type { PipelineStep, StepStatus } from "./components/pipeline"
+export { default as LpLoader } from "./components/LpLoader.vue"
+export type { LoaderLabels, LoaderSize, LoaderTone, LoaderVariant } from "./components/LpLoader.vue"
+export { useLoadingGate } from "./composables/useLoadingGate"
+export type { LoadingGateOptions } from "./composables/useLoadingGate"
+export { useNow } from "./composables/useNow"
+export type { UseNowOptions } from "./composables/useNow"
+export { default as LpCountdown } from "./components/LpCountdown.vue"
+export type { CountdownLabels } from "./components/LpCountdown.vue"
+export {
+  ceilToSecond,
+  crossedMilestone,
+  DEFAULT_MILESTONES,
+  DEFAULT_UNIT_LABELS,
+  formatElapsed,
+  formatTime,
+  msToNextSecond,
+  splitTime,
+  timeParts,
+} from "./components/timeSpan"
+export type { TimeFormat, TimePart, TimeSplit, TimeUnit, TimeUnitLabels } from "./components/timeSpan"
+
+// ── Fields and text (group: fields) ──
+export { default as LpCopyButton } from "./components/LpCopyButton.vue"
+export type { CopyButtonLabels, CopyValue } from "./components/LpCopyButton.vue"
+export { default as LpSecretField } from "./components/LpSecretField.vue"
+export type { SecretFieldLabels } from "./components/LpSecretField.vue"
+export { default as LpDataList } from "./components/LpDataList.vue"
+export type { DataListItem, DataListLabels } from "./components/LpDataList.vue"
+export { default as LpEditable } from "./components/LpEditable.vue"
+export type { EditableLabels } from "./components/LpEditable.vue"
+export { default as LpTruncate } from "./components/LpTruncate.vue"
+export { default as LpCodeDisplay } from "./components/LpCodeDisplay.vue"
+export type { CodeDisplayLabels } from "./components/LpCodeDisplay.vue"
+export { formatRemaining, groupCode, middleTruncate, normalizeCode } from "./components/fieldText"
+
+// ── Overlays and look (group: looks) ──
+export { default as LpHoverCard } from "./components/LpHoverCard.vue"
+export { default as LpIdenticon } from "./components/LpIdenticon.vue"
+export { hashString, identicon, identiconRects, identiconSvg } from "./components/identicon"
+export type { Identicon, IdenticonOptions, IdenticonSvgOptions } from "./components/identicon"
+export { default as LpShaderBackdrop } from "./components/LpShaderBackdrop.vue"
+export { PRESET_NAMES as SHADER_PRESETS } from "./components/shaderBackdrop"
+export type { ShaderPreset } from "./components/shaderBackdrop"
+export { default as LpCollapse } from "./components/LpCollapse.vue"
+export { pseudoLocalize } from "./composables/pseudoLocale"
+export type { PseudoOptions } from "./composables/pseudoLocale"
+
+// ── Text effects (group: text) ──
+export { default as LpTextReveal } from "./components/LpTextReveal.vue"
+export { default as LpShinyText } from "./components/LpShinyText.vue"
+export { default as LpTypewriter } from "./components/LpTypewriter.vue"
+export { default as LpScramble } from "./components/LpScramble.vue"
+export { useScramble } from "./composables/useScramble"
+export type { UseScramble, UseScrambleOptions } from "./composables/useScramble"
+export { useInView } from "./composables/useInView"
+export type { UseInView } from "./composables/useInView"
+export {
+  graphemes,
+  planScramble,
+  randomGlyph,
+  scrambleFrame,
+  seededRandom,
+  settledCells,
+  SCRAMBLE_GLYPHS,
+} from "./components/scramble"
+export type { ScrambleCell, ScrambleFrameCell, ScrambleOptions } from "./components/scramble"
+
+// ── Layout and card effects (group: layout) ──
+export { default as LpDock } from "./components/LpDock.vue"
+export type { DockItem } from "./components/LpDock.vue"
+export { dockSize, magneticOffset } from "./components/dock"
+export { default as LpMasonry } from "./components/LpMasonry.vue"
+export { masonryColumnCount, placeMasonry } from "./components/masonry"
+export type { MasonryColumns, MasonryPlacement } from "./components/masonry"
+export { default as LpRevealOnScroll } from "./components/LpRevealOnScroll.vue"
+export { revealFrom, revealTo, staggerDelay } from "./components/reveal"
+export type { RevealDirection, RevealPreset } from "./components/reveal"
+export { default as LpSpotlight } from "./components/LpSpotlight.vue"
+export { default as LpGlowBorder } from "./components/LpGlowBorder.vue"
+export { default as LpMagnetic } from "./components/LpMagnetic.vue"
+export { spotlightPoint, useSpotlight } from "./composables/useSpotlight"
+export type { UseSpotlight, UseSpotlightOptions } from "./composables/useSpotlight"

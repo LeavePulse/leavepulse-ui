@@ -23,9 +23,9 @@ export default { inheritAttrs: false }
  * set `region:open` (e.g. `// #region label open`) to start expanded.
  */
 import { computed, reactive, ref, watch } from "vue"
-import { useClipboard } from "../composables/useClipboard"
 import { type CodeLang, tokenizeLines } from "./codeHighlight"
 import { useLabels } from "../composables/useLpConfig"
+import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -206,12 +206,6 @@ const showHeader = computed(
   () => Boolean(props.title || props.lang !== "plain" || props.copyable || props.lockToggle),
 )
 
-// ── copy ─────────────────────────────────────────────────────
-// The tick on the button is the whole confirmation here, so no toast: the
-// header is right next to the pointer that just clicked it.
-const { copied, copy: writeClipboard } = useClipboard()
-const copy = () => writeClipboard(copyText.value)
-
 function toggleLock() {
   emit("update:locked", !props.locked)
 }
@@ -253,19 +247,17 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             class="transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-active/lock:scale-90"
           />
         </button>
-        <button
+        <!-- The kit's copy button, trimmed to the header's compact row (the
+             lock toggle's box beside it). Its tick is the whole confirmation,
+             so no toast: the header is right under the pointer that clicked. -->
+        <LpCopyButton
           v-if="copyable"
-          type="button"
-          class="group/copy flex items-center gap-1 rounded-small px-1.5 py-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="copied ? text.copied : text.copy"
-          @click="copy"
-        >
-          <LpIcon
-            :name="copied ? 'lucide:check' : 'lucide:copy'"
-            :size="13"
-            :class="copied ? 'text-action' : ''"
-          />
-        </button>
+          :value="copyText"
+          size="xs"
+          variant="muted"
+          class="size-auto aspect-auto rounded-small px-1.5 py-1 font-normal hover:bg-transparent"
+          :labels="{ copy: text.copy, copied: text.copied }"
+        />
       </div>
     </div>
 

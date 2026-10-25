@@ -160,7 +160,7 @@ export const motion: ComponentEntry[] = [
     id: "video-backdrop",
     name: "VideoBackdrop",
     description:
-      "A muted looping video behind something, filling the positioned box it sits in. Loops a stretch of the clip (start, end), blends the seam so a clip whose last frame does not match its first loops without a jump (crossfade), plays faster or slower (rate) and darkens under text (dim). Pauses on paused, in a hidden tab and under reduced motion, where it shows the stretch's first frame. The sample clip jumps from its last frame to its first: set crossfade to 0 to see the cut it hides.",
+      "A muted looping video behind something, filling the positioned box it sits in. Loops a stretch of the clip (start, end), blends the seam so a clip whose last frame does not match its first loops without a jump (crossfade), plays faster or slower (rate) and darkens under text (dim). Pauses on paused, in a hidden tab, off screen and under reduced motion, where it shows the stretch's first frame. The sample clip jumps from its last frame to its first: set crossfade to 0 to see the cut it hides.",
     components: { LpVideoBackdrop, LpRangeSlider, LpSlider, LpSwitch },
     state: () =>
       reactive({

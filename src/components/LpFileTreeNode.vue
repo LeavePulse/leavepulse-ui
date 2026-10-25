@@ -29,6 +29,7 @@ import {
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = defineProps<{
@@ -208,11 +209,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :class="canExpand ? 'cursor-pointer rounded-sm hover:bg-line' : ''"
           @click.stop="canExpand && !node.disabled ? emit('toggle', node) : undefined"
         >
-          <LpIcon
+          <!-- At once, since it takes the chevron's place; silent, since a
+               "Loading…" inside the row would become part of its name. -->
+          <LpLoader
             v-if="isLoading"
-            name="lucide:loader-circle"
-            :size="13"
-            class="animate-spin text-muted"
+            size="inline"
+            :delay="0"
+            aria-hidden="true"
+            class="text-[13px] text-muted"
           />
           <LpIcon
             v-else-if="canExpand"

@@ -13,10 +13,10 @@ import {
 } from "reka-ui"
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
-import { useClipboard } from "../composables/useClipboard"
 import { useLabels } from "../composables/useLpConfig"
 import { useToast, type ToastItem } from "../composables/useToast"
 import { CLOSE_ICON } from "./dropdown"
+import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import { usePortalTarget } from "../composables/useView"
 
@@ -220,18 +220,9 @@ async function settle(t: ToastItem, run: () => void | Promise<void>) {
  * opts back into selection and keeps its presses from starting a swipe. A
  * click that ends a selection is not a click on the toast.
  */
-const { copy } = useClipboard()
-const copiedId = ref<string | null>(null)
-let copiedTimer: ReturnType<typeof setTimeout> | undefined
 const copyable = (t: ToastItem) => t.variant === "error" || t.variant === "warning"
-
-async function copyToast(t: ToastItem) {
-  if (!(await copy([t.title, t.message, t.details].filter(Boolean).join("\n")))) return
-  copiedId.value = tag(t)
-  clearTimeout(copiedTimer)
-  copiedTimer = setTimeout(() => (copiedId.value = null), 1500)
-}
-onBeforeUnmount(() => clearTimeout(copiedTimer))
+// Read on click rather than bound, so a toast whose text is updated in place copies what it now says.
+const toastText = (t: ToastItem) => () => [t.title, t.message, t.details].filter(Boolean).join("\n")
 
 function selecting(): boolean {
   return Boolean(window.getSelection()?.toString())
@@ -306,16 +297,18 @@ const portalTo = usePortalTarget()
           </div>
         </div>
 
-        <button
+        <!-- Sized to the dismiss button beside it rather than to LpButton's
+             scale; the click stays off the toast, whose own click would run
+             its action or close it. -->
+        <LpCopyButton
           v-if="copyable(t)"
-          type="button"
-          class="-mt-1 rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-          :aria-label="copiedId === tag(t) ? text.copied : text.copy"
-          :title="copiedId === tag(t) ? text.copied : text.copy"
-          @click.stop="copyToast(t)"
-        >
-          <LpIcon :name="copiedId === tag(t) ? 'lucide:check' : 'lucide:copy'" :size="15" />
-        </button>
+          :value="toastText(t)"
+          variant="muted"
+          :icon-size="15"
+          class="-mt-1 size-auto aspect-auto rounded-inner p-1 hover:bg-transparent"
+          :labels="{ copy: text.copy, copied: text.copied }"
+          @click.stop
+        />
         <button
           type="button"
           class="group -mr-1 -mt-1 rounded-inner p-1 text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"

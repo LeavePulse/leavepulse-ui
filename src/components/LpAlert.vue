@@ -10,6 +10,7 @@ import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useSlots, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import LpSwap from "./LpSwap.vue"
 import { slotText } from "./slotText"
 
@@ -61,7 +62,7 @@ const props = withDefaults(
      */
     live?: "assertive" | "polite" | false
     /**
-     * Work is under way: the icon becomes a spinning loader (unless `icon` is
+     * Work is under way: the icon becomes LpLoader's spinner (unless `icon` is
      * given, which then spins instead) and the alert is announced politely.
      * A loader drawn as a still icon read as a frozen page.
      */
@@ -85,7 +86,8 @@ const role = computed(() => {
 
 // `p-3` or a different border must beat the variant's own, not race it.
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => alert({ variant: props.variant }))
-const resolvedIcon = computed(() => props.icon ?? (props.busy ? "lucide:loader-circle" : ICONS[props.variant ?? "info"]))
+const spinning = computed(() => props.busy && !props.icon)
+const resolvedIcon = computed(() => props.icon ?? ICONS[props.variant ?? "info"])
 const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
 
 // What counts as another message: the variant, the title and the slot's words
@@ -96,6 +98,8 @@ const messageKey = () => [props.variant, props.title ?? "", slotText(slots.defau
 
 <template>
   <div :class="rootClass" :role="role" :aria-busy="busy || undefined" v-bind="rest">
+    <!-- The busy loader shows at once, since it replaces the icon, and stays
+         silent: the alert's own role and aria-busy already announce the work. -->
     <span class="relative mt-0.5 grid size-[18px] shrink-0 place-items-center" aria-hidden="true">
       <Transition
         enter-from-class="scale-50 opacity-0"
@@ -103,7 +107,16 @@ const messageKey = () => [props.variant, props.title ?? "", slotText(slots.defau
         enter-active-class="transition-[scale,opacity] duration-(--duration-medium) ease-(--ease-emphasized) motion-reduce:transition-none"
         leave-active-class="absolute transition-[scale,opacity] duration-(--duration-fast) ease-out motion-reduce:transition-none"
       >
+        <LpLoader
+          v-if="spinning"
+          key="busy"
+          size="inline"
+          :delay="0"
+          class="text-[18px] transition-colors duration-(--duration-medium)"
+          :class="iconTone"
+        />
         <LpIcon
+          v-else
           :key="resolvedIcon"
           :name="resolvedIcon"
           :size="18"

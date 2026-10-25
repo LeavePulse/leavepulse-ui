@@ -26,6 +26,7 @@ import { useBarStack } from "./actionBar"
 import { CLOSE_ICON } from "./dropdown"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { usePortalTarget } from "../composables/useView"
 
 export interface ActionBarAction {
@@ -284,12 +285,10 @@ const portalTo = usePortalTarget()
                 :hotkey="action.hotkey"
                 @click="run(action)"
               >
-                <LpIcon
-                  v-if="action.loading"
-                  name="lucide:loader-circle"
-                  :size="15"
-                  class="animate-spin"
-                />
+                <!-- At once: it takes the icon's place, which a delay would
+                     leave empty. Left announced, since nothing else tells a
+                     screen reader the action is under way. -->
+                <LpLoader v-if="action.loading" size="inline" :delay="0" class="text-[15px]" />
                 <LpIcon v-else-if="action.icon" :name="action.icon" :size="15" />
                 {{ action.label }}
               </LpButton>

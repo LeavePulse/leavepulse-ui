@@ -12,6 +12,7 @@ import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpSkeleton from "./LpSkeleton.vue"
+import LpStatus from "./LpStatus.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -128,7 +129,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :class="rootClass"
     v-bind="rest">
     <div class="flex items-center gap-2">
-      <span v-if="online" class="size-1.5 rounded-full bg-action" />
+      <!-- The kit's own "online" light, so a live tile reads (and is spoken)
+           the same as a live server row elsewhere on the page. -->
+      <LpStatus v-if="online" state="online" size="sm" hide-label />
       <LpIcon v-if="icon" :name="icon" :size="14" class="text-muted" />
       <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
         <Transition v-bind="FADE">

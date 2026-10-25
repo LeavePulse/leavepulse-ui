@@ -31,6 +31,7 @@ import { useHotkeys } from "../composables/useHotkeys"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import LpInput from "./LpInput.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -1168,8 +1169,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           v-if="loadingOlder"
           class="flex items-center justify-center gap-2 py-2 text-muted"
         >
-          <LpIcon name="lucide:loader-circle" :size="14" class="animate-spin" />
-          <span class="text-[11px]">{{ text.loadingOlder }}</span>
+          <!-- The loader speaks the row's words; the visible caption is hidden
+               from screen readers so they are not read twice. -->
+          <LpLoader size="inline" :delay="0" :labels="{ loading: text.loadingOlder }" class="text-[14px]" />
+          <span class="text-[11px]" aria-hidden="true">{{ text.loadingOlder }}</span>
         </div>
 
       <!-- ONE context menu wraps the whole list (not each row): @contextmenu

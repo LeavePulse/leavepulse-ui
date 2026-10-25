@@ -10,7 +10,7 @@ import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
-import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -99,7 +99,14 @@ function onUpdate(value: boolean) {
       @update:model-value="onUpdate"
     >
       <SwitchThumb :class="[THUMB, 'grid place-items-center']">
-        <LpIcon v-if="pending" name="lucide:loader-circle" class="size-2.5 animate-spin text-ink-inverse group-data-[state=checked]/switch:text-ink motion-reduce:animate-none" />
+        <!-- Hidden from screen readers: the switch itself says aria-busy, and
+             a "Loading…" inside it would become part of its name. -->
+        <LpLoader
+          :active="pending"
+          size="inline"
+          aria-hidden="true"
+          class="text-[10px] text-ink-inverse group-data-[state=checked]/switch:text-ink"
+        />
       </SwitchThumb>
     </SwitchRoot>
     <span v-if="labelled && labelPosition === 'end'" class="flex min-w-0 flex-col">

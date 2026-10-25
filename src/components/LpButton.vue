@@ -13,7 +13,7 @@ import { appleModifierLabel, parseCombo, useAppleKeyboard, useHotkeys } from "..
 import { useLabels, useLinkComponent } from "../composables/useLpConfig"
 import { useToast } from "../composables/useToast"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { resolveLink, type LinkTarget } from "./link"
 
 const button = tv({
@@ -175,7 +175,17 @@ let viaKey = false
 // that changes ("Save" → "Saved").
 const spoken = ref("")
 function readSpoken() {
-  spoken.value = String(attrs["aria-label"] ?? rootEl()?.textContent?.trim() ?? "")
+  const el = rootEl()
+  spoken.value = String(attrs["aria-label"] ?? (el ? labelText(el).trim() : ""))
+}
+
+// The button's words without any loader in it (its own busy overlay, or one an
+// app put in the slot): a loader carries a screen-reader "Loading…" that would
+// otherwise end up in the key reference as part of the button's name.
+function labelText(node: Node): string {
+  if (node instanceof Element && node.getAttribute("role") === "status") return ""
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+  return Array.from(node.childNodes, labelText).join("")
 }
 onMounted(readSpoken)
 onUpdated(readSpoken)
@@ -297,7 +307,9 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
       :class="spinnerTone"
       aria-hidden="true"
     >
-      <LpIcon name="lucide:loader-circle" class="size-[1.15em] animate-spin motion-reduce:animate-none" />
+      <!-- Shown at once: the faded label already acknowledged the click, so a
+           delay would only leave the button blank. -->
+      <LpLoader size="inline" tone="current" :delay="0" class="text-[1.15em]" />
     </span>
   </component>
 </template>

@@ -11,6 +11,7 @@ import { computed, onMounted, ref } from "vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import { MenuWhen } from "./menuWhen"
 import LpIcon from "./LpIcon.vue"
+import LpIdenticon from "./LpIdenticon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const avatar = tv({
@@ -48,6 +49,14 @@ const props = withDefaults(
      * letters read as noise. `fallback` text still wins when both are given.
      */
     icon?: string
+    /**
+     * Draw an identicon while there is no picture, instead of initials: a
+     * pattern and colour derived from a string, so accounts that never set an
+     * avatar still look different from each other. `true` derives it from
+     * `alt`; a string is the seed itself (an id outlives a rename). `fallback`
+     * text and `icon` still win when given.
+     */
+    identicon?: boolean | string
     size?: AvatarVariants["size"]
     /** Explicit pixel size, wins over `size` — for avatars keyed to a layout. */
     pixelSize?: number
@@ -111,6 +120,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 // <ClientOnly>.
 const mounted = ref(false)
 
+const identiconSeed = computed(() => {
+  if (!props.identicon || props.fallback || props.icon) return ""
+  return props.identicon === true ? (props.alt ?? "").trim() : props.identicon
+})
+
 const menuHeading = computed(() => props.menuTitle ?? props.alt)
 onMounted(() => {
   mounted.value = true
@@ -129,8 +143,9 @@ onMounted(() => {
   >
     <AvatarRoot :class="rootClass" :style="sizeStyle" v-bind="rest">
       <AvatarImage v-if="src && mounted" :src="src" :alt="alt" class="size-full object-cover animate-[fade-in_var(--duration-medium)_ease] motion-reduce:animate-none" />
-      <AvatarFallback>
-        <LpIcon v-if="icon && !fallback" :name="icon" :size="iconSize" />
+      <AvatarFallback :class="identiconSeed ? 'size-full' : undefined">
+        <LpIdenticon v-if="identiconSeed" :seed="identiconSeed" :padding="shape === 'circle' ? 0.24 : 0.14" />
+        <LpIcon v-else-if="icon && !fallback" :name="icon" :size="iconSize" />
         <template v-else>{{ initials }}</template>
       </AvatarFallback>
     </AvatarRoot>

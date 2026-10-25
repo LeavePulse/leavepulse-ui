@@ -40,6 +40,11 @@ import avatarSunny from "../../assets/avatar-sunny.png"
 import { RatingControl } from "../demos"
 import { type ComponentEntry, selectOpts, radioOpts } from "./shared"
 
+// Rows of the repeater card's loop: the same objects in every frame, so a row
+// that stays keeps its identity and only the added or removed one animates.
+const repeaterHttps = { container: "443", host: "8443", bind: "", proto: "tcp" }
+const repeaterQuery = { container: "25565", host: "25565", bind: "", proto: "udp" }
+
 export const forms: ComponentEntry[] = [
   {
     id: "repeater",
@@ -74,6 +79,20 @@ export const forms: ComponentEntry[] = [
   </LpRepeater>
   <LpButton variant="outline" @click="locked = !locked">{{ locked ? 'Unlock' : 'Lock' }} lists</LpButton>
 </div>`,
+    thumb: `<div class="w-64">
+  <LpRepeater :model-value="tPorts" :create-item="emptyPort" label="Ports">
+    <template #default="{ item }">
+      <div class="grid grid-cols-2 gap-2">
+        <LpInput :model-value="item.container" size="sm" aria-label="Container port" />
+        <LpInput :model-value="item.host" size="sm" aria-label="Host port" />
+      </div>
+    </template>
+  </LpRepeater>
+</div>`,
+    thumbLoop: {
+      every: 1800,
+      frames: [{ tPorts: [repeaterHttps] }, { tPorts: [repeaterHttps, repeaterQuery] }, { tPorts: [repeaterQuery] }],
+    },
   },
   {
     id: "input",

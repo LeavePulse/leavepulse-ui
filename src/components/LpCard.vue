@@ -12,6 +12,7 @@ import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import { MenuWhen } from "./menuWhen"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
+import { useSpotlight } from "../composables/useSpotlight"
 
 const card = tv({
   // break-words: a card is where text with no spaces in it ends up (a
@@ -104,6 +105,18 @@ const props = withDefaults(
     accent?: string
     /** Width of the `accent` stripe. */
     accentWidth?: string
+    /**
+     * A soft glow follows the mouse inside the card. For a grid of cards the
+     * user scans with the pointer (a launcher's library, a gallery of builds):
+     * the lit one is the one about to be clicked. Same effect as LpSpotlight.
+     */
+    spotlight?: boolean
+    /**
+     * A gradient runs round the edge — for the one card that must be noticed
+     * first ("new", "recommended"). Same effect as LpGlowBorder; static where
+     * the browser cannot animate it, still under reduced motion.
+     */
+    glow?: boolean
   }>(),
   { variant: "raised", padded: true, interactive: false, as: "div", loading: false },
 )
@@ -112,14 +125,24 @@ const props = withDefaults(
 // consumer's `class` next to ours and leave the winner to stylesheet order —
 // `class="p-1"` lost to the `p-5` of `padded`. useMergedAttrs merges it in and
 // hands back the remaining attrs, so the class never arrives a second time.
+// The effect classes are plain CSS (tokens/effects.css) painted on pseudo
+// elements, so the card's children stay exactly what the app put there.
 const { class: classes, attrs: rest } = useMergedAttrs(() =>
-  card({
-    variant: props.variant,
-    padded: props.padded,
-    interactive: props.interactive,
-    accent: Boolean(props.accent),
-  }),
+  [
+    card({
+      variant: props.variant,
+      padded: props.padded,
+      interactive: props.interactive,
+      accent: Boolean(props.accent),
+    }),
+    props.spotlight && "lp-spotlight",
+    props.glow && "lp-glow-border",
+  ]
+    .filter(Boolean)
+    .join(" "),
 )
+
+const { el: spotlightEl } = useSpotlight({ disabled: () => !props.spotlight })
 
 // Remembers that this card has been through a loading state, so the swap
 // wrapper stays once content arrives instead of being torn down (which would
@@ -150,7 +173,7 @@ const accentStyle = computed(() =>
   <!-- The menu wraps the card only when it has items, so a directive the app
        puts on the card (`v-hint`) reaches its element: see menuWhen.ts. -->
   <MenuWhen :items="menuItems" :title="menuTitle" :subtitle="menuSubtitle">
-    <component :is="as" :class="classes" :style="accentStyle" :aria-busy="loading || undefined" v-bind="rest">
+    <component :is="as" ref="spotlightEl" :class="classes" :style="accentStyle" :aria-busy="loading || undefined" v-bind="rest">
       <!-- The swap only once loading has been asked for: a card that never
            loads keeps its slot as a direct child, so layouts that style the
            card's children (grids, `space-y-*`) are left exactly as they were. -->

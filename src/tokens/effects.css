@@ -1,0 +1,151 @@
+/*
+ * Surface effects: a pointer spotlight and a glowing border.
+ *
+ * Plain classes rather than component-scoped styles because three places paint
+ * them — LpSpotlight, LpGlowBorder and LpCard's `spotlight` / `glow` props —
+ * and a card cannot wrap itself in a component without adding a child, which
+ * would break layouts that style the card's direct children.
+ *
+ * Both draw on `::after`: `.lp-skin-panel` already owns `::before` for its
+ * overlay gradient, and `.lp-skin-panel > *` lifts real children to z-index 1,
+ * so a pseudo element at z-index 0 lands over the fill and under the content.
+ */
+
+/*
+ * Spotlight: a soft radial glow that follows the pointer. useSpotlight writes
+ * the pointer position into --lp-spot-x / --lp-spot-y (rAF-throttled) and
+ * toggles [data-lp-spot] while the pointer is inside; nothing re-renders.
+ */
+.lp-spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.lp-spotlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    var(--lp-spot-size, 280px) circle at var(--lp-spot-x, 50%) var(--lp-spot-y, 50%),
+    color-mix(in srgb, var(--lp-spot-color, var(--color-brand)) var(--lp-spot-strength, 18%), transparent),
+    transparent 70%
+  );
+  transition: opacity var(--duration-medium) var(--ease-emphasized);
+}
+
+.lp-spotlight[data-lp-spot]::after {
+  opacity: 1;
+}
+
+/* The content has to sit above the glow even outside a skin panel. */
+.lp-spotlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Glow border: a gradient running round the edge, for an item that has to
+ * stand out in a list ("new", "recommended").
+ *
+ * The ring is a padded `::after` masked down to its padding box, so it follows
+ * the radius and costs no layout. The angle is a registered property so the
+ * conic gradient can rotate by animating a number; where @property is not
+ * supported (older WebKitGTK in the launcher) the angle cannot interpolate, the
+ * keyframes step without effect and the ring simply stays still — a static
+ * gradient border, which is the intended fallback.
+ */
+@property --lp-glow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.lp-glow-border {
+  position: relative;
+  isolation: isolate;
+}
+
+.lp-glow-border::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--lp-glow-width, 1.5px));
+  z-index: 0;
+  padding: var(--lp-glow-width, 1.5px);
+  border-radius: inherit;
+  pointer-events: none;
+  /* Explicit: on an element that is also .lp-spotlight, that rule hides ::after. */
+  opacity: 1;
+  background: conic-gradient(
+    from var(--lp-glow-angle),
+    var(--lp-glow-from, var(--color-brand)),
+    var(--lp-glow-to, var(--color-action, var(--color-brand))),
+    transparent 40%,
+    transparent 60%,
+    var(--lp-glow-from, var(--color-brand))
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lp-glow-from, var(--color-brand)) 55%, transparent));
+  animation: lp-glow-spin var(--lp-glow-speed, 4s) linear infinite;
+  transition: opacity var(--duration-slow) var(--ease-emphasized);
+}
+
+/* Switched off, the ring fades rather than vanishing, and stops turning. */
+.lp-glow-border[data-lp-glow-off]::after {
+  opacity: 0;
+  animation-play-state: paused;
+}
+
+.lp-glow-border > * {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Both on one element (LpCard with `spotlight` and `glow`): the ring has taken
+ * `::after`, and `::before` belongs to the skin painter, so the spotlight moves
+ * onto the element's own background, under its fill-free overlay. Its strength
+ * is a registered property so it can still fade; without @property it switches.
+ */
+@property --lp-spot-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.lp-spotlight.lp-glow-border {
+  background-image: radial-gradient(
+    var(--lp-spot-size, 280px) circle at var(--lp-spot-x, 50%) var(--lp-spot-y, 50%),
+    color-mix(in srgb, var(--lp-spot-color, var(--color-brand)) var(--lp-spot-alpha), transparent),
+    transparent 70%
+  );
+  transition: --lp-spot-alpha var(--duration-medium) var(--ease-emphasized);
+}
+
+.lp-spotlight.lp-glow-border[data-lp-spot] {
+  --lp-spot-alpha: var(--lp-spot-strength, 18%);
+}
+
+@keyframes lp-glow-spin {
+  to {
+    --lp-glow-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-glow-border::after {
+    animation: none;
+  }
+  .lp-spotlight:not(.lp-glow-border)::after {
+    display: none;
+  }
+}

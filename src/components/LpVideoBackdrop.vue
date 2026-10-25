@@ -21,12 +21,12 @@ export default { inheritAttrs: false }
  *   paced on its own media clock, so a clip whose last frame does not match
  *   its first still loops without a visible cut.
  * - Speed (`rate`) and a darkening veil (`dim`) for text laid over it.
- * - Pausing where motion is unwanted: `paused`, a hidden tab, and the
- *   system's reduced-motion setting, which shows the first frame of the
+ * - Pausing where motion is unwanted: `paused`, a hidden tab, scrolled off
+ *   screen, and the system's reduced-motion setting, which shows the first frame of the
  *   stretch instead (`playWithReducedMotion` overrides it).
  * - Easing in and out of a pause (`easePlayback`): the picture slows to a
  *   standstill and gathers speed again instead of freezing and lurching. A
- *   hidden tab and reduced motion still stop at once.
+ *   hidden tab, a backdrop scrolled away and reduced motion still stop at once.
  *
  * The second element exists only while there is a seam to blend, so a plain
  * loop decodes one stream. Both play the same `src`: a URL the media element
@@ -34,6 +34,7 @@ export default { inheritAttrs: false }
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
+import { useInView } from "../composables/useInView"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { isNativeLoop, planLoop, seamProgress, seamReached } from "./videoBackdrop"
 
@@ -101,7 +102,13 @@ const throttle = ref(1)
 const SLOWEST_RATE = 1 / 16
 
 const reducedMotion = ref(prefersReducedMotion())
-const pageHidden = ref(typeof document !== "undefined" && document.hidden)
+/*
+ * Unseen: the tab is hidden or the backdrop is off screen. A video decoding
+ * frames under the fold spends as much as one in view, and a page of them
+ * (a hero, then panels further down) runs them all at once.
+ */
+const { el: root, inView } = useInView()
+const unseen = computed(() => !inView.value)
 
 const plan = computed(() =>
   planLoop(duration.value, { start: props.start, end: props.end, crossfade: props.crossfade }),
@@ -109,7 +116,7 @@ const plan = computed(() =>
 const native = computed(() => isNativeLoop(plan.value, duration.value))
 const blended = computed(() => plan.value.fade > 0)
 const still = computed(() => reducedMotion.value && !props.playWithReducedMotion)
-const playing = computed(() => ready.value && !props.paused && !pageHidden.value && !still.value)
+const playing = computed(() => ready.value && !props.paused && !unseen.value && !still.value)
 
 function element(index: 0 | 1) {
   return index === 0 ? first.value : second.value
@@ -253,8 +260,8 @@ function sync() {
     rampTo(1, easing)
     return
   }
-  // Nobody sees a hidden tab, and a still is asked for outright: both stop at once.
-  if (!running.value || pageHidden.value || still.value || !easing) {
+  // Nobody watches a hidden tab or a backdrop off screen, and a still is asked for outright: all stop at once.
+  if (!running.value || unseen.value || still.value || !easing) {
     rampTo(throttle.value, 0)
     stopElements()
     return
@@ -301,23 +308,18 @@ watch(
 function onMotionChange(event: MediaQueryListEvent) {
   reducedMotion.value = event.matches
 }
-function onVisibility() {
-  pageHidden.value = document.hidden
-}
 let motionQuery: MediaQueryList | null = null
 
 onMounted(() => {
   applyRate()
   motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
   motionQuery.addEventListener("change", onMotionChange)
-  document.addEventListener("visibilitychange", onVisibility)
 })
 
 onBeforeUnmount(() => {
   if (frame) cancelAnimationFrame(frame)
   if (ramp) cancelAnimationFrame(ramp)
   motionQuery?.removeEventListener("change", onMotionChange)
-  document.removeEventListener("visibilitychange", onVisibility)
 })
 
 function layerStyle(index: 0 | 1) {
@@ -339,7 +341,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 </script>
 
 <template>
-  <div :class="rootClass" aria-hidden="true" v-bind="rest">
+  <div ref="root" :class="rootClass" aria-hidden="true" v-bind="rest">
     <!-- Under the video, which fades in over it: removing a still laid on top
          would flash the page between the two. -->
     <img v-if="poster" class="absolute inset-0 size-full" :style="{ objectFit: fit }" :src="poster" alt="" />

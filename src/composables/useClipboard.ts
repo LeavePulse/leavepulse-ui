@@ -70,6 +70,23 @@ function writeLegacy(text: string): boolean {
   return ok
 }
 
+/*
+ * A blob (an image, mostly) goes through `clipboard.write`. There is no old
+ * command to fall back on here: the copy command only knows the selection,
+ * and an image cannot be selected into a text field. Browsers take a narrow
+ * set of types (PNG reliably, text/html and text/plain), so the caller
+ * converts first; a type the browser refuses fails like any other refusal.
+ */
+async function writeBlob(blob: Blob): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") return false
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })])
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** How long `copied` stays true — long enough to read, short enough to not linger. */
 const COPIED_MS = 1400
 
@@ -102,8 +119,11 @@ export interface UseClipboard {
    * Writes `text` to the clipboard. Resolves true on success, false when the
    * clipboard was unavailable or refused — it never rejects, so `await copy(x)`
    * is safe to call bare from an event handler.
+   *
+   * A `Blob` is written as itself under its own type (an image as a PNG blob),
+   * for "copy image" next to "copy link".
    */
-  copy: (text: string, options?: CopyOptions) => Promise<boolean>
+  copy: (data: string | Blob, options?: CopyOptions) => Promise<boolean>
 }
 
 /**
@@ -125,10 +145,12 @@ export function useClipboard(): UseClipboard {
   const { success, error } = useToast()
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  async function copy(text: string, options: CopyOptions = {}): Promise<boolean> {
+  async function copy(data: string | Blob, options: CopyOptions = {}): Promise<boolean> {
     const { toast = false, errorToast = false } = options
     try {
-      if (!(await writeAsync(text)) && !writeLegacy(text)) throw new Error("clipboard unavailable")
+      const written =
+        typeof data === "string" ? (await writeAsync(data)) || writeLegacy(data) : await writeBlob(data)
+      if (!written) throw new Error("clipboard unavailable")
 
       copied.value = true
       clearTimeout(timer)

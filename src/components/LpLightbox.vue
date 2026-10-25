@@ -25,7 +25,9 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useZoomPan } from "../composables/useZoomPan"
 import { fileNameOf, type LightboxItem } from "./lightbox"
+import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { useModalLayer } from "./modalDepth"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
@@ -381,20 +383,22 @@ async function download() {
   }
 }
 
-async function copy() {
-  const target = item.value
-  if (!target) return
-  try {
-    const response = await fetch(target.src)
-    const blob = await response.blob()
-    // Clipboard only takes PNG; re-encode anything else through a canvas.
-    const png =
-      blob.type === "image/png" ? blob : await reencodeToPng(await createImageBitmap(blob))
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })])
-    emit("copy", target, true)
-  } catch {
-    emit("copy", target, false)
-  }
+/*
+ * The copy button (LpCopyButton) asks for the image when clicked: fetched then,
+ * not for every image paged past, and reported against the item that was on
+ * screen at the click even if the viewer pages on while it loads.
+ */
+let copyTarget: LightboxItem | undefined
+async function imageToCopy(): Promise<Blob> {
+  const target = (copyTarget = item.value)
+  if (!target) throw new Error("No image")
+  const response = await fetch(target.src)
+  const blob = await response.blob()
+  // Clipboard only takes PNG; re-encode anything else through a canvas.
+  return blob.type === "image/png" ? blob : reencodeToPng(await createImageBitmap(blob))
+}
+function copyDone(ok: boolean) {
+  if (copyTarget) emit("copy", copyTarget, ok)
 }
 
 async function reencodeToPng(bitmap: ImageBitmap): Promise<Blob> {
@@ -492,9 +496,15 @@ const guardOutside = useOutsideGuard()
             >
               <LpIcon name="lucide:rotate-cw" :size="18" />
             </button>
-            <button v-if="copyable" :class="BTN" type="button" :title="text.copy" @click="copy">
-              <LpIcon name="lucide:copy" :size="18" />
-            </button>
+            <LpCopyButton
+              v-if="copyable"
+              :value="imageToCopy"
+              :icon-size="18"
+              :class="BTN"
+              :labels="{ copy: text.copy }"
+              @copied="copyDone(true)"
+              @error="copyDone(false)"
+            />
             <button
               v-if="downloadable"
               :class="BTN"
@@ -570,11 +580,13 @@ const guardOutside = useOutsideGuard()
             @error="((failed = true), (loading = false))"
           />
 
-          <LpIcon
-            v-if="loading && !failed && !covered(current)"
-            name="lucide:loader-circle"
-            :size="28"
-            class="absolute animate-spin text-white/50"
+          <!-- Mounted throughout and driven by `active`, so a cached image that
+               loads at once shows no spinner and a slow one keeps it long
+               enough not to blink. -->
+          <LpLoader
+            :active="loading && !failed && !covered(current)"
+            size="inline"
+            class="absolute text-[28px] text-white/50"
           />
 
           <button

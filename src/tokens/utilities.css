@@ -107,3 +107,31 @@
     transition: none;
   }
 }
+
+/*
+ * A two-state icon that morphs instead of swapping: stack both glyphs in one
+ * grid cell and mark the current one `data-on`; the leaving glyph shrinks and
+ * turns away as the arriving one grows in. Shared by the copy button's tick
+ * and every eye toggle in the fields group (password, secret, code display),
+ * so it lives here rather than in one component's <style>, which would only
+ * load where that component is imported.
+ */
+.lp-glyph-swap {
+  opacity: 0;
+  scale: 0.4;
+  rotate: -45deg;
+  transition:
+    opacity var(--duration-fast) var(--ease-emphasized),
+    scale var(--duration-medium) var(--ease-emphasized),
+    rotate var(--duration-medium) var(--ease-emphasized);
+}
+.lp-glyph-swap[data-on] {
+  opacity: 1;
+  scale: 1;
+  rotate: 0deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-glyph-swap {
+    transition: none;
+  }
+}

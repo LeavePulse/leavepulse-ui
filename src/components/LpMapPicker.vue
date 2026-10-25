@@ -24,6 +24,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
+import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 
@@ -672,21 +673,24 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :disabled="disabled || locating"
         :title="text.locate"
         :aria-label="text.locate"
+        :aria-busy="locating || undefined"
         @click="locate"
       >
-        <LpIcon
-          :name="locating ? 'lucide:loader-circle' : 'lucide:crosshair'"
-          :size="16"
-          :class="locating ? 'animate-spin' : ''"
-        />
+        <!-- At once, since it takes the crosshair's place; silent, since the
+             button's aria-busy already says it. -->
+        <LpLoader v-if="locating" size="inline" :delay="0" aria-hidden="true" class="text-[16px]" />
+        <LpIcon v-else name="lucide:crosshair" :size="16" />
       </button>
     </div>
 
-    <LpIcon
-      v-if="loadingTiles"
-      name="lucide:loader-circle"
-      :size="16"
-      class="pointer-events-none absolute left-2 top-2 animate-spin text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
+    <!-- Driven by `active` so cached tiles show nothing and a pan does not
+         blink it. Silent: tiles load on every pan and zoom, and announcing
+         each batch would only be noise. -->
+    <LpLoader
+      :active="loadingTiles"
+      size="inline"
+      aria-hidden="true"
+      class="pointer-events-none absolute left-2 top-2 text-[16px] text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
     />
 
     <p
