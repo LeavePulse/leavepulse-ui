@@ -1,6 +1,15 @@
 import { CalendarDate } from "@internationalized/date"
 import { describe, expect, test } from "bun:test"
-import { clampRange, defaultRangePresets, formatRange, normalizeRange, reshapeRange, sameRange } from "../src/components/dateRange"
+import {
+  clampRange,
+  dayAllowed,
+  defaultDatePresets,
+  defaultRangePresets,
+  formatRange,
+  normalizeRange,
+  reshapeRange,
+  sameRange,
+} from "../src/components/dateRange"
 
 const labels = { today: "Today", last7: "7", last30: "30", thisMonth: "This", lastMonth: "Last" }
 
@@ -55,4 +64,33 @@ test("reshapeRange refuses a day that breaks a rule", () => {
   expect(reshapeRange("2026-10-05", "2026-10-11", { maximumDays: 7 })).not.toBeNull()
   expect(reshapeRange("2026-10-05", "2026-10-10", { unavailable: (d) => d === "2026-10-08" })).toBeNull()
   expect(reshapeRange("2026-10-05", "2026-10-10", { allowed: (d) => d < "2026-10-09" })).toBeNull()
+})
+
+describe("defaultDatePresets", () => {
+  const presets = defaultDatePresets(
+    { today: "Today", tomorrow: "Tomorrow", inWeek: "Week" },
+    () => new CalendarDate(2026, 2, 26),
+  )
+  const days = Object.fromEntries(presets.map((p) => [p.label, p.date()]))
+
+  test("steps across a month end", () => {
+    expect(days["Today"]).toBe("2026-02-26")
+    expect(days["Tomorrow"]).toBe("2026-02-27")
+    expect(days["Week"]).toBe("2026-03-05")
+  })
+})
+
+describe("dayAllowed", () => {
+  test("honours bounds inclusively", () => {
+    expect(dayAllowed("2026-05-01", { min: "2026-05-01", max: "2026-05-31" })).toBe(true)
+    expect(dayAllowed("2026-04-30", { min: "2026-05-01" })).toBe(false)
+    expect(dayAllowed("2026-06-01", { max: "2026-05-31" })).toBe(false)
+  })
+
+  test("asks both predicates and rejects junk", () => {
+    expect(dayAllowed("2026-05-02", { isDisabled: (d) => d === "2026-05-02" })).toBe(false)
+    expect(dayAllowed("2026-05-03", { isDateUnavailable: (d) => d === "2026-05-03" })).toBe(false)
+    expect(dayAllowed("2026-05-04", { isDisabled: () => false, isDateUnavailable: () => false })).toBe(true)
+    expect(dayAllowed("nope")).toBe(false)
+  })
 })

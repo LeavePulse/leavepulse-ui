@@ -22,10 +22,25 @@ export default { inheritAttrs: false }
  * Zoom and pan are useZoomPan, the same maths the lightbox uses: the crop box
  * is fixed and the picture moves under it, which is the interaction people
  * already know from every avatar cropper.
+ *
+ * `file` may also be an address, so a link dropped on LpDropzone (its `link`
+ * event) goes straight in. It is loaded with CORS, because a canvas holding a
+ * picture from another origin without its permission cannot be read back, and
+ * export is the whole point. A server that refuses CORS still gets its picture
+ * shown and edited; export then reports `error` with cause "cors" rather than
+ * throwing the browser's SecurityError at the caller.
  */
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
-import { coverScale, cropGeometry, isSideways } from "./imageCrop"
+import {
+  coverScale,
+  cropGeometry,
+  exportType,
+  type ImageEditorError,
+  type ImageEditorErrorCause,
+  imageTypeFromUrl,
+  isSideways,
+} from "./imageCrop"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useReveal } from "../composables/useReveal"
 import { useZoomPan } from "../composables/useZoomPan"
@@ -36,8 +51,8 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
-    /** The picture to work on. */
-    file: File | Blob
+    /** The picture to work on: a file, or an http(s)/data address. */
+    file: File | Blob | string
     /**
      * Shape of the crop box.
      *
@@ -71,13 +86,21 @@ const props = withDefaults(
      * own strings.
      */
     labels?: Partial<
-      Record<"rotateLeft" | "rotateRight" | "zoomIn" | "zoomOut" | "reset" | "canvas", string>
+      Record<
+        "rotateLeft" | "rotateRight" | "zoomIn" | "zoomOut" | "reset" | "canvas" | "failed" | "cors",
+        string
+      >
     >
     /** Fade the picture in when the editor first comes into view. */
     animate?: boolean
   }>(),
   { aspect: "free", maxEdge: 2400, type: "image/jpeg", quality: 0.9, labels: () => ({}), animate: true },
 )
+
+const emit = defineEmits<{
+  /** The picture could not be opened, or (cause "cors") its crop cannot be exported. */
+  (e: "error", error: ImageEditorError): void
+}>()
 
 // Same rule as the rest of the kit: the entrance belongs to arrival, not to
 // mount. An editor inside a dialog that opens a minute later still draws.
@@ -92,6 +115,8 @@ const text = useLabels(
     zoomOut: "Zoom out",
     reset: "Reset",
     canvas: "Crop area — arrows pan, +/− zoom, R rotates, Alt+wheel turns freely",
+    failed: "This image couldn't be opened.",
+    cors: "This image's server doesn't allow it to be edited here. Upload the file instead.",
   },
   () => props.labels,
 )
@@ -105,7 +130,15 @@ const ASPECTS: Record<string, number | null> = {
 }
 
 const source = shallowRef<ImageBitmap | HTMLImageElement | null>(null)
+/** The address the preview shows: an object URL for a file, the address itself otherwise. */
 const objectUrl = ref("")
+/** The object URL this editor made and has to give back; never a caller's address. */
+let ownedUrl = ""
+/** The preview's `crossorigin`, matching how the picture was actually loaded. */
+const previewCors = ref<"anonymous" | undefined>(undefined)
+/** Loaded without CORS permission: shown, but the canvas cannot be exported. */
+const tainted = ref(false)
+const failed = ref(false)
 const rotation = ref(0)
 const viewport = ref<HTMLElement | null>(null)
 const zoom = useZoomPan({ min: 1, max: 6 })
@@ -146,17 +179,72 @@ watch(
     revoke()
     rotation.value = 0
     zoom.reset()
+    failed.value = false
+    tainted.value = false
     const mine = ++generation
-    objectUrl.value = URL.createObjectURL(file)
-    const decoded = await decode(file, objectUrl.value)
+    let decoded: ImageBitmap | HTMLImageElement | null
+    if (typeof file === "string") {
+      // The preview waits for the load: shown before it, the <img> would make
+      // its own request in a CORS mode that may not match the one that worked.
+      const loaded = await loadAddress(file)
+      decoded = loaded?.image ?? null
+      if (mine === generation && loaded) {
+        tainted.value = !loaded.cors
+        previewCors.value = loaded.cors ? "anonymous" : undefined
+        objectUrl.value = file
+      }
+    } else {
+      previewCors.value = undefined
+      ownedUrl = objectUrl.value = URL.createObjectURL(file)
+      decoded = await decode(file, objectUrl.value)
+    }
     if (mine !== generation) {
       if (decoded instanceof ImageBitmap) decoded.close()
       return
     }
     source.value = decoded
+    if (!decoded) fail(typeof file === "string" ? "load" : "decode")
   },
   { immediate: true },
 )
+
+/*
+ * A picture that does not open said nothing before: the decode resolved null,
+ * the preview showed the browser's broken-image glyph, and export returned
+ * null, which reads as "unchanged". Now the frame says so, the toolbar steps
+ * back, and the caller hears about it.
+ */
+function fail(cause: ImageEditorErrorCause) {
+  const url = typeof props.file === "string" ? props.file : undefined
+  if (cause !== "cors") {
+    failed.value = true
+    objectUrl.value = ""
+  }
+  emit("error", { cause, message: cause === "cors" ? text.value.cors : text.value.failed, url })
+}
+
+function loadImage(url: string, cors: boolean): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    if (cors) img.crossOrigin = "anonymous"
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+/*
+ * An address is tried with CORS first, so the crop can be exported. A server
+ * that does not send the header fails that request outright, which is not the
+ * same as the picture missing: a second, plain request tells the two apart, and
+ * a picture that opens only that way is still worth showing and lining up.
+ */
+async function loadAddress(url: string): Promise<{ image: HTMLImageElement; cors: boolean } | null> {
+  const shared = await loadImage(url, true)
+  if (shared) return { image: shared, cors: true }
+  const plain = await loadImage(url, false)
+  return plain ? { image: plain, cors: false } : null
+}
 
 /**
  * The picture, as something canvas can draw and measure.
@@ -198,7 +286,8 @@ const sourceSize = computed(() => {
 })
 
 function revoke() {
-  if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
+  if (ownedUrl) URL.revokeObjectURL(ownedUrl)
+  ownedUrl = ""
   objectUrl.value = ""
   if (source.value instanceof ImageBitmap) source.value.close()
   source.value = null
@@ -315,6 +404,10 @@ async function exportImage(): Promise<Blob | null> {
   const frame = viewport.value
   if (!picture || !size || !frame) return null
   if (!edited.value && props.aspect === "free") return null
+  if (tainted.value) {
+    fail("cors")
+    return null
+  }
 
   // The crop in upright space, from the same geometry the preview is drawn
   // with, then the whole source drawn through one transform: no per-quarter
@@ -342,17 +435,25 @@ async function exportImage(): Promise<Blob | null> {
   ctx.rotate((rotation.value * Math.PI) / 180)
   ctx.drawImage(picture, -size.width / 2, -size.height / 2)
 
-  return await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, outputType.value, props.quality),
-  )
+  // A picture that loaded with CORS can still taint the canvas (a redirect to
+  // another origin); the browser says so by throwing here.
+  try {
+    return await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, outputType.value, props.quality),
+    )
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "SecurityError") {
+      tainted.value = true
+      fail("cors")
+      return null
+    }
+    throw error
+  }
 }
 
-const ENCODABLE = new Set(["image/png", "image/jpeg", "image/webp"])
-
-const outputType = computed(() => {
-  if (props.type !== "source") return props.type
-  return ENCODABLE.has(props.file.type) ? props.file.type : "image/png"
-})
+const outputType = computed(() =>
+  exportType(props.type, typeof props.file === "string" ? imageTypeFromUrl(props.file) : props.file.type),
+)
 
 /*
  * The wheel.
@@ -461,6 +562,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <img
         v-if="objectUrl"
         :src="objectUrl"
+        :crossorigin="previewCors"
         alt=""
         draggable="false"
         class="lp-editor__image absolute select-none motion-reduce:transition-none"
@@ -471,6 +573,24 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         ]"
         :style="imageStyle"
       >
+
+      <!-- The same failed state the lightbox and gallery draw, in place of the
+           browser's broken-image glyph. -->
+      <Transition
+        enter-active-class="transition-opacity duration-[var(--duration-medium)] ease-[var(--ease-settle)] motion-reduce:transition-none"
+        leave-active-class="transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="failed"
+          role="alert"
+          class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center text-muted"
+        >
+          <LpIcon name="lucide:image-off" :size="40" />
+          <p class="text-sm">{{ text.failed }}</p>
+        </div>
+      </Transition>
 
       <!-- Thirds, only while the picture is being moved. A composition guide
            belongs to the moment of composing; left on, it is one more thing to
@@ -504,6 +624,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpButton
           size="sm"
           variant="ghost"
+          :disabled="!source"
           :title="text.rotateLeft"
           :aria-label="text.rotateLeft"
           @click="rotate(-90)"
@@ -513,6 +634,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpButton
           size="sm"
           variant="ghost"
+          :disabled="!source"
           :title="text.rotateRight"
           :aria-label="text.rotateRight"
           @click="rotate(90)"
@@ -525,7 +647,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpButton
           size="sm"
           variant="ghost"
-          :disabled="zoom.scale.value <= 1"
+          :disabled="!source || zoom.scale.value <= 1"
           :title="text.zoomOut"
           :aria-label="text.zoomOut"
           @click="zoom.zoomBy(1 / 1.2)"
@@ -539,6 +661,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpButton
           size="sm"
           variant="ghost"
+          :disabled="!source"
           :title="text.zoomIn"
           :aria-label="text.zoomIn"
           @click="zoom.zoomBy(1.2)"

@@ -365,7 +365,7 @@ export const registry: ComponentEntry[] = [
     id: "switch",
     name: "Switch · Checkbox · Radio",
     description:
-      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` (LpSwitch also a `description`, and `label-position=\"start\"` for a settings row with the switch at the right edge). LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
+      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` and a `description` (a secondary line the control is described by); LpSwitch also `label-position=\"start\"` for a settings row with the switch at the right edge. LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
     state: () => reactive({ on: true, checked: true, notify: false, plan: "pro", tier: "pro", radioOpts }),
     template: `<div class="flex flex-col gap-6">
@@ -373,6 +373,7 @@ export const registry: ComponentEntry[] = [
     <LpSwitch v-model="on" />
     <LpSwitch v-model="on" label="Dark mode" />
     <LpCheckbox v-model="checked" label="Remember me" />
+    <LpCheckbox v-model="checked" label="Keep me signed in" description="On this device, for 30 days." class="max-w-56" />
     <LpRadioGroup v-model="plan" :options="radioOpts" />
   </div>
 
@@ -648,7 +649,7 @@ export const registry: ComponentEntry[] = [
     id: "progress",
     name: "Progress",
     description:
-      "One value as a bar or a ring — same data, same tones. `variant=\"ring\"` for KPI dials, where a percentage should read at a glance.",
+      "One value as a bar or a ring — same data, same tones. `variant=\"ring\"` for KPI dials, where a percentage should read at a glance. A `class` lands on the outside of either and is merged, so `h-2.5` thickens a bare bar and `w-40` narrows a titled one.",
     components: { LpProgress, LpSlider, LpButton },
     state: () => reactive({ live: 35 }),
     template: `<div class="flex flex-col gap-8">
@@ -667,6 +668,7 @@ export const registry: ComponentEntry[] = [
 
   <div class="flex w-80 flex-col gap-3">
     <LpProgress :value="35" />
+    <LpProgress :value="55" class="h-2.5" />
     <LpProgress :value="70" tone="action" />
     <LpProgress :value="90" tone="danger" />
   </div>
@@ -1126,10 +1128,15 @@ export const registry: ComponentEntry[] = [
   {
     id: "password",
     name: "PasswordInput",
-    description: "Password field with show/hide toggle.",
+    description:
+      "Password field with show/hide toggle. `size` (sm/md/lg) as on LpInput; the toggle's names go through `labels` (scope \"passwordInput\").",
     components: { LpPasswordInput },
     state: () => reactive({ value: "" }),
-    template: `<div class="w-72"><LpPasswordInput v-model="value" placeholder="••••••••" /></div>`,
+    template: `<div class="flex w-72 flex-col gap-2">
+  <LpPasswordInput v-model="value" size="sm" placeholder="sm" />
+  <LpPasswordInput v-model="value" placeholder="md (default)" />
+  <LpPasswordInput v-model="value" size="lg" placeholder="lg" />
+</div>`,
   },
   {
     id: "input-mask",
@@ -1240,12 +1247,19 @@ export const registry: ComponentEntry[] = [
     id: "address",
     name: "AddressInput",
     description:
-      "Postal address form with live suggestions on the street and city fields, plus a map to drop a pin when typing won't do — the picked point is reverse-geocoded back into the fields. v-model is { line, city, postalCode, country, lat, lon }. The geocoder (`provider`), tile server (`tiles`) and the map itself (the `map` slot) are all replaceable; the picker is loaded on demand, so forms that never open the map don't pay for it.",
-    components: { LpAddressInput },
-    state: () => reactive({ value: { line: "", city: "", postalCode: "", country: "" } }),
-    template: `<div class="w-full max-w-xl">
-  <LpAddressInput v-model="value" second-line />
-  <p class="mt-3 text-xs text-muted">{{ JSON.stringify(value) }}</p>
+      "Postal address form with live suggestions on the street and city fields, plus a map to drop a pin when typing won't do — the picked point is reverse-geocoded back into the fields. v-model is { line, city, postalCode, country, lat, lon }. The geocoder (`provider`), tile server (`tiles`) and the map itself (the `map` slot) are all replaceable; the picker is loaded on demand, so forms that never open the map don't pay for it. Inside an LpFormField the field's label names the whole group, its error describes it, and its invalid/disabled states reach every part; `invalid` does the same on its own.",
+    components: { LpAddressInput, LpFormField, LpSwitch },
+    state: () =>
+      reactive({ value: { line: "", city: "", postalCode: "", country: "" }, broken: false, locked: false }),
+    template: `<div class="flex w-full max-w-xl flex-col gap-3">
+  <div class="flex gap-6">
+    <LpSwitch v-model="broken" label="Field error" />
+    <LpSwitch v-model="locked" label="Field disabled" />
+  </div>
+  <LpFormField label="Delivery address" :error="broken ? 'We do not deliver there yet.' : undefined" :disabled="locked">
+    <LpAddressInput v-model="value" second-line />
+  </LpFormField>
+  <p class="text-xs text-muted">{{ JSON.stringify(value) }}</p>
 </div>`,
   },
   {
@@ -1281,7 +1295,7 @@ export const registry: ComponentEntry[] = [
     id: "colorpicker",
     name: "ColorPicker",
     description:
-      "Colour field + popover: a saturation/brightness area over a hue rail, an optional alpha rail, a hex/CSS text field and preset swatches. v-model is a CSS colour STRING — `format` picks hex/rgb/hsl on the way out, and all three are parsed on the way in. @change fires on release (commit-vs-preview), and the area and rails are arrow-key operable. Right-click either the field or the panel to copy as hex/rgb/hsl, switch which format it shows via `Show as`, or paste a colour in — pasting takes hex, rgb() and hsl() in any CSS form, plus loose shapes like `255 0 0` or `rgb 17 34 51`; `recent` remembers what you settle on and offers it back above the presets. Every string it renders — menu items, the Recent heading, the accessible names on the area and rails — goes through `labels` for i18n.",
+      "Colour field + popover: a saturation/brightness area over a hue rail, an optional alpha rail, a hex/CSS text field and preset swatches. v-model is a CSS colour STRING — `format` picks hex/rgb/hsl on the way out, and all three are parsed on the way in. @change fires on release (commit-vs-preview), and the area and rails are arrow-key operable. Right-click either the field or the panel to copy as hex/rgb/hsl, switch which format it shows via `Show as`, or paste a colour in — pasting takes hex, rgb() and hsl() in any CSS form, plus loose shapes like `255 0 0` or `rgb 17 34 51`; `recent` remembers what you settle on and offers it back above the presets. Every string it renders — menu items, the Recent heading, the accessible names on the area and rails, the copy toast — goes through `labels` and the app-wide config (scope \"colorPicker\"); an explicit `copy-toast` still wins, and `false` copies silently.",
     components: { LpColorPicker },
     state: () => reactive({ brand: "#3b82f6", tint: "rgba(236, 72, 153, 0.6)" }),
     template: `<div class="flex flex-col gap-4">
@@ -1349,16 +1363,29 @@ export const registry: ComponentEntry[] = [
     id: "calendar",
     name: "Calendar · DatePicker",
     description:
-      "Inline month calendar and a field+popover date picker (reka Calendar + @internationalized/date). Model is an ISO \"YYYY-MM-DD\" string; min/max bounds and an isDisabled predicate. Today is tinted, the selection is a brand pill.",
+      "Inline month calendar and a field+popover date picker (reka Calendar + @internationalized/date). Model is an ISO \"YYYY-MM-DD\" string; min/max bounds, an isDisabled predicate and `is-date-unavailable` for struck-through days (weekends below). Same core props as the range pair: `months`, `locale`, `labels` (month buttons, scope \"calendar\"). The picker adds `presets`: `true` for Today / Tomorrow / In a week, or your own `{ label, date }` list; a preset that falls on a day the rules forbid is disabled. Its placeholder and Done button come from `labels` (scope \"datePicker\"). Today is tinted, the selection is a brand pill.",
     components: { LpCalendar, LpDatePicker },
-    state: () => reactive({ date: "2026-06-18", picked: "", moment: "" }),
+    state: () =>
+      reactive({
+        date: "2026-06-18",
+        picked: "",
+        moment: "",
+        workday: (iso: string) => [0, 6].includes(new Date(`${iso}T00:00`).getDay()),
+        sprint: [
+          { label: "Sprint start", date: () => "2026-06-01" },
+          { label: "Demo day", date: () => "2026-06-12" },
+        ],
+      }),
     template: `<div class="flex flex-wrap items-start gap-6">
-  <LpCalendar v-model="date" min="2026-06-01" />
+  <LpCalendar v-model="date" min="2026-06-01" :is-date-unavailable="workday" />
+  <LpCalendar v-model="date" :months="2" locale="de-DE" :labels="{ previous: 'Zurück', next: 'Weiter' }" />
   <div class="flex w-64 flex-col gap-2">
-    <LpDatePicker v-model="picked" clearable placeholder="Select a date" />
+    <LpDatePicker v-model="picked" clearable presets placeholder="Select a date" />
     <p class="text-xs text-muted">ISO value: {{ picked || "—" }}</p>
-    <LpDatePicker v-model="moment" time clearable placeholder="Date and time" />
+    <LpDatePicker v-model="moment" time clearable presets :labels="{ placeholder: 'Date and time' }" />
     <p class="text-xs text-muted">with time: {{ moment || "—" }}</p>
+    <LpDatePicker v-model="picked" :presets="sprint" :is-date-unavailable="workday" locale="fr-FR" />
+    <p class="text-xs text-muted">own presets, French, weekends unavailable</p>
   </div>
 </div>`,
   },
@@ -2650,7 +2677,7 @@ export const registry: ComponentEntry[] = [
     id: "popover",
     name: "Popover",
     description:
-      "Anchored overlays. Popover takes side/align, `side-offset`, `panel-class` (width/padding/overflow) and a controllable `v-model:open`; left unbound it stays uncontrolled.",
+      "Anchored overlays. Popover takes side/align, `side-offset`, `panel-class` (width/padding/overflow, merged so `w-72 p-0` replaces the default width and padding) and a controllable `v-model:open`; left unbound it stays uncontrolled.",
     components: { LpPopover, LpButton },
     state: () => reactive({ open: false }),
     template: `<div class="flex flex-wrap items-center gap-3">
@@ -2664,7 +2691,7 @@ export const registry: ComponentEntry[] = [
     v-model:open="open"
     align="end"
     :side-offset="10"
-    panel-class="w-72"
+    panel-class="w-72 p-5"
   >
     <template #trigger>
       <LpButton variant="outline">Controlled ({{ open ? 'open' : 'closed' }})</LpButton>
@@ -2691,24 +2718,26 @@ export const registry: ComponentEntry[] = [
   {
     id: "numberfield",
     name: "NumberField",
-    description: "Numeric input with stepper buttons, min/max/step, optional unit.",
+    description:
+      "Numeric input with stepper buttons, min/max/step, optional unit, and `size` (sm/md/lg) as on LpInput. The stepper buttons are named through `labels` (scope \"numberField\") instead of reka's built-in English.",
     components: { LpNumberField },
     state: () => reactive({ value: 30, watts: 10, millis: 380 }),
     template: `<div class="w-48 space-y-3">
-  <LpNumberField v-model="value" :min="0" :max="100" :step="5" />
+  <LpNumberField v-model="value" :min="0" :max="100" :step="5" size="sm" :labels="{ increase: 'Plus 5', decrease: 'Minus 5' }" />
   <LpNumberField v-model="watts" :min="0" unit="W" />
-  <LpNumberField v-model="millis" :min="0" unit="mA" />
+  <LpNumberField v-model="millis" :min="0" unit="mA" size="lg" />
   <p class="text-xs text-muted">value: {{ value }}</p>
 </div>`,
   },
   {
     id: "timefield",
     name: "TimeField",
-    description: "Time of day as hour and minute segments (reka TimeField): type or step with the arrow keys. Model is \"HH:mm\", like a native time input, but the clock is fixed by `hourCycle` (24 by default) instead of the browser locale, and it is themed like the other fields.",
+    description: "Time of day as hour and minute segments (reka TimeField): type or step with the arrow keys. Model is \"HH:mm\", like a native time input, but the clock is fixed by `hourCycle` (24 by default) instead of the browser locale, and it is themed like the other fields. Full width by default; a class like `w-32` wins over it.",
     components: { LpTimeField },
     state: () => reactive({ at: "18:30", twelve: "" }),
     template: `<div class="flex w-56 flex-col gap-3">
   <LpTimeField v-model="at" />
+  <LpTimeField v-model="at" class="w-32" size="sm" />
   <LpTimeField v-model="twelve" :hour-cycle="12" locale="en-US" />
   <p class="text-xs text-muted">value: {{ at || "—" }} · {{ twelve || "—" }}</p>
 </div>`,
@@ -2840,7 +2869,7 @@ export const registry: ComponentEntry[] = [
     id: "alert",
     name: "Alert",
     description:
-      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. The difference between them that you cannot see is what a screen reader does: only `danger` interrupts it (role=\"alert\"), the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it. An alert that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does.",
+      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. The difference between them that you cannot see is what a screen reader does: only `danger` interrupts it (role=\"alert\"), the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it. An alert that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does. A `class` is merged into the variant's own, so `p-3` or `rounded-control` replaces the default rather than racing it.",
     components: { LpAlert, LpButton, LpShift },
     state: () => {
       const s = reactive({ saved: false, collecting: false, collected: false })
@@ -3508,7 +3537,7 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     id: "imageeditor",
     name: "ImageEditor",
     description:
-      "Straighten and crop on the way to an upload: quarter turns, wheel/pinch zoom, drag to pan. `export()` returns the visible region as a Blob, or null when nothing was changed — an untouched picture uploads byte-for-byte rather than a generation worse.",
+      "Straighten and crop on the way to an upload: quarter turns, wheel/pinch zoom, drag to pan. `export()` returns the visible region as a Blob, or null when nothing was changed — an untouched picture uploads byte-for-byte rather than a generation worse. `file` also takes an address (a link from LpDropzone's `link` event), loaded with CORS. A file that does not open draws a failed state and emits `error` (cause \"decode\", or \"load\" for an address); a picture whose server refuses CORS is still shown and edited, and export emits `error` with cause \"cors\" instead of throwing.",
     components: { LpImageEditor, LpButton, LpSelect },
     state: () => {
       // A deliberately sideways photograph, the case this exists for.
@@ -3525,8 +3554,17 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
  font-size="34" fill="rgba(255,255,255,.5)">900 × 1600 — portrait</text>
 </svg>`
       const file = new File([svg], "plate.svg", { type: "image/svg+xml" })
+      const sources: Record<string, File | string> = {
+        plate: file,
+        broken: new File(["not a picture"], "broken.png", { type: "image/png" }),
+        link: "https://picsum.photos/id/1018/800/600.jpg",
+        closed: "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png",
+      }
       const state = reactive({
-        file,
+        file: file as File | string,
+        which: "plate",
+        error: "",
+        sources,
         aspect: "free",
         type: "image/jpeg",
         result: "",
@@ -3535,7 +3573,9 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
           const blob = await state.editor?.export()
           state.result = blob
             ? `${blob.type}, ${(blob.size / 1024).toFixed(1)} KB written`
-            : "unchanged — the original is uploaded as it arrived"
+            : state.error
+              ? ""
+              : "unchanged — the original is uploaded as it arrived"
         },
       })
       return state
@@ -3560,7 +3600,24 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
       { value: 'source', label: 'source (SVG → PNG)' },
     ]"
   />
-  <LpImageEditor :ref="(el) => (editor = el)" :file="file" :aspect="aspect" :type="type" />
+  <LpSelect
+    v-model="which"
+    :options="[
+      { value: 'plate', label: 'file: sideways plate' },
+      { value: 'broken', label: 'file: not a picture' },
+      { value: 'link', label: 'address (CORS)' },
+      { value: 'closed', label: 'address (no CORS: export reports it)' },
+    ]"
+    @update:model-value="(v) => { file = sources[v]; error = ''; result = '' }"
+  />
+  <LpImageEditor
+    :ref="(el) => (editor = el)"
+    :file="file"
+    :aspect="aspect"
+    :type="type"
+    @error="(e) => (error = e.cause + ': ' + e.message)"
+  />
+  <p v-if="error" class="text-xs text-danger">{{ error }}</p>
   <LpButton size="sm" @click="save">Export</LpButton>
   <p v-if="result" class="text-xs text-muted">{{ result }}</p>
 </div>`,

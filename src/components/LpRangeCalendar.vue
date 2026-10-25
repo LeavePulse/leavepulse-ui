@@ -1,10 +1,10 @@
 <script lang="ts">
+import type { CalendarLabels } from "./calendar"
+
 export default { inheritAttrs: false }
 
-export interface RangeCalendarLabels extends Record<string, string> {
-  previous: string
-  next: string
-}
+/** The month buttons' names; the same shape as LpCalendar's. */
+export type RangeCalendarLabels = CalendarLabels
 
 /** How a range changed: picked by two clicks, or an end reshaped. */
 export type RangeChange = { via: "pick" | "drag" | "keyboard" }
@@ -43,6 +43,7 @@ import {
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { CALENDAR_FRAME, CALENDAR_LABELS, CALENDAR_NAV } from "./calendar"
 import { type DateRange, normalizeRange, parseIsoDay, reshapeRange } from "./dateRange"
 import LpIcon from "./LpIcon.vue"
 
@@ -71,11 +72,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: DateRange, change: RangeChange): void
 }>()
 
-const text = useLabels<RangeCalendarLabels>(
-  "rangeCalendar",
-  { previous: "Previous month", next: "Next month" },
-  () => props.labels,
-)
+const text = useLabels<RangeCalendarLabels>("rangeCalendar", CALENDAR_LABELS, () => props.labels)
 
 function toReka(range: DateRange | undefined): RekaRange {
   const r = normalizeRange(range)
@@ -275,12 +272,7 @@ const maxValue = computed(() => parseIsoDay(props.max))
 const disabledFor = (date: DateValue) => props.isDisabled?.(date.toString()) ?? false
 const unavailableFor = (date: DateValue) => props.isDateUnavailable?.(date.toString()) ?? false
 
-const navBtn =
-  "flex size-8 items-center justify-center rounded-control text-muted outline-none transition-[color,background-color,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:bg-surface-soft hover:text-ink active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring"
-
-const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "inline-block rounded-card border border-line bg-surface-raised p-3",
-)
+const { class: rootClass, attrs: rest } = useMergedAttrs(CALENDAR_FRAME)
 </script>
 
 <template>
@@ -313,11 +305,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     @keydown.capture="onKeydownCapture"
   >
     <RangeCalendarHeader class="mb-2 flex items-center justify-between gap-2">
-      <RangeCalendarPrev :class="navBtn" :aria-label="text.previous">
+      <RangeCalendarPrev :class="CALENDAR_NAV" :aria-label="text.previous">
         <LpIcon name="lucide:chevron-left" :size="16" />
       </RangeCalendarPrev>
       <RangeCalendarHeading class="text-sm font-semibold text-ink" />
-      <RangeCalendarNext :class="navBtn" :aria-label="text.next">
+      <RangeCalendarNext :class="CALENDAR_NAV" :aria-label="text.next">
         <LpIcon name="lucide:chevron-right" :size="16" />
       </RangeCalendarNext>
     </RangeCalendarHeader>

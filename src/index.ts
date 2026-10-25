@@ -33,6 +33,7 @@ export { default as LpBreadcrumbs } from "./components/LpBreadcrumbs.vue"
 export type { Crumb } from "./components/LpBreadcrumbs.vue"
 export { default as LpButton } from "./components/LpButton.vue"
 export { default as LpCalendar } from "./components/LpCalendar.vue"
+export type { CalendarLabels } from "./components/calendar"
 export { default as LpCard } from "./components/LpCard.vue"
 export { default as LpChart } from "./components/LpChart.vue"
 export type { ChartPointEvent } from "./components/LpChart.vue"
@@ -91,12 +92,28 @@ export type { ConfirmOptions } from "./components/confirm"
 export { default as LpContextMenu } from "./components/LpContextMenu.vue"
 export type { ContextMenuItemDef } from "./components/LpContextMenu.vue"
 export { default as LpDatePicker } from "./components/LpDatePicker.vue"
+export type { DatePickerLabels } from "./components/LpDatePicker.vue"
 export { default as LpDateRangePicker } from "./components/LpDateRangePicker.vue"
 export type { DateRangePickerLabels } from "./components/LpDateRangePicker.vue"
 export { default as LpRangeCalendar } from "./components/LpRangeCalendar.vue"
 export type { RangeCalendarLabels } from "./components/LpRangeCalendar.vue"
-export { clampRange, defaultRangePresets, formatRange, normalizeRange, sameRange } from "./components/dateRange"
-export type { DateRange, DateRangePreset, DateRangePresetLabels } from "./components/dateRange"
+export {
+  clampRange,
+  dayAllowed,
+  defaultDatePresets,
+  defaultRangePresets,
+  formatRange,
+  normalizeRange,
+  sameRange,
+} from "./components/dateRange"
+export type {
+  DatePreset,
+  DatePresetLabels,
+  DateRange,
+  DateRangePreset,
+  DateRangePresetLabels,
+  DayRules,
+} from "./components/dateRange"
 export { default as LpDisclosure } from "./components/LpDisclosure.vue"
 export { default as LpDivider } from "./components/LpDivider.vue"
 export { default as LpDrawer } from "./components/LpDrawer.vue"
@@ -125,6 +142,7 @@ export { default as LpFormField } from "./components/LpFormField.vue"
 export { default as LpIcon } from "./components/LpIcon.vue"
 export { iconsVersion, registerAllIcons, registerIconCollection, registerIcons } from "./icons"
 export { default as LpImageEditor } from "./components/LpImageEditor.vue"
+export type { ImageEditorError, ImageEditorErrorCause } from "./components/imageCrop"
 export { default as LpInfraNode } from "./components/LpInfraNode.vue"
 export type { InfraNodeData } from "./components/LpInfraNode.vue"
 export { default as LpInput } from "./components/LpInput.vue"
@@ -146,11 +164,13 @@ export type {
   NotificationLabels,
 } from "./components/LpNotificationBell.vue"
 export { default as LpNumberField } from "./components/LpNumberField.vue"
+export type { NumberFieldLabels } from "./components/LpNumberField.vue"
 export { default as LpTimeField } from "./components/LpTimeField.vue"
 export { default as LpNumberFlow } from "./components/LpNumberFlow.vue"
 export { default as LpOtpInput } from "./components/LpOtpInput.vue"
 export { default as LpPagination } from "./components/LpPagination.vue"
 export { default as LpPasswordInput } from "./components/LpPasswordInput.vue"
+export type { PasswordInputLabels } from "./components/LpPasswordInput.vue"
 export { default as LpPie } from "./components/LpPie.vue"
 export type { SliceEvent } from "./components/LpPie.vue"
 export type { PieText } from "./components/LpPie.vue"

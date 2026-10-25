@@ -1,6 +1,14 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, watch } from "vue"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 
 const alert = tv({
@@ -68,13 +76,14 @@ const role = computed(() => {
   return live === "assertive" ? "alert" : live === "polite" ? "status" : undefined
 })
 
-const classes = computed(() => alert({ variant: props.variant }))
+// `p-3` or a different border must beat the variant's own, not race it.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() => alert({ variant: props.variant }))
 const resolvedIcon = computed(() => props.icon ?? (props.busy ? "lucide:loader-circle" : ICONS[props.variant ?? "info"]))
 const iconTone = computed(() => ICON_TONE[props.variant ?? "info"])
 </script>
 
 <template>
-  <div :class="classes" :role="role" :aria-busy="busy || undefined">
+  <div :class="rootClass" :role="role" :aria-busy="busy || undefined" v-bind="rest">
     <LpIcon
       :name="resolvedIcon"
       :size="18"

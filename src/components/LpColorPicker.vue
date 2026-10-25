@@ -51,6 +51,7 @@ import {
   rgbToHsv,
 } from "./color"
 import { useClipboard } from "../composables/useClipboard"
+import { useLabels } from "../composables/useLpConfig"
 import { POPOVER_PANEL } from "./dropdown"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
@@ -63,7 +64,7 @@ import LpRollingText from "./LpRollingText.vue"
  * the component usable bare. Without this an app in another language would
  * still announce "Saturation and brightness" to a screen reader.
  */
-export interface ColorPickerLabels {
+export interface ColorPickerLabels extends Partial<Record<string, string>> {
   saturation?: string
   hue?: string
   opacity?: string
@@ -80,6 +81,8 @@ export interface ColorPickerLabels {
   format_hsl?: string
   /** Read out as the area's value, with {s} and {v} as whole percentages. */
   saturationValueText?: string
+  /** Toast after a copy, with {value} standing in for the colour (see the `copyToast` prop). */
+  copyToast?: string
 }
 
 const props = withDefaults(
@@ -134,8 +137,9 @@ const props = withDefaults(
     /**
      * Toast raised after a successful copy, with `{value}` standing in for the
      * colour. `false` copies silently — for a page that already confirms it, or
-     * one where a toast per copy would be noise. Translate it via `labels`
-     * rather than here if the rest of your strings go through i18n.
+     * one where a toast per copy would be noise. Unset, it is the `copyToast`
+     * label ("Copied {value}"), so an app translates it with the rest of its
+     * strings; a string here wins over the label.
      */
     copyToast?: string | false
   }>(),
@@ -150,7 +154,6 @@ const props = withDefaults(
     recent: false,
     recentKey: "lp.color.recent",
     recentLimit: 8,
-    copyToast: "Copied {value}",
   },
 )
 
@@ -167,24 +170,29 @@ function fill(tpl: string, vars: Record<string, string | number>): string {
   return tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""))
 }
 
-// Single lookup for every label, so the template never repeats the fallbacks.
-const l = computed(() => ({
-  saturation: props.labels?.saturation ?? "Saturation and brightness",
-  hue: props.labels?.hue ?? "Hue",
-  opacity: props.labels?.opacity ?? "Opacity",
-  value: props.labels?.value ?? "Colour value",
-  recent: props.labels?.recent ?? "Recent",
-  copyHex: props.labels?.copyHex ?? "Copy hex",
-  copyRgb: props.labels?.copyRgb ?? "Copy rgb",
-  copyHsl: props.labels?.copyHsl ?? "Copy hsl",
-  paste: props.labels?.paste ?? "Paste colour",
-  formatAs: props.labels?.formatAs ?? "Show as",
-  format_hex: props.labels?.format_hex ?? "HEX",
-  format_rgb: props.labels?.format_rgb ?? "RGB",
-  format_hsl: props.labels?.format_hsl ?? "HSL",
-  saturationValueText:
-    props.labels?.saturationValueText ?? "saturation {s}%, brightness {v}%",
-}))
+// Single lookup for every label, so the template never repeats the fallbacks:
+// the `labels` prop over the app-wide config over the English defaults.
+const l = useLabels<{ [K in keyof ColorPickerLabels]-?: string }>(
+  "colorPicker",
+  {
+    saturation: "Saturation and brightness",
+    hue: "Hue",
+    opacity: "Opacity",
+    value: "Colour value",
+    recent: "Recent",
+    copyHex: "Copy hex",
+    copyRgb: "Copy rgb",
+    copyHsl: "Copy hsl",
+    paste: "Paste colour",
+    formatAs: "Show as",
+    format_hex: "HEX",
+    format_rgb: "RGB",
+    format_hsl: "HSL",
+    saturationValueText: "saturation {s}%, brightness {v}%",
+    copyToast: "Copied {value}",
+  },
+  () => props.labels,
+)
 
 const { copy } = useClipboard()
 
@@ -533,7 +541,7 @@ function copyAs(fmt: ColorFormat) {
   // The toast quotes the value: a menu item that closes the moment it is picked
   // leaves nothing on screen to confirm WHICH colour went to the clipboard, and
   // the one thing worth checking is that it was the colour you meant.
-  const toast = props.copyToast
+  const toast = props.copyToast ?? l.value.copyToast
   void copy(text, { toast: toast === false ? false : fill(toast, { value: text }) })
 }
 

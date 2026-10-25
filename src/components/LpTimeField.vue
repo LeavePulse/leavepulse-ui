@@ -1,3 +1,10 @@
+<script lang="ts">
+// The consumer's `class` is merged into the root's own (below) rather than
+// appended to it, so opt out of the automatic pass-through that would add it
+// a second time, unmerged.
+export default { inheritAttrs: false }
+</script>
+
 <script setup lang="ts">
 /*
  * Time-of-day field: hour and minute segments, typed or stepped with the arrow
@@ -14,6 +21,7 @@ import { Time } from "@internationalized/date"
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui"
 import { computed } from "vue"
 import { useFieldControl } from "../composables/useField"
+import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
@@ -62,6 +70,15 @@ const shellSize = {
   md: "h-(--size-control-md) text-sm",
   lg: "h-(--size-control-lg) text-sm",
 }
+
+// `w-full` is the default, not a rule: a time column of `w-28` must win over it.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    shellSize[props.size],
+    field.value.invalid ? "border-danger focus-within:ring-danger-soft" : "border-line focus-within:border-brand",
+  ].join(" "),
+)
 </script>
 
 <template>
@@ -74,11 +91,8 @@ const shellSize = {
     :disabled="field.disabled"
     :aria-invalid="field.invalid || undefined"
     :aria-describedby="field.describedBy"
-    class="flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55"
-    :class="[
-      shellSize[size],
-      field.invalid ? 'border-danger focus-within:ring-danger-soft' : 'border-line focus-within:border-brand',
-    ]"
+    :class="rootClass"
+    v-bind="rest"
     @update:model-value="onUpdate"
   >
     <LpIcon v-if="icon" name="lucide:clock" :size="15" class="mr-1.5 shrink-0 text-muted" />

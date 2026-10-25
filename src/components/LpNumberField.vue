@@ -16,9 +16,15 @@ import {
 import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 import { useFieldControl } from "../composables/useField"
+import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
-const props = defineProps<{
+export interface NumberFieldLabels extends Record<string, string> {
+  increase: string
+  decrease: string
+}
+
+const props = withDefaults(defineProps<{
   // null = empty field (reka's native state); consumers that need a number
   // should default it themselves, the field doesn't invent a value.
   modelValue?: number | null
@@ -32,7 +38,10 @@ const props = defineProps<{
   // Not part of the value: it is never typed, selected, or submitted.
   unit?: string
   invalid?: boolean
-}>()
+  /** Control height, matching LpInput. */
+  size?: "sm" | "md" | "lg"
+  labels?: Partial<NumberFieldLabels>
+}>(), { size: "md" })
 
 defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
 
@@ -40,6 +49,20 @@ defineEmits<{ (e: "update:modelValue", value: number | null): void }>()
 // screen the two read as one field, and without this a reader announces "380"
 // and leaves out the milliamps that make it mean anything.
 const unitId = useId()
+
+// reka names the stepper buttons "Increase" / "Decrease" in English and nothing
+// else; an aria-label on the button replaces its own.
+const text = useLabels<NumberFieldLabels>(
+  "numberField",
+  { increase: "Increase", decrease: "Decrease" },
+  () => props.labels,
+)
+
+const SIZE = {
+  sm: "h-(--size-control-sm) text-xs",
+  md: "h-(--size-control-md) text-sm",
+  lg: "h-(--size-control-lg) text-sm",
+}
 
 const field = useFieldControl(() => ({ wrapped: false, invalid: props.invalid, disabled: props.disabled }))
 const describedBy = computed(
@@ -49,7 +72,8 @@ const describedBy = computed(
 // The field is full-width with its own control frame — the two things a consumer laying out a compact numeric column needs to change.
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
-    "flex h-(--size-control-md) w-full items-center rounded-control border bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    "flex w-full items-center rounded-control border bg-surface-soft transition-colors duration-[var(--duration-fast)] focus-within:ring-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    SIZE[props.size],
     field.value.invalid
       ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
       : "border-line focus-within:border-brand focus-within:ring-ring",
@@ -71,6 +95,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     @update:model-value="(v) => $emit('update:modelValue', v ?? null)"
   >
     <NumberFieldDecrement
+      :aria-label="text.decrease"
       class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
       <LpIcon
@@ -83,13 +108,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       :id="field.id"
       :aria-describedby="describedBy"
       :aria-invalid="field.invalid || undefined"
-      class="min-w-0 flex-1 bg-transparent text-center text-sm text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      class="min-w-0 flex-1 bg-transparent text-center text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
     />
     <!-- The unit sits between the value and the increment button, so a long one
          narrows the field rather than covering the digits. Not focusable and
          not part of the value: it is read, never typed. -->
     <span v-if="unit" :id="unitId" class="shrink-0 pr-1 text-xs text-muted">{{ unit }}</span>
     <NumberFieldIncrement
+      :aria-label="text.increase"
       class="group grid h-full w-8 place-items-center text-muted transition-colors duration-[var(--duration-fast)] hover:text-ink disabled:opacity-40"
     >
       <LpIcon

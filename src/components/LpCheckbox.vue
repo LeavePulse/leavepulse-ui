@@ -7,6 +7,7 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
+import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 import { useFieldControl } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -17,6 +18,8 @@ const props = defineProps<{
   indeterminate?: boolean
   disabled?: boolean
   label?: string
+  /** Secondary line under the label, as on LpSwitch. */
+  description?: string
   id?: string
   name?: string
 }>()
@@ -32,10 +35,18 @@ function onUpdate(v: boolean | "indeterminate") {
 }
 
 const field = useFieldControl(() => ({ wrapped: false, id: props.id, disabled: props.disabled }))
+const descriptionId = `${useId()}-description`
+const describedBy = computed(
+  () => [props.description ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
+)
 
 // The label sits a fixed distance from the box; a dense list of options needs that closer.
-const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "group/check inline-flex cursor-pointer items-center gap-2 text-sm text-ink",
+// With a description the box aligns with the first line rather than the middle of two.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  [
+    "group/check inline-flex cursor-pointer gap-2 text-sm text-ink",
+    props.description ? "items-start" : "items-center",
+  ].join(" "),
 )
 </script>
 
@@ -48,8 +59,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :name="name"
       :model-value="indeterminate ? 'indeterminate' : modelValue"
       :disabled="field.disabled"
-      :aria-describedby="field.describedBy"
-      class="flex size-[18px] items-center justify-center rounded-[5px] border border-line-strong bg-surface-soft outline-none transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:not-data-[state=indeterminate]:group-hover/check:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand data-[state=indeterminate]:border-transparent data-[state=indeterminate]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
+      :aria-describedby="describedBy"
+      :class="description ? 'mt-px' : ''"
+      class="flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border border-line-strong bg-surface-soft outline-none transition-[color,background-color,border-color,box-shadow,scale] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] not-data-[state=checked]:not-data-[state=indeterminate]:group-hover/check:border-brand active:scale-90 motion-reduce:active:scale-100 focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-transparent data-[state=checked]:bg-brand data-[state=indeterminate]:border-transparent data-[state=indeterminate]:bg-brand disabled:cursor-not-allowed disabled:opacity-55"
       @update:model-value="onUpdate"
     >
       <CheckboxIndicator
@@ -58,6 +70,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <LpIcon :name="indeterminate ? 'lucide:minus' : 'lucide:check'" :size="13" />
       </CheckboxIndicator>
     </CheckboxRoot>
-    <slot>{{ label }}</slot>
+    <span v-if="description" class="flex min-w-0 flex-col">
+      <slot>{{ label }}</slot>
+      <span :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
+    </span>
+    <slot v-else>{{ label }}</slot>
   </label>
 </template>
