@@ -7,6 +7,7 @@ import LpBadge from "./LpBadge.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import { pickTab } from "./tabs"
 
 export interface TabItem {
@@ -263,6 +264,15 @@ function releaseFocusAfterPointer(event: PointerEvent) {
         </Transition>
       </TabsTrigger>
       </LpContextMenu>
+      <!-- Items that arrive later (counts from a server, tabs from a route)
+           would otherwise leave an empty frame that pops to full width. A
+           few tab-shaped blocks of the same height hold the place instead. -->
+      <template v-if="!items.length">
+        <span v-for="n in (bottom ? 4 : 3)" :key="`skeleton-${n}`" class="flex items-center justify-center" :class="bottom ? 'min-h-14 flex-col gap-1.5 py-1.5' : 'px-1 py-1.5'">
+          <LpSkeleton v-if="bottom" rounded="pill" class="size-5" />
+          <LpSkeleton :class="bottom ? 'h-2.5 w-10' : 'h-5 w-16'" />
+        </span>
+      </template>
     </TabsList>
 
     <!-- Animated panels: only rendered if a per-item #panel slot is provided.
