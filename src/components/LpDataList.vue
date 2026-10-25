@@ -128,7 +128,7 @@ const pad = computed(() => (props.size === "sm" ? "py-1.5 text-xs" : "py-2.5 tex
           </LpTooltip>
         </dt>
         <dd class="flex min-w-0 items-center gap-1.5 text-ink" :class="item.mono ? 'font-mono' : ''">
-          <span class="min-w-0 break-words">
+          <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">
             <slot
               v-if="slots[`value-${keyOf(item)}`] || slots.value"
               :name="slots[`value-${keyOf(item)}`] ? `value-${keyOf(item)}` : 'value'"
@@ -136,7 +136,7 @@ const pad = computed(() => (props.size === "sm" ? "py-1.5 text-xs" : "py-2.5 tex
               :value="item.value"
             />
             <span v-else-if="isEmpty(item.value)" class="text-muted">{{ text.empty }}</span>
-            <LpRollingText v-else-if="rolls(item.value)" :value="item.value!" align="start" />
+            <LpRollingText v-else-if="rolls(item.value)" :value="item.value!" align="start" wrap />
             <template v-else>{{ item.value }}</template>
           </span>
           <!-- Quiet until the row is hovered or focused; always there on touch,

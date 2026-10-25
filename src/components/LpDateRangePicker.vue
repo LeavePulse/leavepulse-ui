@@ -69,6 +69,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: DateRange | undefined): void
+  (e: "blur", event: FocusEvent): void
 }>()
 
 const text = useLabels<DateRangePickerLabels>(
@@ -157,6 +158,7 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
     :presets="presetOptions"
     presets-class="sm:w-40"
     @clear="emit('update:modelValue', undefined)"
+    @blur="emit('blur', $event)"
   >
     <LpRangeCalendar
       :model-value="value"

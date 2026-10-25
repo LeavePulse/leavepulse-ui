@@ -87,6 +87,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string | undefined): void
+  (e: "blur", event: FocusEvent): void
 }>()
 
 const open = ref(false)
@@ -197,6 +198,7 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
     :presets="presetOptions"
     presets-class="sm:w-36"
     @clear="clear"
+    @blur="emit('blur', $event)"
   >
     <div class="flex flex-col">
       <LpCalendar

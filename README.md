@@ -220,3 +220,15 @@ objects are edited, reordered or removed. The slot also provides `index`,
 `LpInput clearable` adds a clear button that keeps focus in the input, respects
 disabled/read-only state, and can be combined with the `trailing` slot. Its
 button text comes from `labels.clear` or the app-wide `input` label scope.
+
+### Browser regression tests
+
+```sh
+bunx playwright install chromium
+bun run test:browser
+```
+
+Playwright starts an isolated Vite server on port 4501. The suite covers field
+locking, secret reveal controls, date/select focus boundaries and a mobile
+form inside a guarded drawer. These checks run in CI and before npm publishing.
+Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to run an existing Chromium installation.

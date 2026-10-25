@@ -35,6 +35,8 @@ const props = withDefaults(
      * width — a value that grows shouldn't shove its neighbours.
      */
     align?: "start" | "center" | "end"
+    /** Wrap to the available width instead of keeping a single line. */
+    wrap?: boolean
   }>(),
   { mode: "slide", direction: "up", duration: 320, align: "center" },
 )
@@ -63,7 +65,7 @@ const style = computed(() => ({
 <template>
   <span
     class="lp-roll relative inline-flex overflow-hidden align-bottom"
-    :class="justify"
+    :class="[justify, wrap && 'lp-roll--wrap']"
     :style="style"
   >
     <Transition :name="name">
@@ -91,6 +93,15 @@ const style = computed(() => ({
   text-overflow: ellipsis;
   white-space: nowrap;
   backface-visibility: hidden;
+}
+
+.lp-roll--wrap {
+  max-width: 100%;
+}
+
+.lp-roll--wrap .lp-roll__item {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* The outgoing copy leaves the flow so the incoming one keeps the baseline. */

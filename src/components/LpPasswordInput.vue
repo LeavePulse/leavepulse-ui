@@ -13,15 +13,18 @@ export interface PasswordInputLabels extends Record<string, string> {
 // LpSecretField's input form is this same field: it drives `visible` (to hide
 // again on a timer) and puts its copy button in `actions`.
 import { ref } from "vue"
+import { useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import LpInput from "./LpInput.vue"
 import RevealToggle from "./RevealToggle.vue"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue?: string
   placeholder?: string
   invalid?: boolean
   disabled?: boolean
+  /** Offer the show/hide button. When false, the field stays masked. */
+  revealable?: boolean
   // Field wrapping mirrors LpInput: passing any of these wraps the control in
   // LpFormField, so a password field labels itself like every other field.
   label?: string
@@ -31,10 +34,11 @@ const props = defineProps<{
   /** Control height, as on LpInput. */
   size?: "sm" | "md" | "lg"
   labels?: Partial<PasswordInputLabels>
-}>()
+}>(), { revealable: true })
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 /** Whether the text shows; bind it to reveal or hide from outside. */
 const visible = defineModel<boolean>("visible", { default: false })
+const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
 
 const text = useLabels<PasswordInputLabels>(
   "passwordInput",
@@ -54,10 +58,10 @@ defineExpose({
     ref="inner"
     v-bind="$attrs"
     :model-value="modelValue"
-    :type="visible ? 'text' : 'password'"
+    :type="revealable && visible ? 'text' : 'password'"
     :placeholder="placeholder"
     :invalid="invalid"
-    :disabled="disabled"
+    :disabled="field.disabled"
     :label="label"
     :hint="hint"
     :error="error"
@@ -71,11 +75,12 @@ defineExpose({
       <!-- Sized to the icon with a hair of padding, as the field's other
            trailing controls are, rather than to a full square button. -->
       <RevealToggle
+        v-if="revealable"
         v-model="visible"
         :icon-size="size === 'sm' ? 14 : 16"
         :show-label="text.show"
         :hide-label="text.hide"
-        :disabled="disabled"
+        :disabled="field.disabled"
         class="size-auto rounded-inner p-1 hover:bg-transparent"
       />
     </template>

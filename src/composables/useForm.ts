@@ -119,7 +119,8 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   const validating = ref(false)
   const submitting = ref(false)
   const submitCount = ref(0)
-  const runs = new Map<keyof T | "form", number>()
+  const runs = new Map<keyof T | "form", symbol>()
+  let validationEpoch = 0
   // What the form-level check set last, so its next run can take back what no
   // longer holds without touching an error a field rule set on the same key.
   const fromForm = new Map<keyof T | "form", string>()
@@ -148,7 +149,7 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   }
 
   async function runField(name: keyof T): Promise<boolean> {
-    const run = (runs.get(name) ?? 0) + 1
+    const run = Symbol()
     runs.set(name, run)
     const found = await checkField(name)
     if (runs.get(name) !== run) return !errors[name]
@@ -159,7 +160,7 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
 
   async function runForm(): Promise<boolean> {
     if (!options.validate) return true
-    const run = (runs.get("form") ?? 0) + 1
+    const run = Symbol()
     runs.set("form", run)
     const found = (await options.validate(plain())) ?? {}
     if (runs.get("form") !== run) return true
@@ -177,12 +178,17 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   }
 
   async function validate(name?: keyof T): Promise<boolean> {
+    const epoch = validationEpoch
     validating.value = true
     try {
-      if (name !== undefined) return await runField(name)
+      if (name !== undefined) {
+        const valid = await runField(name)
+        return epoch === validationEpoch && valid
+      }
       const fields = await Promise.all(keys().map(runField))
+      if (epoch !== validationEpoch) return false
       const form = await runForm()
-      return fields.every(Boolean) && form && !Object.values(external).some(Boolean)
+      return epoch === validationEpoch && fields.every(Boolean) && form && !Object.values(external).some(Boolean)
     } finally {
       validating.value = false
     }
@@ -202,6 +208,7 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   }
 
   function clearState(): void {
+    validationEpoch++
     for (const k of Object.keys(errors)) delete errors[k as keyof T]
     for (const k of Object.keys(external)) delete external[k as keyof T]
     for (const k of Object.keys(touched)) delete touched[k as keyof T]
@@ -242,7 +249,9 @@ export function useForm<T extends object>(options: UseFormOptions<T>): UseForm<T
   // and runs the form-level check again once it has run: a cross-field error
   // ("passwords differ") must clear when either field is fixed.
   async function recheck(names: (keyof T)[]): Promise<void> {
+    const epoch = validationEpoch
     await Promise.all(names.map((name) => validate(name)))
+    if (epoch !== validationEpoch) return
     if (fromForm.size || submitCount.value) await runForm()
   }
 

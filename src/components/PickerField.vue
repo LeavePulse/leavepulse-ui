@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAttrs } from "vue"
-import type { useFieldControl } from "../composables/useField"
+import { useFieldBlur, type useFieldControl } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import { PICKER_CLEAR, PICKER_PRESET, PICKER_PRESETS, PICKER_SIZE, PICKER_TRIGGER, pickerTone } from "./calendar"
 import LpIcon from "./LpIcon.vue"
@@ -21,13 +21,14 @@ withDefaults(defineProps<{
   presetsClass: string
 }>(), { size: "md" })
 const open = defineModel<boolean>("open")
-defineEmits<{ clear: [] }>()
+const emit = defineEmits<{ clear: []; blur: [event: FocusEvent] }>()
+const { partId, onFocusOut } = useFieldBlur((event) => emit("blur", event))
 const attrs = useAttrs()
 </script>
 
 <template>
-  <div :class="mergeClass('relative w-full', attrs.class as string)" :style="attrs.style as never">
-    <LpPopover v-model:open="open" align="start" panel-class="flex w-auto max-w-[calc(100vw-1rem)] flex-col rounded-card p-0 sm:flex-row">
+  <div :data-lp-field-part="partId" @focusout="onFocusOut" :class="mergeClass('relative w-full', attrs.class as string)" :style="attrs.style as never">
+    <LpPopover v-model:open="open" :data-lp-field-part="partId" @focusout="onFocusOut" align="start" panel-class="flex w-auto max-w-[calc(100vw-1rem)] flex-col rounded-card p-0 sm:flex-row">
       <template #trigger>
         <button
           v-bind="{ ...attrs, class: undefined, style: undefined }"

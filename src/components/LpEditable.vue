@@ -129,7 +129,7 @@ function cancel() {
 
 let committing = false
 async function commit(refocus: boolean) {
-  if (!editing.value || committing) return
+  if (!editing.value || committing || !interactive.value) return
   const value = props.trim ? draft.value.trim() : draft.value
   if (value === props.modelValue) {
     notice.clear()
@@ -273,6 +273,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => "relative inline-
           :aria-invalid="(notice.tone.value === 'danger' && !!notice.message.value) || undefined"
           :placeholder="placeholder"
           :maxlength="maxlength"
+          :disabled="disabled"
+          :readonly="readonly"
           :rows="multiline ? 1 : undefined"
           class="col-start-1 row-start-1 w-full min-w-0 resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-muted"
           :class="PAD[size]"

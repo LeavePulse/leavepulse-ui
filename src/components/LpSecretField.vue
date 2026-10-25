@@ -37,6 +37,7 @@ import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { useScramble } from "../composables/useScramble"
 import { useLabels } from "../composables/useLpConfig"
+import { useFieldControl } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
 import LpButton from "./LpButton.vue"
@@ -91,7 +92,11 @@ const emit = defineEmits<{
 }>()
 
 /** Shown or hidden; bind it to drive the reveal from outside. */
-const revealed = defineModel<boolean>("revealed", { default: false })
+const revealedModel = defineModel<boolean>("revealed", { default: false })
+const revealed = computed({
+  get: () => props.revealable && revealedModel.value,
+  set: (value: boolean) => { revealedModel.value = value },
+})
 
 const text = useLabels<SecretFieldLabels>(
   "secretField",
@@ -107,6 +112,7 @@ const text = useLabels<SecretFieldLabels>(
 )
 
 const secret = computed(() => (props.input ? props.modelValue : props.value) ?? "")
+const control = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
 
 // Revealing decrypts the value into place, and a new value (a regenerated key)
 // decrypts over the old one: the change is seen happening, not just swapped.
@@ -167,7 +173,7 @@ const shell = computed(() =>
   mergeClass(
     "relative flex w-full items-center gap-1 overflow-hidden rounded-control border bg-surface-soft text-ink transition-colors duration-(--duration-fast)",
     props.error ? "border-danger" : "border-line",
-    props.disabled ? "opacity-55" : "",
+    control.value.disabled ? "opacity-55" : "",
     props.wrap ? "py-1.5" : "",
     { sm: "min-h-(--size-control-sm) pl-2.5 pr-1 text-xs", md: "min-h-(--size-control-md) pl-3 pr-1.5 text-sm", lg: "min-h-(--size-control-lg) pl-3.5 pr-1.5 text-sm" }[props.size],
   ),
@@ -184,7 +190,8 @@ const shell = computed(() =>
     class="[&_input]:font-mono"
     :model-value="modelValue"
     :placeholder="placeholder"
-    :disabled="disabled"
+    :disabled="control.disabled"
+    :revealable="revealable"
     :label="label"
     :hint="hint"
     :error="error"
@@ -199,7 +206,7 @@ const shell = computed(() =>
         :value="secret"
         size="xs"
         class="size-7"
-        :disabled="disabled"
+        :disabled="control.disabled"
         @copied="(t: string) => emit('copied', t)"
       />
       <slot name="actions" />
@@ -212,7 +219,7 @@ const shell = computed(() =>
         :aria-label="text.regenerate"
         :title="text.regenerate"
         :action="regenerate"
-        :disabled="disabled"
+        :disabled="control.disabled"
       >
         <LpIcon name="lucide:refresh-cw" :size="iconSize" />
       </LpButton>
@@ -264,7 +271,7 @@ const shell = computed(() =>
           :icon-size="iconSize"
           :show-label="text.show"
           :hide-label="text.hide"
-          :disabled="disabled"
+          :disabled="control.disabled"
           :controls="id"
           class="size-7"
         />
@@ -273,7 +280,7 @@ const shell = computed(() =>
           :value="secret"
           :size="copySize"
           class="size-7 text-muted hover:text-ink"
-          :disabled="disabled"
+          :disabled="control.disabled"
           @copied="(t: string) => emit('copied', t)"
         />
         <slot name="actions" />
@@ -284,7 +291,7 @@ const shell = computed(() =>
             square
             class="size-7 text-muted hover:text-ink"
             :action="regenerate"
-            :disabled="disabled"
+            :disabled="control.disabled"
           >
             <LpIcon name="lucide:refresh-cw" :size="iconSize" />
           </LpButton>

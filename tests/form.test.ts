@@ -131,6 +131,63 @@ describe("useForm", () => {
 })
 
 describe("useForm keeps what it checked", () => {
+  test("reset invalidates a field check even after another check starts", async () => {
+    let release!: (error: string) => void
+    const form = useForm({
+      initial: { name: "old" },
+      rules: { name: (value) => value === "old" ? new Promise<string>((done) => { release = done }) : undefined },
+    })
+    const old = form.validate("name")
+    form.reset({ name: "new" })
+    expect(await form.validate("name")).toBe(true)
+    release("Old error")
+    await old
+    expect(form.values.name).toBe("new")
+    expect(form.errors.value).toEqual({})
+    expect(form.valid.value).toBe(true)
+  })
+
+  test("reset invalidates an outstanding form-level check", async () => {
+    let release!: (errors: { form: string }) => void
+    const form = useForm({
+      initial: { name: "old" },
+      validate: (values) => values.name === "old" ? new Promise<{ form: string }>((done) => { release = done }) : undefined,
+    })
+    const old = form.validate()
+    await tick()
+    form.reset({ name: "new" })
+    expect(await form.validate()).toBe(true)
+    release({ form: "Old error" })
+    await old
+    expect(form.errors.value).toEqual({})
+    expect(form.valid.value).toBe(true)
+  })
+
+  for (const stage of ["field", "form"] as const) {
+    test(`a submit reset during ${stage} validation never saves`, async () => {
+      let release!: () => void
+      const checked: string[] = []
+      const sent: { name: string }[] = []
+      const form = useForm({
+        initial: { name: "old" },
+        rules: { name: (value) => stage === "field" && value === "old" ? new Promise<void>((done) => { release = done }) : undefined },
+        validate: (values) => {
+          checked.push(values.name)
+          if (stage === "form" && values.name === "old") return new Promise<void>((done) => { release = done })
+        },
+      })
+      const old = form.handleSubmit((values) => { sent.push(values) })()
+      await tick()
+      form.reset({ name: "new" })
+      await form.validate()
+      release()
+      await old
+      expect(checked).toEqual(stage === "field" ? ["new"] : ["old", "new"])
+      expect(sent).toEqual([])
+      expect(form.errors.value).toEqual({})
+    })
+  }
+
   test("an edit during an async check is checked again, and what passed is what is sent", async () => {
     let release: () => void = () => {}
     let first = true

@@ -1,4 +1,4 @@
-import { computed, inject, provide, useId, type ComputedRef, type InjectionKey } from "vue"
+import { computed, inject, onScopeDispose, provide, useId, type ComputedRef, type InjectionKey } from "vue"
 import type { FieldNoticeOptions } from "./useFieldNotice"
 
 /*
@@ -92,4 +92,29 @@ export function useFieldControl(
 export function focusLeft(event: FocusEvent): boolean {
   const next = event.relatedTarget
   return !(next instanceof Node && (event.currentTarget as Node | null)?.contains(next))
+}
+
+/** Trigger and portalled content share a boundary for the control's public blur. */
+export function useFieldBlur(blur: (event: FocusEvent) => void) {
+  const partId = `lp-field-${useId()}`
+  let cancelPending: (() => void) | undefined
+  const inside = (target: EventTarget | null) =>
+    !!(target as Element | null)?.closest?.(`[data-lp-field-part="${partId}"]`)
+
+  function onFocusOut(event: FocusEvent) {
+    cancelPending?.()
+    if (inside(event.relatedTarget)) return
+    if (event.relatedTarget) return blur(event)
+    // A removed calendar cell can lose focus before its trigger gets it back.
+    const doc = (event.target as Node).ownerDocument!
+    const view = doc.defaultView!
+    const frame = view.requestAnimationFrame(() => {
+      cancelPending = undefined
+      if (!inside(doc.activeElement)) blur(event)
+    })
+    cancelPending = () => view.cancelAnimationFrame(frame)
+  }
+
+  onScopeDispose(() => cancelPending?.())
+  return { partId, onFocusOut }
 }

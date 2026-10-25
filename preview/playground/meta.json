@@ -2440,6 +2440,10 @@
    {
     "name": "update:modelValue",
     "type": "[value: string | undefined]"
+   },
+   {
+    "name": "blur",
+    "type": "[event: FocusEvent]"
    }
   ],
   "slots": []
@@ -2537,6 +2541,10 @@
    {
     "name": "update:modelValue",
     "type": "[value: DateRange | undefined]"
+   },
+   {
+    "name": "blur",
+    "type": "[event: FocusEvent]"
    }
   ],
   "slots": []
@@ -5762,6 +5770,13 @@
     "required": false
    },
    {
+    "name": "revealable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Offer the show/hide button. When false, the field stays masked."
+   },
+   {
     "name": "label",
     "type": "string | undefined",
     "required": false
@@ -6832,6 +6847,12 @@
      "end",
      "start"
     ]
+   },
+   {
+    "name": "wrap",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Wrap to the available width instead of keeping a single line."
    }
   ],
   "events": [],

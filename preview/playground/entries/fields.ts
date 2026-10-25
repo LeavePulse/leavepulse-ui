@@ -7,6 +7,8 @@ import {
   LpDataList,
   LpEditable,
   LpSecretField,
+  LpSlider,
+  LpSwitch,
   LpTruncate,
 } from "../../../src"
 import type { ComponentEntry } from "./shared"
@@ -207,7 +209,7 @@ export const fieldsData: ComponentEntry[] = [
     name: "DataList",
     description:
       "Label and value pairs as a real description list: side by side when the list itself is wide enough, stacked when it is not (a container query), values that change roll, copy buttons on hover, a placeholder for empty values.",
-    components: { LpDataList },
+    components: { LpDataList, LpSlider, LpSwitch, LpButton },
     state: () => {
       const state = reactive({
         width: 420,
@@ -217,13 +219,17 @@ export const fieldsData: ComponentEntry[] = [
       })
       return state
     },
-    template: `<div class="flex w-[28rem] flex-col gap-4">
-  <div class="flex items-center gap-3 text-xs text-muted">
-    <label class="flex flex-1 items-center gap-2">Width <input v-model.number="width" type="range" min="220" max="448" class="flex-1" /></label>
-    <label class="flex items-center gap-1"><input v-model="divided" type="checkbox" /> dividers</label>
-    <button class="rounded-control border border-line px-2 py-1 text-ink" @click="bump()">Players ±</button>
+    template: `<div class="flex w-full max-w-md flex-col gap-4">
+  <div class="flex flex-wrap items-center gap-3">
+    <div class="flex min-w-40 flex-1 items-center gap-2 text-xs text-muted">
+      <span>Width</span>
+      <LpSlider v-model="width" :min="220" :max="448" aria-label="Card width" class="min-w-0 flex-1" />
+      <output class="w-10 text-right tabular-nums">{{ width }}px</output>
+    </div>
+    <LpSwitch v-model="divided" label="Dividers" />
+    <LpButton size="xs" variant="outline" @click="bump()">Players ±</LpButton>
   </div>
-  <div class="rounded-card border border-line bg-surface px-4 py-1" :style="{ width: width + 'px' }">
+  <div class="max-w-full rounded-card border border-line bg-surface px-4 py-1" :style="{ width: width + 'px' }">
     <LpDataList
       :divided="divided"
       :items="[

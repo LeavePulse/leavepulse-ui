@@ -10,6 +10,9 @@ import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
+// The trigger owns its attributes through the slot; fallthrough tags the panel.
+defineOptions({ inheritAttrs: false })
+
 const props = withDefaults(
   defineProps<{
     side?: "top" | "right" | "bottom" | "left"
@@ -47,6 +50,7 @@ const guardOutside = useOutsideGuard()
     </PopoverTrigger>
     <PopoverPortal :to="portalTo">
       <PopoverContent
+        v-bind="$attrs"
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         :collision-padding="8"

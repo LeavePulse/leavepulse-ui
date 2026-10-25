@@ -50,6 +50,12 @@ jobs:
       - name: Test
         run: bun test
 
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: bun run test:browser
+
       - name: Build library
         run: bun run build
 

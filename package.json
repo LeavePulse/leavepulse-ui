@@ -59,6 +59,7 @@
     "prepublishOnly": "npm run build",
     "typecheck": "vue-tsc --noEmit",
     "test": "bun test",
+    "test:browser": "playwright test",
     "release": "npm version patch -m \"chore: release v%s\" && git push --follow-tags",
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags",
@@ -85,6 +86,7 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.112",
     "@iconify/vue": "^5.0.1",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^6.0.6",

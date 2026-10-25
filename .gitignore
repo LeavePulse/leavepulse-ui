@@ -15,3 +15,5 @@ dist-preview/
 .DS_Store
 .vscode/
 .idea/
+playwright-report/
+test-results/

@@ -36,7 +36,7 @@ import {
   ComboboxViewport,
 } from "reka-ui"
 import { computed, nextTick, reactive, ref, useAttrs, useId, watch } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { useFieldBlur, useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
@@ -178,12 +178,7 @@ function onOpenChange(open: boolean) {
 // are marked with one id, because the list is portalled away from the trigger
 // and a check on the trigger alone either missed the search box or took a
 // step into it for leaving.
-const partOf = `lp-select-${useId()}`
-function onFocusOut(event: FocusEvent) {
-  const next = event.relatedTarget as Element | null
-  const inside = !!next && typeof next.closest === "function" && !!next.closest(`[data-lp-select-part="${partOf}"]`)
-  if (!inside) emit("blur", event)
-}
+const { partId, onFocusOut } = useFieldBlur((event) => emit("blur", event))
 
 /*
  * The trigger's name. reka hard-codes aria-label="Show popup" on it, which hid
@@ -396,7 +391,7 @@ const guardOutside = useOutsideGuard()
     @update:open="onOpenChange"
   >
     <ComboboxAnchor
-      :data-lp-select-part="partOf"
+      :data-lp-field-part="partId"
       @focusout="onFocusOut"
       :class="[
         anchorHeight,
@@ -528,7 +523,7 @@ const guardOutside = useOutsideGuard()
 
     <ComboboxPortal :to="portalTo">
       <ComboboxContent
-        :data-lp-select-part="partOf"
+        :data-lp-field-part="partId"
         @focusout="onFocusOut"
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
