@@ -332,9 +332,20 @@ export const registry: ComponentEntry[] = [
   {
     id: "select",
     name: "Select",
-    description: "Searchable / multiple select on reka-ui. Option values may be string OR number. Server-side search via v-model:searchTerm + :loading.",
+    description:
+      "Searchable / multiple select on reka-ui. Option values may be string OR number; options can carry an `image` or `icon` and be `disabled`. The trigger shows the pick with its picture and a muted hint; `multiple` shows chips that collapse to \"+N\" when the row is full, and `@change` carries the value just toggled. Server-side search via v-model:searchTerm + :loading: a pick stays named after it drops out of the results (remembered for the session, or told through `selected`). Placeholder and list texts come from the `select` labels.",
     components: { LpSelect },
     state: () => reactive({
+      people: [
+        { value: "1090027634693525664", label: "Sunny", description: "@sunnyxoo.", image: avatarSunny },
+        { value: "770091071811092481", label: "THÉROËR", description: "@theroer", image: avatarSample },
+        { value: "3", label: "Ada", description: "@ada", icon: "lucide:user" },
+        { value: "4", label: "Grace", description: "@grace", icon: "lucide:user" },
+        { value: "5", label: "Linus", description: "@linus", icon: "lucide:user", disabled: true },
+      ],
+      person: "1090027634693525664",
+      team: ["1090027634693525664", "770091071811092481", "3"],
+      toggled: "",
       value: undefined,
       options: selectOpts,
       pageSize: 30,
@@ -345,9 +356,15 @@ export const registry: ComponentEntry[] = [
       ],
       remoteValue: undefined,
       remoteTerm: "",
-      remoteOptions: selectOpts,
+      get remoteOptions() {
+        const q = this.remoteTerm.trim().toLowerCase()
+        return q ? selectOpts.filter((o) => o.label.toLowerCase().includes(q)) : selectOpts
+      },
     }),
     template: `<div class="flex w-72 flex-col gap-3">
+  <LpSelect v-model="person" :options="people" searchable />
+  <LpSelect v-model="team" :options="people" multiple clearable @change="toggled = $event" />
+  <p class="text-xs text-muted">last toggled: {{ toggled || "\u2014" }}</p>
   <LpSelect v-model="value" :options="options" searchable clearable placeholder="Pick a region" />
   <LpSelect v-model="pageSize" :options="sizes" />
   <p class="text-xs text-muted">numeric value: {{ pageSize }} ({{ typeof pageSize }})</p>
@@ -358,22 +375,36 @@ export const registry: ComponentEntry[] = [
     placeholder="Server-side search"
     search-placeholder="Type to query…"
   />
-  <p class="text-xs text-muted">searchTerm: "{{ remoteTerm }}"</p>
+  <p class="text-xs text-muted">searchTerm: "{{ remoteTerm }}" (pick, then search for something else: the pick keeps its name)</p>
 </div>`,
   },
   {
     id: "switch",
     name: "Switch · Checkbox · Radio",
     description:
-      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` (LpSwitch also a `description`, and `label-position=\"start\"` for a settings row with the switch at the right edge). LpRadioGroup takes `:options` for plain rows, or LpRadio children when a row needs custom content.",
+      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` (LpSwitch also a `description`, and `label-position=\"start\"` for a settings row with the switch at the right edge). LpRadioGroup takes `:options` (each may carry a `description` line, an `icon`, or be `disabled`), or LpRadio children when a row needs custom content.",
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
-    state: () => reactive({ on: true, checked: true, notify: false, plan: "pro", tier: "pro", radioOpts }),
+    state: () => reactive({
+      on: true,
+      checked: true,
+      notify: false,
+      plan: "pro",
+      tier: "pro",
+      radioOpts,
+      billing: "monthly",
+      billingOpts: [
+        { value: "monthly", label: "Monthly", description: "Billed every month, cancel any time." },
+        { value: "yearly", label: "Yearly", description: "Two months free." },
+        { value: "lifetime", label: "Lifetime", description: "Sold out.", disabled: true },
+      ],
+    }),
     template: `<div class="flex flex-col gap-6">
   <div class="flex flex-wrap items-start gap-8">
     <LpSwitch v-model="on" />
     <LpSwitch v-model="on" label="Dark mode" />
     <LpCheckbox v-model="checked" label="Remember me" />
     <LpRadioGroup v-model="plan" :options="radioOpts" />
+    <LpRadioGroup v-model="billing" :options="billingOpts" class="max-w-56" />
   </div>
 
   <!-- Settings row: text on the left, switch at the right edge. -->
@@ -571,7 +602,7 @@ export const registry: ComponentEntry[] = [
     id: "segmented",
     name: "Segmented",
     description:
-      "Compact mutually-exclusive control with a sliding pill (reka ToggleGroup). For short option sets where Tabs is too heavy — view/density toggles. icon and/or label per option; block stretches it full-width.",
+      "Compact mutually-exclusive control with a sliding pill (reka ToggleGroup). For short option sets where Tabs is too heavy — view/density toggles. icon and/or label per option, a `dot` to ask for attention, `disabled` per option; block stretches it full-width; size sm, md or lg. The pill follows the hovered segment and springs back (`:hover-follow=\"false\"` pins it); a mouse pick hands the arrow keys back to the page.",
     components: { LpSegmented },
     state: () =>
       reactive({
@@ -582,6 +613,12 @@ export const registry: ComponentEntry[] = [
           { value: "grid", icon: "lucide:layout-grid", label: "Grid" },
           { value: "board", icon: "lucide:columns-3", label: "Board" },
         ],
+        inboxOpts: [
+          { value: "all", label: "All" },
+          { value: "unread", label: "Unread", dot: true },
+          { value: "archived", label: "Archived", disabled: true },
+        ],
+        inbox: "all",
         densityOpts: [
           { value: "compact", label: "Compact" },
           { value: "default", label: "Default" },
@@ -592,6 +629,8 @@ export const registry: ComponentEntry[] = [
   <LpSegmented v-model="view" :options="viewOpts" />
   <LpSegmented v-model="density" :options="densityOpts" size="sm" />
   <LpSegmented v-model="view" :options="viewOpts" block class="w-80" />
+  <LpSegmented v-model="inbox" :options="inboxOpts" size="lg" />
+  <LpSegmented v-model="inbox" :options="inboxOpts" :hover-follow="false" />
 </div>`,
   },
   {
@@ -1156,9 +1195,24 @@ export const registry: ComponentEntry[] = [
     id: "tags-input",
     name: "TagsInput",
     description:
-      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` keeps it typed, `ignore` drops it, `allow` keeps the repeat) gets a note that floats under the field without moving anything below, and the tag it repeats pulses. Works inside LpFormField like any kit control.",
+      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` keeps it typed, `ignore` drops it, `allow` keeps the repeat) gets a note that floats under the field without moving anything below, and the tag it repeats pulses. Works inside LpFormField like any kit control. `display` draws a tag as what it stands for (picture, name, muted hint) while the model keeps the values; `options` suggest while typing (↑/↓ walk them, Enter picks; Enter without walking still adds the typed text), `loading` and `@search` fetch them server-side. `size` is sm, md or lg.",
     components: { LpTagsInput, LpFormField },
-    state: () => reactive({ emails: ["ada@example.com"], labels: [] as string[] }),
+    state: () => {
+      const people = [
+        { value: "1090027634693525664", label: "Sunny", description: "@sunnyxoo.", image: avatarSunny },
+        { value: "770091071811092481", label: "THÉROËR", description: "@theroer", image: avatarSample },
+      ]
+      return reactive({
+        emails: ["ada@example.com"],
+        labels: [] as string[],
+        ids: ["770091071811092481"],
+        people,
+        who: (tag: string) => {
+          const p = people.find((o) => o.value === tag)
+          return p ? { label: p.label, hint: p.description, image: p.image } : null
+        },
+      })
+    },
     template: `<div class="flex w-96 flex-col gap-4">
   <LpTagsInput
     v-model="emails"
@@ -1170,7 +1224,10 @@ export const registry: ComponentEntry[] = [
     :validate="(t) => /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(t) ? undefined : t + ' is not an email address'"
   />
   <LpFormField label="Labels" hint="A repeat is dropped with a passing note">
-    <LpTagsInput v-model="labels" duplicates="ignore" placeholder="Add a label" />
+    <LpTagsInput v-model="labels" duplicates="ignore" placeholder="Add a label" size="sm" />
+  </LpFormField>
+  <LpFormField label="Moderators" hint="Type a name or paste an id">
+    <LpTagsInput v-model="ids" :options="people" :display="who" placeholder="Name or ID" />
   </LpFormField>
 </div>`,
   },

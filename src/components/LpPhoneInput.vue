@@ -3,6 +3,20 @@
 // it, so opt out of the automatic pass-through that would add it a second
 // time, unmerged.
 export default { inheritAttrs: false }
+
+export type PhoneInputLabels = {
+  selectCountry: string
+  placeholder: string
+  search: string
+  searchLabel: string
+  empty: string
+  tooLong: string
+  tooLongFor: string
+  tooShort: string
+  tooShortFor: string
+  invalidNumber: string
+  unknownCountry: string
+}
 </script>
 
 <script setup lang="ts">
@@ -88,12 +102,11 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg"
     emptyText?: string
     searchPlaceholder?: string
+    labels?: Partial<PhoneInputLabels>
   }>(),
   {
     placeholder: undefined,
     size: "md",
-    emptyText: "No country",
-    searchPlaceholder: "Search country…",
   },
 )
 
@@ -318,16 +331,19 @@ const field = useFieldControl(() => ({
   invalid: props.invalid || flagged.value,
   disabled: props.disabled,
 }))
-const text = useLabels("phoneInput", {
+const text = useLabels<PhoneInputLabels>("phoneInput", {
   selectCountry: "Select country",
   placeholder: "Phone number",
+  search: "Search country…",
+  searchLabel: "Search countries",
+  empty: "No country",
   tooLong: "A phone number has at most {max} digits",
   tooLongFor: "Numbers in {country} have at most {max} digits after the code",
   tooShort: "This number is too short",
   tooShortFor: "Too short for {country}",
   invalidNumber: "Not a valid phone number",
   unknownCountry: "Unknown country code",
-})
+}, () => props.labels)
 const noticeId = `${field.value.id ?? "lp-phone"}-notice`
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
@@ -396,7 +412,8 @@ const inputAttrs = computed(() => {
             -->
             <ComboboxInput
               :model-value="query"
-              :placeholder="searchPlaceholder"
+              :placeholder="searchPlaceholder ?? text.search"
+              :aria-label="text.searchLabel"
               auto-focus
               class="h-(--size-control-sm) w-full rounded-inner border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
               @input="query = ($event.target as HTMLInputElement).value"
@@ -404,7 +421,7 @@ const inputAttrs = computed(() => {
           </div>
           <ComboboxViewport class="max-h-56 overflow-y-auto p-1">
             <ComboboxEmpty class="px-3 py-4 text-center text-sm italic text-muted">
-              {{ emptyText }}
+              {{ emptyText ?? text.empty }}
             </ComboboxEmpty>
             <ComboboxItem
               v-for="(c, i) in filtered"
