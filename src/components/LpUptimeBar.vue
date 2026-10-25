@@ -9,6 +9,8 @@ export default { inheritAttrs: false }
 import { computed, ref } from "vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
+import LpSkeleton from "./LpSkeleton.vue"
+import LpSwap from "./LpSwap.vue"
 import LpTooltip from "./LpTooltip.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
@@ -41,9 +43,18 @@ const props = withDefaults(
      */
     colors?: Partial<Record<UptimeStatus, string>>
     /** Status names, for the tooltip and screen readers. */
-    labels?: Partial<Record<UptimeStatus, string>>
+    labels?: Partial<Record<UptimeStatus | "loading", string>>
+    /**
+     * The history is on its way. The row of ticks pulses in place of the
+     * slices (as many as `segments` already holds, else `skeletonSlices`) at
+     * the bar's own height, and the uptime figure waits as a block; the
+     * captions stay, so nothing around the bar moves when the data lands.
+     */
+    loading?: boolean
+    /** Ticks drawn while loading with no segments yet. */
+    skeletonSlices?: number
   }>(),
-  { showUptime: true },
+  { showUptime: true, loading: false, skeletonSlices: 45 },
 )
 
 /*
@@ -75,9 +86,12 @@ const statusLabel = useLabels(
     down: "Down",
     maintenance: "Maintenance",
     empty: "No data",
+    loading: "Loading",
   },
   () => props.labels,
 )
+
+const skeletonCount = computed(() => props.segments.length || props.skeletonSlices)
 
 // Uptime counts only slices with data; operational + maintenance are "up".
 const uptimePct = computed(() => {
@@ -166,7 +180,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 <template>
   <div
     :class="rootClass"
+    :aria-busy="loading || undefined"
     v-bind="rest">
+    <span v-if="loading" class="sr-only">{{ statusLabel.loading }}</span>
     <div v-if="title" class="text-xs">
       <span class="font-medium text-ink">{{ title }}</span>
     </div>
@@ -178,7 +194,20 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       single readout being scrubbed along the timeline. It also means the kit's
       tooltip is used here rather than a second, hand-wired copy of reka.
     -->
-    <LpTooltip :delay="80" follow-cursor side="top" :disabled="hovered === null">
+    <!-- Both states are the bar's 34px, so the swap only fades; LpSwap is
+         still what plays it, for the same entrance as every other placeholder. -->
+    <LpSwap :swap-key="loading ? 'loading' : 'bar'">
+    <!-- The same slot-and-mark geometry as the real bar (`.lp-uptime__mark`
+         narrows each one), so the ticks sit exactly where the slices will. -->
+    <LpSkeleton
+      v-if="loading"
+      class="lp-uptime flex h-[34px] items-stretch"
+    >
+      <span v-for="n in skeletonCount" :key="n" class="min-w-0 flex-1">
+        <span class="lp-uptime__mark lp-skeleton-item block h-full rounded-[1px] bg-surface-soft" />
+      </span>
+    </LpSkeleton>
+    <LpTooltip v-else :delay="80" follow-cursor side="top" :disabled="hovered === null">
       <template #content>
         <span v-if="tip" class="flex items-center gap-1.5">
           <span
@@ -225,6 +254,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </button>
       </div>
     </LpTooltip>
+    </LpSwap>
 
     <!--
       The figure sits BETWEEN the two dates rather than above the bar: it is a
@@ -239,8 +269,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <span class="shrink-0">{{ startLabel }}</span>
       <span class="h-px flex-1 bg-line" />
       <span v-if="showUptime" class="shrink-0 text-muted-strong">
+        <LpSkeleton
+          v-if="loading"
+          class="inline-block h-[0.9em] w-8 align-middle"
+        />
         <LpNumberFlow
-          v-if="uptimePct != null"
+          v-else-if="uptimePct != null"
           :value="uptimePct"
           :decimals="uptimeDecimals"
           suffix="%"

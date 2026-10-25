@@ -28,6 +28,7 @@ import { prefersReducedMotion } from "../composables/easing"
 import { useClipboard } from "../composables/useClipboard"
 import { useHotkeys } from "../composables/useHotkeys"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import LpEmptyState from "./LpEmptyState.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -952,13 +953,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       :style="{ height }"
       @scroll="onScroll"
     >
-      <div
+      <LpEmptyState
         v-if="lines.length === 0 || filteredEmpty"
-        class="flex h-full flex-col items-center justify-center gap-1 px-4 py-10 text-center"
-      >
-        <span class="text-muted">{{ filteredEmpty ? text.noMatch : (emptyLabel ?? text.empty) }}</span>
-        <span v-if="filteredEmpty && term" class="text-muted/70">“{{ term }}”</span>
-      </div>
+        compact
+        :icon="filteredEmpty ? 'lucide:search-x' : 'lucide:scroll-text'"
+        :title="filteredEmpty ? text.noMatch : (emptyLabel ?? text.empty)"
+        :description="filteredEmpty && term ? `“${term}”` : undefined"
+        class="h-full justify-center px-4"
+      />
 
       <template v-else>
         <!-- Older-history loading row, pinned at the top while a scroll-back page

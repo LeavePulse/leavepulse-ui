@@ -15,6 +15,7 @@
  *   <LpSparkline :data="load" area tone="danger" :width="72" />
  */
 import { computed } from "vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import { useReveal } from "../composables/useReveal"
 import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
@@ -57,7 +58,13 @@ const props = withDefaults(
      * watched being drawn — not a figure mostly spent easing out.
      */
     duration?: number
-    labels?: Partial<Record<"empty" | "up" | "down" | "flat" | "latest", string>>
+    /**
+     * The series is on its way: a pulsing band the size of the line's own box
+     * stands in, so a cell or a stat tile does not change size when the trend
+     * arrives, and the line then draws itself in as usual.
+     */
+    loading?: boolean
+    labels?: Partial<Record<"empty" | "up" | "down" | "flat" | "latest" | "loading", string>>
   }>(),
   { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900 },
 )
@@ -135,7 +142,14 @@ const hasData = computed(() => series.value[0].values.some((v) => v != null))
 /* A bare <svg> is invisible to a screen reader; say the shape out loud. */
 const text = useLabels(
   "sparkline",
-  { empty: "No data", up: "trending up", down: "trending down", flat: "flat", latest: "latest" },
+  {
+    empty: "No data",
+    up: "trending up",
+    down: "trending down",
+    flat: "flat",
+    latest: "latest",
+    loading: "Loading",
+  },
   () => props.labels,
 )
 
@@ -191,8 +205,37 @@ const gradientId = `lp-spark-${Math.random().toString(36).slice(2, 9)}`
 </script>
 
 <template>
+  <!--
+    A cross-fade, not LpSwap: both states are exactly width × height, so there
+    is no size to ease, and LpSwap's block wrapper would break a sparkline that
+    sits inline in a row of text. Attributes fall through to whichever element
+    is showing, as they did before.
+  -->
+  <Transition
+    mode="out-in"
+    enter-from-class="opacity-0"
+    enter-active-class="transition-opacity duration-fast ease-out motion-reduce:transition-none"
+    leave-active-class="transition-opacity duration-fast ease-in motion-reduce:transition-none"
+    leave-to-class="opacity-0"
+  >
+  <!-- The wrapper form of LpSkeleton, so the band pulses with every other
+       skeleton on the page; the box itself is the sparkline's own size. -->
+  <span
+    v-if="loading"
+    key="loading"
+    class="inline-flex shrink-0 items-center align-middle"
+    :style="{ width: `${width}px`, height: `${height}px` }"
+    role="img"
+    :aria-label="text.loading"
+    aria-busy="true"
+  >
+    <LpSkeleton class="flex size-full items-center">
+      <span class="lp-skeleton-item block h-1/3 w-full rounded-pill bg-surface-soft" />
+    </LpSkeleton>
+  </span>
   <svg
-    v-if="hasData"
+    v-else-if="hasData"
+    key="line"
     ref="el"
     :width="width"
     :height="height"
@@ -253,11 +296,13 @@ const gradientId = `lp-spark-${Math.random().toString(36).slice(2, 9)}`
   <!-- Keeps the row's rhythm when a machine has reported nothing yet. -->
   <span
     v-else
+    key="empty"
     class="inline-block shrink-0 rounded-pill bg-surface-soft"
     :style="{ width: `${width}px`, height: '2px' }"
     role="img"
     :aria-label="label"
   />
+  </Transition>
 </template>
 
 <style>

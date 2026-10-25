@@ -11,6 +11,7 @@ export default { inheritAttrs: false }
 import { computed } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -42,6 +43,14 @@ const props = withDefaults(
     /** For metrics where down is good (latency, errors): swaps the colours so a
      *  downward trend reads as positive (action) and upward as danger. */
     invertTrend?: boolean
+    /**
+     * The figure is still on its way. The tile keeps its shape and every line
+     * its height: the value and the delta pulse as blocks set in their own type
+     * size, so the tile is exactly as tall loading as loaded and the row of
+     * tiles does not move when the numbers land. A known label stays readable
+     * (it names the tile, it is not data); an empty one pulses too.
+     */
+    loading?: boolean
   }>(),
   { trend: "auto", decimals: 0 },
 )
@@ -95,6 +104,19 @@ const deltaDecimals = computed(() => {
   return Math.min(fraction?.length ?? 0, 4)
 })
 
+/*
+ * Placeholder and figure cross-fade in place. Both sit in the same line box, so
+ * there is no size to ease, only the content: LpSwap's height tween would have
+ * nothing to do, and its block wrapper would break the baseline row.
+ */
+const FADE = {
+  mode: "out-in",
+  enterFromClass: "opacity-0",
+  enterActiveClass: "transition-opacity duration-fast ease-out motion-reduce:transition-none",
+  leaveActiveClass: "transition-opacity duration-fast ease-in motion-reduce:transition-none",
+  leaveToClass: "opacity-0",
+} as const
+
 // A stat tile spaces its label and value on a fixed gap; a dense KPI row needs that tighter.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex flex-col gap-2",
@@ -109,24 +131,44 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <span v-if="online" class="size-1.5 rounded-full bg-action" />
       <LpIcon v-if="icon" :name="icon" :size="14" class="text-muted" />
       <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-        {{ label }}
+        <Transition v-bind="FADE">
+          <LpSkeleton v-if="loading && !label" class="inline-block h-[0.8em] w-20 align-middle" />
+          <span v-else>{{ label }}</span>
+        </Transition>
       </span>
     </div>
     <div class="flex items-baseline gap-2">
+      <!-- The placeholder sits INSIDE the value's own type size, so its line box
+           is the real one: the tile cannot change height when the figure lands. -->
       <span class="font-mono text-3xl font-medium tracking-tight text-ink">
-        <LpNumberFlow
-          v-if="typeof value === 'number'"
-          :value="value"
-          :compact="compact"
-          :grouped="grouped"
-          :decimals="decimals"
-          :prefix="prefix"
-          :suffix="valueSuffix"
-        />
-        <template v-else>{{ value }}</template>
+        <!-- Each side wrapped in a plain element: LpNumberFlow renders more
+             than one root node, which a Transition cannot fade. -->
+        <Transition v-bind="FADE">
+          <span v-if="loading" key="loading">
+            <LpSkeleton class="inline-block h-[0.8em] w-[4.5ch] align-middle" />
+          </span>
+          <span v-else key="value">
+            <LpNumberFlow
+              v-if="typeof value === 'number'"
+              :value="value"
+              :compact="compact"
+              :grouped="grouped"
+              :decimals="decimals"
+              :prefix="prefix"
+              :suffix="valueSuffix"
+            />
+            <template v-else>{{ value }}</template>
+          </span>
+        </Transition>
       </span>
       <span
-        v-if="showDelta"
+        v-if="loading"
+        class="inline-flex items-center text-sm font-medium"
+      >
+        <LpSkeleton class="inline-block h-[0.9em] w-10 align-middle" />
+      </span>
+      <span
+        v-else-if="showDelta"
         class="inline-flex items-center gap-0.5 text-sm font-medium tabular-nums"
         :class="trendColor"
       >

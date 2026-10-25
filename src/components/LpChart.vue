@@ -46,14 +46,19 @@ import {
   type ChartThreshold,
 } from "./chart"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
-import LpIcon from "./LpIcon.vue"
+import LpEmptyState from "./LpEmptyState.vue"
 import LpShift from "./LpShift.vue"
+import LpSkeleton from "./LpSkeleton.vue"
+import LpSwap from "./LpSwap.vue"
+import { skeletonHeights, skeletonWave } from "./chartSkeleton"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { backgroundOf, downloadFile, fileStem, resolveCssColor, svgToPng, toCsv, type CsvOptions } from "./exportData"
 
 export interface ChartText {
   [key: string]: string
   empty: string
+  /** Read out while `loading`; the placeholder itself is silent. */
+  loading: string
   rightAxis: string
   /** Prefix of the keyboard readout, before the point's label. */
   point: string
@@ -117,6 +122,13 @@ const props = withDefaults(
     animate?: boolean
     /** Shown when every series is empty. */
     emptyLabel?: string
+    /**
+     * The series are on their way. The plot keeps its `height` and draws a
+     * pulsing stand-in of the chart's own type in the area the marks will take
+     * (bars for `bar`, a line for line/area, tick stubs where the axes are), so
+     * a dashboard does not jump from an empty box to a filled one.
+     */
+    loading?: boolean
     /** Reference lines and bands (SLOs, budgets, alert levels). */
     thresholds?: ChartThreshold[]
     /** Vertical markers at x positions (deploys, incidents). */
@@ -154,7 +166,7 @@ const props = withDefaults(
 
 const strings = useLabels<ChartText>(
   "chart",
-  { empty: "No data", rightAxis: "Measured on the right axis", point: "Point", xColumn: "Label" },
+  { empty: "No data", loading: "Loading", rightAxis: "Measured on the right axis", point: "Point", xColumn: "Label" },
   () => props.text,
 )
 
@@ -299,6 +311,24 @@ const banded = computed(() => props.type === "bar")
 const hasData = computed(() =>
   allSeries.value.some((s) => s.values.some((v) => v != null)),
 )
+
+/* Data to interact with: present, and not about to be replaced by the load in
+   flight (whose placeholder is what is on screen). */
+const ready = computed(() => hasData.value && !props.loading)
+
+/* Which of the three things the plot area holds; the key of its swap. */
+const plotState = computed(() => (props.loading ? "loading" : hasData.value ? "plot" : "empty"))
+
+// ── loading placeholder ─────────────────────────
+// As many bars as the chart will have, when that is already known (labels
+// usually are); a dozen otherwise.
+const skeletonBars = computed(() =>
+  skeletonHeights(Math.min(Math.max(count.value, props.labels?.length ?? 0) || 12, 24)),
+)
+// The line takes a few gentle swells whatever the point count: a curve through
+// two dozen pseudo-points reads as noise, not as "a line goes here".
+const skeletonPath = skeletonWave(skeletonHeights(8))
+const skeletonTicks = computed(() => Math.max(2, props.yTicks) + 1)
 
 // Bars are read against a baseline, so their axis must contain zero.
 const zeroBased = computed(() => props.includeZero || props.type === "bar")
@@ -971,7 +1001,7 @@ const summary = computed(
 const keyboard = ref(false)
 
 const onKeydown = (e: KeyboardEvent) => {
-  if (!count.value || !hasData.value) return
+  if (!count.value || !ready.value) return
   const last = count.value - 1
   let next: number
   switch (e.key) {
@@ -1144,27 +1174,87 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <div
         class="group/plot relative rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :style="{ height: `${height}px` }"
-        :tabindex="hasData ? 0 : undefined"
-        :role="hasData ? 'group' : undefined"
+        :tabindex="ready ? 0 : undefined"
+        :role="ready ? 'group' : undefined"
         aria-roledescription="chart"
-        :aria-label="hasData ? summary : undefined"
+        :aria-label="ready ? summary : undefined"
+        :aria-busy="loading || undefined"
         @keydown="onKeydown"
         @blur="onBlur"
       >
-        <div
-          v-if="!hasData"
-          class="flex size-full flex-col items-center justify-center gap-2 rounded-control border border-dashed border-line text-muted"
-        >
-          <LpIcon name="lucide:chart-no-axes-column" :size="18" />
-          <span class="text-xs">{{ emptyLabel ?? strings.empty }}</span>
+        <!-- Placeholder, empty state and plot each fill the same fixed height,
+             so the swap only fades and rises; nothing around the chart moves. -->
+        <LpSwap :swap-key="plotState">
+        <div v-if="loading" :style="{ height: `${height}px` }">
+          <span class="sr-only">{{ strings.loading }}</span>
+          <!-- Laid out with the real box's margins: tick stubs in the y gutter,
+               labels under the x axis, the marks in between. -->
+          <LpSkeleton
+            class="flex size-full"
+            :style="{ paddingTop: '10px', paddingBottom: showXAxis ? '26px' : '8px' }"
+          >
+            <div v-if="showYAxis" class="flex w-9 shrink-0 flex-col justify-between pr-2">
+              <div v-for="n in skeletonTicks" :key="n" class="lp-skeleton-item h-2 w-full -translate-y-1 rounded-control bg-surface-soft" />
+            </div>
+            <div class="relative min-w-0 flex-1">
+              <div v-if="showGrid" class="absolute inset-0 flex flex-col justify-between">
+                <div v-for="n in skeletonTicks" :key="n" class="h-px bg-line" />
+              </div>
+              <div v-if="type === 'bar'" class="absolute inset-0 flex items-end gap-[2%] px-[1%]">
+                <div
+                  v-for="(h, i) in skeletonBars"
+                  :key="i"
+                  class="lp-skeleton-item min-w-0 flex-1 rounded-t-[3px] bg-surface-soft"
+                  :style="{ height: `${h * 100}%` }"
+                />
+              </div>
+              <svg
+                v-else
+                class="absolute inset-0 size-full overflow-visible"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <path
+                  v-if="type === 'area'"
+                  class="lp-skeleton-item"
+                  :d="`${skeletonPath} L100 100 L0 100 Z`"
+                  fill="var(--color-surface-soft)"
+                />
+                <path
+                  class="lp-skeleton-item"
+                  :d="skeletonPath"
+                  fill="none"
+                  stroke="var(--color-surface-soft)"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                />
+              </svg>
+              <div
+                v-if="showXAxis"
+                class="absolute inset-x-0 -bottom-[18px] flex justify-between"
+              >
+                <div v-for="n in 5" :key="n" class="lp-skeleton-item h-2 w-8 rounded-control bg-surface-soft" />
+              </div>
+            </div>
+          </LpSkeleton>
         </div>
+
+        <LpEmptyState
+          v-else-if="!hasData"
+          compact
+          icon="lucide:chart-no-axes-column"
+          :title="emptyLabel ?? strings.empty"
+          class="justify-center rounded-control border border-dashed border-line py-0"
+          :style="{ height: `${height}px` }"
+        />
 
         <svg
           v-else-if="width > 0"
           ref="svgEl"
           :width="width"
           :height="height"
-          class="overflow-visible touch-none select-none"
+          class="block overflow-visible touch-none select-none"
           aria-hidden="true"
           @pointermove="onMove"
           @pointerleave="onLeave"
@@ -1404,10 +1494,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             {{ l.label }}
           </text>
         </svg>
+        </LpSwap>
 
         <!-- tooltip: springs after the pointer (see tooltipTarget) -->
         <Motion
-          v-if="active >= 0 && hasData"
+          v-if="active >= 0 && ready"
           as="div"
           class="pointer-events-none absolute left-0 top-0 z-(--z-tooltip) min-w-32 rounded-control border border-line bg-surface-overlay px-2.5 py-2 shadow-panel backdrop-blur group-data-[state=open]/plot:hidden"
           :initial="{ opacity: 0, scale: 0.96 }"
@@ -1445,7 +1536,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </div>
     </LpContextMenu>
 
-    <table v-if="dataTable && hasData" class="sr-only">
+    <table v-if="dataTable && ready" class="sr-only">
       <caption v-if="title">{{ title }}</caption>
       <thead>
         <tr>
