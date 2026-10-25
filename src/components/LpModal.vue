@@ -111,6 +111,16 @@ async function onOpenChange(next: boolean) {
   if (next || (await allowClose())) emit("update:open", next)
 }
 
+/**
+ * Close the way the dialog's own ways out do, through `guard`. For the app's
+ * own "Cancel": a button that sets `open` to false itself would skip the
+ * question. Handed to the default and footer slots, and exposed.
+ */
+function close() {
+  void onOpenChange(false)
+}
+defineExpose({ close })
+
 function onEscape(event: KeyboardEvent) {
   if (!props.dismissible) event.preventDefault()
 }
@@ -395,7 +405,7 @@ watch(
           class="flex min-h-0 flex-1 flex-col overflow-hidden text-sm text-ink/90"
           :class="bodyPad"
         >
-          <slot />
+          <slot :close="close" />
         </div>
         <!-- While the panel is still growing it is briefly shorter than the body
              it already holds, so the scroll area raises a bar for an overflow
@@ -407,11 +417,11 @@ watch(
           :class="resizing ? '[&_[data-scrollbarimpl]]:invisible' : ''"
           :content-class="bodyPad"
         >
-          <slot />
+          <slot :close="close" />
         </LpScrollArea>
 
         <footer v-if="$slots.footer" class="flex shrink-0 justify-end gap-2 p-5 pt-4">
-          <slot name="footer" />
+          <slot name="footer" :close="close" />
         </footer>
       </div>
       <aside

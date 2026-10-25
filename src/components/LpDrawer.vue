@@ -209,6 +209,10 @@ async function requestClose() {
   if (await allowClose()) emit("update:open", false)
 }
 
+// For the app's own "Cancel": closes through `guard`, as the drawer's own
+// ways out do. Handed to the body and footer slots, and exposed.
+defineExpose({ close: requestClose })
+
 // The header's close button is vaul's own and would slide the panel away at
 // once; with a guard it asks first and closes through the same path as above.
 function guardClose(event: MouseEvent) {
@@ -631,12 +635,12 @@ const previewStyle = computed(() => {
                viewer's min-w-max rows with wrap off) scrolls INSIDE itself
                instead of stretching the whole panel into a horizontal scroll. -->
           <LpScrollArea class="min-h-0 min-w-0 flex-1" :content-class="`min-w-0 ${padClass}`">
-            <slot />
+            <slot :close="requestClose" />
           </LpScrollArea>
         </div>
 
         <footer v-if="$slots.footer" class="flex justify-end gap-2 px-5 pb-5 pt-4">
-          <slot name="footer" />
+          <slot name="footer" :close="requestClose" />
         </footer>
       </DrawerContent>
     </DrawerPortal>

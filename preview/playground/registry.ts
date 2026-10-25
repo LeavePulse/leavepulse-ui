@@ -2354,7 +2354,7 @@ export const registry: ComponentEntry[] = [
   {
     id: "modal",
     name: "Modal",
-    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `guard` asks before closing when something would be lost (`:guard=\"form.dirty\"`, or a function for the app's own question), and also warns on leaving the page; `:dismissible=\"false\"` keeps Escape and the scrim from closing a step the user must finish on purpose. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Without a title, `aria-label` names the dialog (Drawer and Popover take it too). A custom overlay joins the same stack with `useModalLayer()`, and page-level hotkeys stay quiet while a modal covers them unless they set `overLayers` — see the bottom of the example. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
+    description: "Dialog with overlay, title and footer. size=sm…xl|2xl|3xl|full (or width=\"…\"); long content scrolls inside. A body that arrives late resizes the panel smoothly instead of snapping — see the second example. `guard` asks before closing when something would be lost (`:guard=\"form.dirty\"`, or a function for the app's own question), and also warns on leaving the page; the footer and body slots get a `close` that goes through the guard, for the app's own Cancel button (Drawer has the same); `:dismissible=\"false\"` keeps Escape and the scrim from closing a step the user must finish on purpose. `glass` trades the solid panel for frosted glass over a lighter scrim (also on Drawer, CommandPalette and the dialogs built on Modal) — see the third. Without a title, `aria-label` names the dialog (Drawer and Popover take it too). A custom overlay joins the same stack with `useModalLayer()`, and page-level hotkeys stay quiet while a modal covers them unless they set `overLayers` — see the bottom of the example. Unset, it follows `provideGlass()` from an ancestor, so an app that wants every overlay frosted says it once at its root; an explicit `:glass=\"false\"` still wins.",
     components: { LpModal, LpButton, CustomSheet, LayerKeys },
     state: () => {
       const s = reactive({
@@ -2387,7 +2387,8 @@ export const registry: ComponentEntry[] = [
 
   <LpModal v-model:open="guarded" title="Edit note" :guard="draft.trim() !== ''">
     <textarea v-model="draft" rows="3" class="w-full rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" placeholder="Type something, then press Escape" />
-    <template #footer>
+    <template #footer="{ close }">
+      <LpButton variant="ghost" @click="close">Cancel</LpButton>
       <LpButton variant="solid" @click="draft = ''; guarded = false">Save</LpButton>
     </template>
   </LpModal>
