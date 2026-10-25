@@ -40,6 +40,7 @@ import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } fr
 import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
+import MenuShortcut from "./MenuShortcut.vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
@@ -112,7 +113,10 @@ export interface Command {
    * when it fails, the fallback (or `icon`) holds the slot.
    */
   image?: string | CommandImage
-  /** Right-aligned hint, e.g. "⌘P". */
+  /**
+   * Right-aligned hint, written as LpKeys reads it: "Ctrl+P" (shown as ⌘P on
+   * an Apple keyboard), "G I" for a sequence.
+   */
   shortcut?: string
   /** Extra search terms not shown but matched against the query. */
   keywords?: string[]
@@ -277,6 +281,8 @@ export type PaletteLabels = {
   description?: string
   /** The key hint printed beside the box and in the footer. */
   esc?: string
+  /** The Tab key's name in the footer hint for a row's actions. */
+  tab?: string
 }
 
 const props = withDefaults(
@@ -416,6 +422,7 @@ const DEFAULT_LABELS: Required<PaletteLabels> = {
   title: "Command palette",
   description: "Search and run a command.",
   esc: "esc",
+  tab: "tab",
 }
 
 const text = useLabels("palette", DEFAULT_LABELS, () => props.labels)
@@ -1375,7 +1382,7 @@ useHotkeys(() =>
                       </template>
                     </span>
                   </span>
-                  <kbd v-if="c.shortcut" class="shrink-0 text-xs text-muted">{{ c.shortcut }}</kbd>
+                  <MenuShortcut v-if="c.shortcut" :combo="c.shortcut" />
                   <!-- The prefix that opens this mode from the box, so the
                        shortcut is learned by seeing it rather than reading docs. -->
                   <kbd
@@ -1484,7 +1491,7 @@ useHotkeys(() =>
             <kbd
               class="rounded-small border px-1 text-[10px] transition-colors"
               :class="showActionsKey ? 'border-brand' : 'border-line'"
-            >tab</kbd>
+            >{{ text.tab }}</kbd>
             {{ text.actions }}
           </span>
           <span v-if="trail.length" class="flex items-center gap-1">

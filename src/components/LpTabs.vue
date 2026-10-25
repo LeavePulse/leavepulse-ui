@@ -3,7 +3,11 @@ import { Motion, useReducedMotion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
+import LpBadge from "./LpBadge.vue"
+import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
+import LpRollingText from "./LpRollingText.vue"
+import { pickTab } from "./tabs"
 
 export interface TabItem {
   value: string
@@ -12,6 +16,15 @@ export interface TabItem {
   icon?: string
   /** A small dot on the tab: something behind it wants a look (unread, a problem). */
   dot?: boolean
+  /**
+   * A count chip after the label (number or short string), as on sidebar
+   * items: how much is behind the tab, not merely that something is.
+   */
+  badge?: number | string
+  /** Shown but not selectable; skipped by the arrow keys and by hover. */
+  disabled?: boolean
+  /** Right-click menu for this tab, headed by its label. */
+  menu?: ContextMenuItemDef[]
 }
 
 const props = withDefaults(
@@ -53,12 +66,23 @@ const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
 // Held here rather than left to reka, so the active marker follows the active
 // tab in uncontrolled use too: reading the prop alone left it unmarked.
-const current = ref(props.modelValue ?? props.defaultValue ?? props.items[0]?.value)
+const current = ref(props.modelValue ?? pickTab(props.items, props.defaultValue))
 watch(
   () => props.modelValue,
   (value) => {
     if (value !== undefined) current.value = value
   },
+)
+
+// Uncontrolled, the tabs re-pick when the list changes under them: items that
+// arrive after the first render, or a removed or disabled current tab, would
+// otherwise leave no tab active. Bound with v-model the choice is the app's.
+watch(
+  () => props.items.map((item) => [item.value, item.disabled]),
+  () => {
+    if (props.modelValue === undefined) current.value = pickTab(props.items, current.value)
+  },
+  { deep: true },
 )
 
 // A row wider than its container scrolls sideways (a phone, a narrow card)
@@ -150,11 +174,18 @@ function releaseFocusAfterPointer(event: PointerEvent) {
           ]"
       @pointerleave="hovered = null"
     >
-      <TabsTrigger
+      <!-- Passthrough when the tab has no menu, so it keeps the native one. -->
+      <LpContextMenu
         v-for="item in items"
         :key="item.value"
+        :items="item.menu ?? []"
+        :title="item.label"
+        :title-icon="item.icon"
+      >
+      <TabsTrigger
         :value="item.value"
-        class="relative inline-flex items-center justify-center outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring"
+        :disabled="item.disabled"
+        class="relative inline-flex items-center justify-center outline-none transition-[color,opacity] duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45"
         :class="[
           bottom
             ? 'min-h-14 min-w-0 flex-col gap-0.5 px-1 py-1.5 text-[11px] font-medium focus-visible:ring-inset'
@@ -165,7 +196,7 @@ function releaseFocusAfterPointer(event: PointerEvent) {
           accent ? 'data-[state=active]:text-brand' : 'data-[state=active]:text-ink',
           hovered === item.value && !bottom ? 'text-ink' : !hoverFollow && !bottom ? 'text-muted hover:text-ink' : 'text-muted',
         ]"
-        @pointerenter="hoverFollow && (hovered = item.value)"
+        @pointerenter="hoverFollow && !item.disabled && (hovered = item.value)"
         @pointerup="releaseFocusAfterPointer"
       >
         <!-- Active marker: a bar under the tab in "underline", over it in
@@ -199,6 +230,18 @@ function releaseFocusAfterPointer(event: PointerEvent) {
             aria-hidden="true"
             class="absolute -right-1 -top-0.5 size-2 rounded-full bg-accent"
           />
+          <!-- On a bottom bar the count rides on the icon's corner, as phone
+               navs draw it: the label under the icon has no room beside it. -->
+          <Transition name="lp-tab-badge">
+            <LpBadge
+              v-if="bottom && item.badge != null"
+              size="sm"
+              :tone="current === item.value ? 'brand' : 'neutral'"
+              class="absolute -right-3 -top-1.5 min-w-[18px] justify-center"
+            >
+              <LpRollingText :value="item.badge" />
+            </LpBadge>
+          </Transition>
         </span>
         <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : ''">{{ item.label }}</span>
         <span
@@ -206,7 +249,20 @@ function releaseFocusAfterPointer(event: PointerEvent) {
           aria-hidden="true"
           class="relative z-10 size-1.5 self-start rounded-full bg-accent"
         />
+        <!-- The count rolls when it changes, and the chip scales in and out
+             rather than popping. -->
+        <Transition name="lp-tab-badge">
+          <LpBadge
+            v-if="!(bottom && item.icon) && item.badge != null"
+            size="sm"
+            :tone="current === item.value ? 'brand' : 'neutral'"
+            class="relative z-10 min-w-[18px] justify-center"
+          >
+            <LpRollingText :value="item.badge" />
+          </LpBadge>
+        </Transition>
       </TabsTrigger>
+      </LpContextMenu>
     </TabsList>
 
     <!-- Animated panels: only rendered if a per-item #panel slot is provided.
@@ -231,3 +287,23 @@ function releaseFocusAfterPointer(event: PointerEvent) {
     <slot />
   </TabsRoot>
 </template>
+
+<style scoped>
+.lp-tab-badge-enter-active,
+.lp-tab-badge-leave-active {
+  transition:
+    opacity var(--duration-fast) var(--ease-emphasized),
+    transform var(--duration-fast) var(--ease-emphasized);
+}
+.lp-tab-badge-enter-from,
+.lp-tab-badge-leave-to {
+  opacity: 0;
+  transform: scale(0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-tab-badge-enter-active,
+  .lp-tab-badge-leave-active {
+    transition: none;
+  }
+}
+</style>

@@ -114,6 +114,11 @@ const props = withDefaults(
      * 0 turns it off — the app then owns the state through `collapsed`.
      */
     autoCollapseAfter?: number
+    /**
+     * The active pill follows the hovered item, as in LpTabs. Off by default;
+     * see LpSidebarNav for why a tall nav keeps it pinned.
+     */
+    hoverFollow?: boolean
   }>(),
   {
     skeletonRows: 6,
@@ -123,6 +128,7 @@ const props = withDefaults(
     divider: true,
     variant: "rail",
     autoCollapseAfter: 14,
+    hoverFollow: false,
   },
 )
 
@@ -314,6 +320,7 @@ defineOptions({ inheritAttrs: false })
       :skeleton-rows="skeletonRows"
       :skeleton-header="skeletonHeader"
       :collapsed-keys="collapsedKeys"
+      :hover-follow="hoverFollow"
       @activate="activate"
       @toggle-section="toggleSection"
     >
@@ -373,6 +380,7 @@ defineOptions({ inheritAttrs: false })
         :skeleton-rows="skeletonRows"
         :skeleton-header="skeletonHeader"
         :collapsed-keys="collapsedKeys"
+        :hover-follow="hoverFollow"
         @activate="activate"
         @toggle-section="toggleSection"
       >

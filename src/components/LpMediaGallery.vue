@@ -27,8 +27,23 @@
 import { computed, ref, watch } from "vue"
 import type { LightboxItem } from "./lightbox"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useLabels } from "../composables/useLpConfig"
+import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLightbox from "./LpLightbox.vue"
+
+const DEFAULT_LABELS = {
+  /** Accessible name of the grid. */
+  gallery: "Media",
+  /** Name of an image without a title; `{n}` and `{total}` are replaced. */
+  image: "Image {n} of {total}",
+  /** The word on a covered image. */
+  spoiler: "Spoiler",
+  /** Accessible name of a covered image. */
+  showSpoiler: "Spoiler — show image",
+  /** Accessible name of the overflow tile; `{n}` is the hidden count. */
+  showMore: "Show {n} more",
+}
 
 const props = withDefaults(
   defineProps<{
@@ -56,8 +71,15 @@ const props = withDefaults(
     downloadable?: boolean
     /** Passed through to the lightbox. */
     rotatable?: boolean
-    /** Accessible name for the grid. */
+    /** Accessible name for the grid. Defaults to the `gallery` label. */
     ariaLabel?: string
+    /**
+     * Right-click menu for a thumbnail (download, copy link, set as cover…),
+     * headed by the image's title and the thumbnail itself. Return [] for an
+     * image without one; it keeps the browser's own menu.
+     */
+    itemMenu?: (item: LightboxItem, index: number) => ContextMenuItemDef[]
+    labels?: Partial<typeof DEFAULT_LABELS>
   }>(),
   {
     columns: 3,
@@ -66,9 +88,25 @@ const props = withDefaults(
     openable: true,
     downloadable: true,
     rotatable: true,
-    ariaLabel: "Media",
   },
 )
+
+const text = useLabels("mediaGallery", DEFAULT_LABELS, () => props.labels)
+
+/** `{n}` is the image's position, `{total}` the size of the set. */
+function fill(template: string, n: number, total = 0): string {
+  return template.replace("{n}", String(n)).replace("{total}", String(total))
+}
+
+/*
+ * The menu's heading names the image. A covered one shows neither its picture
+ * nor its title there: the heading would uncover in a right click what the
+ * tile keeps covered until someone asks for it.
+ */
+function menuTitle(item: LightboxItem, i: number): string {
+  if (isHidden(item)) return text.value.spoiler
+  return item.title || fill(text.value.image, i + 1, props.items.length)
+}
 
 const emit = defineEmits<{
   /** A thumbnail was activated, before the lightbox opens. */
@@ -262,10 +300,16 @@ defineExpose({
     <slot name="empty" />
   </div>
 
-  <div v-else role="group" :aria-label="ariaLabel" :class="rootClass" v-bind="rest">
-    <button
+  <div v-else role="group" :aria-label="ariaLabel ?? text.gallery" :class="rootClass" v-bind="rest">
+    <LpContextMenu
       v-for="(item, i) in visible"
       :key="item.src + i"
+      :items="itemMenu?.(item, i) ?? []"
+      :title="menuTitle(item, i)"
+      :title-image="isHidden(item) ? undefined : item.thumb || item.src"
+      :subtitle="isHidden(item) ? undefined : item.description"
+    >
+    <button
       type="button"
       :class="[
         'group relative overflow-hidden rounded-card bg-surface-soft outline-none',
@@ -275,10 +319,10 @@ defineExpose({
       ]"
       :aria-label="
         isHidden(item)
-          ? 'Spoiler — show image'
+          ? text.showSpoiler
           : hiddenCount && i === visible.length - 1
-            ? `Show ${hiddenCount} more`
-            : item.title || `Image ${i + 1} of ${items.length}`
+            ? fill(text.showMore, hiddenCount)
+            : menuTitle(item, i)
       "
       @click="
         isHidden(item)
@@ -339,7 +383,7 @@ defineExpose({
         <span
           class="rounded-pill bg-black/55 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white"
         >
-          Spoiler
+          {{ text.spoiler }}
         </span>
       </span>
 
@@ -358,6 +402,7 @@ defineExpose({
         <LpIcon name="lucide:maximize-2" :size="18" class="text-white" />
       </span>
     </button>
+    </LpContextMenu>
 
     <LpLightbox
       v-if="openable"

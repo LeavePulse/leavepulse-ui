@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /*
- * Right-click context menu (reka ContextMenu). Same item shape as
- * LpDropdownMenu, plus nested submenus (`children`) and a shortcut hint. The
+ * Right-click context menu (reka ContextMenu). Same items as LpDropdownMenu,
+ * drawn by the same renderer: nested submenus (`children`), tick-box items and
+ * shortcut hints (drawn with LpKeys, so they follow the keyboard). The
  * trigger is whatever you put in the default slot — right-clicking it (or
  * long-press on touch) opens the menu at the pointer. Shares the floating-panel
  * surface + option-row look with the rest of the kit via dropdown.ts.
@@ -17,7 +18,10 @@ import { POPOVER_PANEL } from "./dropdown"
 export interface ContextMenuItemDef {
   label: string
   icon?: string
-  /** Right-aligned hint, e.g. "⌘C". */
+  /**
+   * Right-aligned hint, written as LpKeys reads it: "Ctrl+C" (shown as ⌘C on
+   * an Apple keyboard), "Shift+Del", "G I".
+   */
   shortcut?: string
   danger?: boolean
   disabled?: boolean
