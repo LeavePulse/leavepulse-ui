@@ -41,6 +41,7 @@ import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import MenuShortcut from "./MenuShortcut.vue"
+import { usePersisted } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
@@ -729,19 +730,14 @@ const fallbacks = computed<Command[]>(() =>
  * relevance is the better order and a duplicated row is just noise.
  */
 const RECENT_KEEP = 20
-const ownRecent = ref<RecentItem[]>([])
-watch(
-  () => props.recentKey,
-  (key) => {
-    if (!key || typeof localStorage === "undefined") return
-    try {
-      ownRecent.value = readRecent(JSON.parse(localStorage.getItem(key) ?? "[]"))
-    } catch {
-      ownRecent.value = []
-    }
-  },
-  { immediate: true },
-)
+// Kept in the kit's storage (the app's own, or the browser's made safe), and
+// re-checked on the way in: a list written by an older version or by hand
+// passes through readRecent before the palette shows any of it.
+const storedRecent = usePersisted<unknown>(() => props.recentKey, [])
+const ownRecent = computed<RecentItem[]>({
+  get: () => readRecent(storedRecent.value),
+  set: (list) => (storedRecent.value = list),
+})
 
 /*
  * Where each recent row was found, so running it again remembers it under
@@ -760,9 +756,6 @@ function remember(c: Command) {
   const key = props.recentKey
   if (!key || props.recent) return
   ownRecent.value = pushRecent(ownRecent.value, item, RECENT_KEEP)
-  try {
-    localStorage.setItem(key, JSON.stringify(ownRecent.value))
-  } catch {}
 }
 const recentList = computed(() => props.recent ?? (props.recentKey ? ownRecent.value : []))
 

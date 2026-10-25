@@ -14,6 +14,7 @@
  * the static <nav> it always has — existing call sites are unaffected.
  */
 import { computed, ref, useId } from "vue"
+import { usePersisted } from "../composables/usePersisted"
 import { useLabels } from "../composables/useLpConfig"
 import LpDrawer from "./LpDrawer.vue"
 import LpInput from "./LpInput.vue"
@@ -101,6 +102,12 @@ const props = withDefaults(
      * `autoCollapseAfter`.
      */
     collapsed?: string[]
+    /**
+     * Remember which groups the user folded, across visits, under this key
+     * (the kit's storage, see `usePersisted`). Without it, and without
+     * v-model:collapsed, the choice lasts for the session.
+     */
+    persist?: string
     /**
      * Fold collapsible groups automatically once the nav has more than this
      * many rows, counting headings and items alike.
@@ -195,10 +202,15 @@ function keyOf(section: SidebarSection): string {
 }
 
 /*
- * Folded state. The app may own it (v-model:collapsed) — that is how a stored
- * setting survives a reload; otherwise the sidebar keeps it for the session.
+ * Folded state. The app may own it (v-model:collapsed); otherwise the sidebar
+ * keeps it, for the session or, under `persist`, across visits. Null until
+ * something is toggled, so the automatic folding below still applies.
  */
-const ownCollapsed = ref<string[] | null>(null)
+const ownCollapsed = usePersisted<string[] | null>(
+  () => props.persist && `lp-sidebar:${props.persist}`,
+  null,
+  { validate: (value): value is string[] | null => value === null || (Array.isArray(value) && value.every((k) => typeof k === "string")) },
+)
 
 /** Headings + items: what the eye actually has to walk past. */
 const navLength = computed(
