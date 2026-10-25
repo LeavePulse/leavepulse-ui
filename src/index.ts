@@ -354,6 +354,7 @@ export { LP_CONFIG, lpConfig, mergeConfig, provideLpConfig, useLabels, useLinkCo
 export type { KitStorage, LabelScope, LpConfig } from "./composables/useLpConfig"
 export { browserStorage, useKitStorage, usePersisted } from "./composables/usePersisted"
 export { useCloseGuard } from "./composables/useCloseGuard"
+export { useOptimisticToggle } from "./composables/useOptimisticToggle"
 export type { CloseGuard, CloseGuardLabels } from "./composables/useCloseGuard"
 export type { PersistedOptions } from "./composables/usePersisted"
 export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMergedClass"

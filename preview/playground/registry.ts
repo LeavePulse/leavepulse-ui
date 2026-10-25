@@ -439,6 +439,7 @@ export const registry: ComponentEntry[] = [
     description="A digest of new comments, once a day."
     class="max-w-sm"
   />
+  <LpCheckbox v-model="synced" :action="(v) => sync()" label="Same, as a checkbox" description="Ticks at once, spins while saving, unticks on failure." class="max-w-sm" />
   <LpSwitch
     v-model="synced"
     :action="(v) => sync()"
@@ -3001,9 +3002,9 @@ export const registry: ComponentEntry[] = [
     id: "actionbar",
     name: "ActionBar",
     description:
-      "A bar that rises from the bottom of the viewport to ask for ONE decision and stays until something resolves it — unsaved changes, a cookie notice, a bulk action on a selection. Not a dialog (the page stays usable behind it, no focus trap) and not a toast (it does not leave on a timer). Teleported to the body, so it pins to the viewport wherever it is declared. The last action is the primary one automatically, and several open at once stack instead of covering each other.",
+      "A bar that rises from the bottom of the viewport to ask for ONE decision and stays until something resolves it — unsaved changes, a cookie notice, a bulk action on a selection. Not a dialog (the page stays usable behind it, no focus trap) and not a toast (it does not leave on a timer). Teleported to the body, so it pins to the viewport wherever it is declared. The last action is the primary one automatically, and several open at once stack instead of covering each other. An action takes LpButton's `action` (the button spins while it runs and a failure becomes an error toast) and `hotkey`: \"Save changes\" below is Ctrl+S while the bar is open.",
     components: { LpActionBar, LpButton },
-    state: () => reactive({ dirty: false, cookies: false, selection: false, saving: false }),
+    state: () => reactive({ dirty: false, cookies: false, selection: false }),
     template: `<div class="flex flex-wrap gap-2">
   <LpButton variant="outline" size="sm" @click="dirty = true">Unsaved changes</LpButton>
   <LpButton variant="outline" size="sm" @click="cookies = true">Cookie notice (full width)</LpButton>
@@ -3016,10 +3017,9 @@ export const registry: ComponentEntry[] = [
     description="Leaving this page will discard them."
     :actions="[
       { label: 'Discard', onClick: () => { dirty = false } },
-      { label: 'Save changes', icon: 'lucide:check', loading: saving, onClick: async () => {
-          saving = true
+      { label: 'Save changes', icon: 'lucide:check', hotkey: 'Ctrl+S', action: async () => {
           await new Promise(r => setTimeout(r, 900))
-          saving = false; dirty = false
+          dirty = false
         } },
     ]"
   />
@@ -3705,7 +3705,7 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     id: "dropzone",
     name: "Dropzone",
     description:
-      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree. `links` adds an address by the same routes: drag a picture in from another tab (a browser gives its address, not a file), paste a copied link, or press \"or a link\" and type it where the zone was; Enter adds, Escape goes back. Only http(s) is taken, and it arrives as the `link` event; whether it serves a picture is the app's call.",
+      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree. `links` adds an address by the same routes: drag a picture in from another tab (a browser gives its address, not a file), paste a copied link, or press \"or a link\" and type it where the zone was (a zone narrower than 280px opens the field in a popover under itself instead); Enter adds, Escape goes back. Only http(s) is taken, and it arrives as the `link` event; whether it serves a picture is the app's call.",
     components: { LpDropzone, LpSelect },
     state: () => reactive({ taken: [] as string[], refused: [] as string[], link: "", tone: "sunken" }),
     template: `<div class="flex w-full max-w-md flex-col gap-3">
@@ -3731,6 +3731,10 @@ ${Array.from({ length: 12 }, (_, i) => `<circle cx="${w / 2}" cy="${h / 2}" r="$
     @link="(url) => ((link = url), (taken = []))"
   />
   <p v-if="taken.length" class="text-xs text-muted">Taken: {{ taken.join(', ') }}</p>
+  <div class="flex items-start gap-3">
+    <LpDropzone ref="narrow" accept="image/*" links class="aspect-video !w-36 shrink-0 !p-0" title="" @link="(url) => (link = url)" @files="(f) => (taken = f.map((x) => x.name))" />
+    <p class="text-xs text-muted">A zone too narrow for the field (a cover thumbnail) opens it in a popover under itself: <button type="button" class="text-brand hover:underline" @click="$refs.narrow.link()">open it</button>.</p>
+  </div>
   <div v-if="link" class="flex items-center gap-2 text-xs text-muted">
     <img :src="link" alt="" class="size-10 shrink-0 rounded-control bg-surface-soft object-cover" />
     <span class="min-w-0 truncate">Link: {{ link }}</span>

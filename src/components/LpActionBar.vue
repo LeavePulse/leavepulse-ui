@@ -37,6 +37,14 @@ export interface ActionBarAction {
   /** Shows a spinner in place of the icon and blocks repeat clicks. */
   loading?: boolean
   onClick?: () => void | Promise<void>
+  /**
+   * Work the button starts, as LpButton's `action`: a spinner while it runs,
+   * repeat clicks ignored, a failure shown as an error toast. The bar's
+   * "Save" no longer needs a loading flag of its own.
+   */
+  action?: () => unknown
+  /** A key that presses the button, as LpButton's `hotkey` ("Ctrl+S"). */
+  hotkey?: string
 }
 
 const props = withDefaults(
@@ -268,6 +276,8 @@ onBeforeUnmount(() => observer?.disconnect())
                 :variant="action.variant"
                 size="sm"
                 :disabled="action.disabled || action.loading"
+                :action="action.action"
+                :hotkey="action.hotkey"
                 @click="run(action)"
               >
                 <LpIcon

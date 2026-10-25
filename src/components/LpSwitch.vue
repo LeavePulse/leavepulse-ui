@@ -6,10 +6,10 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, ref, useId, useSlots } from "vue"
+import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
-import { useToast } from "../composables/useToast"
+import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -44,9 +44,7 @@ const emit = defineEmits<{
   (e: "error", error: unknown): void
 }>()
 
-const toast = useToast()
-const instance = getCurrentInstance()
-const pending = ref(false)
+const { pending, set } = useOptimisticToggle(() => props.action, emit)
 
 const slots = useSlots()
 const labelled = computed(() => Boolean(props.label || props.description || slots.default))
@@ -78,24 +76,8 @@ const describedBy = computed(
   () => [props.description && labelled.value ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
 )
 
-async function onUpdate(value: boolean) {
-  if (!props.action) return emit("update:modelValue", value)
-  // A second flip while saving is ignored: the switch is controlled, so reka
-  // shows whatever `modelValue` says and the click leaves no trace.
-  if (pending.value) return
-  const previous = !value
-  emit("update:modelValue", value)
-  pending.value = true
-  try {
-    await props.action(value)
-    emit("done", value)
-  } catch (error) {
-    emit("update:modelValue", previous)
-    if (instance?.vnode.props?.onError) emit("error", error)
-    else toast.error(error instanceof Error ? error : String(error))
-  } finally {
-    pending.value = false
-  }
+function onUpdate(value: boolean) {
+  void set(value)
 }
 </script>
 

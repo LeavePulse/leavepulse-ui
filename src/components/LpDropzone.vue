@@ -39,9 +39,10 @@ import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
-import LpButton from "./LpButton.vue"
+import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-ui"
+import DropzoneLinkField from "./DropzoneLinkField.vue"
+import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
-import LpInput from "./LpInput.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -268,7 +269,11 @@ function onPaste(event: ClipboardEvent) {
 const linking = ref(false)
 const draft = ref("")
 const invalid = ref(false)
-const linkField = ref<InstanceType<typeof LpInput> | null>(null)
+const linkField = ref<InstanceType<typeof DropzoneLinkField> | null>(null)
+
+// Narrower than this, the field and its button would not fit in the zone.
+const IN_PLACE_MIN = 280
+const floating = ref(false)
 const pressTarget = ref<HTMLButtonElement | null>(null)
 
 // The zone keeps its height while the field stands in for its content, so
@@ -277,7 +282,9 @@ const heldHeight = ref<number | null>(null)
 
 function startLink() {
   if (!props.links || props.disabled) return
-  heldHeight.value = (revealAnchor.value as HTMLElement | null)?.offsetHeight ?? null
+  const zone = revealAnchor.value as HTMLElement | null
+  floating.value = (zone?.offsetWidth ?? 0) < IN_PLACE_MIN
+  heldHeight.value = floating.value ? null : (zone?.offsetHeight ?? null)
   linking.value = true
   invalid.value = false
 }
@@ -457,27 +464,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
       @after-enter="contentBack"
     >
       <div
-        v-if="linking"
+        v-if="linking && !floating"
         key="link"
-        class="relative z-10 flex w-full max-w-md flex-col gap-1.5"
+        class="relative z-10 flex w-full max-w-md"
         @focusout="onLinkLeave"
       >
-        <div class="flex items-center gap-2">
-          <LpInput
-            ref="linkField"
-            v-model="draft"
-            class="min-w-0 flex-1"
-            size="sm"
-            type="url"
-            icon="lucide:link"
-            :invalid="invalid"
-            :placeholder="labels.placeholder"
-            :aria-label="labels.placeholder"
-            @keydown="onLinkKey"
-          />
-          <LpButton size="sm" @click="addLink">{{ labels.done }}</LpButton>
-        </div>
-        <span class="text-xs" :class="invalid ? 'text-danger' : 'text-muted'" aria-live="polite">{{ invalid ? labels.invalid : labels.keys }}</span>
+        <DropzoneLinkField ref="linkField" v-model="draft" :invalid="invalid" :labels="labels" @add="addLink" @key="onLinkKey" />
       </div>
       <div
         v-else
@@ -505,6 +497,25 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
         </slot>
       </div>
     </Transition>
+
+    <!-- A zone too narrow for the field (a thumbnail beside its controls)
+         keeps its picture and opens the field under itself instead. -->
+    <PopoverRoot :open="linking && floating" @update:open="(open: boolean) => !open && stopLink(false)">
+      <PopoverAnchor :reference="revealAnchor ?? undefined" />
+      <PopoverPortal>
+        <PopoverContent
+          :collision-padding="8"
+          side="bottom"
+          align="start"
+          :side-offset="6"
+          :class="POPOVER_PANEL"
+          class="z-(--z-popover) w-80 rounded-card p-3 outline-none"
+          @open-auto-focus.prevent
+        >
+          <DropzoneLinkField ref="linkField" v-model="draft" :invalid="invalid" :labels="labels" @add="addLink" @key="onLinkKey" />
+        </PopoverContent>
+      </PopoverPortal>
+    </PopoverRoot>
 
     <input
       ref="input"
