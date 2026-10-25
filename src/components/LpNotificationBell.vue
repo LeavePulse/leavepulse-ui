@@ -199,8 +199,11 @@ const contextMenu = computed<ContextMenuItemDef[]>(() => {
   return items
 })
 
+// Picking an item goes somewhere (a page, a dialog, a tour step), so the feed
+// steps out of the way: left open it would cover what the item just opened.
 function onSelect(item: NotificationItem) {
   if (!item.read) emit("markRead", item.id)
+  open.value = false
   emit("select", item)
 }
 
@@ -226,7 +229,7 @@ function rowMenu(item: NotificationItem): ContextMenuItemDef[] {
     actions.push({
       label: l.value.open,
       icon: "lucide:external-link",
-      onSelect: () => emit("select", item),
+      onSelect: () => onSelect(item),
     })
   }
   actions.push({
