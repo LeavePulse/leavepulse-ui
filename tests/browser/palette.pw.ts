@@ -100,8 +100,8 @@ test("sigils expose providers and preview actions are clickable", async ({ page 
 })
 
 test("wrong-layout queries find page commands", async ({ page }) => {
-  const input = await open(page, "dtnrb")
-  await expect(page.getByRole("option", { name: /Ветки/ })).toBeVisible()
+  const input = await open(page, "икфтсруы")
+  await expect(page.getByRole("option", { name: /Branches/ })).toBeVisible()
   await input.press("Enter")
   await expect(page.getByRole("status", { name: "Picked action" })).toHaveText("branches")
 })

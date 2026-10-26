@@ -81,21 +81,32 @@ function rankExact<T extends SearchableCommand>(items: T[], terms: CommandSearch
 }
 
 const LATIN_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,."
-const CYRILLIC_KEYS = "ёйцукенгшщзхъфывапролджэячсмитьбю"
-const LAYOUT_KEYS = new Map([...LATIN_KEYS].flatMap((key, i) => [[key, CYRILLIC_KEYS[i]!], [CYRILLIC_KEYS[i]!, key]]))
+const CYRILLIC_LAYOUTS = ["ґйцукенгшщзхїфівапролджєячсмитьбю", "ёйцукенгшщзхъфывапролджэячсмитьбю"]
+const LAYOUT_MAPS = CYRILLIC_LAYOUTS.map(keys => new Map([...LATIN_KEYS].flatMap((key, i) => [[key, keys[i]!], [keys[i]!, key]])))
 
-export function swapCommandLayout(value: string): string {
+function swapWith(value: string, keys: Map<string, string>): string {
   return [...value].map(char => {
-    const replacement = LAYOUT_KEYS.get(char.toLowerCase())
+    const replacement = keys.get(char.toLowerCase())
     return replacement ? char === char.toUpperCase() ? replacement.toUpperCase() : replacement : char
   }).join("")
+}
+
+/** The query as if typed on the other layout: Latin to Ukrainian by default, `layout` 1 for the other Cyrillic one. */
+export function swapCommandLayout(value: string, layout = 0): string {
+  return swapWith(value, LAYOUT_MAPS[layout] ?? LAYOUT_MAPS[0]!)
 }
 
 export function searchCommandItems<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): { items: T[]; terms: string[] } {
   const exact = rankExact(items, terms)
   if (exact.length || !terms.include.length) return { items: exact, terms: terms.include }
-  const alternate = { include: terms.include.map(swapCommandLayout), exclude: terms.exclude, groups: terms.groups }
-  return { items: rankExact(items, alternate), terms: alternate.include }
+  let fallback = terms.include
+  for (const keys of LAYOUT_MAPS) {
+    const alternate = { include: terms.include.map(term => swapWith(term, keys)), exclude: terms.exclude, groups: terms.groups }
+    const found = rankExact(items, alternate)
+    if (found.length) return { items: found, terms: alternate.include }
+    if (fallback === terms.include) fallback = alternate.include
+  }
+  return { items: [], terms: fallback }
 }
 
 export function rankCommandItems<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): T[] {

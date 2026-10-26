@@ -4,17 +4,17 @@ import { createPaletteRegistry, mergePaletteCommands, usePaletteCommands } from 
 import { searchCommandItems, parseCommandQuery, swapCommandLayout } from "../src/components/commandSearch"
 
 test("layout fallback works in either direction and retains operator filters", () => {
-  const items = [{ id: "branches", label: "Ветки", group: "Navigation" }, { id: "theme", label: "Theme", group: "Settings" }]
-  expect(searchCommandItems(items, parseCommandQuery("dtnrb in:navigation")).items.map(c => c.id)).toEqual(["branches"])
-  expect(searchCommandItems(items, parseCommandQuery("еруыу")).items.map(c => c.id)).toEqual(["theme"])
-  expect(searchCommandItems(items, parseCommandQuery("dtnrb -Ветки")).items).toEqual([])
-  expect(searchCommandItems(items, parseCommandQuery("dtnrb")).terms).toEqual(["ветки"])
-  expect(swapCommandLayout("Dtnrb")).toBe("Ветки")
+  const items = [{ id: "branches", label: "Гілки", group: "Navigation" }, { id: "theme", label: "Theme", group: "Settings" }]
+  expect(searchCommandItems(items, parseCommandQuery("uskrb in:navigation")).items.map(c => c.id)).toEqual(["branches"])
+  expect(searchCommandItems(items, parseCommandQuery("еруіу")).items.map(c => c.id)).toEqual(["theme"])
+  expect(searchCommandItems(items, parseCommandQuery("uskrb -Гілки")).items).toEqual([])
+  expect(searchCommandItems(items, parseCommandQuery("uskrb")).terms).toEqual(["гілки"])
+  expect(swapCommandLayout("Uskrb")).toBe("Гілки")
 })
 
 test("an exact query wins over keyboard-layout guesses", () => {
-  const items = [{ id: "literal", label: "dtnrb" }, { id: "branches", label: "Ветки" }]
-  expect(searchCommandItems(items, parseCommandQuery("dtnrb")).items.map(c => c.id)).toEqual(["literal"])
+  const items = [{ id: "literal", label: "uskrb" }, { id: "branches", label: "Гілки" }]
+  expect(searchCommandItems(items, parseCommandQuery("uskrb")).items.map(c => c.id)).toEqual(["literal"])
 })
 
 test("context registrations are reactive, prioritised and removed on disposal", () => {
