@@ -45,7 +45,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     </div>
     <div class="flex flex-col gap-1">
       <p class="font-semibold text-ink" :class="compact ? 'text-sm' : ''">{{ title }}</p>
-      <p v-if="description" class="max-w-sm text-sm text-muted">{{ description }}</p>
+      <!-- The slot is for a line a string cannot carry: a command, a link. -->
+      <p v-if="description || $slots.description" class="max-w-sm text-sm text-muted">
+        <slot name="description">{{ description }}</slot>
+      </p>
     </div>
     <div v-if="$slots.default" class="mt-1"><slot /></div>
   </div>

@@ -5,6 +5,7 @@ import {
   LpBadge,
   LpButton,
   LpThemeSwitcher,
+  LpThemeStudio,
 } from "../../../src"
 import { type ComponentEntry } from "./shared"
 
@@ -13,8 +14,8 @@ export const theming: ComponentEntry[] = [
     id: "theme-switcher",
     name: "ThemeSwitcher",
     description:
-      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads. `system` adds a \"System\" entry that follows the OS colour scheme with a light/dark pair (`useTheme().setSystem({ light, dark })` does the same in code). LpThemeProvider paints one subtree in another theme, derived tokens included. Selected text follows the theme too once the app imports the opt-in `@leavepulse/ui/selection.css` (this preview does: select any text here and switch themes); without it the browser paints selection in the OS accent, which on Linux comes from the GTK theme.",
-    components: { LpThemeSwitcher, LpThemeProvider, LpButton, LpBadge },
+      "Theme picker wired to the token engine — swatch / icon / pill triggers, circular-reveal transition on change, and the choice persisted across reloads. `system` adds a \"System\" entry that follows the OS colour scheme with a light/dark pair (`useTheme().setSystem({ light, dark })` does the same in code). LpThemeProvider paints one subtree in another theme, derived tokens included. Selected text follows the theme too once the app imports the opt-in `@leavepulse/ui/selection.css` (this preview does: select any text here and switch themes); without it the browser paints selection in the OS accent, which on Linux comes from the GTK theme. The switcher's right-click menu ends in the theme studio; LpThemeStudio puts the same studio on a page, as a settings section, and lays its themes out to the width it is given.",
+    components: { LpThemeSwitcher, LpThemeStudio, LpThemeProvider, LpButton, LpBadge },
     state: () => {
       const theme = useTheme()
       return {
@@ -48,6 +49,9 @@ export const theming: ComponentEntry[] = [
         <LpBadge tone="danger">failed</LpBadge>
       </div>
     </LpThemeProvider>
+  </div>
+  <div class="rounded-card border border-line bg-surface-raised p-4">
+    <LpThemeStudio :hide="['export']" />
   </div>
 </div>`,
     thumb: `<div class="flex flex-col items-center gap-3">

@@ -104,6 +104,17 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg"
     /** Trigger text beside the swatch. Defaults to the colour's own value. */
     label?: string
+    /**
+     * `swatch` makes the trigger a round chip of the colour alone, for a row of
+     * presets that ends in "any colour" or a toolbar with no room for a field.
+     * The panel is the same.
+     */
+    variant?: "field" | "swatch"
+    /**
+     * The swatch is the current choice. False draws it as "any colour" (a
+     * colour wheel), for when the value came from presets beside it.
+     */
+    selected?: boolean
     /** Accessible name for the trigger when it carries no visible text. */
     ariaLabel?: string
     /** Popover side, as LpPopover. */
@@ -156,6 +167,8 @@ const props = withDefaults(
     recent: false,
     recentKey: "lp.color.recent",
     recentLimit: 8,
+    variant: "field",
+    selected: true,
   },
 )
 
@@ -371,6 +384,9 @@ function tickClass(value: string) {
   const rgb = parseColor(value)
   return rgb && isLight(rgbToHsv(rgb)) ? "text-black" : "text-white"
 }
+
+const SWATCH_SIZE = { sm: "size-6", md: "size-7", lg: "size-8" }
+const ANY_COLOUR = "conic-gradient(from 90deg, #ff5c5c, #ffd23f, #39e58c, #2dd4bf, #00bcff, #7c5cff, #ff5ca8, #ff5c5c)"
 
 const triggerSize = {
   sm: "h-(--size-control-sm) text-xs",
@@ -634,10 +650,25 @@ const guardOutside = useOutsideGuard()
          menu's trigger and the popover's trigger both. LpContextMenu renders
          just its slot when `items` is empty, so `menu="none"` with no items of
          your own leaves the native browser menu in place. -->
-    <PopoverAnchor class="block w-full">
+    <PopoverAnchor :class="variant === 'swatch' ? 'inline-block' : 'block w-full'">
       <LpContextMenu :items="menuItems">
       <PopoverTrigger as-child>
         <button
+          v-if="variant === 'swatch'"
+          type="button"
+          :id="field.id"
+          :disabled="field.disabled"
+          :aria-label="ariaLabel ?? current"
+          :title="current"
+          class="relative shrink-0 overflow-hidden rounded-full outline-none ring-2 ring-offset-2 ring-offset-surface-raised transition-[box-shadow,scale] duration-(--duration-fast) hover:scale-110 focus-visible:ring-ring data-[state=open]:ring-brand disabled:cursor-not-allowed disabled:opacity-55"
+          :class="[SWATCH_SIZE[size], selected ? 'ring-ink' : 'ring-line']"
+          :style="{ background: CHECKERBOARD }"
+        >
+          <span class="block size-full" :style="{ background: selected ? previewCss : ANY_COLOUR }" />
+          <LpIcon v-if="!selected" name="lucide:pipette" :size="12" class="absolute inset-0 m-auto text-white drop-shadow" />
+        </button>
+        <button
+          v-else
           type="button"
           :id="field.id"
           :disabled="field.disabled"

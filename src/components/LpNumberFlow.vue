@@ -375,7 +375,9 @@ const label = computed(
     class="lp-nf inline-flex items-baseline tabular-nums"
   >
     <span class="sr-only">{{ label }}</span>
-    <span v-if="prefix" aria-hidden="true">{{ prefix }}</span>
+    <!-- `pre`: a flex item drops its leading and trailing spaces, so " ms"
+         as a suffix printed "12.8ms". -->
+    <span v-if="prefix" aria-hidden="true" class="whitespace-pre">{{ prefix }}</span>
 
     <span class="lp-nf__track inline-flex items-baseline" aria-hidden="true">
       <TransitionGroup name="lp-nf-cell">
@@ -402,7 +404,7 @@ const label = computed(
       </TransitionGroup>
     </span>
 
-    <span v-if="suffix" aria-hidden="true">{{ suffix }}</span>
+    <span v-if="suffix" aria-hidden="true" class="whitespace-pre">{{ suffix }}</span>
   </span>
 </template>
 
