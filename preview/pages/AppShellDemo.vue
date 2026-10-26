@@ -16,6 +16,7 @@ import {
   LpIcon,
   LpSegmented,
   LpStat,
+  LpSwitch,
   LpTabs,
   type SidebarItem,
   type SidebarSection,
@@ -104,12 +105,15 @@ const sectionSubtitle = computed(
     })[section.value],
 )
 const drawer = ref(false)
+// A page that owns the whole region (a canvas) next to padded ones: the shell
+// moves the same page between the two, so its state and transitions survive.
+const bleed = ref(false)
 </script>
 
 <template>
   <div class="p-6">
     <div class="h-[640px] overflow-hidden rounded-card border border-line [&>div]:h-full">
-      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false" environment="staging" bottom-nav>
+      <LpAppShell v-model="active" v-model:open="drawer" :full-bleed="bleed" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false" environment="staging" bottom-nav>
         <template #logo="{ compact }">
           <div class="flex items-center gap-2 font-semibold text-ink">
             <LpIcon name="lucide:activity" :size="20" class="shrink-0 text-brand" />
@@ -169,7 +173,10 @@ const drawer = ref(false)
                   eases between those sizes instead of snapping.
                 </p>
               </div>
-              <LpSegmented v-model="section" :options="sectionOptions" size="sm" />
+              <div class="flex items-center gap-2">
+                <LpSwitch v-model="bleed" label="Full bleed" />
+                <LpSegmented v-model="section" :options="sectionOptions" size="sm" />
+              </div>
             </div>
           </LpCard>
 

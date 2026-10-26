@@ -31,7 +31,7 @@ export default { inheritAttrs: false }
  * Overlays that aren't part of the frame (command palette, toaster) live in the
  * host next to <LpAppShell>.
  */
-import { computed, ref, useId, watch } from "vue"
+import { computed, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import LpBottomNav from "./LpBottomNav.vue"
 import LpButton from "./LpButton.vue"
@@ -180,6 +180,10 @@ const text = useLabels(
  * a scrolled page landed mid-way down the next one.
  */
 const scrollArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
+const bleedId = `lp-shell-bleed-${useId()}`
+const mounted = ref(false)
+onMounted(() => (mounted.value = true))
+const bleeding = computed(() => props.fullBleed && mounted.value)
 const mainId = `lp-main-${useId()}`
 
 // Focus instead of following the hash, which a router would treat as a navigation.
@@ -348,18 +352,23 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </header>
 
       <!-- full-bleed: page owns the whole region (canvas/map); otherwise the
-           single scroll region with padding. -->
+           single scroll region with padding. The page is rendered once and
+           moved between the two by a teleport rather than drawn in two
+           branches: switching branches remounted the whole page, so a section
+           tab going from a full-bleed page to a padded one cut instead of
+           playing its transition, and lost the page's state. Until mount the
+           page stays in the scroll region, which is what a server render has. -->
       <main :id="mainId" tabindex="-1" class="flex min-h-0 flex-1 flex-col outline-none">
-        <div v-if="fullBleed" class="min-h-0 flex-1 overflow-hidden">
-          <slot />
-        </div>
+        <div v-show="bleeding" :id="bleedId" class="min-h-0 flex-1 overflow-hidden" />
         <LpScrollArea
-          v-else
+          v-show="!bleeding"
           ref="scrollArea"
           class="min-h-0 flex-1"
           :content-class="mergeClass('px-4 py-6 md:px-6', contentClass)"
         >
-          <slot />
+          <Teleport :to="`#${bleedId}`" :disabled="!bleeding" defer>
+            <slot />
+          </Teleport>
         </LpScrollArea>
       </main>
       <LpBottomNav
