@@ -8,11 +8,12 @@ export default { inheritAttrs: false }
 <script setup lang="ts">
 // Stat tile: dot + caps label, big mono value, optional delta/trend badge and a
 // subtitle. A product pattern, fully token-driven — re-skins with the theme.
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpStatus from "./LpStatus.vue"
+import { useFitScale } from "../composables/useFitScale"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { TONES } from "./tone"
 
@@ -124,6 +125,20 @@ const FADE = {
   leaveToClass: "opacity-0",
 } as const
 
+/*
+ * The figure never wraps, so on a narrow tile a long one ("200 h 23 min", a
+ * word instead of a number) ran past the edge and was cut mid-letter. It now
+ * shrinks to the tile's width, down to `FIT_MIN` of its size, and only past
+ * that is it cut, with an ellipsis and the whole value on hover. The line box
+ * keeps its height, so a row of tiles stays level whichever of them shrank.
+ */
+const FIT_MIN = 0.6
+const row = ref<HTMLElement | null>(null)
+const figure = ref<HTMLElement | null>(null)
+const fit = useFitScale(row, figure, FIT_MIN)
+const figureStyle = computed(() => (fit.scale.value < 1 ? { fontSize: `calc(var(--text-3xl, 1.875rem) * ${fit.scale.value})`, lineHeight: "calc(var(--text-3xl, 1.875rem) * var(--text-3xl--line-height, 1.2))" } : undefined))
+const figureTitle = computed(() => (fit.clipped.value && !props.loading ? `${props.prefix ?? ""}${props.value}${props.valueSuffix ?? ""}` : undefined))
+
 // A stat tile spaces its label and value on a fixed gap; a dense KPI row needs that tighter.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex flex-col gap-2",
@@ -148,10 +163,16 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </div>
     <!-- A narrow tile moves the delta under the figure rather than breaking the
          figure itself: "2085 h" split across two lines reads as two values. -->
-    <div class="flex flex-wrap items-baseline gap-x-2">
+    <div ref="row" class="flex min-w-0 flex-wrap items-baseline gap-x-2">
       <!-- The placeholder sits INSIDE the value's own type size, so its line box
            is the real one: the tile cannot change height when the figure lands. -->
-      <span class="whitespace-nowrap font-mono text-3xl font-medium tracking-tight text-ink">
+      <span
+        ref="figure"
+        class="max-w-full whitespace-nowrap font-mono text-3xl font-medium tracking-tight text-ink"
+        :class="fit.clipped.value ? 'inline-block overflow-hidden text-ellipsis align-bottom' : ''"
+        :style="figureStyle"
+        :title="figureTitle"
+      >
         <!-- Each side wrapped in a plain element: LpNumberFlow renders more
              than one root node, which a Transition cannot fade. -->
         <Transition v-bind="FADE">

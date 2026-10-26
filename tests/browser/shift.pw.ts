@@ -93,3 +93,24 @@ test("going full bleed moves the same page instead of remounting it", async ({ p
   await expect(shell.getByText("Header motion", { exact: true })).toHaveAttribute("data-kept", "yes")
   await expect(shell.locator("[id^=lp-shell-bleed-]")).toBeHidden()
 })
+
+test("a wrapping row inside a widening box stays on one line while it eases", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=shift-wrap")
+  const row = page.getByTestId("row")
+  await expect(row).toBeVisible()
+  const height = (await row.boundingBox())!.height
+  await row.evaluate((el) => {
+    const heights: number[] = []
+    const until = performance.now() + 600
+    const sample = () => {
+      heights.push(el.getBoundingClientRect().height)
+      if (performance.now() < until) requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+    Object.assign(window, { rowHeights: heights })
+  })
+  await page.getByRole("button", { name: "Toggle" }).click()
+  await page.waitForTimeout(700)
+  const heights = await page.evaluate(() => (window as unknown as { rowHeights: number[] }).rowHeights)
+  expect(Math.max(...heights)).toBeLessThanOrEqual(height + 1)
+})
