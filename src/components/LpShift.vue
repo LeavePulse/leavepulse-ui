@@ -231,6 +231,17 @@ watch(
   { flush: "post" },
 )
 
+// A child that changed inside itself (a label rolling to a longer word) moves
+// its neighbours without any child coming or going: when the box starts to
+// resize, every child glides from where it was last seen.
+watch(resizing, (now) => {
+  const box = el.value
+  if (!now || !box || !presenceObserver || prefersReducedMotion()) return
+  requestAnimationFrame(() => {
+    for (const child of box.children) if (!child.hasAttribute(GHOST)) glide(child)
+  })
+})
+
 onBeforeUnmount(() => {
   presenceObserver?.disconnect()
   presenceSize?.disconnect()
@@ -253,6 +264,10 @@ defineExpose({ resizing })
         ? `${transitionClass} duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none`
         : '',
       resizing ? 'overflow-hidden' : '',
+      // While the box holds a width its content has outgrown, a flex row would
+      // squeeze its children to fit (a button's keys folding into a column)
+      // instead of letting the easing edge clip them.
+      resizing && axis !== 'height' ? '[&>*]:shrink-0' : '',
       resizing && anchor === 'end' ? 'justify-end' : '',
       presence ? 'relative' : '',
     ]"

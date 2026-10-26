@@ -34,7 +34,11 @@ const steps = computed(() => (Array.isArray(props.combo) ? [props.combo] : combo
   <span class="lp-keys" :class="`lp-keys--${size}`">
     <template v-for="(step, stepIndex) in steps" :key="stepIndex">
       <span v-if="stepIndex" class="lp-keys__then">{{ text.then }}</span>
-      <kbd v-for="(key, index) in step" :key="`${key}-${index}`">{{ appleModifierLabel(key.trim(), apple) }}</kbd>
+      <!-- A chord never splits: squeezed, the keys wrap between steps, not
+           between Ctrl and K. -->
+      <span class="lp-keys__step">
+        <kbd v-for="(key, index) in step" :key="`${key}-${index}`">{{ appleModifierLabel(key.trim(), apple) }}</kbd>
+      </span>
     </template>
     <span v-if="label || $slots.default" class="lp-keys__label"><slot>{{ label }}</slot></span>
   </span>
@@ -47,6 +51,11 @@ const steps = computed(() => (Array.isArray(props.combo) ? [props.combo] : combo
   align-items: center;
   gap: 3px;
   color: var(--color-muted);
+}
+.lp-keys__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .lp-keys__then {
   padding: 0 2px;
