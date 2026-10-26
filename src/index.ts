@@ -308,7 +308,7 @@ export type { RevealOrigin } from "./theme/useTheme"
 export { detectBackdropFilter, GLASS_BACKDROP_ATTR, isBrokenBackdropEngine, NO_BACKDROP_ATTR, setGlassBackdrop } from "./theme/backdrop"
 export { DEFAULT_SURFACE } from "./theme/tokens"
 export { defineTheme, withBrand } from "./theme/define"
-export { STUDIO_BRANDS, STUDIO_CORNERS, STUDIO_MOTION, STUDIO_SIZES, useThemeStudio } from "./theme/studio"
+export { STUDIO_BRANDS, STUDIO_CORNERS, STUDIO_MOTION, STUDIO_SIZES, STUDIO_SYSTEM, useThemeStudio } from "./theme/studio"
 export type { StudioState, ThemeStudio, ThemeStudioOptions } from "./theme/studio"
 export type { ThemeOverrides } from "./theme/define"
 export type {

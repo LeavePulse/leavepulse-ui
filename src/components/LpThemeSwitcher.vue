@@ -228,6 +228,9 @@ function followSystem() {
   // With the studio, "System" is its base theme, so the tuning stays on top.
   if (tuner) {
     tuner.pickTheme(STUDIO_SYSTEM)
+    // A v-model bound to the switcher learns "system" too, or it would keep
+    // the previous name and win over the studio: the check stayed on it.
+    emit("update:modelValue", STUDIO_SYSTEM)
     emit("change", tuner.theme.value)
     return
   }
