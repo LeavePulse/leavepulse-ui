@@ -74,15 +74,20 @@ export interface ThemeStudio {
   reset(origin?: RevealOrigin): void
 }
 
+export interface PreviewableThemeStudio extends ThemeStudio {
+  /** Build a draft for a scoped preview, without applying or persisting it. */
+  preview(state: StudioState): { theme: TokenSet; exported: { code: string; json: string; css: string } }
+}
+
 const DURATIONS = ["--duration-fast", "--duration-medium", "--duration-slow"] as const
-const studios = new Map<string, { config: Ref<Omit<ThemeStudioOptions, "storageKey">>; studio: ThemeStudio }>()
+const studios = new Map<string, { config: Ref<Omit<ThemeStudioOptions, "storageKey">>; studio: PreviewableThemeStudio }>()
 
 /**
  * The studio state for `storageKey`, made on first use and shared after. A
  * later caller's `themes` or `system` fill in what the first one left out:
  * the page may make the studio before the switcher that offers "System".
  */
-export function useThemeStudio(options: ThemeStudioOptions = {}): ThemeStudio {
+export function useThemeStudio(options: ThemeStudioOptions = {}): PreviewableThemeStudio {
   const key = options.storageKey ?? "lp-theme-studio"
   let entry = studios.get(key)
   if (!entry) {
@@ -97,7 +102,7 @@ export function useThemeStudio(options: ThemeStudioOptions = {}): ThemeStudio {
   return entry.studio
 }
 
-function create(key: string, config: Ref<Omit<ThemeStudioOptions, "storageKey">>): ThemeStudio {
+function create(key: string, config: Ref<Omit<ThemeStudioOptions, "storageKey">>): PreviewableThemeStudio {
   const themes = computed(() => (config.value.themes?.length ? config.value.themes : Object.values(presets)))
   const system = computed(() => {
     const pair = config.value.system
@@ -186,8 +191,8 @@ function create(key: string, config: Ref<Omit<ThemeStudioOptions, "storageKey">>
     })
   }
 
-  const exported = computed(() => {
-    const s = state.value
+  function exportState(s: StudioState) {
+    const built = build(s)
     const preset = Object.entries(presets).find(([, p]) => p.name === base(s).name)?.[0]
     const source = preset ? `"${preset}"` : "yourTheme"
     const overrides: string[] = []
@@ -195,8 +200,10 @@ function create(key: string, config: Ref<Omit<ThemeStudioOptions, "storageKey">>
     if (s.size !== "default") overrides.push(`density: ${JSON.stringify(STUDIO_SIZES[s.size])}`)
     const shaped = overrides.length ? `defineTheme(${source}, { ${overrides.join(", ")} })` : source
     const code = s.brand ? `withBrand(${shaped}, "${s.brand}")` : overrides.length ? shaped : preset ? `presets.${preset}` : source
-    return { code, json: serializeTheme(theme.value), css: themeToCssRule(theme.value) }
-  })
+    return { code, json: serializeTheme(built), css: themeToCssRule(built) }
+  }
+  const exported = computed(() => exportState(state.value))
+  const preview = (draft: StudioState) => ({ theme: build(draft), exported: exportState(draft) })
 
-  return { state, themes, system, theme, brand, changed, exported, pickTheme, tune, reset }
+  return { state, themes, system, theme, brand, changed, exported, pickTheme, tune, reset, preview }
 }

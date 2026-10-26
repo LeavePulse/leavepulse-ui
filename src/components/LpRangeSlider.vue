@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Two thumbs on one track: a range rather than a value. A price "from – to",
  * a stretch of a clip to loop, a span of years. The model is `[low, high]`;
@@ -20,6 +21,8 @@ import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: [number, number]
     min?: number
     max?: number
@@ -32,7 +35,7 @@ const props = withDefaults(
     /** Label over each thumb while it is in use: `(value) => "1:05"`. */
     format?: (value: number) => string
   }>(),
-  { modelValue: () => [0, 100], min: 0, max: 100, step: 1, minGap: 0 },
+  { palette: undefined, modelValue: () => [0, 100], min: 0, max: 100, step: 1, minGap: 0 },
 )
 
 const emit = defineEmits<{
@@ -65,6 +68,8 @@ const thumbClass =
   "group/thumb relative block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
 const labelClass =
   "pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 translate-y-0.5 rounded-control bg-surface-raised px-1.5 py-0.5 text-[11px] whitespace-nowrap text-ink tabular-nums opacity-0 shadow-sm transition-[opacity,translate] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-hover/thumb:translate-y-0 group-hover/thumb:opacity-100 group-focus-visible/thumb:translate-y-0 group-focus-visible/thumb:opacity-100 group-active/thumb:translate-y-0 group-active/thumb:opacity-100 motion-reduce:transition-none"
+
+usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>

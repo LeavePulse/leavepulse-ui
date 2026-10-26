@@ -20,11 +20,14 @@
 import HighlightText from "./HighlightText.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import type { PaletteFact } from "./commandPalette"
+import { computed } from "vue"
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: PaletteFact[]
+    loading?: boolean
     /** Small heading over the list. */
     title?: string
     /** Plain rows instead of soft tiles, for a list read as text. */
@@ -32,6 +35,7 @@ withDefaults(
   }>(),
   { plain: false },
 )
+const shown = computed(() => props.loading && !props.items.length ? Array.from({ length: 3 }, () => ({ label: "", value: "—" } as PaletteFact)) : props.items)
 
 defineSlots<{
   value?: (props: { item: PaletteFact; index: number }) => unknown
@@ -39,11 +43,11 @@ defineSlots<{
 </script>
 
 <template>
-  <section class="lp-palette-facts" :class="{ 'lp-palette-facts--plain': plain }">
+  <section class="lp-palette-facts" :aria-busy="loading || undefined" :class="{ 'lp-palette-facts--plain': plain }">
     <p v-if="title" class="lp-palette-facts__title">{{ title }}</p>
     <ul class="lp-palette-facts__list">
       <li
-        v-for="(item, index) in items"
+        v-for="(item, index) in shown"
         :key="index"
         class="lp-palette-facts__row"
         :class="{ 'is-current': item.current }"
@@ -52,15 +56,16 @@ defineSlots<{
         <span v-if="item.color" class="lp-palette-facts__dot" :style="{ background: item.color }" />
         <LpIcon v-else-if="item.icon" :name="item.icon" :size="15" class="lp-palette-facts__icon" />
         <span class="lp-palette-facts__label">
-          <span class="lp-palette-facts__name"><HighlightText :text="item.label" /></span>
+          <span class="lp-palette-facts__name"><LpSkeleton v-if="loading && !item.label" class="h-3 w-24" /><HighlightText v-else :text="item.label" /></span>
           <span v-if="item.hint?.length" class="lp-palette-facts__hint"><HighlightText :text="item.hint" /></span>
         </span>
         <span
-          v-if="item.value !== undefined && item.value !== '' || $slots.value"
+          v-if="loading || item.value !== undefined && item.value !== '' || $slots.value"
           class="lp-palette-facts__value"
           :class="{ 'lp-palette-facts__value--mono': item.mono }"
         >
-          <slot name="value" :item="item" :index="index">
+          <LpSkeleton v-if="loading" class="h-3 w-16 max-w-full" />
+          <slot v-else name="value" :item="item" :index="index">
             <LpRollingText v-if="item.value !== undefined" :value="item.value" align="end" />
           </slot>
         </span>

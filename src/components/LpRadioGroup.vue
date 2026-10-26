@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { RadioGroupIndicator, RadioGroupItem, RadioGroupRoot } from "reka-ui"
 import { useId } from "vue"
 import { useFieldControl } from "../composables/useField"
@@ -21,7 +22,7 @@ export interface RadioOption extends LpOptionBase<string> {
 // a disabled option stays visible but cannot be picked. For anything richer
 // (badges, custom layout) pass <LpRadio> children in the default slot instead —
 // they share the same RadioGroupRoot, so selection still flows through v-model.
-const props = defineProps<{ modelValue?: string; options?: RadioOption[]; disabled?: boolean }>()
+const props = withDefaults(defineProps<{ palette?: PaletteControlOptions; modelValue?: string; options?: RadioOption[]; disabled?: boolean }>(), { palette: undefined })
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
 const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
@@ -31,6 +32,8 @@ const uid = useId()
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex flex-col gap-2",
 )
+
+usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>

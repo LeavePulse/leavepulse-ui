@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteAction, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Collapsible "show more" section built on reka Collapsible. The trigger is a
  * full-width row with a chevron that rotates open; the body folds open and shut
@@ -31,6 +32,7 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
+    palette?: PaletteControlOptions
     /** Controlled open state. Omit to let the component own it (with `defaultOpen`). */
     open?: boolean
     defaultOpen?: boolean
@@ -45,7 +47,7 @@ const props = withDefaults(
      */
     scrollIntoView?: boolean
   }>(),
-  { defaultOpen: false, scrollIntoView: false },
+  { palette: undefined, defaultOpen: false, scrollIntoView: false },
 )
 
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>()
@@ -113,6 +115,8 @@ function onToggle(value: boolean) {
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "shrink-0 overflow-hidden rounded-control border border-line bg-surface-soft",
 )
+
+usePaletteAction({ label: () => props.label, element: () => (root.value?.$el as HTMLElement | undefined)?.querySelector<HTMLElement>("button"), disabled: () => false })
 </script>
 
 <template>

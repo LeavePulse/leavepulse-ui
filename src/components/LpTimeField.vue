@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Time-of-day field: hour and minute segments, typed or stepped with the arrow
  * keys (reka TimeField). The model is "HH:mm" (v-model), the same shape a
@@ -26,6 +27,8 @@ import LpIcon from "./LpIcon.vue"
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     /** Selected time "HH:mm" (v-model). */
     modelValue?: string
     disabled?: boolean
@@ -38,7 +41,7 @@ const props = withDefaults(
     /** Show the clock icon at the start of the field. */
     icon?: boolean
   }>(),
-  { size: "md", hourCycle: 24, icon: true },
+  { palette: undefined, size: "md", hourCycle: 24, icon: true },
 )
 
 const emit = defineEmits<{
@@ -84,6 +87,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     field.value.invalid ? "border-danger focus-within:ring-danger-soft" : "border-line focus-within:border-brand",
   ].join(" "),
 )
+
+usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid })
 </script>
 
 <template>

@@ -9,6 +9,10 @@ import type { FieldNoticeOptions } from "./useFieldNotice"
  */
 export interface FieldContext {
   id: string
+  /** Human-readable name shared by controls and contextual commands. */
+  label?: string
+  hint?: string
+  error?: string
   /** Id of the visible label, for controls a `<label for>` cannot name (groups). */
   labelId?: string
   describedBy?: string
@@ -74,6 +78,9 @@ export function useFieldControl(
     return {
       id: state.id ?? field?.id,
       labelId: field?.labelId,
+      label: field?.label,
+      hint: field?.hint,
+      error: field?.error,
       describedBy: field?.describedBy,
       invalid: !!state.invalid || !!field?.invalid,
       required: !!state.required || !!field?.required,

@@ -3,12 +3,15 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, useAttrs } from "vue"
 import { useFieldControl } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
   modelValue?: string
   placeholder?: string
   rows?: number
@@ -22,7 +25,7 @@ const props = defineProps<{
    * the <textarea> for native validation.
    */
   required?: boolean
-}>()
+}>(), { palette: undefined })
 
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
@@ -53,6 +56,8 @@ const textareaClass = computed(() =>
     hasField.value ? "" : (attrs.class as string),
   ),
 )
+
+usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled, invalid: () => field.value.invalid, editorProps: () => ({ label: undefined, hint: undefined, error: undefined }) })
 </script>
 
 <template>

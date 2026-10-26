@@ -72,12 +72,34 @@ function score(command: SearchableCommand, terms: CommandSearchTerms): number {
   return total
 }
 
-export function rankCommandItems<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): T[] {
+function rankExact<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): T[] {
   return items
     .map((command) => ({ command, score: score(command, terms) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.command.label.localeCompare(b.command.label))
     .map((entry) => entry.command)
+}
+
+const LATIN_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,."
+const CYRILLIC_KEYS = "ёйцукенгшщзхъфывапролджэячсмитьбю"
+const LAYOUT_KEYS = new Map([...LATIN_KEYS].flatMap((key, i) => [[key, CYRILLIC_KEYS[i]!], [CYRILLIC_KEYS[i]!, key]]))
+
+export function swapCommandLayout(value: string): string {
+  return [...value].map(char => {
+    const replacement = LAYOUT_KEYS.get(char.toLowerCase())
+    return replacement ? char === char.toUpperCase() ? replacement.toUpperCase() : replacement : char
+  }).join("")
+}
+
+export function searchCommandItems<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): { items: T[]; terms: string[] } {
+  const exact = rankExact(items, terms)
+  if (exact.length || !terms.include.length) return { items: exact, terms: terms.include }
+  const alternate = { include: terms.include.map(swapCommandLayout), exclude: terms.exclude, groups: terms.groups }
+  return { items: rankExact(items, alternate), terms: alternate.include }
+}
+
+export function rankCommandItems<T extends SearchableCommand>(items: T[], terms: CommandSearchTerms): T[] {
+  return searchCommandItems(items, terms).items
 }
 
 /**

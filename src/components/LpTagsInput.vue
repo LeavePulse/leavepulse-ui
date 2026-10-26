@@ -13,6 +13,7 @@ export type TagsInputLabels = {
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Free-form list of short values: emails, labels, hostnames. Typing a
  * delimiter or Enter turns the text into a tag, a paste is split into many,
@@ -56,6 +57,8 @@ import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: string[]
     placeholder?: string
     /** Characters (or a RegExp) that end a tag while typing and split a paste. */
@@ -99,7 +102,7 @@ const props = withDefaults(
     /** Box height and text size, as LpInput. */
     size?: "sm" | "md" | "lg"
   }>(),
-  {
+  { palette: undefined,
     modelValue: () => [],
     delimiter: () => [",", "\n", "\t"],
     duplicates: "reject",
@@ -424,6 +427,8 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled, invalid: () => field.value.invalid, editorProps: () => ({ label: undefined, hint: undefined, error: undefined }) })
 </script>
 
 <template>

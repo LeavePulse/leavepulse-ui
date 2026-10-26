@@ -12,6 +12,7 @@ export interface SecretFieldLabels extends Record<string, string> {
 </script>
 
 <script setup lang="ts">
+import { suppressPaletteDiscovery } from "../composables/usePaletteCommands"
 /*
  * A value someone must be able to read and copy but should not have on screen
  * by default: an API key, a bot token, a webhook secret, a recovery code.
@@ -178,6 +179,8 @@ const shell = computed(() =>
     { sm: "min-h-(--size-control-sm) pl-2.5 pr-1 text-xs", md: "min-h-(--size-control-md) pl-3 pr-1.5 text-sm", lg: "min-h-(--size-control-lg) pl-3.5 pr-1.5 text-sm" }[props.size],
   ),
 )
+
+suppressPaletteDiscovery()
 </script>
 
 <template>

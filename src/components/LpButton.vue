@@ -5,6 +5,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteAction, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, getCurrentInstance, onMounted, onUpdated, ref, useAttrs, type Component, type ComponentPublicInstance } from "vue"
 import { HINT_SIGNALS, noteHotkeyTarget } from "../composables/useHintSystem"
@@ -86,6 +87,7 @@ type ButtonVariants = VariantProps<typeof button>
 
 const props = withDefaults(
   defineProps<{
+    palette?: PaletteControlOptions
     variant?: ButtonVariants["variant"]
     size?: ButtonVariants["size"]
     block?: boolean
@@ -126,7 +128,7 @@ const props = withDefaults(
     hotkeyGroup?: string
     labels?: Partial<{ group: string }>
   }>(),
-  { type: "button" },
+  { palette: undefined, type: "button" },
 )
 
 const emit = defineEmits<{
@@ -282,6 +284,8 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
     loading: busy.value,
   }),
 )
+
+usePaletteAction({ label: () => typeof attrs["aria-label"] === "string" ? attrs["aria-label"] : undefined, element: () => rootEl(), disabled: () => props.disabled || busy.value })
 </script>
 
 <template>

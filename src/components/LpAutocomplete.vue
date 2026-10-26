@@ -10,6 +10,7 @@ export type AutocompleteLabels = {
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Free-text autocomplete — a text field that suggests as you type but never
  * forces a choice. Unlike LpSelect (which binds to an option value and requires
@@ -49,6 +50,8 @@ export type AutocompleteSelection = OptionSelection
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     /** The free text. This is the model — bind with v-model. */
     modelValue?: string
     /** Suggestions. Strings or {value,label,description}. */
@@ -85,7 +88,7 @@ const props = withDefaults(
     selected?: AutocompleteSelection | null
     labels?: Partial<AutocompleteLabels>
   }>(),
-  {
+  { palette: undefined,
     size: "md",
     clearable: false,
     filter: true,
@@ -270,6 +273,8 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid })
 </script>
 
 <template>

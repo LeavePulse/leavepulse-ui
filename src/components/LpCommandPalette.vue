@@ -36,7 +36,11 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
+import { type Component, computed, h, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
+import { mergePaletteCommands, suppressPaletteDiscovery, usePaletteScope } from "../composables/usePaletteCommands"
+import { useToast } from "../composables/useToast"
+import LpButton from "./LpButton.vue"
+import PalettePreviewBoundary from "./PalettePreviewBoundary.vue"
 import LpAvatar from "./LpAvatar.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
@@ -57,12 +61,14 @@ import {
   highlightParts,
   parseCommandQuery,
   parsePaletteQuery,
-  rankCommandItems,
+  searchCommandItems,
   type HighlightPart,
   type PaletteQuery,
 } from "./commandSearch"
 import {
   commandHasPreview,
+  PALETTE_MODES,
+  type PaletteMode,
   fallbackRows,
   matchModePrefix,
   modeChipLabel,
@@ -227,7 +233,23 @@ export interface Command {
    * placeholder. For a whole class of rows, `hasPreview` says it once.
    */
   noPreview?: boolean
-  onSelect?: () => void
+  /** Render a live editor or other rich preview without an application-wide slot. */
+  previewComponent?: Component
+  /** Enter or click focuses the preview editor, including on narrow screens. */
+  editInPreview?: boolean
+  /** Runs after the dialog releases its focus trap (e.g. focus the original field). */
+  afterClose?: () => void
+  prompt?: CommandPrompt
+  /** Called only when execution succeeded, with its result. */
+  undo?: (result: unknown) => unknown | Promise<unknown>
+  onSelect?: () => unknown | Promise<unknown>
+}
+
+export interface CommandPrompt {
+  placeholder?: string
+  initial?: string
+  validate?: (value: string) => string | undefined | Promise<string | undefined>
+  submit: (value: string) => unknown | Promise<unknown>
 }
 
 /**
@@ -257,8 +279,17 @@ export type CommandFetcher = (
 ) => Command[] | Promise<Command[]>
 
 /** Footer hints and the mode chip, spelled out so an app can translate them. */
-export type PaletteLabels = {
+export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
   navigate: string
+  pin?: string
+  unpin?: string
+  undo?: string
+  backToResults?: string
+  actionFailed?: string
+  submit?: string
+  running?: string
+  search?: string
+  pinned?: string
   select: string
   close: string
   /** Hint for leaving a mode, shown only while inside one. */
@@ -292,7 +323,14 @@ export type PaletteLabels = {
 const props = withDefaults(
   defineProps<{
     open?: boolean
-    commands: Command[]
+    commands?: Command[]
+    /** Include live commands registered by enclosing LpCommandScope components. */
+    context?: boolean
+    /** Built-in sigils; people, channels and roles appear when a provider is supplied. */
+    modes?: Partial<Record<PaletteMode, Command[] | CommandFetcher>>
+    pinned?: RecentItem[]
+    pinnedKey?: string
+    pinnedLabel?: string
     placeholder?: string
     emptyText?: string
     /** Bind a global ⌘K / Ctrl-K toggle. */
@@ -392,6 +430,8 @@ const props = withDefaults(
   {
     placeholder: "Type a command or search…",
     emptyText: "No results",
+    commands: () => [],
+    context: true,
     hotkey: true,
     debounce: 250,
     minChars: 1,
@@ -405,12 +445,49 @@ const props = withDefaults(
   },
 )
 
+const paletteScope = usePaletteScope()
+suppressPaletteDiscovery()
+const baseCommands = computed(() => mergePaletteCommands(props.context ? paletteScope?.registry.commands.value ?? [] : [], props.commands))
+const rootCommands = computed<Command[]>(() => mergePaletteCommands([
+  ...baseCommands.value,
+  ...Object.entries(PALETTE_MODES).flatMap(([key, definition]) => {
+    const name = key as PaletteMode
+    const children = props.modes?.[name] ?? (name === "commands" ? baseCommands.value.filter(c => !c.href && !c.children && !c.editInPreview)
+      : name === "help" ? [{ id: "palette/help/keys", label: "Keyboard navigation", editInPreview: true, previewComponent: { render: () => h("p", { class: "whitespace-pre-line text-sm leading-relaxed" }, "↑ ↓ Navigate results\nEnter Run or edit\nTab Result actions\nAlt+P Pin a result\nEscape Back or close") } }] : undefined)
+    return children ? [{ id: `palette/mode/${name}`, ...definition, label: text.value[name], children, group: text.value.search, remember: false }] : []
+  }),
+], []))
+const toast = useToast()
+const editing = shallowRef<Command>()
+let stopEditorFocus: (() => void) | undefined
+const promptCommand = shallowRef<Command>()
+const promptValue = ref("")
+const promptError = ref("")
+const promptValidation = useAsyncTask<string | undefined>()
+const validating = promptValidation.pending
+watch(promptCommand, () => promptValidation.cancel(), { flush: "sync" })
+const executing = ref(false)
+const actionError = ref("")
+let executionEpoch = 0
+let afterClose: (() => void) | undefined
+const inputQuery = computed({ get: () => promptCommand.value ? promptValue.value : query.value, set: value => { if (promptCommand.value) { promptValidation.cancel(); promptValue.value = value; promptError.value = "" } else query.value = value } })
+
 const frosted = useGlass(() => props.glass)
 const contentRef = ref<{ $el: HTMLElement } | null>(null)
 const { claim, release, layer } = useModalLayer({ element: () => contentRef.value?.$el })
 
 const DEFAULT_LABELS: Required<PaletteLabels> = {
+  ...Object.fromEntries(Object.entries(PALETTE_MODES).map(([key, mode]) => [key, mode.label])) as Record<PaletteMode, string>,
+  search: "Search",
+  pinned: "Pinned",
   navigate: "navigate",
+  pin: "Pin",
+  unpin: "Unpin",
+  undo: "Undo",
+  backToResults: "Back to results",
+  actionFailed: "The action could not be completed.",
+  submit: "Submit",
+  running: "Running…",
   select: "select",
   close: "close",
   back: "back",
@@ -429,11 +506,13 @@ const DEFAULT_LABELS: Required<PaletteLabels> = {
   tab: "tab",
 }
 
-const text = useLabels("palette", DEFAULT_LABELS, () => props.labels)
+const text = useLabels<Required<PaletteLabels>>("palette", DEFAULT_LABELS, () => props.labels)
+const pinnedHeading = computed(() => props.pinnedLabel ?? text.value.pinned)
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void
   (e: "select", command: Command): void
+  (e: "update:pinned", items: RecentItem[]): void
   /**
    * A command ran — id first, because the common use is appending it to a
    * stored recency list. Fires for leaf commands only: opening a mode is
@@ -519,6 +598,7 @@ const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]
  * actions it keeps that default.
  */
 function onTab(event: KeyboardEvent) {
+  if (promptCommand.value) return
   // Without actions Tab stays Tab, so the trail chips and a Retry button are
   // still reachable from the keyboard.
   if (event.shiftKey) return
@@ -527,10 +607,16 @@ function onTab(event: KeyboardEvent) {
   if (!c || !actions.length) return
   event.preventDefault()
   event.stopPropagation()
+  openActions(c)
+}
+function openActions(c: Command) {
+  const actions = actionsOf(c)
+  if (!actions.length) return
   const actionsMode: Command = { id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions }
   syntheticModes.add(actionsMode)
   hints.use(HINT_SIGNALS.paletteActions)
   enter(actionsMode)
+  inputRef.value?.focus()
 }
 
 // A returning user who never pressed Tab gets the footer key lit up, nothing
@@ -551,7 +637,7 @@ const showActionsKey = computed(() => {
  * `keepOpen` pick inside it shows its own effect.
  */
 watch(
-  () => props.commands,
+  () => rootCommands.value,
   (commands) => {
     if (!trail.value.length) return
     let level: Command[] = commands
@@ -671,7 +757,7 @@ function refresh() {
  * next to "which service?" is how a palette gets someone to restart the wrong
  * thing.
  */
-const source = computed<Command[]>(() => (mode.value ? modeItems.value : props.commands))
+const source = computed<Command[]>(() => (mode.value ? modeItems.value : rootCommands.value))
 
 /*
  * Keyboard layouts typed through each other use a QWERTY ↔ Cyrillic map.
@@ -692,8 +778,7 @@ const local = computed<{ items: Command[]; terms: string[] }>(() => {
   // Empty query: show everything EXCEPT hidden commands (they only surface once
   // typed). With a query, hidden commands rank like any other.
   if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
-  const items = rankCommandItems(filtered, terms)
-  return { items, terms: terms.include }
+  return searchCommandItems(filtered, terms)
 })
 
 const ranked = computed<Command[]>(() => local.value.items)
@@ -774,7 +859,7 @@ const recentItems = computed<Command[]>(() => {
   if (mode.value || !recentList.value.length) return []
   const terms = parseCommandQuery(query.value)
   if (terms.include.length) return []
-  const found = resolveRecentItems(recentList.value, props.commands, {
+  const found = resolveRecentItems(recentList.value, rootCommands.value, {
     limit: Number.POSITIVE_INFINITY,
     resolve: props.resolveRecent,
     fromEntry,
@@ -789,6 +874,26 @@ const recentItems = computed<Command[]>(() => {
   return out
 })
 
+const storedPinned = usePersisted<unknown>(() => props.pinnedKey ?? (props.recentKey ? `${props.recentKey}:pinned` : undefined), [])
+const pinList = computed(() => props.pinned ?? readRecent(storedPinned.value))
+const pinResolved = computed(() => resolveRecentItems(pinList.value, rootCommands.value, { limit: Infinity, resolve: props.resolveRecent, fromEntry }))
+const pinnedItems = computed(() => {
+  if (mode.value || parseCommandQuery(query.value).include.length) return []
+  return pinResolved.value.filter(({ command }) => recentVisible(command, parseCommandQuery(query.value), pinnedHeading.value)).map(({ command, path }) => { recentPath.set(command, path); return command })
+})
+function isPinned(command: Command) {
+  const path = recentPath.get(command) ?? trail.value.map(step => step.id)
+  return pinList.value.some(item => typeof item === "string" ? !path.length && item === command.id : item.id === command.id && item.path.join("\0") === path.join("\0"))
+}
+function togglePin(command: Command | undefined) {
+  if (!command || moreOf.has(command) || command.children || trail.value.some(step => syntheticModes.has(step))) return
+  const path = recentPath.get(command) ?? trail.value.map(step => step.id)
+  const next = isPinned(command) ? pinList.value.filter(item => typeof item === "string" ? item !== command.id : item.id !== command.id || item.path.join("\0") !== path.join("\0"))
+    : pushRecent(pinList.value, toRecentItem(command, path), Infinity)
+  if (props.pinned === undefined) storedPinned.value = next
+  emit("update:pinned", next)
+}
+
 // Group preserving first-seen order; ungrouped commands sit under "".
 // Recent first (it answers "the thing I always run"), then the matched list,
 // then whatever the provider found.
@@ -802,11 +907,13 @@ const grouped = computed<{ name: string; items: Command[] }[]>(() => {
     }
     map.get(group)!.push(c)
   }
-  const recent = recentItems.value
+  const pinned = pinnedItems.value
+  for (const c of pinned) push(c, pinnedHeading.value)
+  const recent = recentItems.value.filter(c => !pinned.some(p => p.id === c.id))
   for (const c of recent) push(c, props.recentLabel)
   // A recent entry is shown once: leaving the copy in its own group would put
   // the same row on screen twice with nothing to tell them apart.
-  for (const c of ranked.value) if (!recent.includes(c)) push(c, c.group ?? "")
+  for (const c of ranked.value) if (!recent.includes(c) && !pinned.some(p => p.id === c.id)) push(c, c.group ?? "")
   for (const c of fetched.value) push(c, c.group ?? "")
   // Last, whatever their group: they are the way out when nothing above is it.
   const tail = new Map<string, Command[]>()
@@ -869,6 +976,7 @@ const active = computed<Command | undefined>(() => {
   const c = flat.value[selectedIndex.value]
   return c && !moreOf.has(c) ? c : undefined
 })
+const canPin = computed(() => active.value && !active.value.children && !moreOf.has(active.value) && !trail.value.some(step => syntheticModes.has(step)))
 const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 
 /*
@@ -877,7 +985,7 @@ const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
  * decides what to show, so any highlighted row opens it.
  */
 const previewable = computed(() =>
-  props.previewPane && commandHasPreview(active.value, { slot: !!slots.preview, hasPreview: props.hasPreview }),
+  (props.previewPane || !!editing.value) && commandHasPreview(active.value, { slot: !!slots.preview, hasPreview: props.hasPreview }),
 )
 
 /*
@@ -891,7 +999,7 @@ const PANE_LINGER_MS = 160
 const paneCommand = shallowRef<Command | undefined>()
 let lingerTimer: ReturnType<typeof setTimeout> | undefined
 watch(
-  [active, previewable],
+  [() => editing.value ?? active.value, previewable],
   ([command, show]) => {
     clearTimeout(lingerTimer)
     if (show) {
@@ -905,7 +1013,7 @@ watch(
 )
 onBeforeUnmount(() => clearTimeout(lingerTimer))
 
-const paneOpen = computed(() => props.previewPane && !!paneCommand.value)
+const paneOpen = computed(() => !promptCommand.value && (!!editing.value || (props.previewPane && !!paneCommand.value)))
 
 function paneHighlight(text: string): HighlightPart[] {
   return highlight(text, paneBody.value?.highlight)
@@ -1061,7 +1169,12 @@ function movePage(direction: -1 | 1) {
   select(selectedIndex.value + direction * 8, true)
 }
 function onPaletteKeydown(event: KeyboardEvent) {
-  if (event.isComposing) return
+  if (event.isComposing || event.target !== inputRef.value || promptCommand.value) return
+  if (event.altKey && event.key.toLowerCase() === "p") {
+    event.preventDefault()
+    togglePin(active.value)
+    return
+  }
   if (!(["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"] as string[]).includes(event.key)) return
   // Home and End belong to the caret while there is text to move it through.
   const typing = event.target instanceof HTMLInputElement && event.target.value !== ""
@@ -1077,10 +1190,38 @@ function onPaletteKeydown(event: KeyboardEvent) {
 function onPointerMove() {
   keyboardSelection.value = false
 }
+function onCloseAutoFocus(event: Event) {
+  if (!afterClose) return
+  event.preventDefault()
+  const focus = afterClose
+  afterClose = undefined
+  requestAnimationFrame(focus)
+}
+async function focusEditor() {
+  stopEditorFocus?.()
+  await nextTick()
+  if (!editing.value) return
+  const root = previewRef.value?.viewportEl
+  if (!root) return
+  const focus = () => {
+    const body = root.querySelector("[data-lp-command-preview]")
+    const field = body?.querySelector<HTMLElement>('input:not([type="hidden"]):not([disabled]):not([tabindex="-1"]):not([aria-hidden="true"]),textarea:not([disabled]):not([tabindex="-1"]),select:not([disabled]),[contenteditable="true"]')
+      ?? body?.querySelector<HTMLElement>('button:not([disabled]):not([tabindex="-1"]),[tabindex="0"]')
+    field?.focus()
+    return !!field
+  }
+  if (focus()) return
+  const observer = new MutationObserver(() => { if (focus()) { observer.disconnect(); stopEditorFocus = undefined } })
+  observer.observe(root, { childList: true, subtree: true })
+  stopEditorFocus = () => { observer.disconnect(); stopEditorFocus = undefined }
+}
+watch([editing, () => props.open], () => { if (!editing.value || !props.open) stopEditorFocus?.() })
+onBeforeUnmount(() => stopEditorFocus?.())
 function onPointerEnter(c: Command) {
   if (!keyboardSelection.value) select(flatIndexOf(c))
 }
 function runSelected(event?: KeyboardEvent) {
+  if (promptCommand.value) { void submitPrompt(); return }
   const c = flat.value[selectedIndex.value]
   if (c?.href && !c.disabled && (event?.ctrlKey || event?.metaKey)) {
     openInNewTab(c)
@@ -1108,8 +1249,8 @@ function onRowClick(event: MouseEvent, c: Command) {
   run(c)
 }
 
-function run(row: Command | undefined) {
-  if (!row || row.disabled) return
+async function run(row: Command | undefined) {
+  if (!row || row.disabled || executing.value) return
   const c = fallbackOf.get(row) ?? row
   // The highlight stays on the same index, which is now the first row that
   // was hidden: the arrows carry on from where the fold was.
@@ -1120,8 +1261,20 @@ function run(row: Command | undefined) {
     inputRef.value?.focus()
     return
   }
-  emit("select", c)
-  c.onSelect?.()
+  if (c.editInPreview && c.previewComponent) {
+    editing.value = c
+    paneCommand.value = c
+    await focusEditor()
+    return
+  }
+  if (c.prompt) {
+    promptCommand.value = c
+    promptValue.value = c.prompt.initial ?? ""
+    promptError.value = ""
+    inputRef.value?.focus()
+    return
+  }
+  if (!await execute(c, () => c.onSelect?.())) return
   if (!c.onSelect && c.href && !c.children) window.location.assign(c.href)
   // A command with children drills in instead of closing, and is navigation
   // rather than a pick — so it stays out of the recency history.
@@ -1145,7 +1298,44 @@ function run(row: Command | undefined) {
     inputRef.value?.focus()
     return
   }
+  afterClose = c.afterClose
   emit("update:open", false)
+}
+
+async function execute(command: Command, action: () => unknown | Promise<unknown>): Promise<boolean> {
+  if (executing.value) return false
+  executing.value = true
+  actionError.value = ""
+  const epoch = executionEpoch
+  try {
+    emit("select", command)
+    const result = await action()
+    if (command.undo) toast.success(command.label, { duration: 8000, actions: [{ label: text.value.undo, onClick: async () => { await command.undo!(result) } }] })
+    return epoch === executionEpoch
+  } catch (error) {
+    if (epoch === executionEpoch) actionError.value = error instanceof Error ? error.message : text.value.actionFailed
+    return false
+  } finally { executing.value = false }
+}
+function submitPrompt() {
+  const command = promptCommand.value
+  if (!command?.prompt || executing.value || validating.value) return
+  const value = promptValue.value
+  promptValidation.run(() => command.prompt!.validate?.(value), {
+    apply: error => { void completePrompt(command, value, error) },
+    fail: error => { promptError.value = error instanceof Error ? error.message : text.value.actionFailed },
+  })
+}
+async function completePrompt(command: Command, value: string, error: string | undefined) {
+  if (promptCommand.value !== command || promptValue.value !== value) return
+  promptError.value = error ?? ""
+  if (promptError.value || !await execute(command, () => command.prompt!.submit(value))) return
+  remember(command)
+  emit("run", command.id, command)
+  if (promptCommand.value !== command) return
+  promptCommand.value = undefined
+  afterClose = command.afterClose
+  if (!command.keepOpen) emit("update:open", false)
 }
 
 /*
@@ -1154,7 +1344,7 @@ function run(row: Command | undefined) {
  * finger — Escape stays the way out of the palette itself.
  */
 function onBackspace(event: KeyboardEvent) {
-  if (query.value) return
+  if (promptCommand.value || query.value) return
   if (back()) event.preventDefault()
 }
 
@@ -1165,6 +1355,14 @@ function onBackspace(event: KeyboardEvent) {
  * (stopPropagation) only while there is a mode to pop.
  */
 function onEscape(event: KeyboardEvent) {
+  if (promptCommand.value || editing.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    promptCommand.value = undefined
+    editing.value = undefined
+    inputRef.value?.focus()
+    return
+  }
   if (!trail.value.length) return
   event.preventDefault()
   event.stopPropagation()
@@ -1187,6 +1385,11 @@ watch(
       claim()
       hints.use(HINT_SIGNALS.palette)
     } else release()
+    executionEpoch++
+    editing.value = undefined
+    promptCommand.value = undefined
+    promptError.value = ""
+    actionError.value = ""
     cancel()
     query.value = ""
     select(0)
@@ -1242,12 +1445,14 @@ const guardOutside = useOutsideGuard()
       />
       <DialogContent
         @interact-outside="guardOutside"
-        @escape-key-down="guardOutside"
+        @escape-key-down="event => { guardOutside(event); if (!event.defaultPrevented) onEscape(event) }"
+        @close-auto-focus="onCloseAutoFocus"
         ref="contentRef"
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :style="{ zIndex: layer.panel }"
         :data-pane="paneOpen ? 'open' : undefined"
+        :data-editing="editing ? '' : undefined"
         @open-auto-focus.prevent
         @keydown.capture="onPaletteKeydown"
       >
@@ -1259,7 +1464,7 @@ const guardOutside = useOutsideGuard()
              to its left. -->
         <div class="flex shrink-0 items-center gap-2.5 border-b border-line px-4">
           <LpIcon
-            v-if="!searching"
+            v-if="!searching && !executing && !validating"
             name="lucide:search"
             :size="18"
             class="shrink-0 text-muted"
@@ -1270,7 +1475,7 @@ const guardOutside = useOutsideGuard()
             v-else
             size="inline"
             :delay="0"
-            :labels="{ loading: text.searching }"
+            :labels="{ loading: executing || validating ? text.running : text.searching }"
             class="shrink-0 text-[18px] text-muted"
           />
 
@@ -1289,14 +1494,16 @@ const guardOutside = useOutsideGuard()
 
           <input
             ref="inputRef"
-            v-model="query"
+            v-model="inputQuery"
+            :readonly="executing && !!promptCommand"
+            @focus="editing = undefined"
             type="text"
             role="combobox"
             aria-autocomplete="list"
             aria-expanded="true"
             :aria-controls="listId"
             :aria-activedescendant="activeId"
-            :placeholder="mode?.childPlaceholder ?? placeholder"
+            :placeholder="promptCommand?.prompt?.placeholder ?? mode?.childPlaceholder ?? placeholder"
             class="h-12 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
             @keydown.enter.prevent="runSelected"
             @keydown.backspace="onBackspace"
@@ -1306,9 +1513,19 @@ const guardOutside = useOutsideGuard()
           <kbd class="shrink-0 rounded-small border border-line px-1.5 py-0.5 text-[10px] text-muted">{{ text.esc }}</kbd>
         </div>
 
+        <div v-if="promptCommand" class="flex flex-col gap-3 p-4">
+          <p class="text-sm font-semibold">{{ promptCommand.label }}</p>
+          <p v-if="promptError" role="alert" class="text-sm text-danger">{{ promptError }}</p>
+          <div class="flex gap-2"><LpButton :loading="executing || validating" @click="submitPrompt">{{ text.submit }}</LpButton><LpButton variant="ghost" @click="promptCommand = undefined; inputRef?.focus()">{{ text.backToResults }}</LpButton></div>
+        </div>
+        <p v-if="actionError" role="alert" class="px-4 py-2 text-sm text-danger">{{ actionError }}</p>
+        <div v-if="active && (canPin || selectedActions.length) && !promptCommand" class="flex items-center justify-end gap-2 border-b border-line px-3 py-1">
+          <LpButton v-if="selectedActions.length" size="xs" variant="ghost" @click="openActions(active)">{{ text.actions }} <span class="text-muted">Tab</span></LpButton>
+          <LpButton v-if="canPin" size="xs" variant="ghost" :aria-label="isPinned(active) ? text.unpin : text.pin" :aria-pressed="isPinned(active)" @click="togglePin(active)"><LpIcon name="lucide:star" :size="14" />{{ isPinned(active) ? text.unpin : text.pin }} <span class="text-muted">Alt+P</span></LpButton>
+        </div>
         <!-- Results -->
         <div class="flex min-h-0 flex-1" @pointermove="onPointerMove">
-          <LpScrollArea ref="scrollRef" class="lp-cmd-list min-h-0 min-w-0 flex-1" content-class="p-2">
+          <LpScrollArea v-show="!editing && !promptCommand" ref="scrollRef" class="lp-cmd-list min-h-0 min-w-0 flex-1" content-class="p-2">
             <!-- While a request is out there is nothing to say yet: "no results"
                  under a spinner reads as an answer, and it is not one. -->
             <p v-if="flat.length === 0 && !failed" class="px-2 py-10 text-center text-sm text-muted">
@@ -1441,13 +1658,18 @@ const guardOutside = useOutsideGuard()
           <Transition name="lp-cmd-pane">
             <aside
               v-if="paneOpen"
-              class="lp-cmd-pane hidden min-h-0 shrink-0 flex-col border-l border-line md:flex"
+              class="lp-cmd-pane min-h-0 flex-col"
+              :class="editing ? 'flex min-w-0 flex-1' : 'hidden shrink-0 border-l border-line md:flex'"
             >
               <LpScrollArea ref="previewRef" class="min-h-0 flex-1" content-class="px-5 py-4">
                 <!-- Keyed by the row, so moving the highlight replays the
                      entrance rather than swapping text in place. -->
                 <div v-if="paneBody" :key="paneBody.id">
+                  <LpButton v-if="editing" size="sm" variant="ghost" class="mb-3" @click="editing = undefined; inputRef?.focus()">{{ text.backToResults }}</LpButton>
+                  <PalettePreviewBoundary>
                   <slot name="preview" :command="paneBody" :highlight="paneHighlight" :query="paneQuery">
+                    <component v-if="paneBody.previewComponent" :is="paneBody.previewComponent" />
+                    <template v-else>
                     <div class="lp-cmd-para flex items-center gap-2 text-ink">
                       <LpAvatar
                         v-if="imageOf(paneBody)"
@@ -1477,7 +1699,12 @@ const guardOutside = useOutsideGuard()
                         <template v-else>{{ p.text }}</template>
                       </template>
                     </p>
+                    </template>
                   </slot>
+                  </PalettePreviewBoundary>
+                  <div v-if="actionsOf(paneBody).length" class="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
+                    <LpButton v-for="action in actionsOf(paneBody)" :key="action.id" size="sm" variant="outline" :disabled="action.disabled || executing" @click="run({ ...action, remember: false })">{{ action.label }}</LpButton>
+                  </div>
                 </div>
               </LpScrollArea>
             </aside>
@@ -1555,6 +1782,13 @@ const guardOutside = useOutsideGuard()
 }
 .lp-cmd-pane {
   width: var(--lp-cmd-pane);
+}
+.lp-cmd-dialog[data-editing] .lp-cmd-pane {
+  width: 100%;
+}
+.lp-cmd-dialog[data-editing] {
+  width: var(--lp-cmd-list);
+  min-height: 0;
 }
 /*
  * The pane rides in from the right edge while the dialog opens up to it, and

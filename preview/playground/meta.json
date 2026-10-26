@@ -471,6 +471,13 @@
  "LpAutocomplete": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "string | undefined",
     "required": false,
@@ -678,7 +685,7 @@
   "props": [
    {
     "name": "tone",
-    "type": "\"danger\" | \"brand\" | \"ok\" | \"warning\" | \"neutral\" | \"info\" | \"success\" | \"muted\" | \"action\" | \"accent\" | \"error\" | \"outline\" | undefined",
+    "type": "\"danger\" | \"brand\" | \"ok\" | \"warning\" | \"neutral\" | \"error\" | \"info\" | \"success\" | \"muted\" | \"action\" | \"accent\" | \"outline\" | undefined",
     "required": false,
     "choices": [
      "danger",
@@ -686,12 +693,12 @@
      "ok",
      "warning",
      "neutral",
+     "error",
      "info",
      "success",
      "muted",
      "action",
      "accent",
-     "error",
      "outline"
     ]
    },
@@ -771,6 +778,12 @@
  },
  "LpButton": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined"
+   },
    {
     "name": "variant",
     "type": "\"danger\" | \"soft\" | \"muted\" | \"action\" | \"outline\" | \"solid\" | \"light\" | \"ghost\" | undefined",
@@ -1283,6 +1296,13 @@
  "LpCheckbox": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "boolean | undefined",
     "required": false
@@ -1790,8 +1810,37 @@
    },
    {
     "name": "commands",
-    "type": "Command[]",
-    "required": true
+    "type": "Command[] | undefined",
+    "required": false,
+    "default": "[]"
+   },
+   {
+    "name": "context",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Include live commands registered by enclosing LpCommandScope components."
+   },
+   {
+    "name": "modes",
+    "type": "Partial<Record<\"commands\" | \"people\" | \"channels\" | \"roles\" | \"help\", CommandFetcher | Command[]>> | undefined",
+    "required": false,
+    "description": "Built-in sigils; people, channels and roles appear when a provider is supplied."
+   },
+   {
+    "name": "pinned",
+    "type": "RecentItem[] | undefined",
+    "required": false
+   },
+   {
+    "name": "pinnedKey",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "pinnedLabel",
+    "type": "string | undefined",
+    "required": false
    },
    {
     "name": "placeholder",
@@ -1921,6 +1970,10 @@
     "type": "[command: Command]"
    },
    {
+    "name": "update:pinned",
+    "type": "[items: RecentItem[]]"
+   },
+   {
     "name": "run",
     "type": "[id: string, command: Command]"
    },
@@ -1934,6 +1987,55 @@
     "name": "preview",
     "type": "{ command: Command; highlight: (text: string) => HighlightPart[]; query: PaletteQuery; }",
     "description": "Body of the preview pane for the highlighted command. `highlight(text)`\nsplits any text around the words typed (positive terms only, plus the\ncommand's own `highlight` words), the same matching the rows use; the\nLpPalette* blocks take its result wherever they take text, and\n`query` is the parsed box for anything else."
+   }
+  ]
+ },
+ "LpCommandScope": {
+  "props": [
+   {
+    "name": "id",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "enabled",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "discover",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "isolated",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Start a separate registry, e.g. an embedded demo inside an application's palette scope."
+   },
+   {
+    "name": "theme",
+    "type": "ThemeStudio | undefined",
+    "required": false
+   },
+   {
+    "name": "commands",
+    "type": "Command[] | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
    }
   ]
  },
@@ -2042,6 +2144,12 @@
  },
  "LpContextMenu": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined"
+   },
    {
     "name": "items",
     "type": "ContextMenuItemDef[]",
@@ -2552,6 +2660,12 @@
  "LpDisclosure": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
     "name": "open",
     "type": "boolean | undefined",
     "required": false,
@@ -2907,6 +3021,12 @@
  },
  "LpDropdownMenu": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined"
+   },
    {
     "name": "items",
     "type": "ContextMenuItemDef[]",
@@ -4050,6 +4170,13 @@
  },
  "LpInput": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
    {
     "name": "modelValue",
     "type": "string | undefined",
@@ -5275,6 +5402,13 @@
  "LpNumberField": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "number | null | undefined",
     "required": false
@@ -5606,6 +5740,11 @@
     "required": true
    },
    {
+    "name": "loading",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
     "name": "title",
     "type": "string | undefined",
     "required": false,
@@ -5714,6 +5853,11 @@
     "required": true
    },
    {
+    "name": "loading",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
     "name": "columns",
     "type": "2 | 3 | 4 | undefined",
     "required": false,
@@ -5742,6 +5886,17 @@
     "type": "string | undefined",
     "required": false,
     "description": "Accessible name of the strip, e.g. the theme's name."
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpPaletteTheme": {
+  "props": [
+   {
+    "name": "studio",
+    "type": "PreviewableThemeStudio",
+    "required": true
    }
   ],
   "events": [],
@@ -6466,6 +6621,12 @@
  "LpRadioGroup": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
     "name": "modelValue",
     "type": "string | undefined",
     "required": false
@@ -6569,6 +6730,13 @@
  },
  "LpRangeSlider": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
    {
     "name": "modelValue",
     "type": "[number, number] | undefined",
@@ -7176,6 +7344,13 @@
  "LpSegmented": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "string | undefined",
     "required": false
@@ -7226,6 +7401,13 @@
  },
  "LpSelect": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
    {
     "name": "modelValue",
     "type": "Model",
@@ -7830,6 +8012,13 @@
  "LpSlider": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "number | undefined",
     "required": false,
@@ -8299,6 +8488,13 @@
  "LpSwitch": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "boolean | undefined",
     "required": false
@@ -8360,6 +8556,13 @@
  },
  "LpTable": {
   "props": [
+   {
+    "name": "palette",
+    "type": "false | { id?: string | undefined; label?: string | undefined; labelKey?: keyof T | undefined; } | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Publish loaded rows and existing row actions to the enclosing command scope."
+   },
    {
     "name": "columns",
     "type": "TableColumn<T>[]",
@@ -8713,6 +8916,13 @@
  "LpTagsInput": {
   "props": [
    {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
+   {
     "name": "modelValue",
     "type": "string[] | undefined",
     "required": false,
@@ -8933,6 +9143,13 @@
  },
  "LpTextarea": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
    {
     "name": "modelValue",
     "type": "string | undefined",
@@ -9248,6 +9465,13 @@
  },
  "LpTimeField": {
   "props": [
+   {
+    "name": "palette",
+    "type": "PaletteControlOptions | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Contextual palette metadata; false excludes this control."
+   },
    {
     "name": "modelValue",
     "type": "string | undefined",
@@ -9771,6 +9995,17 @@
     "description": "Show the computed uptime % above the bar."
    },
    {
+    "name": "uptime",
+    "type": "number | null | undefined",
+    "required": false,
+    "description": "The uptime figure, when the app has a more exact one than the slices\n(a server that counted every minute). Otherwise it is worked out from\nthe slices: their `durations`, else their spans, else their count."
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
     "name": "title",
     "type": "string | undefined",
     "required": false,
@@ -9784,7 +10019,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"loading\" | UptimeStatus, string>> | undefined",
+    "type": "Partial<Record<\"loading\" | \"uptime\" | UptimeStatus, string>> | undefined",
     "required": false,
     "description": "Status names, for the tooltip and screen readers."
    },

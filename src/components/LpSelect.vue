@@ -16,6 +16,7 @@ export type SelectLabels = {
 </script>
 
 <script setup lang="ts" generic="V extends SelectValue = string">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * One select to rule them all — built on reka-ui Combobox.
  * `searchable` opts into the filter input; without it, it's a plain select.
@@ -61,6 +62,8 @@ type Model = V | V[] | undefined
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: Model
     options: SelectOption<V>[]
     placeholder?: string
@@ -90,7 +93,7 @@ const props = withDefaults(
     selected?: SelectSelection | (SelectSelection | null | undefined)[] | null
     labels?: Partial<SelectLabels>
   }>(),
-  {
+  { palette: undefined,
     searchable: false,
     multiple: false,
     clearable: false,
@@ -173,12 +176,43 @@ function onOpenChange(open: boolean) {
   isOpen.value = open
   query.value = ""
 }
+async function openFromKeyboard(event: KeyboardEvent) {
+  if (field.value.disabled || isOpen.value || !["ArrowDown", "ArrowUp"].includes(event.key)) return
+  event.preventDefault()
+  event.stopPropagation()
+  const trigger = event.currentTarget as HTMLElement
+  trigger.click()
+  await nextTick()
+  const panel = trigger.ownerDocument.getElementById(trigger.getAttribute("aria-controls") ?? "")
+  const search = panel?.querySelector<HTMLInputElement>('input:not([disabled])')
+  const items = panel?.querySelectorAll<HTMLElement>('[role="option"]:not([data-disabled])')
+  const selected = panel?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not([data-disabled])')
+  const target = search ?? selected ?? (event.key === "ArrowUp" ? items?.[items.length - 1] : items?.[0])
+  target?.focus()
+}
 
 // Leaving the field, not moving between its parts: the trigger and the list
 // are marked with one id, because the list is portalled away from the trigger
 // and a check on the trigger alone either missed the search box or took a
 // step into it for leaving.
 const { partId, onFocusOut } = useFieldBlur((event) => emit("blur", event))
+const triggerRef = ref<{ $el: HTMLElement } | null>(null)
+
+/*
+ * A pick closes the list while the chosen option still holds focus, then the
+ * option is removed and focus falls to the body: the field looked left, and
+ * the next arrow key went to the page (inside the palette's editor it went
+ * nowhere). Focus dropped by a closed list goes back to the trigger instead,
+ * and that is not leaving the field, so no blur is reported for it.
+ */
+function onListFocusOut(event: FocusEvent) {
+  const trigger = triggerRef.value?.$el
+  if (isOpen.value || event.relatedTarget || !trigger?.isConnected) {
+    onFocusOut(event)
+    return
+  }
+  trigger.focus({ preventScroll: true })
+}
 
 /*
  * The trigger's name. reka hard-codes aria-label="Show popup" on it, which hid
@@ -368,6 +402,8 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid, editorProps: () => ({ selected: props.multiple ? modelList.value.map((value, index) => shown(value, index)) : current.value }) })
 </script>
 
 <template>
@@ -408,7 +444,10 @@ const guardOutside = useOutsideGuard()
            being cut short. -->
       <span :id="valueId" hidden>{{ valueText }}</span>
       <ComboboxTrigger
+        ref="triggerRef"
         :id="field.id"
+        :tabindex="field.disabled ? -1 : 0"
+        @keydown="openFromKeyboard"
         v-bind="triggerName"
         :aria-invalid="field.invalid || undefined"
         :aria-describedby="field.describedBy"
@@ -524,7 +563,7 @@ const guardOutside = useOutsideGuard()
     <ComboboxPortal :to="portalTo">
       <ComboboxContent
         :data-lp-field-part="partId"
-        @focusout="onFocusOut"
+        @focusout="onListFocusOut"
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         position="popper"

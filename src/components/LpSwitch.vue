@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
 import { useFieldControl } from "../composables/useField"
@@ -15,6 +16,8 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: boolean
     disabled?: boolean
     label?: string
@@ -34,7 +37,7 @@ const props = withDefaults(
      */
     action?: (value: boolean) => unknown
   }>(),
-  { labelPosition: "end" },
+  { palette: undefined, labelPosition: "end" },
 )
 const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void
@@ -79,6 +82,8 @@ const describedBy = computed(
 function onUpdate(value: boolean) {
   void set(value)
 }
+
+usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled || pending.value, editorProps: () => ({ action: undefined, 'onUpdate:modelValue': onUpdate }) })
 </script>
 
 <template>

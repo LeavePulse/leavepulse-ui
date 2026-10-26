@@ -232,3 +232,94 @@ Playwright starts an isolated Vite server on port 4501. The suite covers field
 locking, secret reveal controls, date/select focus boundaries and a mobile
 form inside a guarded drawer. These checks run in CI and before npm publishing.
 Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to run an existing Chromium installation.
+
+### Contextual command palette
+
+Wrap the application (or a page and its palette) in `LpCommandScope`. Nested
+scopes share a registry, prioritise page commands, and unregister on unmount.
+`isolated` starts a separate registry for an embedded application or demo.
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import {
+  LpCommandScope, LpCommandPalette, LpFormField, LpNumberField,
+  useThemeStudio,
+} from '@leavepulse/ui'
+
+const studio = useThemeStudio()
+const open = ref(false)
+const cpu = ref(4)
+</script>
+
+<template>
+  <LpCommandScope id="settings" label="Settings" :theme="studio">
+    <LpFormField label="CPU limit">
+      <LpNumberField v-model="cpu" :min="1" :max="128" :palette="{ id: 'cpu' }" />
+    </LpFormField>
+    <LpCommandPalette v-model:open="open" preview-pane recent-key="my-app-palette" />
+  </LpCommandScope>
+</template>
+```
+
+Named kit fields, buttons, tabs and disclosures register automatically in a
+scope. A field uses its own label, its `LpFormField` label or `aria-label`.
+`palette` metadata (`id`, `label`, `description`, `keywords`) refines its metadata;
+`:palette="false"` excludes it. Passwords and secrets are excluded even when
+revealed. Previews reuse the original component's model bindings and constraints;
+Enter opens an editor on narrow screens too. Escape returns to results.
+Preview components and compound control internals are excluded from discovery.
+
+Tables take `:palette="{ id: 'services', label: 'Services', labelKey: 'name' }"`.
+They publish the currently loaded/filtered rows and their existing `rowMenu`
+actions. Searching an entire remote dataset still needs a search provider.
+Menus with a title reuse their existing item definitions. `discover=false` on a
+scope disables automatic component discovery while retaining manual commands and
+an explicitly supplied Theme studio. `context=false` on the palette excludes
+contextual commands.
+
+Inside a descendant page component, `usePaletteCommands(() => [...])` registers
+reactive manual commands for that page's lifetime. Alternatively pass `commands`
+to `LpCommandScope` directly. Manual `commands` passed to the palette replace a
+registered command with the same ID. `previewComponent` provides a rich preview;
+`editInPreview` makes Enter focus it. Native markup can opt in with the locally
+imported `vPalette` directive:
+
+```vue
+<button v-palette="{ id: 'refresh', label: 'Refresh servers', action: 'click' }"
+        @click="refresh">Refresh</button>
+```
+
+The directive defaults to focusing its target. `afterClose` on a manual command
+runs after the palette releases its focus trap, suitable for focusing a field
+or a lazily revealed section. Page hints can prepare that section in `onSelect`
+and locate its existing `v-hint` target in `afterClose`.
+
+Theme uses the same `ThemeStudio` as `LpThemeSwitcher` / `LpThemeStudio`; these
+components also register it when inside a scope. The palette editor keeps a
+local draft, shows it through `LpThemeProvider`, and commits only on Apply.
+Revert or closing the editor discards pending edits. `usePaletteTheme(studio)`
+registers a studio explicitly from a descendant component.
+
+`modes` accepts providers under `people`, `channels`, `roles`, `commands`, `help`.
+Their sigils are `@`, `#`, `&`, `>`, `?`. People/channels/roles appear when supplied;
+commands and keyboard help are provided by default. Each provider is the same
+static array or abortable `CommandFetcher` used by `children`.
+
+Pin the highlighted leaf with the star button or Alt+P in the search box.
+Pins have their own group and storage (`pinnedKey`, defaulting to
+`${recentKey}:pinned`) and do not expire from recent history. Bind `pinned` /
+`update:pinned` for external storage. Persistence uses the kit's configured
+storage adapter.
+
+A `prompt` command accepts `{ placeholder, initial, validate, submit }`.
+Validation may be asynchronous; errors keep the input open, and changing the
+value or leaving the step invalidates an outstanding validation. Async actions
+are awaited, duplicate execution is blocked, and failures remain visible.
+`undo(result)` adds an Undo toast only after successful execution; the application
+supplies the actual inverse operation. Preview actions have visible buttons as
+well as the Tab menu, including an Actions button on phones.
+
+`LpPaletteFacts` and `LpPaletteStats` accept `loading`. Known labels retain their
+place, values become skeletons; empty item lists receive placeholder rows.
+Try the complete example at `/component/context-palette` in the preview.

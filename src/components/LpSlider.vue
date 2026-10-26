@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Single-value slider (reka Slider). reka models value as an array; we expose
 // a plain number for the common single-thumb case. Themed via tokens.
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
@@ -15,6 +16,8 @@ import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: number
     min?: number
     max?: number
@@ -23,7 +26,7 @@ const props = withDefaults(
     /** Accessible name for the thumb when there's no visible label. */
     ariaLabel?: string
   }>(),
-  { modelValue: 0, min: 0, max: 100, step: 1 },
+  { palette: undefined, modelValue: 0, min: 0, max: 100, step: 1 },
 )
 
 const emit = defineEmits<{
@@ -47,6 +50,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`,
 )
 const { dragging, onPointerDown } = useSliderDrag()
+
+usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>

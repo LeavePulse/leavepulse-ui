@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Numeric input with stepper buttons (reka NumberField). Themed via tokens.
 import {
   NumberFieldDecrement,
@@ -25,6 +26,8 @@ export interface NumberFieldLabels extends Record<string, string> {
 }
 
 const props = withDefaults(defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
   // null = empty field (reka's native state); consumers that need a number
   // should default it themselves, the field doesn't invent a value.
   modelValue?: number | null
@@ -67,7 +70,7 @@ const props = withDefaults(defineProps<{
   /** Control height, matching LpInput. */
   size?: "sm" | "md" | "lg"
   labels?: Partial<NumberFieldLabels>
-}>(), { size: "md", stepSnapping: true, steppers: true, focusOnChange: true })
+}>(), { palette: undefined, size: "md", stepSnapping: true, steppers: true, focusOnChange: true })
 
 // The value is committed when the field loses focus or Enter is pressed, and on
 // every step, not on each keystroke: "1." or "-" is not a number yet, and a
@@ -131,6 +134,8 @@ const rootClass = useMergedClass(() =>
       : "border-line focus-within:border-brand focus-within:ring-ring",
   ].join(" "),
 )
+
+usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid })
 </script>
 
 <template>

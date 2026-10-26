@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
 import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
 import { computed, nextTick, ref, useId, watch } from "vue"
@@ -152,6 +153,12 @@ function releaseFocusAfterPointer(event: PointerEvent) {
   const target = event.currentTarget
   if (target instanceof HTMLElement) target.blur()
 }
+
+const paletteScope = usePaletteScope()
+usePaletteCommands(() => props.items.map(item => ({
+  id: `${paletteScope?.id}/tabs/${pillId}/${item.value}`, label: props.label ? `${props.label}: ${item.label}` : item.label,
+  icon: item.icon, disabled: item.disabled, onSelect: () => select(item.value),
+})), { automatic: true })
 </script>
 
 <template>

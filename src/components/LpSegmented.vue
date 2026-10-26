@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Segmented control — a compact bar of mutually-exclusive options with a sliding
  * pill marking the selection (iOS-style). Built on reka ToggleGroup for the
@@ -36,6 +37,8 @@ export interface SegmentedOption extends LpOptionBase<string> {
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: string
     options: SegmentedOption[]
     size?: "sm" | "md" | "lg"
@@ -49,7 +52,7 @@ const props = withDefaults(
      */
     hoverFollow?: boolean
   }>(),
-  { size: "md", block: false, hoverFollow: true },
+  { palette: undefined, size: "md", block: false, hoverFollow: true },
 )
 
 const emit = defineEmits<{
@@ -106,6 +109,8 @@ function releaseFocusAfterPointer(event: PointerEvent) {
   const target = event.currentTarget
   if (target instanceof HTMLElement) target.blur()
 }
+
+usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>

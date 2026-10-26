@@ -5,7 +5,10 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, watch } from "vue"
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, useId, watch } from "vue"
+import { suppressPaletteDiscovery, usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
+import { menuPaletteCommands } from "./commandPalette"
+import LpDataList from "./LpDataList.vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
@@ -157,6 +160,8 @@ type RowKey = string | number
 
 const props = withDefaults(
   defineProps<{
+    /** Publish loaded rows and existing row actions to the enclosing command scope. */
+    palette?: false | { id?: string; label?: string; labelKey?: keyof T }
     columns: TableColumn<T>[]
     /** The rows, for a table that holds its data. Ignored when `load` is set. */
     rows?: T[]
@@ -245,7 +250,7 @@ const props = withDefaults(
      */
     allMatching?: boolean
   }>(),
-  {
+  { palette: undefined,
     rows: () => [],
     pageSize: 25,
     skeletonRows: 5,
@@ -1075,6 +1080,34 @@ onBeforeUnmount(() => {
 const barInsetTop = computed(() =>
   props.stickyHeader && headHeight.value ? `${headHeight.value}px` : undefined,
 )
+
+const paletteScope = usePaletteScope()
+const paletteId = useId()
+suppressPaletteDiscovery()
+usePaletteCommands(() => {
+  if (props.palette === false) return []
+  const name = props.palette?.label ?? attrs["aria-label"] as string | undefined
+  if (!name) return []
+  const id = `${paletteScope?.id}/${props.palette?.id ?? paletteId}`
+  return [{
+    id, label: name, icon: "lucide:table", children: [
+      ...menuPaletteCommands(tableMenu(), `${id}/table`),
+      ...displayRows.value.map((row, index) => {
+        const menu = resolveRowMenu(props.rowMenu?.(row))
+        const rowId = `${id}/row/${keyFor(row, index)}`
+        const labelKey = props.palette && props.palette.labelKey || props.columns[0]?.key
+        return {
+          id: rowId, label: menu.title ?? String(labelKey ? row[labelKey] ?? keyFor(row, index) : keyFor(row, index)),
+          description: menu.subtitle, icon: menu.icon ?? "lucide:rows-3", image: menu.image,
+          onSelect: () => emit("rowClick", row), actions: menuPaletteCommands(menu.items, rowId),
+          previewComponent: { setup: () => () => h(LpDataList, { items: props.columns.map(column => ({
+            label: column.label, value: typeof row[column.key] === "object" ? null : String(row[column.key] ?? ""),
+          })) }) },
+        }
+      }),
+    ],
+  }]
+}, { automatic: true })
 </script>
 
 <template>

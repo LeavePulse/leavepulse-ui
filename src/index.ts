@@ -555,3 +555,20 @@ export { default as LpGlowBorder } from "./components/LpGlowBorder.vue"
 export { default as LpMagnetic } from "./components/LpMagnetic.vue"
 export { spotlightPoint, useSpotlight } from "./composables/useSpotlight"
 export type { UseSpotlight, UseSpotlightOptions } from "./composables/useSpotlight"
+
+export { default as LpCommandScope } from "./components/LpCommandScope.vue"
+export { createPaletteRegistry, usePaletteCommands, mergePaletteCommands } from "./composables/usePaletteCommands"
+export type { PaletteRegistry, PaletteControlOptions } from "./composables/usePaletteCommands"
+export { PALETTE_MODES } from "./components/commandPalette"
+export type { PaletteMode } from "./components/commandPalette"
+export { searchCommandItems, swapCommandLayout } from "./components/commandSearch"
+export type { CommandPrompt } from "./components/LpCommandPalette.vue"
+
+export { usePaletteTheme } from "./theme/palette"
+export { default as LpPaletteTheme } from "./components/LpPaletteTheme.vue"
+
+export { vPalette } from "./composables/usePaletteCommands"
+export type { PaletteTargetOptions } from "./composables/usePaletteCommands"
+export { menuPaletteCommands } from "./components/commandPalette"
+
+export type { PreviewableThemeStudio } from "./theme/studio"

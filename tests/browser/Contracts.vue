@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue"
+import CommandContextDemo from "../../preview/playground/CommandContextDemo.vue"
 import {
   LpButton, LpConfirmHost, LpDatePicker, LpDateRangePicker, LpDrawer,
   LpEditable, LpFormField, LpInput, LpPasswordInput, LpRepeater,
@@ -48,7 +49,8 @@ const menuItems = [{ label: "Move to", children: [
 
 <template>
   <main class="mx-auto flex max-w-xl flex-col gap-4 p-6">
-    <template v-if="scenario === 'frame'">
+    <CommandContextDemo v-if="scenario === 'context-palette'" testing :manual-commands="mode === 'override' ? [{ id: 'service/cpu', label: 'Custom processor action' }] : undefined" />
+    <template v-else-if="scenario === 'frame'">
       <button data-test-outside>Outside frame</button>
       <LpFrame :height="420" title="Frame interactions">
         <div class="flex flex-col items-start gap-5 p-6">

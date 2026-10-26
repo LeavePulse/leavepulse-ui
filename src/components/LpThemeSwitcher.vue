@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePaletteTheme } from "../theme/palette"
 /*
  * Theme switcher. The kit convention for theming, so consumers stop hand-rolling
  * their own. Default behaviour mirrors LeaveHosting: LEFT-click cycles to the
@@ -298,6 +299,8 @@ const labelName = computed(() =>
 const triggerLabel = computed(
   () => props["aria-label"] ?? text.value.trigger.replace("{name}", labelName.value),
 )
+
+usePaletteTheme(() => tuner ?? undefined)
 </script>
 
 <template>

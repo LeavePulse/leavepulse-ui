@@ -60,7 +60,10 @@ const FORWARDED = ["pointerdown", "pointerup", "click", "focusin", "keydown"] as
 
 export function forwardViewEvents(from: Document, to: Document): () => void {
   const forward = (event: Event) => {
-    if (event.type === "keydown" && (event as KeyboardEvent).key !== "Escape") return
+    if (event.type === "keydown") {
+      const key = event as KeyboardEvent
+      if (key.defaultPrevented || (key.key !== "Escape" && !key.ctrlKey && !key.metaKey)) return
+    }
     const Copy = event.constructor as new (type: string, init: Event) => Event
     const copy = new Copy(event.type, event) as Marked
     copy[ORIGIN] = from
@@ -68,6 +71,7 @@ export function forwardViewEvents(from: Document, to: Document): () => void {
     Object.defineProperty(copy, "target", { value: event.target })
     copy.composedPath = () => path
     to.dispatchEvent(copy)
+    if (copy.defaultPrevented) event.preventDefault()
   }
   for (const type of FORWARDED) from.addEventListener(type, forward)
   return () => {

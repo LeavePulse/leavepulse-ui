@@ -5,15 +5,14 @@ import {
   LpButton,
   type Command,
   LpCommandPalette,
+  LpCommandScope,
   LpConfirmHost,
   LpEmptyState,
   LpIcon,
   LpKeys,
-  LpPaletteFacts,
   LpPaletteHeader,
   LpPalettePreview,
   LpPaletteStats,
-  LpPaletteSwatches,
   LpShortcutsDialog,
   LpToaster,
   presets,
@@ -82,23 +81,9 @@ function goHome(e: MouseEvent) {
 }
 
 // The site theme is the kit's own studio: the header's switcher cycles it on
-// a click and opens it on a right-click, and the palette's theme rows pick
-// from the same state.
+// a click and opens it on a right-click. The command scope exposes the same studio.
 const studio = useThemeStudio()
 const THEMES = Object.keys(presets) as PresetName[]
-const theme = computed<PresetName>(() => THEMES.find((name) => presets[name].name === studio.state.value.theme) ?? "dark")
-const THEME_ICON: Record<PresetName, string> = {
-  dark: "lucide:moon",
-  light: "lucide:sun",
-  lime: "lucide:sprout",
-  rose: "lucide:flower",
-  amber: "lucide:flame",
-  violet: "lucide:gem",
-  nord: "lucide:snowflake",
-}
-function setTheme(name: PresetName) {
-  studio.pickTheme(presets[name].name)
-}
 
 /*
  * The site is laid out by the kit's own shell: the sections of the registry
@@ -133,7 +118,7 @@ const paletteOpen = ref(false)
 // The CommandPalette page mounts its own example, which binds ⌘K too: both
 // would toggle on one press and stack two dialogs. The example is what that
 // page is about, so the site palette steps aside there.
-const siteHotkey = computed(() => !(route.value.kind === "component" && route.value.id === "commandpalette"))
+const siteHotkey = computed(() => !(route.value.kind === "component" && ["commandpalette", "context-palette"].includes(route.value.id)))
 
 /*
  * The palette the way an app would use it: a history it keeps itself, the
@@ -156,11 +141,6 @@ const pageLink = (id: string) => href({ kind: "page", id })
 type Prose = { text: string; code: boolean }[]
 const prose = (text: string): Prose =>
   text.split(/`([^`]+)`/).map((part, i) => ({ text: part, code: i % 2 === 1 })).filter((part) => part.text)
-function themePreview(id: string) {
-  const name = id.replace(/^theme\//, "") as PresetName
-  return id.startsWith("theme/") && name in presets ? { name, preset: presets[name] } : null
-}
-
 function componentPreview(id: string) {
   const entry = registry.find((e) => e.id === id.replace(/^component\//, ""))
   if (!entry) return null
@@ -195,23 +175,6 @@ const commands = computed<Command[]>(() => [
     href: pageLink(id),
     onSelect: () => navigate({ kind: "page", id }),
   })),
-  {
-    id: "theme",
-    label: "Theme",
-    description: `Now: ${presets[theme.value].name}`,
-    icon: "lucide:palette",
-    group: "Preferences",
-    keywords: ["theme", "dark", "light", ...THEMES],
-    childPlaceholder: "Pick a theme…",
-    prefix: "t:",
-    children: THEMES.map((name) => ({
-      id: `theme/${name}`,
-      label: presets[name].name,
-      icon: theme.value === name ? "lucide:check" : THEME_ICON[name],
-      keepOpen: true,
-      onSelect: () => setTheme(name),
-    })),
-  },
   {
     id: "shortcuts",
     label: "Keyboard shortcuts",
@@ -257,6 +220,7 @@ const SITE_KEYS: ShortcutGroup[] = [
 </script>
 
 <template>
+  <LpCommandScope id="preview" label="LeavePulse UI" :discover="false" :theme="studio">
   <LpAppShell :model-value="activeNav" :sections="navSections" :full-bleed="fullBleed" :auto-collapse-after="16">
     <template #logo>
       <a :href="href({ kind: 'home' })" class="flex items-center gap-2 font-semibold text-ink" @click="goHome">
@@ -332,24 +296,6 @@ const SITE_KEYS: ShortcutGroup[] = [
             <LpKeys combo="Enter" label="opens its page" />
           </template>
         </LpPalettePreview>
-        <LpPalettePreview v-else-if="themePreview(command.id)">
-          <template v-for="t in [themePreview(command.id)!]" :key="t.name">
-            <LpPaletteHeader eyebrow="Theme" :title="t.preset.name" :icon="THEME_ICON[t.name]" :subtitle="t.preset.mode === 'dark' ? 'Dark mode' : 'Light mode'" />
-            <LpPaletteSwatches
-              :label="t.preset.name"
-              :background="t.preset.colors.surface"
-              :colors="[t.preset.colors.surfaceSoft, t.preset.colors.ink, t.preset.colors.muted, t.preset.colors.brand, t.preset.colors.action, t.preset.colors.accent]"
-            />
-            <LpPaletteFacts
-              :items="[
-                { color: t.preset.colors.brand, label: 'Brand', value: t.preset.colors.brand, mono: true },
-                { color: t.preset.colors.action, label: 'Action', value: t.preset.colors.action, mono: true },
-                { icon: 'lucide:check', label: 'In use', value: theme === t.name ? 'yes' : 'no', current: theme === t.name },
-              ]"
-            />
-            <LpKeys combo="Enter" :label="theme === t.name ? 'keeps it' : 'tries it, the palette stays open'" />
-          </template>
-        </LpPalettePreview>
         <LpPalettePreview v-else-if="command.id.startsWith('page/')">
           <LpPaletteHeader eyebrow="Page" :title="highlight(command.label)" :icon="command.icon" />
           <LpPaletteStats
@@ -374,5 +320,6 @@ const SITE_KEYS: ShortcutGroup[] = [
     <LpConfirmHost />
     </template>
   </LpAppShell>
+  </LpCommandScope>
 </template>
 

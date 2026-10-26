@@ -1,4 +1,15 @@
 import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type HighlightPart, type SearchableCommand } from "./commandSearch"
+import type { Command } from "./LpCommandPalette.vue"
+import type { ContextMenuItemDef } from "./LpContextMenu.vue"
+
+/** The same action definitions serve a row menu and the command palette. */
+export function menuPaletteCommands(items: ContextMenuItemDef[], prefix: string): Command[] {
+  return items.map((item, index) => ({
+    id: `${prefix}/${index}`, label: item.label, icon: item.icon, disabled: item.disabled,
+    onSelect: item.onSelect, keepOpen: item.checked !== undefined,
+    children: item.children ? menuPaletteCommands(item.children, `${prefix}/${index}`) : undefined,
+  }))
+}
 
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so
@@ -7,6 +18,7 @@ import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type Hig
 
 /** The fields of a command that decide whether the preview pane opens for it. */
 export interface PreviewableCommand {
+  previewComponent?: unknown
   preview?: string
   excerpt?: string
   noPreview?: boolean
@@ -23,8 +35,17 @@ export function commandHasPreview<T extends PreviewableCommand>(
 ): boolean {
   if (!command || command.noPreview) return false
   if (options.hasPreview) return options.hasPreview(command)
-  return options.slot || !!(command.preview || command.excerpt)
+  return options.slot || !!(command.previewComponent || command.preview || command.excerpt)
 }
+
+export const PALETTE_MODES = {
+  people: { prefix: "@", label: "People", icon: "lucide:users" },
+  channels: { prefix: "#", label: "Channels", icon: "lucide:hash" },
+  roles: { prefix: "&", label: "Roles", icon: "lucide:shield" },
+  commands: { prefix: ">", label: "Commands", icon: "lucide:terminal" },
+  help: { prefix: "?", label: "Help", icon: "lucide:circle-help" },
+} as const
+export type PaletteMode = keyof typeof PALETTE_MODES
 
 /** One line of LpPaletteFacts: what it is, and what it is set to now. */
 export interface PaletteFact {

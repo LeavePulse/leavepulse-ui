@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useId } from "vue"
+import { menuPaletteCommands } from "./commandPalette"
+import { usePaletteCommands, usePaletteScope, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * A menu opened from a button (usually a row's "…"). Its items are the same
  * shape as LpContextMenu's and are drawn by the same renderer, so one array
@@ -17,7 +20,8 @@ import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 /** A dropdown item: the context-menu item shape, kept under its old name. */
 export type MenuItem = ContextMenuItemDef
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  palette?: PaletteControlOptions
   items: MenuItem[]
   /** A heading naming what the menu acts on; see LpContextMenu's `title`. */
   title?: string
@@ -29,7 +33,7 @@ const props = defineProps<{
    * menu). Opening it then counts toward the hint system's right-click tip.
    */
   rightClickToo?: boolean
-}>()
+}>(), { palette: undefined })
 
 const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
 
@@ -42,6 +46,13 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+const paletteScope = usePaletteScope()
+const paletteId = useId()
+usePaletteCommands(() => props.palette === false || !props.title || !props.items.length ? [] : [{
+  id: `${paletteScope?.id}/${props.palette?.id ?? paletteId}`, label: props.palette?.label ?? props.title,
+  children: menuPaletteCommands(props.items, `${paletteScope?.id}/${props.palette?.id ?? paletteId}`),
+}], { automatic: true })
 </script>
 
 <template>

@@ -1,3 +1,4 @@
+import CommandContextDemo from "../CommandContextDemo.vue"
 import { reactive } from "vue"
 import {
   LpActionBar,
@@ -33,6 +34,11 @@ import avatarSample from "../../assets/avatar-sample.png"
 import { type ComponentEntry, GamepadNav, tabItems, bottomTabItems } from "./shared"
 
 export const navigation: ComponentEntry[] = [
+  {
+    id: "context-palette", name: "Contextual palette",
+    description: "A palette built from the current page: fields keep their original bindings, tabs and table actions register themselves, and Theme opens a draft editor. Page commands add a validated input step and an action with Undo. Try CPU, Theme, dtnrb, @, #, &, >, ?; Alt+P pins the highlighted result. See README for the provider and registration API.",
+    components: { CommandContextDemo }, template: `<CommandContextDemo />`,
+  },
   {
     id: "tabs",
     name: "Tabs",

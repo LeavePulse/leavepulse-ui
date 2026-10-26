@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
 import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
@@ -14,7 +15,9 @@ import { useFieldControl } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
   modelValue?: boolean
   /** Mixed state (e.g. a "select all" with a partial selection). Shows a dash. */
   indeterminate?: boolean
@@ -30,7 +33,7 @@ const props = defineProps<{
    * (or the `error` event, when the app listens).
    */
   action?: (value: boolean) => unknown
-}>()
+}>(), { palette: undefined })
 const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void
   (e: "change", value: boolean): void
@@ -63,6 +66,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     props.description ? "items-start" : "items-center",
   ].join(" "),
 )
+
+usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled || pending.value, editorProps: () => ({ action: undefined, 'onUpdate:modelValue': onUpdate, onChange: undefined }) })
 </script>
 
 <template>

@@ -49,6 +49,9 @@ const noticeId = computed(() => `${id.value}-notice`)
 provideField(
   computed(() => ({
     id: id.value,
+    label: props.label,
+    hint: props.hint,
+    error: props.error,
     labelId: props.label ? `${id.value}-label` : undefined,
     describedBy:
       [hasMessage.value ? messageId.value : "", notice.message.value ? noticeId.value : ""]

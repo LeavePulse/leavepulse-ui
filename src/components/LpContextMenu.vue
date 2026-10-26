@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useId } from "vue"
+import { menuPaletteCommands } from "./commandPalette"
+import { usePaletteCommands, usePaletteScope, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Right-click context menu (reka ContextMenu). Same items as LpDropdownMenu,
  * drawn by the same renderer: nested submenus (`children`), tick-box items and
@@ -39,7 +42,8 @@ export interface ContextMenuItemDef {
   checked?: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  palette?: PaletteControlOptions
   items: ContextMenuItemDef[]
   /**
    * Keep the reka menu mounted even while `items` is momentarily empty. Use when
@@ -64,7 +68,7 @@ const props = defineProps<{
    * menus that only hold generic items (a whole table without row actions).
    */
   noHint?: boolean
-}>()
+}>(), { palette: undefined })
 
 // With no items the trigger is disabled, so the element keeps the browser's
 // native context menu. Lets callers wrap unconditionally and pass [] to opt out
@@ -146,6 +150,13 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+const paletteScope = usePaletteScope()
+const paletteId = useId()
+usePaletteCommands(() => props.palette === false || !props.title || !props.items.length ? [] : [{
+  id: `${paletteScope?.id}/${props.palette?.id ?? paletteId}`, label: props.palette?.label ?? props.title,
+  children: menuPaletteCommands(props.items, `${paletteScope?.id}/${props.palette?.id ?? paletteId}`),
+}], { automatic: true })
 </script>
 
 <template>

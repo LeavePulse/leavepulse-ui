@@ -3,6 +3,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
 import { useFieldControl } from "../composables/useField"
@@ -46,6 +47,8 @@ type InputVariants = VariantProps<typeof shell>
 
 const props = withDefaults(
   defineProps<{
+    /** Contextual palette metadata; false excludes this control. */
+    palette?: PaletteControlOptions
     modelValue?: string
     size?: InputVariants["size"]
     invalid?: boolean
@@ -87,7 +90,7 @@ const props = withDefaults(
     /** Extra or replacement mask tokens, one-character RegExps by key. */
     maskTokens?: MaskTokens
   }>(),
-  { type: "text", size: "md" },
+  { palette: undefined, type: "text", size: "md" },
 )
 
 const emit = defineEmits<{
@@ -174,6 +177,8 @@ defineExpose({
   select: () => inputEl.value?.select(),
   input: inputEl,
 })
+
+usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled, invalid: () => field.value.invalid, available: () => !['password', 'hidden'].includes(props.type), editorProps: () => ({ label: undefined, hint: undefined, error: undefined }) })
 </script>
 
 <template>

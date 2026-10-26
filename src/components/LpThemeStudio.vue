@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePaletteTheme } from "../theme/palette"
 /*
  * The theme, tuned in place: a base theme, any brand colour, corners, control
  * size and motion speed, all applied live, and the result ready to take away
@@ -102,8 +103,9 @@ const TILE =
   "flex min-w-0 flex-col items-center gap-1 rounded-control p-1.5 text-[11px] text-muted transition-colors duration-(--duration-fast) hover:bg-surface-soft hover:text-ink"
 const SWATCH = "relative size-8 overflow-hidden rounded-full ring-2 transition-[box-shadow] duration-(--duration-fast)"
 
-const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K) =>
-  (value: string) => studio.tune({ [key]: value } as Partial<StudioState>)
+const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K, value: string) => studio.tune({ [key]: value } as Partial<StudioState>)
+
+usePaletteTheme(() => studio ?? undefined)
 </script>
 
 <template>
@@ -171,7 +173,7 @@ const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K) =>
         :model-value="state.corners"
         size="sm"
         :options="[{ value: 'sharp', label: text.sharp }, { value: 'default', label: text.default }, { value: 'round', label: text.round }]"
-        @update:model-value="tuneTo('corners')"
+        @update:model-value="tuneTo('corners', $event)"
       />
     </LpThemeStudioSection>
 
@@ -180,7 +182,7 @@ const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K) =>
         :model-value="state.size"
         size="sm"
         :options="[{ value: 'compact', label: text.compact }, { value: 'default', label: text.default }, { value: 'comfortable', label: text.comfortable }]"
-        @update:model-value="tuneTo('size')"
+        @update:model-value="tuneTo('size', $event)"
       />
     </LpThemeStudioSection>
 
@@ -189,7 +191,7 @@ const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K) =>
         :model-value="state.motion"
         size="sm"
         :options="[{ value: 'fast', label: text.fast }, { value: 'normal', label: text.normal }, { value: 'slow', label: text.slow }]"
-        @update:model-value="tuneTo('motion')"
+        @update:model-value="tuneTo('motion', $event)"
       />
     </LpThemeStudioSection>
 

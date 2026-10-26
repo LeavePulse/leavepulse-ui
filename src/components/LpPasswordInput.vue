@@ -8,6 +8,7 @@ export interface PasswordInputLabels extends Record<string, string> {
 </script>
 
 <script setup lang="ts">
+import { suppressPaletteDiscovery } from "../composables/usePaletteCommands"
 // Password field = LpInput + a show/hide toggle in its trailing slot.
 // No duplicated field styling — the shell lives in LpInput.
 // LpSecretField's input form is this same field: it drives `visible` (to hide
@@ -51,6 +52,8 @@ defineExpose({
   blur: () => inner.value?.blur(),
   select: () => inner.value?.select(),
 })
+
+suppressPaletteDiscovery()
 </script>
 
 <template>

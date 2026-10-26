@@ -13,23 +13,29 @@
  */
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
+import LpSkeleton from "./LpSkeleton.vue"
 import type { PaletteStat } from "./commandPalette"
+import { computed } from "vue"
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     items: PaletteStat[]
+    loading?: boolean
     /** Tiles per row. */
     columns?: 2 | 3 | 4
   }>(),
   { columns: 2 },
 )
+const shown = computed(() => props.loading && !props.items.length ? Array.from({ length: props.columns }, () => ({ label: "", value: "—" } as PaletteStat)) : props.items)
 </script>
 
 <template>
-  <dl class="lp-palette-stats" :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }">
-    <div v-for="(item, index) in items" :key="`${item.label}-${index}`" class="lp-palette-stats__tile">
-      <dt>{{ item.label }}</dt>
-      <dd>
+  <dl class="lp-palette-stats" :aria-busy="loading || undefined" :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }">
+    <div v-for="(item, index) in shown" :key="`${item.label}-${index}`" class="lp-palette-stats__tile">
+      <dt><LpSkeleton v-if="loading && !item.label" class="my-1 h-2 w-20" /><template v-else>{{ item.label }}</template></dt>
+      <dd class="relative">
+        <LpSkeleton v-if="loading" class="absolute top-1/2 h-[1em] w-16 max-w-full -translate-y-1/2" />
+        <span :class="loading && 'invisible'" :aria-hidden="loading || undefined">
         <LpNumberFlow
           v-if="typeof item.value === 'number'"
           :value="item.value"
@@ -40,6 +46,7 @@ withDefaults(
           grouped
         />
         <LpRollingText v-else :value="item.value" align="start" />
+        </span>
       </dd>
     </div>
   </dl>
