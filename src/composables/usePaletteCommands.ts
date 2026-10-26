@@ -31,6 +31,9 @@ function numbered(entries: readonly PaletteRegistration[]): Command[] {
   for (const entry of entries) {
     for (const command of entry.commands()) {
       if (!entry.automatic) {
+        // Two mounts of one component (a header switcher and its phone twin)
+        // register the same command: it is one command, listed once.
+        if (manual.has(command.id)) continue
         manual.add(command.id)
         out.push(command)
         continue

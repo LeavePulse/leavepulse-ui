@@ -71,3 +71,10 @@ test("a discovered command is found by the name of the scope it sits in", () => 
   expect(searchCommandItems(registry.commands.value, parseCommandQuery("settings save")).items.map(c => c.id)).toEqual(["settings/save"])
   run.stop()
 })
+
+test("one manual command registered twice is listed once", () => {
+  const registry = createPaletteRegistry()
+  registry.register({ priority: 10, commands: () => [{ id: "app/theme", label: "Theme" }] })
+  registry.register({ priority: 10, commands: () => [{ id: "app/theme", label: "Theme" }] })
+  expect(registry.commands.value.map(c => c.id)).toEqual(["app/theme"])
+})
