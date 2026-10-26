@@ -101,8 +101,6 @@ const EASE = "cubic-bezier(0.2, 0, 0, 1)"
 const GHOST = "data-lp-shift-ghost"
 
 interface Seen {
-  from: number
-  top: number
   width: number
   height: number
   x: number
@@ -124,12 +122,9 @@ function elementsOf(box: HTMLElement): Element[] {
 }
 
 function remember(box: HTMLElement) {
-  const outer = box.getBoundingClientRect()
   for (const node of elementsOf(box)) {
     const r = node.getBoundingClientRect()
     seen.set(node, {
-      from: props.anchor === "end" ? outer.right - r.right : r.left - outer.left,
-      top: r.top - outer.top,
       width: r.width,
       height: r.height,
       x: r.left,
@@ -149,14 +144,21 @@ function ghost(box: HTMLElement, node: Element) {
   copy.inert = true
   Object.assign(copy.style, {
     position: "absolute",
-    top: `${at.top}px`,
-    [props.anchor === "end" ? "right" : "left"]: `${at.from}px`,
+    left: "0px",
+    top: "0px",
     width: `${at.width}px`,
     height: `${at.height}px`,
     margin: "0",
     pointerEvents: "none",
   })
   box.appendChild(copy)
+  // The box is not made a positioning context (content inside it may centre
+  // itself against an ancestor further out), so the clone is placed against
+  // whatever it is positioned from: put at that origin, measured, and moved
+  // by the difference to where the element was last seen.
+  const origin = copy.getBoundingClientRect()
+  copy.style.left = `${at.x - origin.left}px`
+  copy.style.top = `${at.y - origin.top}px`
   copy
     .animate(
       [
@@ -269,7 +271,6 @@ defineExpose({ resizing })
       // instead of letting the easing edge clip them.
       resizing && axis !== 'height' ? '[&>*]:shrink-0' : '',
       resizing && anchor === 'end' ? 'justify-end' : '',
-      presence ? 'relative' : '',
     ]"
   >
     <slot :resizing="resizing" />
