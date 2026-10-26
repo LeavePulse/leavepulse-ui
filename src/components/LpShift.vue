@@ -304,10 +304,8 @@ defineExpose({ resizing })
       resizing ? 'overflow-hidden' : '',
       // While the box holds a width its content has outgrown, a flex row would
       // squeeze its children to fit (a button's keys folding into a column)
-      // instead of letting the easing edge clip them. A single child that is
-      // itself a wrapping row is laid out at the width the box is heading for,
-      // or it would break onto a second line until the tween lands.
-      resizing && axis !== 'height' ? '[&>*]:shrink-0 [&>*:only-child]:min-w-(--lp-shift-to-w)' : '',
+      // instead of letting the easing edge clip them.
+      resizing && axis !== 'height' ? '[&>*]:shrink-0' : '',
       resizing && anchor === 'end' ? 'justify-end' : '',
     ]"
   >

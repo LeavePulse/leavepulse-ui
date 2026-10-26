@@ -62,9 +62,6 @@ export interface UseShift {
   retune: () => void
 }
 
-/** Set on the box while it eases its width: where that width will land. */
-export const TARGET_WIDTH = "--lp-shift-to-w"
-
 /** Kept in step with the `duration-fast` token the transition utilities use. */
 const TWEEN_MS = 160
 
@@ -191,14 +188,8 @@ export function useShift(
     // its bar re-animated some sixty times a second).
     if (wantsHeight()) node.style.height = ""
     if (wantsWidth()) node.style.width = ""
-    // The content's own width, not the one the last tween held it at: left in
-    // place, the rounded-up figure fed back into the next measurement and the
-    // box grew a pixel a frame for good.
-    node.style.removeProperty(TARGET_WIDTH)
     const toHeight = wantsHeight() ? node.offsetHeight : 0
     const toWidth = wantsWidth() ? node.offsetWidth : 0
-    // offsetWidth is rounded, and content that needs 406.4px wraps at 406.
-    const exactWidth = wantsWidth() ? Math.ceil(node.getBoundingClientRect().width) : 0
     restoreScroll(tops)
     lastHeight = toHeight
     lastWidth = toWidth
@@ -224,10 +215,6 @@ export function useShift(
     void node.offsetHeight
     if (movesHeight) node.style.height = `${toHeight}px`
     if (movesWidth) node.style.width = `${toWidth}px`
-    // The width the box is heading for, for content that would otherwise lay
-    // itself out at every in-between width: a wrapping row inside a widening
-    // box broke onto a second line for the length of the tween.
-    if (movesWidth) node.style.setProperty(TARGET_WIDTH, `${exactWidth}px`)
     restoreScroll(tops)
 
     inFlight = true
@@ -246,7 +233,6 @@ export function useShift(
       // clearing it let the box spread to the window's edges.
       if (wantsHeight()) node.style.height = ""
       if (wantsWidth()) node.style.width = ""
-      node.style.removeProperty(TARGET_WIDTH)
       // Re-read rather than trusting the target: the layout around may have
       // moved meanwhile, and the next tween has to start from where it sits.
       lastHeight = node.offsetHeight

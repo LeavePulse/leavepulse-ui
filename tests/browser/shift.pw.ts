@@ -94,49 +94,14 @@ test("going full bleed moves the same page instead of remounting it", async ({ p
   await expect(shell.locator("[id^=lp-shell-bleed-]")).toBeHidden()
 })
 
-test("a wrapping row inside a widening box stays on one line while it eases", async ({ page }) => {
-  await page.goto("/tests/browser/?scenario=shift-wrap")
-  const row = page.getByTestId("row")
-  await expect(row).toBeVisible()
-  // A late webfont resizes the row once on its own; that tween is not the one under test.
-  await page.evaluate(() => document.fonts.ready)
-  await page.waitForTimeout(400)
-  const height = (await row.boundingBox())!.height
-  await row.evaluate((el) => {
-    const heights: number[] = []
-    const frames: string[] = []
-    const box = el.parentElement!
-    const until = performance.now() + 600
-    const sample = () => {
-      heights.push(el.getBoundingClientRect().height)
-      frames.push(`${Math.round(el.getBoundingClientRect().height)}/${Math.round(el.getBoundingClientRect().width)} box=${Math.round(box.getBoundingClientRect().width)} style=${box.style.width} var=${box.style.getPropertyValue("--lp-shift-to-w")} minw=${getComputedStyle(el).minWidth} cls=${box.className}`)
-      if (performance.now() < until) requestAnimationFrame(sample)
-    }
-    requestAnimationFrame(sample)
-    Object.assign(window, { rowHeights: heights, rowFrames: frames })
-  })
-  await page.getByRole("button", { name: "Toggle" }).click()
-  await page.waitForTimeout(700)
-  const heights = await page.evaluate(() => (window as unknown as { rowHeights: number[] }).rowHeights)
-  const settled = (await row.boundingBox())!.height
-  expect(settled).toBeLessThanOrEqual(height + 1)
-  const frames = await page.evaluate(() => (window as unknown as { rowFrames: string[] }).rowFrames)
-  expect(Math.max(...heights), frames.join("\n")).toBeLessThanOrEqual(settled + 1)
-  // Settled means settled: the box must not keep re-measuring itself wider.
-  const widths = await page.getByTestId("shift").evaluate((el) => new Promise<number[]>((done) => {
-    const seen: number[] = []
-    const sample = () => {
-      seen.push(el.getBoundingClientRect().width)
-      if (seen.length < 30) requestAnimationFrame(sample)
-      else done(seen)
-    }
-    requestAnimationFrame(sample)
-  }))
-  expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(0.5)
-})
-
 test("the shell's header comes to rest after the page loads", async ({ page }) => {
+  // As after Ctrl+F5: nothing from the cache, so fonts and styles land late.
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true })
   await page.setViewportSize({ width: 1920, height: 1080 })
+  // A saved theme whose name is short puts the switcher's own eased label
+  // inside the eased header actions, the pair that once chased each other.
+  await page.addInitScript(() => localStorage.setItem("lp-theme-studio", JSON.stringify({ theme: "Rose", brand: null, corners: "default", size: "default", motion: "normal" })))
   await page.goto("/")
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(1500)
