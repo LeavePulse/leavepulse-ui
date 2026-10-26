@@ -20,7 +20,7 @@ import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSidebarRow from "./LpSidebarRow.vue"
-import type { SidebarItem, SidebarSection } from "./sidebar"
+import { waiting, type SidebarItem, type SidebarSection } from "./sidebar"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -196,7 +196,12 @@ function onKey(event: KeyboardEvent) {
 const SECTION = "lp-section:"
 function sectionItem(section: SidebarSection): SidebarItem {
   const icon = section.icon ?? section.items.find((i) => i.icon)?.icon
-  return { id: `${SECTION}${sectionKey(section)}`, label: section.title ?? "", icon, children: section.items }
+  return {
+    id: `${SECTION}${sectionKey(section)}`,
+    label: section.title ?? "",
+    icon,
+    children: section.items,
+  }
 }
 
 function activate(item: SidebarItem) {
@@ -311,6 +316,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
              It is always rendered and merely fades, never removed: taking it
              out of the row changes the heading's height, and a heading that
              resizes under the cursor makes its own click feel like a misfire. -->
+        <span
+          v-if="section.items.some(waiting)"
+          class="size-1.5 shrink-0 rounded-full bg-brand transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"
+          :class="isOpen(section) ? 'opacity-0' : 'opacity-100'"
+        />
         <LpBadge
           tone="neutral"
           class="shrink-0 transition-opacity duration-[var(--duration-fast)] motion-reduce:transition-none"

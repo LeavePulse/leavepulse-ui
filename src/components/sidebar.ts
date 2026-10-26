@@ -92,3 +92,11 @@ export interface SidebarSection {
   /** Icon for the heading — shown when the group is collapsible. */
   icon?: string
 }
+
+/**
+ * Something on this page or a page under it is waiting: a count, news, a dot.
+ * A row or a group whose pages are out of sight shows it for them.
+ */
+export function waiting(item: SidebarItem): boolean {
+  return item.badge != null || !!item.dot || !!item.children?.some(waiting)
+}

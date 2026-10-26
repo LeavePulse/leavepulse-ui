@@ -20,7 +20,7 @@ import LpHoverCard from "./LpHoverCard.vue"
 import LpIcon from "./LpIcon.vue"
 import LpKeys from "./LpKeys.vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
-import type { SidebarItem } from "./sidebar"
+import { waiting, type SidebarItem } from "./sidebar"
 import { resolveLink, type ResolvedLink } from "./link"
 
 const props = withDefaults(
@@ -92,7 +92,11 @@ const initials = computed(() =>
     .join(""),
 )
 
-const hasBadge = computed(() => props.item.badge != null || props.item.dot)
+// Something waiting on a page under this row shows on the row while those pages
+// are out of sight, folded away or behind a compact icon: otherwise closing a
+// group would hide that anything is waiting in it.
+const hidden = computed(() => (props.compact || !props.expanded) && !!props.item.children?.some(waiting))
+const hasBadge = computed(() => props.item.badge != null || !!props.item.dot || hidden.value)
 const card = computed(() => !props.item.disabled && (props.compact || !!props.item.preview))
 const delay = computed(() => (props.compact && !props.item.preview ? 250 : props.previewDelay))
 </script>
@@ -172,7 +176,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
                 aria-hidden="true"
                 class="pointer-events-none absolute right-2 z-10 rounded-small bg-surface-raised/90 opacity-0 transition-opacity duration-(--duration-fast) group-hover/item:opacity-100 group-focus-visible/item:opacity-100"
               />
-              <span v-if="item.dot && item.badge == null" class="relative z-10 size-2 shrink-0 rounded-full bg-brand" />
+              <span v-if="hasBadge && item.badge == null" class="relative z-10 size-2 shrink-0 rounded-full bg-brand" />
               <LpBadge v-if="item.badge != null" :tone="active ? 'brand' : 'neutral'" class="relative z-10 shrink-0">
                 <span v-if="bumped" class="absolute inset-0 animate-ping rounded-pill bg-brand/30" />
                 <LpNumberFlow v-if="typeof item.badge === 'number'" :value="item.badge" grouped :locale="locale" :animate-on-mount="false" />
