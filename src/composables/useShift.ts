@@ -193,6 +193,8 @@ export function useShift(
     if (wantsWidth()) node.style.width = ""
     const toHeight = wantsHeight() ? node.offsetHeight : 0
     const toWidth = wantsWidth() ? node.offsetWidth : 0
+    // offsetWidth is rounded, and content that needs 406.4px wraps at 406.
+    const exactWidth = wantsWidth() ? Math.ceil(node.getBoundingClientRect().width) : 0
     restoreScroll(tops)
     lastHeight = toHeight
     lastWidth = toWidth
@@ -221,7 +223,7 @@ export function useShift(
     // The width the box is heading for, for content that would otherwise lay
     // itself out at every in-between width: a wrapping row inside a widening
     // box broke onto a second line for the length of the tween.
-    if (movesWidth) node.style.setProperty(TARGET_WIDTH, `${toWidth}px`)
+    if (movesWidth) node.style.setProperty(TARGET_WIDTH, `${exactWidth}px`)
     restoreScroll(tops)
 
     inFlight = true
