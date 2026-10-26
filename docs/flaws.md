@@ -18,6 +18,13 @@ entry is deleted, not ticked: the commit says what changed.
   Ship prop types consumers check, or warn in dev on an unknown prop of a kit
   component.
 
+- **The palette's async-undo browser test flakes on CI.** `palette.pw.ts`
+  "a completed async action offers its declared undo" saw the snapshot count
+  at 2 on the v0.72.3 publish run and passed on rerun and locally: the second
+  Enter (confirm) seems to land twice on a slow runner. Wait for the confirm
+  step to render before the second press, or make the action ignore a repeat
+  while it runs.
+
 ## Ideas
 
 - **Context switcher in the rail header**: server, workspace or machine, which
