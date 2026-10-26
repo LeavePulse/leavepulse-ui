@@ -11,6 +11,7 @@ export const COMPONENT_NAMES = [
   "LpAutocomplete",
   "LpAvatar",
   "LpBadge",
+  "LpBottomNav",
   "LpBreadcrumbs",
   "LpButton",
   "LpCalendar",

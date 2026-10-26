@@ -223,6 +223,7 @@ export type { TableRowMenu, TableRowMenuResult } from "./components/tableRowMenu
 export { default as LpTableOfContents } from "./components/LpTableOfContents.vue"
 export type { TocLink } from "./components/LpTableOfContents.vue"
 export { default as LpTabs } from "./components/LpTabs.vue"
+export { default as LpBottomNav } from "./components/LpBottomNav.vue"
 export type { TabItem } from "./components/LpTabs.vue"
 export { default as LpTagsInput } from "./components/LpTagsInput.vue"
 export type { TagsInputLabels } from "./components/LpTagsInput.vue"

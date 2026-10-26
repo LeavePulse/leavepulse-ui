@@ -33,6 +33,7 @@ export default { inheritAttrs: false }
  */
 import { computed, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import LpBottomNav from "./LpBottomNav.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -95,6 +96,16 @@ const props = withDefaults(
     previewDelay?: number
     /** The key that folds the rail; false turns it off. Forwarded to LpSidebar. */
     compactHotkey?: string | false
+    /** Marks a non-production copy along the top of the rail. Forwarded to LpSidebar. */
+    environment?: string | { label: string; tone?: "warning" | "danger" | "action" | "brand" }
+    /** The app's hint system; rows with a `hintPage` show unread news as a dot. Forwarded to LpSidebar. */
+    hints?: { unreadNews: (page?: string) => readonly unknown[] }
+    /**
+     * On phones, the main pages along the bottom instead of the burger, with
+     * "More" for the rest (it opens the drawer). `true` takes the first four
+     * pages, a number that many, a list of ids those pages.
+     */
+    bottomNav?: boolean | number | string[]
   }>(),
   {
     mobileBreakpoint: "lg",
@@ -197,7 +208,23 @@ const burgerHidden: Record<NonNullable<typeof props.mobileBreakpoint>, string> =
   lg: "lg:hidden",
   xl: "xl:hidden",
 }
-const burgerClass = computed(() => burgerHidden[props.mobileBreakpoint])
+const burgerClass = computed(() => (props.bottomNav ? "hidden" : burgerHidden[props.mobileBreakpoint]))
+
+const topItems = computed<SidebarItem[]>(() => (props.sections ? props.sections.flatMap((s) => s.items) : (props.items ?? [])))
+const bottomItems = computed<SidebarItem[]>(() => {
+  const want = props.bottomNav
+  if (!want) return []
+  if (Array.isArray(want)) return want.map((id) => topItems.value.find((i) => i.id === id)).filter((i): i is SidebarItem => !!i)
+  return topItems.value.slice(0, want === true ? 4 : want)
+})
+const moreActive = computed(() => {
+  const shown = new Set(bottomItems.value.map((i) => i.id))
+  return flatItems.value.some((i) => !shown.has(i.id) && activeTest.value(i)) && !bottomItems.value.some((i) => activeTest.value(i))
+})
+function onBottom(item: SidebarItem) {
+  onModel(item.id)
+  onSelect(item)
+}
 
 // Expose the burger trigger so a host can omit its own header entirely.
 const _openDrawer = () => (drawerOpen.value = true)
@@ -240,6 +267,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :persist="persist"
       :preview-delay="previewDelay"
       :compact-hotkey="compactHotkey"
+      :environment="environment"
+      :hints="hints"
       class="shrink-0"
       @update:model-value="onModel"
       @update:compact="(v) => emit('update:compact', v)"
@@ -331,6 +360,16 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           <slot />
         </LpScrollArea>
       </main>
+      <LpBottomNav
+        v-if="bottomNav"
+        :class="burgerHidden[mobileBreakpoint]"
+        :items="bottomItems"
+        :is-active="activeTest"
+        more
+        :more-active="moreActive"
+        @select="onBottom"
+        @more="drawerOpen = true"
+      />
     </div>
 
     <slot name="overlays" />

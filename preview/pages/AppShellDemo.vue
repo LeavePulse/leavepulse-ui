@@ -106,7 +106,7 @@ const drawer = ref(false)
 <template>
   <div class="p-6">
     <div class="h-[640px] overflow-hidden rounded-card border border-line [&>div]:h-full">
-      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false">
+      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false" environment="staging" bottom-nav>
         <template #logo="{ compact }">
           <div class="flex items-center gap-2 font-semibold text-ink">
             <LpIcon name="lucide:activity" :size="20" class="shrink-0 text-brand" />

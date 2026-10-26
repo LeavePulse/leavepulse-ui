@@ -24,3 +24,12 @@ export function pickTab(items: readonly TabChoice[], current: string | undefined
   if (items.some((item) => item.value === current && !item.disabled)) return current
   return items.find((item) => !item.disabled)?.value ?? current
 }
+
+/*
+ * A phone's bottom bar, shared by LpTabs (`variant="bottom"`, sections of a
+ * page) and LpBottomNav (pages of an app), so the two never drift apart.
+ */
+export const BOTTOM_BAR =
+  "grid w-full auto-cols-fr grid-flow-col border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+export const BOTTOM_ITEM = "min-h-14 min-w-0 flex-col gap-0.5 px-1 py-1.5 text-[11px] font-medium focus-visible:ring-inset"
+export const BOTTOM_MARKER = "absolute inset-x-[22%] top-0 z-0 h-0.5 rounded-b-full"

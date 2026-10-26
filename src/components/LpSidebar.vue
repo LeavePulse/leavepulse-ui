@@ -165,6 +165,18 @@ const props = withDefaults(
     pinned?: string[]
     /** How long the pointer rests on a row with a `preview` before its card opens, in ms. */
     previewDelay?: number
+    /**
+     * Mark the app as not production: a coloured band along the top of the rail
+     * with the label hanging from it ("staging", "local"). It is there so an
+     * edit on the test copy is not mistaken for one on the real thing; leave it
+     * unset in production.
+     */
+    environment?: string | { label: string; tone?: "warning" | "danger" | "action" | "brand" }
+    /**
+     * The app's hint system (createHintSystem). Rows that name a `hintPage`
+     * then mark unread news on it with a dot, with nothing for the app to wire.
+     */
+    hints?: { unreadNews: (page?: string) => readonly unknown[] }
   }>(),
   {
     skeletonRows: 6,
@@ -218,10 +230,18 @@ const text = useLabels(
 )
 const placeholder = computed(() => props.searchPlaceholder ?? text.value.search)
 
+function withNews(item: SidebarItem): SidebarItem {
+  const children = item.children?.map(withNews)
+  const pages = item.hintPage === undefined ? [] : Array.isArray(item.hintPage) ? item.hintPage : [item.hintPage]
+  const fresh = !!props.hints && pages.some((p) => props.hints!.unreadNews(p).length > 0)
+  return fresh || children ? { ...item, children, dot: item.dot || fresh } : item
+}
+
 // Normalise both inputs to a single section list.
-const allGroups = computed<SidebarSection[]>(() =>
-  props.sections ?? (props.items ? [{ items: props.items }] : []),
-)
+const allGroups = computed<SidebarSection[]>(() => {
+  const groups = props.sections ?? (props.items ? [{ items: props.items }] : [])
+  return props.hints ? groups.map((g) => ({ ...g, items: g.items.map(withNews) })) : groups
+})
 
 /*
  * The filter query. Controlled through v-model:search when the app wants it —
@@ -334,6 +354,19 @@ function setCompact(value: boolean) {
   ownCompact.value = value
   emit("update:compact", value)
 }
+
+const ENV_TONE = {
+  warning: "bg-accent text-ink-inverse",
+  danger: "bg-danger text-white",
+  action: "bg-action text-ink-inverse",
+  brand: "bg-brand text-ink-inverse",
+} as const
+const env = computed(() => {
+  const e = props.environment
+  if (!e) return null
+  const { label, tone = "warning" } = typeof e === "string" ? { label: e } : e
+  return { label, tone: ENV_TONE[tone] }
+})
 
 const DEFAULT_WIDTH = 240
 const COMPACT_WIDTH = 64
@@ -473,6 +506,14 @@ defineOptions({ inheritAttrs: false })
     :aria-label="text.nav"
     v-bind="$attrs"
   >
+    <div v-if="env" class="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px]" :class="env.tone" />
+    <span
+      v-if="env && !isCompact"
+      class="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 rounded-b-small px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      :class="env.tone"
+    >
+      {{ env.label }}
+    </span>
     <!-- Rail: edge-to-edge (negative margins cancel the p-3) and h-16 to match
          the app header, so its bottom hairline continues the header's border-b.
          Panel: kept inside the padding — bleeding to the edge would cut across

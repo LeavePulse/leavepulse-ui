@@ -5,13 +5,10 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import { prefersReducedMotion } from "../composables/easing"
-import AttentionDot from "./AttentionDot.vue"
-import LpBadge from "./LpBadge.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
-import LpIcon from "./LpIcon.vue"
-import LpRollingText from "./LpRollingText.vue"
 import LpSkeleton from "./LpSkeleton.vue"
-import { pickTab } from "./tabs"
+import LpTabFace from "./LpTabFace.vue"
+import { BOTTOM_BAR, BOTTOM_ITEM, BOTTOM_MARKER, pickTab } from "./tabs"
 
 export interface TabItem {
   value: string
@@ -177,7 +174,7 @@ usePaletteCommands(() => props.items.map(item => ({
       ref="list"
       :aria-label="label"
       :class="bottom
-        ? 'grid w-full auto-cols-fr grid-flow-col border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]'
+        ? BOTTOM_BAR
         : [
             'max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             block ? 'flex w-full' : 'inline-flex',
@@ -201,7 +198,7 @@ usePaletteCommands(() => props.items.map(item => ({
         class="relative inline-flex items-center justify-center outline-none transition-[color,opacity] duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45"
         :class="[
           bottom
-            ? 'min-h-14 min-w-0 flex-col gap-0.5 px-1 py-1.5 text-[11px] font-medium focus-visible:ring-inset'
+            ? BOTTOM_ITEM
             : 'shrink-0 gap-1.5 whitespace-nowrap text-sm',
           block && !bottom ? 'flex-1' : '',
           variant === 'underline' ? 'rounded-t-inner px-3 pt-1.5 pb-2' : '',
@@ -225,10 +222,7 @@ usePaletteCommands(() => props.items.map(item => ({
                 accent ? 'bg-brand' : 'bg-ink',
               ]
             : bottom
-              ? [
-                  'absolute inset-x-[22%] top-0 z-0 h-0.5 rounded-b-full',
-                  accent ? 'bg-brand' : 'bg-ink',
-                ]
+              ? [BOTTOM_MARKER, accent ? 'bg-brand' : 'bg-ink']
               : [
                   'absolute inset-0 z-0 rounded-inner shadow-sm',
                   accent
@@ -236,36 +230,7 @@ usePaletteCommands(() => props.items.map(item => ({
                     : 'border border-line bg-surface-raised',
                 ]"
         />
-        <span v-if="item.icon" class="relative z-10 inline-flex">
-          <LpIcon :name="item.icon" :size="bottom ? 22 : 14" />
-          <AttentionDot v-if="item.dot" corner />
-          <!-- On a bottom bar the count rides on the icon's corner, as phone
-               navs draw it: the label under the icon has no room beside it. -->
-          <Transition name="lp-tab-badge">
-            <LpBadge
-              v-if="bottom && item.badge != null"
-              size="sm"
-              :tone="current === item.value ? 'brand' : 'neutral'"
-              class="absolute -right-3 -top-1.5 min-w-[18px] justify-center"
-            >
-              <LpRollingText :value="item.badge" />
-            </LpBadge>
-          </Transition>
-        </span>
-        <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : compact && item.icon ? 'sr-only' : ''">{{ item.label }}</span>
-        <AttentionDot v-if="item.dot && !item.icon" />
-        <!-- The count rolls when it changes, and the chip scales in and out
-             rather than popping. -->
-        <Transition name="lp-tab-badge">
-          <LpBadge
-            v-if="!(bottom && item.icon) && item.badge != null"
-            size="sm"
-            :tone="current === item.value ? 'brand' : 'neutral'"
-            class="relative z-10 min-w-[18px] justify-center"
-          >
-            <LpRollingText :value="item.badge" />
-          </LpBadge>
-        </Transition>
+        <LpTabFace :item="item" :bottom="bottom" :compact="compact" :active="current === item.value" />
       </TabsTrigger>
       </LpContextMenu>
       <!-- Items that arrive later (counts from a server, tabs from a route)

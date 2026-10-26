@@ -119,6 +119,9 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
           :aria-current="active ? 'page' : undefined"
           :aria-disabled="item.disabled || undefined"
           :aria-label="compact ? item.label : undefined"
+          data-lp-nav-row
+          :aria-keyshortcuts="item.hotkey"
+          :data-lp-nav-nested="nested || undefined"
           class="group/item relative flex items-center rounded-control font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           :class="[
             compact ? ['mx-auto size-10 justify-center', onPath && !active ? 'bg-ink/[0.06]' : ''] : nested ? 'gap-2.5 py-1.5 pl-9 pr-3 text-[13px]' : 'gap-3 px-3 py-2 text-sm',
@@ -153,6 +156,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
                 v-if="item.hotkey && !hasBadge && !expandable"
                 :combo="item.hotkey"
                 size="sm"
+                aria-hidden="true"
                 class="pointer-events-none absolute right-2 z-10 rounded-small bg-surface-raised/90 opacity-0 transition-opacity duration-(--duration-fast) group-hover/item:opacity-100 group-focus-visible/item:opacity-100"
               />
               <span v-if="item.dot && item.badge == null" class="relative z-10 size-2 shrink-0 rounded-full bg-brand" />

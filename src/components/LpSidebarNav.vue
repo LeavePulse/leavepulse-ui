@@ -136,6 +136,63 @@ function menuOf(item: SidebarItem) {
   ]
 }
 
+/*
+ * The keyboard, as a tree: arrows walk the rows that are showing, right and
+ * left open and close a group or the pages under a row (left from such a page
+ * goes back to its row), Home and End jump to the ends, and typing jumps to the
+ * next row starting with what was typed. Tab still reaches every row, so this
+ * only adds a faster way through a long nav.
+ */
+let typed = ""
+let typedAt = 0
+
+function onKey(event: KeyboardEvent) {
+  const box = event.currentTarget as HTMLElement
+  const list = [...box.querySelectorAll<HTMLElement>("[data-lp-nav-row]")].filter((r) => r.offsetParent !== null)
+  const at = list.indexOf(document.activeElement as HTMLElement)
+  if (at < 0) return
+  const row = list[at]!
+  const go = (i: number) => {
+    event.preventDefault()
+    list[(i + list.length) % list.length]?.focus()
+  }
+  switch (event.key) {
+    case "ArrowDown":
+      return go(at + 1)
+    case "ArrowUp":
+      return go(at - 1)
+    case "Home":
+      return go(0)
+    case "End":
+      return go(list.length - 1)
+    case "ArrowRight":
+    case "ArrowLeft": {
+      const open = event.key === "ArrowRight"
+      const toggle = row.hasAttribute("aria-expanded")
+        ? row
+        : row.parentElement?.querySelector<HTMLElement>(":scope > button[aria-expanded]")
+      if (toggle && (toggle.getAttribute("aria-expanded") === "true") !== open) {
+        event.preventDefault()
+        toggle.click()
+        return
+      }
+      if (!open && row.dataset.lpNavNested !== undefined) {
+        for (let i = at - 1; i >= 0; i--) if (list[i]!.dataset.lpNavNested === undefined) return go(i)
+      }
+      return
+    }
+  }
+  if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
+  const now = Date.now()
+  typed = now - typedAt > 700 ? event.key : typed + event.key
+  typedAt = now
+  const needle = typed.toLocaleLowerCase()
+  for (let k = 1; k <= list.length; k++) {
+    const next = list[(at + k) % list.length]!
+    if ((next.textContent ?? "").trim().toLocaleLowerCase().startsWith(needle)) return go(at + k)
+  }
+}
+
 const SECTION = "lp-section:"
 function sectionItem(section: SidebarSection): SidebarItem {
   const icon = section.icon ?? section.items.find((i) => i.icon)?.icon
@@ -185,6 +242,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :content-class="compact ? 'flex min-h-full flex-col gap-1' : 'flex min-h-full flex-col gap-4'"
     @pointerleave="hovered = null"
   >
+    <!-- `contents`: no box of its own, only somewhere for the rows' keys to bubble to. -->
+    <div class="contents" @keydown="onKey">
     <!-- Pinned pages come first and carry no pill: the same page further down
          already holds it, and one pill shared by two rows would jump between
          them. -->
@@ -236,6 +295,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <div v-if="compact && (si > 0 || pinned.length)" class="mx-3 mb-1 border-t border-line" />
       <CollapsibleTrigger
         v-else-if="!compact && section.title && section.collapsible"
+        data-lp-nav-row
         class="group/section mt-2 flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-ink/[0.04] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <LpIcon
@@ -321,5 +381,6 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </CollapsibleContent>
     </CollapsibleRoot>
     </template>
+    </div>
   </LpScrollArea>
 </template>

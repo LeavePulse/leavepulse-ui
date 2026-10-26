@@ -54,6 +54,12 @@ export interface SidebarItem {
    * rested on it (`previewDelay`): a glance before going there.
    */
   preview?: Component
+  /**
+   * The hint-system page (or pages) this row opens. With the sidebar's
+   * `hints`, the row carries a dot while that page has news nobody has read,
+   * and loses it once the news is read there.
+   */
+  hintPage?: string | string[]
 }
 
 export interface SidebarSection {
