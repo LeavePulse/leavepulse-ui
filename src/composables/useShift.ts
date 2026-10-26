@@ -191,6 +191,10 @@ export function useShift(
     // its bar re-animated some sixty times a second).
     if (wantsHeight()) node.style.height = ""
     if (wantsWidth()) node.style.width = ""
+    // The content's own width, not the one the last tween held it at: left in
+    // place, the rounded-up figure fed back into the next measurement and the
+    // box grew a pixel a frame for good.
+    node.style.removeProperty(TARGET_WIDTH)
     const toHeight = wantsHeight() ? node.offsetHeight : 0
     const toWidth = wantsWidth() ? node.offsetWidth : 0
     // offsetWidth is rounded, and content that needs 406.4px wraps at 406.

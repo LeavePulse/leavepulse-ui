@@ -67,6 +67,14 @@ const sections = computed<SidebarSection[]>(() => [
 // title from it.
 const active = ref("/servers")
 
+// Two datacentres, one rail each: the header turns into the switcher between them.
+const datacentres = [
+  { id: "dc1", label: "Datacentre DC1", icon: "lucide:server" },
+  { id: "dc2", label: "Datacentre DC2", icon: "lucide:server-cog" },
+]
+const datacentre = ref("dc1")
+const datacentreLabel = computed(() => datacentres.find((d) => d.id === datacentre.value)?.label ?? "")
+
 const stats = [
   { label: "Servers", value: "12", delta: 2 },
   { label: "Uptime", value: "99.98%", delta: 0.4 },
@@ -113,19 +121,19 @@ const bleed = ref(false)
 <template>
   <div class="p-6">
     <div class="h-[640px] overflow-hidden rounded-card border border-line [&>div]:h-full">
-      <LpAppShell v-model="active" v-model:open="drawer" :full-bleed="bleed" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false" environment="staging" bottom-nav>
-        <template #logo="{ compact }">
-          <div class="flex items-center gap-2 font-semibold text-ink">
+      <LpAppShell v-model="active" v-model:open="drawer" v-model:context="datacentre" :contexts="datacentres" :full-bleed="bleed" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false" environment="staging" bottom-nav>
+        <template #logo="{ compact, context }">
+          <span class="flex min-w-0 items-center gap-2 font-semibold text-ink">
             <LpIcon name="lucide:activity" :size="20" class="shrink-0 text-brand" />
-            <span v-if="!compact">LeavePulse</span>
-          </div>
+            <span v-if="!compact" class="truncate">LeavePulse <span class="font-normal text-muted">{{ context?.id.toUpperCase() }}</span></span>
+          </span>
         </template>
 
         <!-- A title that gains and loses a subtitle: the block changes height,
              and the shell eases it rather than jolting the bar. -->
         <template #header-title>
           <div class="min-w-0">
-            <h1 class="truncate text-lg font-semibold leading-tight">Datacentre DC1</h1>
+            <h1 class="truncate text-lg font-semibold leading-tight">{{ datacentreLabel }}</h1>
             <p v-if="sectionSubtitle" class="truncate text-xs text-muted">
               {{ sectionSubtitle }}
             </p>

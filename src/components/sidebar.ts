@@ -7,6 +7,13 @@
 import type { Component } from "vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 
+/** One of an app's contexts in the rail header switcher (LpContextSwitcher). */
+export interface AppContext {
+  id: string
+  label: string
+  icon?: string
+}
+
 export interface SidebarItem {
   id: string
   label: string

@@ -35,12 +35,13 @@ import { computed, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useScrollMemory } from "../composables/scrollMemory"
 import LpBottomNav from "./LpBottomNav.vue"
+import LpContextSwitcher from "./LpContextSwitcher.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpShift from "./LpShift.vue"
 import LpSidebar from "./LpSidebar.vue"
-import type { SidebarItem, SidebarSection } from "./sidebar"
+import type { AppContext, SidebarItem, SidebarSection } from "./sidebar"
 import { mergeClass, useMergedAttrs } from "../composables/useMergedClass"
 
 export type { SidebarItem, SidebarSection } from "./sidebar"
@@ -107,6 +108,14 @@ const props = withDefaults(
     previewDelay?: number
     /** The key that folds the rail; false turns it off. Forwarded to LpSidebar. */
     compactHotkey?: string | false
+    /**
+     * The app's contexts — a server, a workspace, a part of the product — each
+     * with its own rail. With more than one, the rail's header becomes the
+     * switcher between them (v-model:context), and the `logo` slot draws the
+     * switcher's face with the current `context` in its props.
+     */
+    contexts?: AppContext[]
+    context?: string
     /** Marks a non-production copy along the top of the rail. Forwarded to LpSidebar. */
     environment?: string | { label: string; tone?: "warning" | "danger" | "action" | "brand" }
     /** The app's hint system; rows with a `hintPage` show unread news as a dot. Forwarded to LpSidebar. */
@@ -134,7 +143,10 @@ const emit = defineEmits<{
   (e: "select", item: SidebarItem): void
   (e: "update:compact", value: boolean): void
   (e: "update:pinned", ids: string[]): void
+  (e: "update:context", id: string): void
 }>()
+
+const switching = computed(() => (props.contexts?.length ?? 0) > 1)
 
 // Normalise items/sections to a flat list for the title computation.
 const flatItems = computed<SidebarItem[]>(() =>
@@ -297,8 +309,20 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       @update:collapsed="(v) => emit('update:collapsed', v)"
       @select="onSelect"
     >
-      <template v-if="$slots.logo" #header="{ compact: folded }">
-        <slot name="logo" :compact="folded" />
+      <template v-if="switching" #header="{ compact: folded }">
+        <LpContextSwitcher
+          :contexts="contexts!"
+          :model-value="context"
+          :compact="folded"
+          @update:model-value="(id) => emit('update:context', id)"
+        >
+          <template v-if="$slots.logo" #default="{ context: shown }">
+            <slot name="logo" :compact="folded" :context="shown" />
+          </template>
+        </LpContextSwitcher>
+      </template>
+      <template v-else-if="$slots.logo" #header="{ compact: folded }">
+        <slot name="logo" :compact="folded" :context="contexts?.[0]" />
       </template>
       <template v-if="$slots['sidebar-actions']" #actions>
         <slot name="sidebar-actions" />

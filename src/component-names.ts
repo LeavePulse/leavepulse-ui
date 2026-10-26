@@ -27,6 +27,7 @@ export const COMPONENT_NAMES = [
   "LpConfirmDialog",
   "LpConfirmHost",
   "LpContextMenu",
+  "LpContextSwitcher",
   "LpCopyButton",
   "LpCountdown",
   "LpDataList",

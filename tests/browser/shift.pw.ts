@@ -122,4 +122,40 @@ test("a wrapping row inside a widening box stays on one line while it eases", as
   expect(settled).toBeLessThanOrEqual(height + 1)
   const frames = await page.evaluate(() => (window as unknown as { rowFrames: string[] }).rowFrames)
   expect(Math.max(...heights), frames.join("\n")).toBeLessThanOrEqual(settled + 1)
+  // Settled means settled: the box must not keep re-measuring itself wider.
+  const widths = await page.getByTestId("shift").evaluate((el) => new Promise<number[]>((done) => {
+    const seen: number[] = []
+    const sample = () => {
+      seen.push(el.getBoundingClientRect().width)
+      if (seen.length < 30) requestAnimationFrame(sample)
+      else done(seen)
+    }
+    requestAnimationFrame(sample)
+  }))
+  expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(0.5)
+})
+
+test("the shell's header comes to rest after the page loads", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  await page.goto("/")
+  await page.evaluate(() => document.fonts.ready)
+  await page.waitForTimeout(1500)
+  const changes = await page.locator("header").first().evaluate((header) => new Promise<number>((done) => {
+    const boxes = [...header.querySelectorAll("*")]
+    const last = new Map<Element, string>()
+    let moved = 0
+    let frames = 0
+    const sample = () => {
+      for (const node of boxes) {
+        const r = node.getBoundingClientRect()
+        const key = `${Math.round(r.x)},${Math.round(r.width)}`
+        if (last.has(node) && last.get(node) !== key) moved++
+        last.set(node, key)
+      }
+      if (++frames < 60) requestAnimationFrame(sample)
+      else done(moved)
+    }
+    requestAnimationFrame(sample)
+  }))
+  expect(changes).toBe(0)
 })
