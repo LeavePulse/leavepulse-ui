@@ -26,7 +26,7 @@ describe("formatBytes", () => {
 
   test("follows the locale", () => {
     // Every locale gets the same no-break space before the unit symbol.
-    expect(formatBytes(1536, "ru")).toBe("1,5\u00a0кБ")
+    expect(formatBytes(1536, "fr")).toBe("1,5\u00a0ko")
     expect(formatBytes(1.5 * 1024 ** 3, "de")).toBe("1,5\u00a0GB")
   })
 
@@ -68,7 +68,7 @@ describe("compactNumber", () => {
   })
 
   test("a locale changes the separator, never the suffix", () => {
-    expect(compactNumber(1200, { locale: "ru" })).toBe("1,2k")
+    expect(compactNumber(1200, { locale: "fr" })).toBe("1,2k")
     expect(compactNumber(1200, { locale: "en" })).toBe("1.2k")
     expect(compactNumber(5_000_000, { locale: "de", fixed: true })).toBe("5,0M")
     expect(compactNumber(12_345_678_900_000_000, { locale: "en" })).toBe("12345.7T")
@@ -83,8 +83,8 @@ describe("compactNumber", () => {
 describe("formatModified", () => {
   test("follows the locale and passes strings through", () => {
     const at = Date.UTC(2026, 9, 25, 12, 0)
-    expect(formatModified(at, "ru")).toBe(
-      new Intl.DateTimeFormat("ru", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(at),
+    expect(formatModified(at, "fr")).toBe(
+      new Intl.DateTimeFormat("fr", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(at),
     )
     expect(formatModified("yesterday")).toBe("yesterday")
     expect(formatModified(Number.NaN)).toBe("—")
@@ -102,20 +102,20 @@ describe("formatClipTime", () => {
 describe("decimalMark", () => {
   test("is the locale's own mark, not always a point", () => {
     expect(decimalMark("en")).toBe(".")
-    expect(decimalMark("ru-RU")).toBe(",")
+    expect(decimalMark("fr-FR")).toBe(",")
     expect(decimalMark("de")).toBe(",")
   })
 })
 
 describe("compactNumber with words", () => {
   test("writes the unit in the locale's words", () => {
-    expect(compactNumber(11900, { locale: "ru-RU", words: true })).toBe("11,9\u00a0тыс.")
-    expect(compactNumber(13_100_000_000, { locale: "ru-RU", words: true })).toBe("13,1\u00a0млрд")
+    expect(compactNumber(11900, { locale: "fr-FR", words: true })).toBe("11,9\u00a0k")
+    expect(compactNumber(13_100_000_000, { locale: "fr-FR", words: true })).toBe("13,1\u00a0Md")
     expect(compactNumber(1200, { locale: "en", words: true })).toBe("1.2K")
   })
 
   test("keeps the kit's suffixes without a locale and below a thousand", () => {
     expect(compactNumber(1200, { words: true })).toBe("1.2k")
-    expect(compactNumber(42, { locale: "ru-RU", words: true })).toBe("42")
+    expect(compactNumber(42, { locale: "fr-FR", words: true })).toBe("42")
   })
 })

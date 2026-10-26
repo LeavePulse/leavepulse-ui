@@ -32,7 +32,7 @@ const commands = computed<Command[]>(() => [
     submit: value => { limit.value = Number(value) },
   } },
   { id: "service/advanced", label: "Find deployment note", onSelect: () => { advanced.value = true }, afterClose: () => target.value?.focus() },
-  { id: "service/branches", label: "Ветки", onSelect: () => { picked.value = "branches" } },
+  { id: "service/branches", label: "Branches", onSelect: () => { picked.value = "branches" } },
 ])
 const people = [{ id: "person/ada", label: "Ada Lovelace", description: "Administrator", preview: "Production services", actions: [{ id: "person/ada/copy", label: "Copy user ID", onSelect: () => { picked.value = "ada" } }] }]
 const modes = { people, channels: [{ id: "channel/general", label: "general" }], roles: [{ id: "role/admin", label: "Administrator" }] }

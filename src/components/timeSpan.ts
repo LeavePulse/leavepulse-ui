@@ -19,7 +19,7 @@ export interface TimeSplit {
 
 export type TimeUnit = "d" | "h" | "m" | "s"
 
-/** Unit suffixes, so an app can write "2 д 3 ч" without reformatting. */
+/** Unit suffixes, so an app can write "2 j 3 h" without reformatting. */
 export type TimeUnitLabels = Record<TimeUnit, string>
 
 export const DEFAULT_UNIT_LABELS: TimeUnitLabels = { d: "d", h: "h", m: "m", s: "s" }

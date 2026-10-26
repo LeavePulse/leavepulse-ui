@@ -7,7 +7,7 @@ test("only the changed digit of a countdown rolls", () => {
 
 test("a changed word rolls whole, not the letters that differ", () => {
   expect(splitChange("Online", "Offline")).toEqual({ head: "", mid: "Offline", tail: "" })
-  expect(splitChange("работает 5 дней", "работает 6 дней")).toEqual({ head: "работает ", mid: "6", tail: " дней" })
+  expect(splitChange("running 5 days", "running 6 days")).toEqual({ head: "running ", mid: "6", tail: " days" })
 })
 
 test("a value that grows keeps its common ends", () => {

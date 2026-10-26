@@ -46,7 +46,7 @@ describe("formatTime", () => {
     expect(formatTime(72 * S, "units")).toBe("1m 12s")
   })
   test("unit labels and places are the caller's", () => {
-    expect(formatTime(2 * D + 3 * H + 4 * M, "units", { d: "д", h: "ч", m: "м", s: "с" }, 3)).toBe("2д 3ч 4м")
+    expect(formatTime(2 * D + 3 * H + 4 * M, "units", { d: "j", h: "h", m: "min", s: "s" }, 3)).toBe("2j 3h 4min")
   })
 })
 

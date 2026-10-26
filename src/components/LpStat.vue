@@ -147,7 +147,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </span>
     </div>
     <!-- A narrow tile moves the delta under the figure rather than breaking the
-         figure itself: "2085 ч" split across two lines reads as two values. -->
+         figure itself: "2085 h" split across two lines reads as two values. -->
     <div class="flex flex-wrap items-baseline gap-x-2">
       <!-- The placeholder sits INSIDE the value's own type size, so its line box
            is the real one: the tile cannot change height when the figure lands. -->

@@ -56,20 +56,7 @@ function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string): string
 export default defineNuxtModule<LeavepulseUiOptions>({
   meta: { name: "@leavepulse/ui", configKey: "leavepulseUi" },
   defaults: { theme: true, link: true, icons: "scan" },
-  setup(
-    options: LeavepulseUiOptions,
-    nuxt: {
-      options: {
-        runtimeConfig: { public: Record<string, unknown> }
-        alias: Record<string, string>
-        srcDir: string
-      }
-      hook: (
-        name: "prepare:types",
-        fn: (options: { references: { path: string }[] }) => void,
-      ) => void
-    },
-  ) {
+  setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
     const skip = new Set(options.exclude ?? [])
     for (const name of COMPONENT_NAMES) {

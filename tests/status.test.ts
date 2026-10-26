@@ -122,7 +122,7 @@ describe("formatRelativeTime", () => {
     expect(formatRelativeTime(now - 400 * 86_400_000, now, en).text).toBe("last year")
   })
   test("follows the locale", () => {
-    expect(formatRelativeTime(now - 3 * 60_000, now, { locale: "ru" }).text).toBe("3 минуты назад")
+    expect(formatRelativeTime(now - 3 * 60_000, now, { locale: "de" }).text).toBe("vor 3 Minuten")
     expect(formatRelativeTime(now - 3 * 60_000, now, { locale: "en", style: "short" }).text).toBe("3 min. ago")
   })
   test("accepts ISO strings and Dates", () => {

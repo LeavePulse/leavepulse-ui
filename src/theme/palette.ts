@@ -7,8 +7,8 @@ import { useLabels } from "../composables/useLpConfig"
 const Editor = defineAsyncComponent(() => import("../components/LpPaletteTheme.vue"))
 
 /** Registers the studio itself; no second list of theme options in the app. */
-/** `hide` leaves out the same studio rows the app hides in its own studio. */
-export function usePaletteTheme(studio: MaybeRefOrGetter<ThemeStudio | undefined>, options: { id?: string; label?: string; scope?: PaletteScope; hide?: ThemeStudioPart[] } = {}) {
+/** `hide` leaves out the same studio rows the app hides in its own studio; `keywords` adds the app's own search words. */
+export function usePaletteTheme(studio: MaybeRefOrGetter<ThemeStudio | undefined>, options: { id?: string; label?: string; scope?: PaletteScope; hide?: ThemeStudioPart[]; keywords?: string[] } = {}) {
   const scope = options.scope ?? usePaletteScope()
   const text = useLabels("paletteTheme", { title: "Theme" })
   const currentStudio = () => {
@@ -21,7 +21,7 @@ export function usePaletteTheme(studio: MaybeRefOrGetter<ThemeStudio | undefined
     if (!current) return []
     return [{
       id: `${scope?.id}/${options.id ?? "theme"}`, label: options.label ?? text.value.title, icon: "lucide:palette",
-      description: current.theme.value.name, keywords: ["theme", "appearance", "accent", "density", "тема", "цвет", "плотность"],
+      description: current.theme.value.name, keywords: ["theme", "appearance", "accent", "density", ...(options.keywords ?? [])],
       previewComponent: preview, editInPreview: true,
     }]
   }, { scope: options.scope })

@@ -65,7 +65,7 @@ export function quotaState(
 
 /**
  * An amount in its unit, locale-aware. Bytes go through `formatBytes`, whose
- * unit names come from Intl, so a Russian app reads "1,5 ГБ" without a
+ * unit names come from Intl, so a French app reads "1,5 Go" without a
  * translation table of its own.
  */
 export function formatAmount(value: number, unit?: QuotaUnit, locale?: string): string {

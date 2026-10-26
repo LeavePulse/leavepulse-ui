@@ -35,7 +35,7 @@ export interface FormatBytesOptions {
 /**
  * A byte count in the largest unit that keeps it readable: 1 536 → "1.5 kB".
  * Binary steps, the way file managers and storage limits show sizes. Unit
- * names come from Intl, so a Russian app reads "1,5 МБ" without a table of
+ * names come from Intl, so a French app reads "1,5 Mo" without a table of
  * its own. One decimal under 10 (2.4 MB), none above (240 MB). Negative or
  * non-finite input is "—": there is no size to show.
  */
@@ -54,7 +54,7 @@ export function formatBytes(bytes: number, locale?: string, options: FormatBytes
   // Intl's "short" form spells the smallest unit out ("1023 byte", "1023 Byte")
   // while every other unit is a symbol, and its "narrow" form glues English
   // symbols to the figure ("1023B"). Narrow symbols with one no-break space
-  // read the same in every locale: "1023 B", "1.5 kB", "1,5 МБ".
+  // read the same in every locale: "1023 B", "1.5 kB", "1,5 Mo".
   const parts = numberFormat(locale, {
     style: "unit",
     unit: BYTE_UNITS[step],
@@ -79,8 +79,8 @@ const COMPACT_UNITS: readonly (readonly [number, string])[] = [
 ]
 
 /*
- * The unit word and the gap before it as the locale writes them: "тыс." with a
- * no-break space in Russian, "K" glued on in English. Taken from Intl's compact
+ * The unit word and the gap before it as the locale writes them: "Md" with a
+ * no-break space in French, "K" glued on in English. Taken from Intl's compact
  * notation rather than a table, so any locale reads its own.
  */
 const compactSuffixes = new Map<string, string>()
@@ -99,14 +99,14 @@ function compactSuffix(locale: string, step: number): string {
 
 export interface CompactNumberOptions {
   /**
-   * Writes the decimal separator the locale's way ("1,2k" in Russian). The
+   * Writes the decimal separator the locale's way ("1,2k" in French). The
    * k/M/B/T suffixes stay: Intl's own compact notation changes the shape of
-   * the figure per locale ("1,2 тыс."), which a tick label cannot absorb.
+   * the figure per locale ("1,2 k" in French), which a tick label cannot absorb.
    * Unset keeps a plain "." whatever the browser says.
    */
   locale?: string
   /**
-   * With a locale, write the unit as that locale does: "11,9 тыс." in Russian.
+   * With a locale, write the unit as that locale does: "13,1 Md" in French.
    * For a figure read on its own (a stat tile, a counter), where "11,9k" looks
    * foreign; not for axis ticks, where the longer word crowds the axis.
    */
@@ -124,7 +124,7 @@ export interface CompactNumberOptions {
 
 /**
  * A figure shortened with k/M/B/T: 1 200 → "1.2k", 3 400 000 → "3.4M"; with
- * `words` and a locale in that locale's own words, "1,2 тыс." in Russian.
+ * `words` and a locale in that locale's own words, "13,1 Md" in French.
  *
  * The unit is picked by what will PRINT, not by the raw size: 999 950 at one
  * place rounds to "1000k", which reads as the next unit up, so it becomes
@@ -163,7 +163,7 @@ export function compactNumber(value: number, options: CompactNumberOptions = {})
 
 /**
  * The character a locale writes between the whole and the fractional part:
- * "." in English, "," in Russian and German. A counter that splits a grouped
+ * "." in English, "," in French and German. A counter that splits a grouped
  * figure into columns has to find the fraction by this mark, not by ".",
  * because in German "." is the thousands separator.
  */

@@ -226,7 +226,7 @@ onBeforeUnmount(stop)
 
 /*
  * The app's locale (reka's ConfigProvider) when the counter has none of its
- * own, the same rule the dates follow: a Russian app read "4,594" otherwise.
+ * own, the same rule the dates follow: a French app read "4,594" otherwise.
  */
 const locale = useLocale(() => props.locale)
 // The grouped and compact forms are written in the locale; the plain one always uses ".".
@@ -250,7 +250,7 @@ function formatAt(v: number, padded: boolean): string {
      * The decimal count is what stays fixed: one place whenever a unit is in
      * play, so the row's shape only changes at a rollover, not on every frame.
      * Written in the app's locale: the cells find the fraction by that
-     * locale's own mark (fractionMark), so "1,2 тыс." keeps its columns.
+     * locale's own mark (fractionMark), so "1,2 k" keeps its columns.
      */
     return compactNumber(v, { plainDecimals: 0, fixed: true, locale: locale.value, words: true })
   }
@@ -492,7 +492,7 @@ const label = computed(
 /* Faded, so a held-open column reads as an empty wheel rather than a zero the
    number actually has. */
 /*
- * A space separator (ru, fr, …) takes a whole column in a monospaced or
+ * A space separator (fr, pl, …) takes a whole column in a monospaced or
  * tabular face, so "7 271" read as "7  271". It is drawn as the narrow gap
  * the locale means.
  */
