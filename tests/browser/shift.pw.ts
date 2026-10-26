@@ -104,18 +104,22 @@ test("a wrapping row inside a widening box stays on one line while it eases", as
   const height = (await row.boundingBox())!.height
   await row.evaluate((el) => {
     const heights: number[] = []
+    const frames: string[] = []
+    const box = el.parentElement!
     const until = performance.now() + 600
     const sample = () => {
       heights.push(el.getBoundingClientRect().height)
+      frames.push(`${Math.round(el.getBoundingClientRect().height)}/${Math.round(el.getBoundingClientRect().width)} box=${Math.round(box.getBoundingClientRect().width)} style=${box.style.width} var=${box.style.getPropertyValue("--lp-shift-to-w")} minw=${getComputedStyle(el).minWidth} cls=${box.className}`)
       if (performance.now() < until) requestAnimationFrame(sample)
     }
     requestAnimationFrame(sample)
-    Object.assign(window, { rowHeights: heights })
+    Object.assign(window, { rowHeights: heights, rowFrames: frames })
   })
   await page.getByRole("button", { name: "Toggle" }).click()
   await page.waitForTimeout(700)
   const heights = await page.evaluate(() => (window as unknown as { rowHeights: number[] }).rowHeights)
   const settled = (await row.boundingBox())!.height
   expect(settled).toBeLessThanOrEqual(height + 1)
-  expect(Math.max(...heights)).toBeLessThanOrEqual(settled + 1)
+  const frames = await page.evaluate(() => (window as unknown as { rowFrames: string[] }).rowFrames)
+  expect(Math.max(...heights), frames.join("\n")).toBeLessThanOrEqual(settled + 1)
 })
