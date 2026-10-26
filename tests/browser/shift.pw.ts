@@ -98,6 +98,9 @@ test("a wrapping row inside a widening box stays on one line while it eases", as
   await page.goto("/tests/browser/?scenario=shift-wrap")
   const row = page.getByTestId("row")
   await expect(row).toBeVisible()
+  // A late webfont resizes the row once on its own; that tween is not the one under test.
+  await page.evaluate(() => document.fonts.ready)
+  await page.waitForTimeout(400)
   const height = (await row.boundingBox())!.height
   await row.evaluate((el) => {
     const heights: number[] = []
