@@ -46,6 +46,11 @@ export interface ScrollToElementOptions {
 }
 
 /** Scroll the nearest scroller, and only it, so that `el` is in view. */
+/** The element's own `scroll-margin-top`, the gap it asks to keep above it when scrolled to. */
+export function scrollMarginTop(el: Element): number {
+  return Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0
+}
+
 export function scrollToElement(
   el: Element | null | undefined,
   { block = "nearest", behavior = "auto", margin = 0 }: ScrollToElementOptions = {},

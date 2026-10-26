@@ -12,7 +12,7 @@
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
-import { atScrollEnd, scrollParent } from "../composables/scroll"
+import { atScrollEnd, scrollMarginTop, scrollParent, scrollToElement } from "../composables/scroll"
 import { usePillTransition } from "../composables/usePillTransition"
 
 export interface TocLink {
@@ -170,7 +170,9 @@ function onClick(id: string, ev: MouseEvent) {
   ev.preventDefault()
   activeId.value = id // mark immediately so the bar jumps to the clicked item
   suppressSpyUntilScrollEnds(el)
-  el.scrollIntoView({ behavior: "smooth", block: "start" })
+  // Only the nearest scrolling box moves: scrollIntoView also shifted every
+  // overflow-hidden ancestor, the shell itself among them.
+  scrollToElement(el, { block: "start", behavior: "smooth", margin: scrollMarginTop(el) })
   // Keep the router's own state: replacing it with null broke scroll
   // restoration and back/forward bookkeeping in vue-router apps.
   history.replaceState(history.state, "", `#${id}`)

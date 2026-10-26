@@ -33,6 +33,7 @@ export default { inheritAttrs: false }
  */
 import { computed, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import { useScrollMemory } from "../composables/scrollMemory"
 import LpBottomNav from "./LpBottomNav.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
@@ -59,8 +60,18 @@ const props = withDefaults(
      * The current route path. Enables the built-in prefix-match active test and
      * the derived page title without the host wiring its own `isActive`. Pass
      * `route.path`. Ignored when a custom `isActive` is provided.
+     *
+     * A new path also places the page in the shell's scroll region: back and
+     * forward return to where it was left, a `hash` lands on that anchor
+     * (honouring its `scroll-margin-top`), anything else starts at the top.
      */
     path?: string
+    /**
+     * The current route hash (`route.hash`). With `path` it lands a page on
+     * its anchor; a new hash on the same path glides there, after a dialog
+     * that started the jump has closed.
+     */
+    hash?: string
     /**
      * Custom active test (router-driven nav). Overrides `path`/`modelValue`.
      */
@@ -177,7 +188,8 @@ const text = useLabels(
 /*
  * The page scrolls inside the shell's own region, not the window, so the
  * router's scroll behaviour never reaches it: without this a route change from
- * a scrolled page landed mid-way down the next one.
+ * a scrolled page landed mid-way down the next one, and back never returned.
+ * A full-bleed page owns its scrolling, so the shell leaves it alone.
  */
 const scrollArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
 const bleedId = `lp-shell-bleed-${useId()}`
@@ -195,8 +207,12 @@ watch(
   () => props.path,
   () => {
     if (drawerOpen.value) drawerOpen.value = false
-    scrollArea.value?.viewportEl?.scrollTo({ top: 0, left: 0, behavior: "instant" })
   },
+)
+useScrollMemory(
+  () => (bleeding.value ? null : scrollArea.value?.viewportEl),
+  () => props.path,
+  () => props.hash,
 )
 
 function onSelect(item: SidebarItem) {
