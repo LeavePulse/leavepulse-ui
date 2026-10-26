@@ -141,10 +141,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </Transition>
       </span>
     </div>
-    <div class="flex items-baseline gap-2">
+    <!-- A narrow tile moves the delta under the figure rather than breaking the
+         figure itself: "2085 ч" split across two lines reads as two values. -->
+    <div class="flex flex-wrap items-baseline gap-x-2">
       <!-- The placeholder sits INSIDE the value's own type size, so its line box
            is the real one: the tile cannot change height when the figure lands. -->
-      <span class="font-mono text-3xl font-medium tracking-tight text-ink">
+      <span class="whitespace-nowrap font-mono text-3xl font-medium tracking-tight text-ink">
         <!-- Each side wrapped in a plain element: LpNumberFlow renders more
              than one root node, which a Transition cannot fade. -->
         <Transition v-bind="FADE">
@@ -173,7 +175,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </span>
       <span
         v-else-if="showDelta"
-        class="inline-flex items-center gap-0.5 text-sm font-medium tabular-nums"
+        class="inline-flex items-center gap-0.5 whitespace-nowrap text-sm font-medium tabular-nums"
         :class="trendColor"
       >
         <LpIcon :name="trendIcon" :size="14" />
