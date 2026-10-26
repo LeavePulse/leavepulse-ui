@@ -60,6 +60,13 @@ export interface SidebarItem {
    * and loses it once the news is read there.
    */
   hintPage?: string | string[]
+  /**
+   * Work started on this page is still running (a publish, a deploy): a thin
+   * bar along the row's foot, sweeping while `true`, filled to a fraction
+   * while a number from 0 to 1. Leaving the page no longer hides that it is
+   * not done.
+   */
+  busy?: boolean | number
 }
 
 export interface SidebarSection {

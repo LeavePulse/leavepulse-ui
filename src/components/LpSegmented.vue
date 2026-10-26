@@ -79,7 +79,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
     "inline-flex items-center gap-1 rounded-control border border-line bg-surface-soft p-1",
     sizeCls[props.size],
-    props.block ? "flex w-full" : "",
+    // `w-fit`, not left to the parent: in a column a flex item stretches, and
+    // the options sat on the left of an empty bar (the theme studio met it).
+    props.block ? "flex w-full" : "w-fit",
   ].join(" "),
 )
 

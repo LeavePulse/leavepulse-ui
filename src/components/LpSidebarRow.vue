@@ -121,6 +121,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
           :aria-label="compact ? item.label : undefined"
           data-lp-nav-row
           :aria-keyshortcuts="item.hotkey"
+          :aria-busy="item.busy ? true : undefined"
           :data-lp-nav-nested="nested || undefined"
           class="group/item relative flex items-center rounded-control font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           :class="[
@@ -134,6 +135,18 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
           @click="emit('activate', item)"
           @pointerenter="emit('hover', item)"
         >
+          <span
+            v-if="item.busy !== undefined && item.busy !== false"
+            class="pointer-events-none absolute bottom-0.5 z-10 h-0.5 overflow-hidden rounded-pill bg-brand/15"
+            :class="compact ? 'inset-x-2' : 'inset-x-3'"
+          >
+            <span
+              v-if="typeof item.busy === 'number'"
+              class="block h-full rounded-pill bg-brand transition-[width] duration-(--duration-medium) ease-[var(--ease-emphasized)]"
+              :style="{ width: `${Math.round(Math.min(1, Math.max(0, item.busy)) * 100)}%` }"
+            />
+            <span v-else class="lp-sweep absolute inset-y-0 left-0 w-2/5 rounded-pill bg-brand" />
+          </span>
           <Motion v-if="pill" :layout-id="pillId" :transition="pillTransition" class="absolute inset-0 z-0 rounded-control bg-brand-soft" />
           <slot :item="item" :active="active">
             <span v-if="item.icon" class="relative z-10 shrink-0">

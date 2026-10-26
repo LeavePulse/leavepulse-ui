@@ -48,6 +48,7 @@ const sections = computed<SidebarSection[]>(() => [
       },
       { id: "/alerts", label: "Alerts", icon: "lucide:bell", badge: alerts.value },
       { id: "/billing", label: "Billing", icon: "lucide:credit-card", dot: true },
+      { id: "/deploys", label: "Deploys", icon: "lucide:rocket", busy: true },
     ],
   },
   {

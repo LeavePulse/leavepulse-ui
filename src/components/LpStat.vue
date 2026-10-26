@@ -29,6 +29,11 @@ const props = withDefaults(
     /** Formatting for a numeric `value` — see LpNumberFlow. */
     compact?: boolean
     grouped?: boolean
+    /**
+     * Count up from zero when the tile first shows (the default), or show the
+     * value outright: a report or a screenshot wants the figure, not the run.
+     */
+    animateOnMount?: boolean
     decimals?: number
     prefix?: string
     valueSuffix?: string
@@ -54,7 +59,7 @@ const props = withDefaults(
      */
     loading?: boolean
   }>(),
-  { trend: "auto", decimals: 0 },
+  { trend: "auto", decimals: 0, animateOnMount: true },
 )
 
 // Resolve the trend direction: explicit wins; "auto" reads a numeric delta.
@@ -159,6 +164,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               :value="value"
               :compact="compact"
               :grouped="grouped"
+              :animate-on-mount="animateOnMount"
               :decimals="decimals"
               :prefix="prefix"
               :suffix="valueSuffix"

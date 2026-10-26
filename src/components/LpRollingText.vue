@@ -20,7 +20,8 @@
  *   <LpRollingText :value="label" />
  *   <LpRollingText :value="status" mode="flip" />
  */
-import { computed } from "vue"
+import { computed, ref, useSlots, watch } from "vue"
+import { splitChange } from "./rolling"
 
 const props = withDefaults(
   defineProps<{
@@ -45,6 +46,21 @@ const props = withDefaults(
    text patch — without it there is nothing to transition between. */
 const key = computed(() => String(props.value))
 
+/*
+ * Only what changed rolls. "Valid for 2:54" turning into "2:53" rolled every
+ * word of the line once a second (a countdown badge), so the whole badge
+ * flickered; now "Valid for 2:5" stays and the "4" rolls to "3". With a slot
+ * of its own, or wrapping text, the whole value rolls as before.
+ */
+const slots = useSlots()
+const partial = computed(() => !slots.default && !props.wrap)
+const parts = ref({ head: "", mid: String(props.value), tail: "" })
+watch(
+  () => String(props.value),
+  (next, was) => (parts.value = splitChange(was, next)),
+)
+const midKey = computed(() => `${parts.value.head.length}:${parts.value.mid}`)
+
 const name = computed(() =>
   props.mode === "flip" ? "lp-roll-flip" : `lp-roll-${props.direction}`,
 )
@@ -68,7 +84,16 @@ const style = computed(() => ({
     :class="[justify, wrap && 'lp-roll--wrap']"
     :style="style"
   >
-    <Transition :name="name">
+    <template v-if="partial">
+      <span v-if="parts.head" class="whitespace-pre">{{ parts.head }}</span>
+      <span class="relative inline-flex overflow-hidden">
+        <Transition :name="name">
+          <span :key="midKey" class="lp-roll__item whitespace-pre">{{ parts.mid }}</span>
+        </Transition>
+      </span>
+      <span v-if="parts.tail" class="whitespace-pre">{{ parts.tail }}</span>
+    </template>
+    <Transition v-else :name="name">
       <span :key="key" class="lp-roll__item">
         <slot :value="value">{{ value }}</slot>
       </span>

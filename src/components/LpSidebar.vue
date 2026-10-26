@@ -13,7 +13,7 @@
  * auto-closes the drawer. With `responsive` off the component renders exactly
  * the static <nav> it always has — existing call sites are unaffected.
  */
-import { computed, ref, useId } from "vue"
+import { computed, nextTick, ref, useId } from "vue"
 import { parseCombo, useHotkeys } from "../composables/useHotkeys"
 import { usePersisted } from "../composables/usePersisted"
 import { useLabels } from "../composables/useLpConfig"
@@ -414,6 +414,13 @@ function startResize(event: PointerEvent) {
   handle.addEventListener("pointerup", stop)
   handle.addEventListener("pointercancel", stop)
 }
+const railEl = ref<HTMLElement | null>(null)
+async function searchFromCompact() {
+  setCompact(false)
+  await nextTick()
+  railEl.value?.querySelector<HTMLInputElement>("input")?.focus()
+}
+
 function resetWidth() {
   ownWidth.value = DEFAULT_WIDTH
   setCompact(false)
@@ -493,6 +500,7 @@ defineOptions({ inheritAttrs: false })
 <template>
   <!-- Desktop / always-on rail -->
   <nav
+    ref="railEl"
     class="relative h-full shrink-0 flex-col gap-1"
     :class="[
       railClass,
@@ -532,6 +540,18 @@ defineOptions({ inheritAttrs: false })
     <!-- The filter sits between the brand and the nav: it belongs to the list,
          not to the header, and a person reaching for it is already looking at
          the items. -->
+    <!-- Folded, the filter is a button: a field forty pixels wide holds no
+         query, so the rail opens to give it room and puts the caret in it. -->
+    <LpTooltip v-if="searchable && isCompact" :content="placeholder" side="right">
+      <button
+        type="button"
+        class="mx-auto mb-2 grid size-10 shrink-0 place-items-center rounded-control text-muted outline-none transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="placeholder"
+        @click="searchFromCompact"
+      >
+        <LpIcon name="lucide:search" :size="17" />
+      </button>
+    </LpTooltip>
     <LpInput
       v-if="searchable && !isCompact"
       v-model="query"

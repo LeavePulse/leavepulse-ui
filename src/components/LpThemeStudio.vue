@@ -239,7 +239,6 @@ usePaletteTheme(() => studio ?? undefined, { hide: props.hide })
         <LpSegmented
           v-model="format"
           size="sm"
-          class="self-start"
           :options="[{ value: 'code', label: 'Code' }, { value: 'json', label: 'JSON' }, { value: 'css', label: 'CSS' }]"
         />
         <LpCodeBlock
