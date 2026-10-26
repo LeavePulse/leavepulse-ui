@@ -3,12 +3,12 @@ import { computed, ref } from "vue"
 import type { StudioState, PreviewableThemeStudio } from "../theme/studio"
 import { useLabels } from "../composables/useLpConfig"
 import { suppressPaletteDiscovery } from "../composables/usePaletteCommands"
-import LpThemeStudio from "./LpThemeStudio.vue"
+import LpThemeStudio, { type ThemeStudioPart } from "./LpThemeStudio.vue"
 import LpThemeProvider from "./LpThemeProvider.vue"
 import LpButton from "./LpButton.vue"
 import LpInput from "./LpInput.vue"
 
-const props = defineProps<{ studio: PreviewableThemeStudio }>()
+const props = defineProps<{ studio: PreviewableThemeStudio; hide?: ThemeStudioPart[] }>()
 suppressPaletteDiscovery()
 const text = useLabels("paletteTheme", { title: "Theme", apply: "Apply theme", revert: "Revert draft", sample: "Preview", action: "Continue", placeholder: "A field in this theme" })
 const snapshot = ref({ ...props.studio.state.value })
@@ -43,6 +43,6 @@ function apply() {
       <LpInput :placeholder="text.placeholder" readonly :tabindex="-1" />
       <LpButton :tabindex="-1">{{ text.action }}</LpButton>
     </LpThemeProvider>
-    <LpThemeStudio :studio="draft" :labels="{ reset: text.revert }" />
+    <LpThemeStudio :studio="draft" :hide="hide" :labels="{ reset: text.revert }" />
   </div>
 </template>

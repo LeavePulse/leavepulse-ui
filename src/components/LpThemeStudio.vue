@@ -105,7 +105,7 @@ const SWATCH = "relative size-8 overflow-hidden rounded-full ring-2 transition-[
 
 const tuneTo = <K extends keyof Omit<StudioState, "theme">>(key: K, value: string) => studio.tune({ [key]: value } as Partial<StudioState>)
 
-usePaletteTheme(() => studio ?? undefined)
+usePaletteTheme(() => studio ?? undefined, { hide: props.hide })
 </script>
 
 <template>

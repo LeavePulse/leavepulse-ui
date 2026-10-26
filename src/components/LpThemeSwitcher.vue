@@ -303,7 +303,7 @@ const triggerLabel = computed(
   () => props["aria-label"] ?? text.value.trigger.replace("{name}", labelName.value),
 )
 
-usePaletteTheme(() => tuner ?? undefined)
+usePaletteTheme(() => tuner ?? undefined, { hide: props.studioHide })
 </script>
 
 <template>
