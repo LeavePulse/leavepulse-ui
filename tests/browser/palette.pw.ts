@@ -220,7 +220,7 @@ test("the palette shortcut works from a field inside the preview frame", async (
 test("mouse-accessible actions also work on narrow screens", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await open(page, "@Ada")
-  await page.getByRole("button", { name: "actions Tab", exact: true }).click()
+  await page.getByRole("button", { name: "actions", exact: true }).click()
   await page.getByRole("option", { name: /Copy user ID/ }).click()
   await expect(page.getByRole("status", { name: "Picked action" })).toHaveText("ada")
 })

@@ -1519,7 +1519,10 @@ const guardOutside = useOutsideGuard()
           <div class="flex gap-2"><LpButton :loading="executing || validating" @click="submitPrompt">{{ text.submit }}</LpButton><LpButton variant="ghost" @click="promptCommand = undefined; inputRef?.focus()">{{ text.backToResults }}</LpButton></div>
         </div>
         <p v-if="actionError" role="alert" class="px-4 py-2 text-sm text-danger">{{ actionError }}</p>
-        <div v-if="active && (canPin || selectedActions.length) && !promptCommand" class="flex items-center justify-end gap-2 border-b border-line px-3 py-1">
+        <!-- Touch only: there the footer with its keys is hidden, and these are
+             the only way to the row's actions and pin. On a pointer the same
+             buttons live in the footer, so the list never shifts under this strip. -->
+        <div v-if="active && (canPin || selectedActions.length) && !promptCommand" class="hidden items-center justify-end gap-2 border-b border-line px-3 py-1 [@media(hover:none)_and_(pointer:coarse)]:flex">
           <LpButton v-if="selectedActions.length" size="xs" variant="ghost" @click="openActions(active)">{{ text.actions }} <span class="text-muted">Tab</span></LpButton>
           <LpButton v-if="canPin" size="xs" variant="ghost" :aria-label="isPinned(active) ? text.unpin : text.pin" :aria-pressed="isPinned(active)" @click="togglePin(active)"><LpIcon name="lucide:star" :size="14" />{{ isPinned(active) ? text.unpin : text.pin }} <span class="text-muted">Alt+P</span></LpButton>
         </div>
@@ -1727,17 +1730,32 @@ const guardOutside = useOutsideGuard()
           </span>
           <!-- Only inside a mode: at the root Backspace just edits the query,
                and advertising it there would be a lie. -->
-          <span
-            v-if="selectedActions.length"
-            class="flex items-center gap-1 transition-colors"
+          <button
+            v-if="selectedActions.length && active"
+            type="button"
+            class="flex items-center gap-1 rounded-small outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             :class="showActionsKey && 'font-medium text-brand'"
+            :aria-label="text.actions"
+            @click="openActions(active)"
           >
             <kbd
               class="rounded-small border px-1 text-[10px] transition-colors"
               :class="showActionsKey ? 'border-brand' : 'border-line'"
             >{{ text.tab }}</kbd>
             {{ text.actions }}
-          </span>
+          </button>
+          <button
+            v-if="canPin && active && !promptCommand"
+            type="button"
+            class="flex items-center gap-1 rounded-small outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            :aria-label="isPinned(active) ? text.unpin : text.pin"
+            :aria-pressed="isPinned(active)"
+            @click="togglePin(active)"
+          >
+            <kbd class="rounded-small border border-line px-1 text-[10px]">Alt+P</kbd>
+            <LpIcon name="lucide:star" :size="11" :class="isPinned(active) && 'fill-current text-brand'" />
+            {{ isPinned(active) ? text.unpin : text.pin }}
+          </button>
           <span v-if="trail.length" class="flex items-center gap-1">
             <kbd class="rounded-small border border-line px-1 text-[10px]">⌫</kbd>
             {{ text.back }}
