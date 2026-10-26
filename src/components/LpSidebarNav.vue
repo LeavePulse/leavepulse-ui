@@ -15,6 +15,7 @@ export default { inheritAttrs: false }
 import { Motion } from "motion-v"
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "reka-ui"
 import { computed, ref } from "vue"
+import { useLocale } from "../composables/useLocale"
 import { usePillTransition } from "../composables/usePillTransition"
 import LpBadge from "./LpBadge.vue"
 import LpContextMenu from "./LpContextMenu.vue"
@@ -61,6 +62,12 @@ const emit = defineEmits<{
 }>()
 
 /** `key` when the app set one, else the title — see SidebarSection.key. */
+// A count reads in the app's locale like every other figure: "7 563", not "7563".
+const locale = useLocale()
+function badgeText(badge: number | string): string {
+  return typeof badge === "number" ? badge.toLocaleString(locale.value) : badge
+}
+
 function sectionKey(section: SidebarSection): string {
   return section.key ?? section.title ?? ""
 }
@@ -245,7 +252,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
               :tone="itemActive(item) ? 'brand' : 'neutral'"
               class="relative z-10 shrink-0"
             >
-              {{ item.badge }}
+              {{ badgeText(item.badge) }}
             </LpBadge>
           </slot>
         </component>
