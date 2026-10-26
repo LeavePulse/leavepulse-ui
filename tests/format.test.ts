@@ -106,3 +106,16 @@ describe("decimalMark", () => {
     expect(decimalMark("de")).toBe(",")
   })
 })
+
+describe("compactNumber with words", () => {
+  test("writes the unit in the locale's words", () => {
+    expect(compactNumber(11900, { locale: "ru-RU", words: true })).toBe("11,9\u00a0тыс.")
+    expect(compactNumber(13_100_000_000, { locale: "ru-RU", words: true })).toBe("13,1\u00a0млрд")
+    expect(compactNumber(1200, { locale: "en", words: true })).toBe("1.2K")
+  })
+
+  test("keeps the kit's suffixes without a locale and below a thousand", () => {
+    expect(compactNumber(1200, { words: true })).toBe("1.2k")
+    expect(compactNumber(42, { locale: "ru-RU", words: true })).toBe("42")
+  })
+})

@@ -229,8 +229,8 @@ onBeforeUnmount(stop)
  * own, the same rule the dates follow: a Russian app read "4,594" otherwise.
  */
 const locale = useLocale(() => props.locale)
-// Only the grouped form is written in the locale; the others always use ".".
-const fractionMark = computed(() => (props.grouped && !props.format && !props.compact ? decimalMark(locale.value) : "."))
+// The grouped and compact forms are written in the locale; the plain one always uses ".".
+const fractionMark = computed(() => ((props.grouped || props.compact) && !props.format ? decimalMark(locale.value) : "."))
 
 const formatted = computed(() => formatAt(round(displayed.value), !settled.value))
 
@@ -249,10 +249,10 @@ function formatAt(v: number, padded: boolean): string {
      *
      * The decimal count is what stays fixed: one place whenever a unit is in
      * play, so the row's shape only changes at a rollover, not on every frame.
-     * No locale here: the cells below find the fraction by its ".", and a
-     * locale's "," would turn the fraction's columns into integer ones.
+     * Written in the app's locale: the cells find the fraction by that
+     * locale's own mark (fractionMark), so "1,2 тыс." keeps its columns.
      */
-    return compactNumber(v, { plainDecimals: 0, fixed: true })
+    return compactNumber(v, { plainDecimals: 0, fixed: true, locale: locale.value, words: true })
   }
   const pad = padded ? Math.max(1, padTo.value) : 1
   if (props.grouped)

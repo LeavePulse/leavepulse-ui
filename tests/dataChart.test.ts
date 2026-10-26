@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { calloutLabels, chartSummary, formatTick, markerIndex, normalise } from "../src/components/chart"
+import { calloutLabels, chartSummary, formatTick, markerIndex, normalise, xLabelIndices } from "../src/components/chart"
 
 test("callout labels survive a side with no labels", () => {
   const single = calloutLabels([{ index: 0, mid: 0 }], 100, 100, 50, 16, 14, 17, 200)
@@ -44,4 +44,12 @@ test("summary names the span and each series' range", () => {
   const series = normalise([{ name: "cpu", data: [1, 5, 3] }])
   const text = chartSummary(series, ["Mon", "Tue", "Wed"], (_s, v) => `${v}%`, "Load")
   expect(text).toBe("Load, 3 points, Mon to Wed. cpu: from 1% to 5%, latest 3%")
+})
+
+test("x labels keep the last point and drop a neighbour that would touch it", () => {
+  expect(xLabelIndices(24, 2)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23])
+  expect(xLabelIndices(25, 2)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24])
+  expect(xLabelIndices(10, 4)).toEqual([0, 4, 9])
+  expect(xLabelIndices(1, 3)).toEqual([0])
+  expect(xLabelIndices(0, 3)).toEqual([])
 })

@@ -61,8 +61,15 @@ const props = withDefaults(
      * where the pointer crosses the bar on its way elsewhere.
      */
     hoverFollow?: boolean
+    /**
+     * Icons only, the label kept for screen readers and shown on hover. For a
+     * header that cannot fit every label: a tab cut off at the edge, or hidden
+     * under the actions beside it, cannot be reached at all. Tabs without an
+     * icon keep their label.
+     */
+    compact?: boolean
   }>(),
-  { variant: "contained", accent: false, block: false, hoverFollow: true },
+  { variant: "contained", accent: false, block: false, hoverFollow: true, compact: false },
 )
 
 const bottom = computed(() => props.variant === "bottom")
@@ -190,6 +197,7 @@ usePaletteCommands(() => props.items.map(item => ({
       <TabsTrigger
         :value="item.value"
         :disabled="item.disabled"
+        :title="compact && item.icon && !bottom ? item.label : undefined"
         class="relative inline-flex items-center justify-center outline-none transition-[color,opacity] duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-45"
         :class="[
           bottom
@@ -244,7 +252,7 @@ usePaletteCommands(() => props.items.map(item => ({
             </LpBadge>
           </Transition>
         </span>
-        <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : ''">{{ item.label }}</span>
+        <span class="relative z-10" :class="bottom ? 'max-w-full truncate' : compact && item.icon ? 'sr-only' : ''">{{ item.label }}</span>
         <AttentionDot v-if="item.dot && !item.icon" />
         <!-- The count rolls when it changes, and the chip scales in and out
              rather than popping. -->

@@ -41,6 +41,7 @@ import {
   pointCount,
   resolveLabels,
   xAt,
+  xLabelIndices,
   yAt,
   type Box,
   type ChartMarker,
@@ -254,6 +255,23 @@ const allSeries = computed(() =>
   normalise(source.value).map((s, i) => ({ ...s, id: `${i}:${s.name}` })),
 )
 const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.id)))
+
+// A series asked to start hidden is hidden once, when it first appears: the
+// legend owns it from then on, and a data refresh must not switch it back off.
+const seeded = new Set<string>()
+watch(
+  () => props.series.map((s, i) => [`${i}:${s.name}`, !!s.hidden] as const),
+  (entries) => {
+    let next: Set<string> | null = null
+    for (const [id, off] of entries) {
+      if (seeded.has(id)) continue
+      seeded.add(id)
+      if (off) (next ??= new Set(hidden.value)).add(id)
+    }
+    if (next && next.size < entries.length) hidden.value = next
+  },
+  { immediate: true },
+)
 
 /*
  * How present each series is, 1 to 0, driven per frame rather than by CSS.
@@ -664,9 +682,11 @@ const xLabelStride = computed(() => {
 })
 
 const xLabels = computed(() =>
-  labels.value
-    .map((label, i) => ({ label, i, x: xAt(i, count.value, box.value, banded.value) }))
-    .filter(({ i }) => i % xLabelStride.value === 0 || i === count.value - 1),
+  xLabelIndices(labels.value.length, xLabelStride.value).map((i) => ({
+    label: labels.value[i],
+    i,
+    x: xAt(i, count.value, box.value, banded.value),
+  })),
 )
 
 // ── marks ──────────────────────────────────────

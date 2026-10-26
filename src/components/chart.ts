@@ -28,6 +28,13 @@ export interface ChartSeries {
    * own scale and its own ticks.
    */
   axis?: "left" | "right"
+  /**
+   * Start with this series switched off, the legend turning it back on. For a
+   * series worth having but loud next to the rest: messages in thousands beside
+   * people in tens flatten the people line on a shared axis until they are
+   * hidden, so the chart opens on the readable view.
+   */
+  hidden?: boolean
 }
 
 export type ChartAxis = "left" | "right"
@@ -56,6 +63,25 @@ export interface ChartMarker {
   at: number | string
   label?: string
   color?: string
+}
+
+/**
+ * Which x labels to print with every `stride`-th one shown. The last point is
+ * always labelled (it is usually "now"), and when it lands within half a
+ * stride to the previous shown label that one gives way: "20 22 23" read as
+ * one smudge at the end of an hourly axis.
+ */
+export function xLabelIndices(count: number, stride: number): number[] {
+  if (count <= 0) return []
+  const step = Math.max(1, Math.floor(stride))
+  const out: number[] = []
+  for (let i = 0; i < count; i += step) out.push(i)
+  const last = count - 1
+  if (out[out.length - 1] !== last) {
+    if (out.length > 1 && last - out[out.length - 1] <= step / 2) out.pop()
+    out.push(last)
+  }
+  return out
 }
 
 /** The x index a marker points at, or -1 when it names nothing on the axis. */

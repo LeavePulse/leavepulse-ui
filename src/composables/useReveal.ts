@@ -1,6 +1,5 @@
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { prefersReducedMotion } from "./easing"
-import { atScrollEnd } from "./scroll"
 
 /*
  * "Has this element actually been SEEN yet?"
@@ -60,7 +59,13 @@ export interface UseReveal {
 }
 
 export function useReveal(options: UseRevealOptions = {}): UseReveal {
-  const { threshold = 0.25, rootMargin = "0px 0px -10% 0px" } = options
+  /*
+   * No margin by default. Shrinking the viewport from below meant whatever sat
+   * in the bottom strip of the screen showed its starting state (a 0, an empty
+   * bar) while plainly on screen, which reads as "no data" rather than as an
+   * entrance yet to come; a quarter of the element in view is arrival enough.
+   */
+  const { threshold = 0.25, rootMargin = "0px" } = options
 
   const el = ref<Element | null>(null)
   // SSR has no viewport to intersect with, and no animation runs there either;
@@ -68,16 +73,10 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
   const revealed = ref(typeof window === "undefined")
 
   let observer: IntersectionObserver | null = null
-  let edge: IntersectionObserver | null = null
-  let onScroll: (() => void) | null = null
 
   function stop() {
     observer?.disconnect()
     observer = null
-    edge?.disconnect()
-    edge = null
-    if (onScroll) window.removeEventListener("scroll", onScroll, true)
-    onScroll = null
   }
 
   function reveal() {
@@ -110,28 +109,6 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
         { threshold, rootMargin },
       )
       observer.observe(node)
-
-      /*
-       * The margin shrinks the viewport from below, so the last element of a
-       * page sits in that strip for good: there is no more scroll to lift it
-       * out, and its count-up never started (a figure at the bottom of a
-       * dashboard stayed at 0). On screen with nowhere left to scroll is an
-       * arrival too.
-       */
-      let onScreen = false
-      const check = () => {
-        if (onScreen && atScrollEnd(node)) reveal()
-      }
-      edge = new IntersectionObserver(
-        (entries) => {
-          onScreen = entries.some((entry) => entry.isIntersecting)
-          check()
-        },
-        { threshold },
-      )
-      edge.observe(node)
-      onScroll = check
-      window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     },
     { immediate: true, flush: "post" },
   )

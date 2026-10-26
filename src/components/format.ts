@@ -78,14 +78,39 @@ const COMPACT_UNITS: readonly (readonly [number, string])[] = [
   [1e12, "T"],
 ]
 
+/*
+ * The unit word and the gap before it as the locale writes them: "тыс." with a
+ * no-break space in Russian, "K" glued on in English. Taken from Intl's compact
+ * notation rather than a table, so any locale reads its own.
+ */
+const compactSuffixes = new Map<string, string>()
+
+function compactSuffix(locale: string, step: number): string {
+  const key = `${locale}|${step}`
+  let found = compactSuffixes.get(key)
+  if (found === undefined) {
+    const parts = numberFormat(locale, { notation: "compact", compactDisplay: "short" }).formatToParts(COMPACT_UNITS[step][0])
+    const at = parts.findIndex((p) => p.type === "compact")
+    found = at < 0 ? COMPACT_UNITS[step][1] : (parts[at - 1]?.type === "literal" ? parts[at - 1].value : "") + parts[at].value
+    compactSuffixes.set(key, found)
+  }
+  return found
+}
+
 export interface CompactNumberOptions {
   /**
    * Writes the decimal separator the locale's way ("1,2k" in Russian). The
    * k/M/B/T suffixes stay: Intl's own compact notation changes the shape of
-   * the figure per locale ("1,2 тыс."), which a tick label or a rolling
-   * counter cannot absorb. Unset keeps a plain "." whatever the browser says.
+   * the figure per locale ("1,2 тыс."), which a tick label cannot absorb.
+   * Unset keeps a plain "." whatever the browser says.
    */
   locale?: string
+  /**
+   * With a locale, write the unit as that locale does: "11,9 тыс." in Russian.
+   * For a figure read on its own (a stat tile, a counter), where "11,9k" looks
+   * foreign; not for axis ticks, where the longer word crowds the axis.
+   */
+  words?: boolean
   /** Places for a figure below a thousand (12.25). Default 2. */
   plainDecimals?: number
   /** Places once a unit is in play (1.2k). Default 1. */
@@ -98,7 +123,8 @@ export interface CompactNumberOptions {
 }
 
 /**
- * A figure shortened with k/M/B/T: 1 200 → "1.2k", 3 400 000 → "3.4M".
+ * A figure shortened with k/M/B/T: 1 200 → "1.2k", 3 400 000 → "3.4M"; with
+ * `words` and a locale in that locale's own words, "1,2 тыс." in Russian.
  *
  * The unit is picked by what will PRINT, not by the raw size: 999 950 at one
  * place rounds to "1000k", which reads as the next unit up, so it becomes
@@ -106,7 +132,7 @@ export interface CompactNumberOptions {
  */
 export function compactNumber(value: number, options: CompactNumberOptions = {}): string {
   if (!Number.isFinite(value)) return String(value)
-  const { locale, plainDecimals = 2, decimals = 1, fixed = false } = options
+  const { locale, plainDecimals = 2, decimals = 1, fixed = false, words = false } = options
   const abs = Math.abs(value)
   let i = COMPACT_UNITS.length - 1
   while (i > 0 && abs < COMPACT_UNITS[i][0]) i--
@@ -132,7 +158,7 @@ export function compactNumber(value: number, options: CompactNumberOptions = {})
           maximumFractionDigits: places,
           useGrouping: false,
         }).format(scaled)
-  return `${number}${COMPACT_UNITS[i][1]}`
+  return `${number}${words && locale !== undefined && i > 0 ? compactSuffix(locale, i) : COMPACT_UNITS[i][1]}`
 }
 
 /**

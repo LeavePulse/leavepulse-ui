@@ -104,10 +104,11 @@ const props = withDefaults(
   },
 )
 
+/* The text steps with the height, as in every other kit field: a small select beside a small input read a size larger. */
 const SIZE_HEIGHT = {
-  sm: "h-(--size-control-sm)",
-  md: "h-(--size-control-md)",
-  lg: "h-(--size-control-lg)",
+  sm: "h-(--size-control-sm) text-xs",
+  md: "h-(--size-control-md) text-sm",
+  lg: "h-(--size-control-lg) text-sm",
 } as const
 const anchorHeight = computed(() => SIZE_HEIGHT[props.size])
 
@@ -431,7 +432,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       @focusout="onFocusOut"
       :class="[
         anchorHeight,
-        'group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-sm text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2',
+        'group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2',
         field.disabled && 'cursor-not-allowed opacity-55',
         field.invalid
           ? 'border-danger focus-within:border-danger focus-within:ring-danger-soft'
