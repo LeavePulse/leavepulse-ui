@@ -125,7 +125,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
           :data-lp-nav-nested="nested || undefined"
           class="group/item relative flex items-center rounded-control font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           :class="[
-            compact ? ['mx-auto size-10 justify-center', onPath && !active ? 'bg-ink/[0.06]' : ''] : nested ? 'gap-2.5 py-1.5 pl-9 pr-3 text-[13px]' : 'gap-3 px-3 py-2 text-sm',
+            compact ? ['ml-1 size-10 justify-center', onPath && !active ? 'bg-ink/[0.06]' : ''] : nested ? 'gap-2.5 py-1.5 pl-9 pr-3 text-[13px]' : 'gap-3 px-3 py-2 text-sm',
             item.disabled
               ? 'cursor-not-allowed text-muted/50'
               : active || hovered || onPath
@@ -175,7 +175,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
               <span v-if="item.dot && item.badge == null" class="relative z-10 size-2 shrink-0 rounded-full bg-brand" />
               <LpBadge v-if="item.badge != null" :tone="active ? 'brand' : 'neutral'" class="relative z-10 shrink-0">
                 <span v-if="bumped" class="absolute inset-0 animate-ping rounded-pill bg-brand/30" />
-                <LpNumberFlow v-if="typeof item.badge === 'number'" :value="item.badge" grouped :locale="locale" />
+                <LpNumberFlow v-if="typeof item.badge === 'number'" :value="item.badge" grouped :locale="locale" :animate-on-mount="false" />
                 <template v-else>{{ item.badge }}</template>
               </LpBadge>
               <span v-if="expandable" class="w-5 shrink-0" aria-hidden="true" />

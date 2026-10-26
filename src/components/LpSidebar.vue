@@ -530,11 +530,14 @@ defineOptions({ inheritAttrs: false })
       v-if="$slots.header"
       class="mb-3 flex shrink-0 items-center"
       :class="[
-        variant === 'panel' ? 'pb-3' : isCompact ? '-mx-2 -mt-3 h-16 overflow-hidden px-[18px] [mask-image:linear-gradient(to_right,black_75%,transparent)]' : '-mx-3 -mt-3 h-16 px-3',
+        variant === 'panel' ? 'pb-3' : isCompact ? '-mx-2 -mt-3 h-16 overflow-hidden' : '-mx-3 -mt-3 h-16 px-3',
         divider ? 'border-b border-line' : '',
       ]"
     >
-      <slot name="header" :compact="isCompact" />
+      <div v-if="isCompact" class="flex w-16 shrink-0 justify-center">
+        <slot name="header" :compact="true" />
+      </div>
+      <slot v-else name="header" :compact="false" />
     </div>
 
     <!-- The filter sits between the brand and the nav: it belongs to the list,
@@ -545,7 +548,7 @@ defineOptions({ inheritAttrs: false })
     <LpTooltip v-if="searchable && isCompact" :content="placeholder" side="right">
       <button
         type="button"
-        class="mx-auto mb-2 grid size-10 shrink-0 place-items-center rounded-control text-muted outline-none transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+        class="mb-2 ml-1 grid size-10 shrink-0 place-items-center rounded-control text-muted outline-none transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="placeholder"
         @click="searchFromCompact"
       >
@@ -589,7 +592,7 @@ defineOptions({ inheritAttrs: false })
       <button
         type="button"
         class="mt-1 flex h-8 shrink-0 items-center gap-2 rounded-control px-3 text-xs text-muted outline-none transition-colors hover:bg-ink/[0.05] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-        :class="isCompact ? 'mx-auto w-10 justify-center px-0' : ''"
+        :class="isCompact ? 'ml-1 w-10 justify-center px-0' : ''"
         :aria-label="isCompact ? text.expandRail : text.compact"
         :aria-pressed="isCompact"
         @click="setCompact(!isCompact)"
@@ -602,12 +605,15 @@ defineOptions({ inheritAttrs: false })
     <!-- Actions (search, "new …") sit just above the footer, pinned to the
          bottom of the rail and outside the scroll region — not trailing the
          nav list. -->
-    <div v-if="$slots.actions" class="mt-2 flex shrink-0 flex-col gap-2">
+    <div v-if="$slots.actions" class="mt-2 flex shrink-0 flex-col gap-2" :class="isCompact ? 'w-12 items-center' : ''">
       <slot name="actions" :compact="isCompact" />
     </div>
 
     <div v-if="$slots.footer" class="mt-2 shrink-0 overflow-hidden border-t border-line pt-3">
-      <slot name="footer" :compact="isCompact" />
+      <div v-if="isCompact" class="flex w-12 justify-center">
+        <slot name="footer" :compact="true" />
+      </div>
+      <slot v-else name="footer" :compact="false" />
     </div>
 
     <!-- The edge itself is the handle: a few pixels either side of the

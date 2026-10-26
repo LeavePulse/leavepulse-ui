@@ -129,7 +129,7 @@ const drawer = ref(false)
         <template #header-actions>
           <!-- The primary action changes with the section — present or absent,
                short label or long. That is what moves everything to its left. -->
-          <LpButton v-if="sectionAction" size="sm">
+          <LpButton v-if="sectionAction" :key="sectionAction" size="sm">
             <LpIcon name="lucide:plus" :size="16" />
             {{ sectionAction }}
           </LpButton>

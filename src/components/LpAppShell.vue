@@ -317,7 +317,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
              translation that wraps a long title onto a second line, otherwise
              re-lays the whole bar in one frame. Width is left free so the
              truncation still resolves against the space actually available. -->
-        <LpShift axis="height" class="flex min-w-0 flex-1 items-center">
+        <LpShift axis="height" presence class="flex min-w-0 flex-1 items-center">
           <slot name="header-title">
             <h1 class="truncate text-lg font-semibold">{{ pageTitle }}</h1>
           </slot>
@@ -339,6 +339,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
              the title keeps a third and every button stays reachable. -->
         <LpShift
           axis="width"
+          anchor="end"
+          presence
           class="ml-auto flex max-w-[66%] shrink items-center gap-2 overflow-x-auto lp-scrollbar-none md:max-w-none md:shrink-0 md:overflow-visible"
         >
           <slot name="header-actions" />
