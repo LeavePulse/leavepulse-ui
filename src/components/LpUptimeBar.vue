@@ -10,6 +10,7 @@ export type { UptimeEvent, UptimeSegment, UptimeStatus } from "./uptimeBar"
 import { computed, ref } from "vue"
 import LpNumberFlow from "./LpNumberFlow.vue"
 import LpRollingText from "./LpRollingText.vue"
+import LpShift from "./LpShift.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
 import LpTooltip from "./LpTooltip.vue"
@@ -217,30 +218,32 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </LpSkeleton>
     <LpTooltip v-else :delay="80" follow-cursor side="top" :disabled="hovered === null">
       <template #content>
-        <span v-if="tip" class="flex min-w-36 flex-col gap-1">
-          <span class="flex items-center gap-1.5">
-            <span
-              class="size-1.5 shrink-0 rounded-full"
-              :style="{ backgroundColor: colorFor(tip.status) }"
-            />
-            <LpRollingText :value="tip.text" :duration="180" align="start" class="font-medium" />
-          </span>
-          <span v-if="tip.range" class="text-[0.7rem] opacity-70 tabular-nums">{{ tip.range }}</span>
-          <span v-if="tip.parts.length > 1 || (tip.parts.length === 1 && tip.parts[0].status !== tip.status)" class="mt-0.5 flex flex-col gap-0.5">
-            <span v-for="part in tip.parts" :key="part.status" class="flex items-center gap-1.5 tabular-nums">
-              <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: colorFor(part.status) }" />
-              <span class="flex-1">{{ part.text }}</span>
-              <span class="opacity-80">{{ part.time }}</span>
+        <LpShift v-if="tip" axis="both" class="flex">
+          <span class="flex min-w-36 flex-col gap-1">
+            <span class="flex items-center gap-1.5">
+              <span
+                class="size-1.5 shrink-0 rounded-full transition-colors duration-[var(--duration-fast)]"
+                :style="{ backgroundColor: colorFor(tip.status) }"
+              />
+              <LpRollingText :value="tip.text" :duration="180" align="start" class="font-medium" />
+            </span>
+            <LpRollingText v-if="tip.range" :value="tip.range" :duration="180" align="start" class="text-[0.7rem] opacity-70 tabular-nums" />
+            <span v-if="tip.parts.length > 1 || (tip.parts.length === 1 && tip.parts[0].status !== tip.status)" class="mt-0.5 flex flex-col gap-0.5">
+              <span v-for="part in tip.parts" :key="part.status" class="flex items-center gap-1.5 tabular-nums">
+                <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: colorFor(part.status) }" />
+                <span class="flex-1">{{ part.text }}</span>
+                <LpRollingText :value="part.time" :duration="180" align="end" class="opacity-80" />
+              </span>
+            </span>
+            <span v-if="tip.events.length" class="mt-0.5 flex flex-col gap-0.5 border-t border-current/15 pt-1">
+              <span v-for="(event, n) in tip.events" :key="n" class="flex items-baseline gap-1.5">
+                <LpRollingText v-if="event.at" :value="event.at" :duration="180" align="start" class="shrink-0 tabular-nums opacity-70" />
+                <LpRollingText :value="event.text" :duration="180" align="start" wrap />
+              </span>
+              <span v-if="tip.more" class="opacity-70">+{{ tip.more }}</span>
             </span>
           </span>
-          <span v-if="tip.events.length" class="mt-0.5 flex flex-col gap-0.5 border-t border-current/15 pt-1">
-            <span v-for="(event, n) in tip.events" :key="n" class="flex items-baseline gap-1.5">
-              <span v-if="event.at" class="shrink-0 tabular-nums opacity-70">{{ event.at }}</span>
-              <span>{{ event.text }}</span>
-            </span>
-            <span v-if="tip.more" class="opacity-70">+{{ tip.more }}</span>
-          </span>
-        </span>
+        </LpShift>
       </template>
 
       <!--

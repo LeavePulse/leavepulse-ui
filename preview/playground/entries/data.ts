@@ -360,15 +360,30 @@ export const data: ComponentEntry[] = [
   {
     id: "uptime-bar",
     name: "Uptime Bar",
-    description: "Status-page uptime scale: per-slice tooltips and a computed %. `loading` pulses a row of ticks at the bar's height (as many as `segments` holds, else `skeletonSlices`) and holds the figure, so the captions around it stay put.",
+    description: "Status-page uptime scale. The figure counts real time: give each slice its `durations` (ms in each state) and one bad minute costs a minute, not a whole slice; without them slices weigh by their `start`–`end` span. It is never rounded up to 100% over an outage, and `uptime` takes an exact figure from the server instead. Hovering a slice shows its span, the time it spent in each state and its `events`. `loading` pulses a row of ticks at the bar's height and holds the figure, so the captions around it stay put.",
     components: { LpUptimeBar, LpSwitch },
     state: () =>
       reactive({
         loading: false,
         days: Array.from({ length: 60 }, (_, i) => {
-          const status =
-            i === 12 ? "down" : i === 33 || i === 34 ? "degraded" : i === 50 ? "maintenance" : "operational"
-          return { status, label: `Day ${i + 1} — ${status}` }
+          const DAY = 86_400_000
+          const MIN = 60_000
+          const start = Date.UTC(2026, 7, 27) + i * DAY
+          const trouble: Record<number, { status: "down" | "degraded" | "maintenance"; minutes: number; at: number; text: string }> = {
+            12: { status: "down", minutes: 47, at: 14 * 60 + 5, text: "Database failover, 47 min down" },
+            33: { status: "degraded", minutes: 180, at: 9 * 60, text: "Slow responses from the EU region" },
+            34: { status: "degraded", minutes: 12, at: 7 * 60 + 40, text: "Latency spike" },
+            50: { status: "maintenance", minutes: 20, at: 3 * 60, text: "Planned upgrade" },
+          }
+          const t = trouble[i]
+          if (!t) return { status: "operational", start, end: start + DAY, durations: { operational: DAY } }
+          return {
+            status: t.status,
+            start,
+            end: start + DAY,
+            durations: { operational: DAY - t.minutes * MIN, [t.status]: t.minutes * MIN },
+            events: [{ at: start + t.at * MIN, text: t.text, status: t.status }],
+          }
         }),
       }),
     template: `<div class="w-96 flex flex-col gap-6">
