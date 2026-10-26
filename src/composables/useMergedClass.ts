@@ -1,5 +1,6 @@
 import { computed, useAttrs, type ComputedRef, type MaybeRefOrGetter, toValue } from "vue"
-import { cn } from "tailwind-variants"
+import { extendTailwindMerge } from "tailwind-merge"
+import { cx } from "tailwind-variants"
 
 /*
  * "The class the consumer passed should win."
@@ -23,6 +24,28 @@ import { cn } from "tailwind-variants"
  * the component said nothing about shadows.
  */
 
+/*
+ * tailwind-merge knows Tailwind's own scales only, so the kit's named tokens
+ * (`rounded-card`, `shadow-panel`, `ease-emphasized`) looked like unrelated
+ * classes to it: `class="rounded-card"` on a box that rounds itself
+ * `rounded-control` kept both, and stylesheet order picked the control radius.
+ * Named here from tokens.css, so a consumer's token wins like any utility.
+ */
+const kitMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      radius: ["control", "card", "pill", "inner", "small"],
+      shadow: ["panel"],
+      ease: ["emphasized", "travel", "settle"],
+    },
+  },
+})
+
+function merge(...classes: (string | undefined | null | false)[]): string {
+  const joined = cx(...classes)
+  return joined ? kitMerge(joined) : ""
+}
+
 /**
  * Merges the component's own classes with the `class` attribute the consumer
  * passed, resolving Tailwind conflicts in the consumer's favour.
@@ -43,7 +66,7 @@ export function useMergedClass(
   const attrs = useAttrs()
   // `cn` returns undefined when everything it was given was empty; a class
   // binding is happier with "" than with undefined.
-  return computed(() => cn(toValue(own), attrs.class as string | undefined) ?? "")
+  return computed(() => merge(toValue(own), attrs.class as string | undefined))
 }
 
 /**
@@ -82,5 +105,5 @@ export function useMergedAttrs(own: MaybeRefOrGetter<string | undefined>): {
  * component merging a class onto a child rather than its own root.
  */
 export function mergeClass(...classes: (string | undefined | null | false)[]): string {
-  return cn(...classes) ?? ""
+  return merge(...classes)
 }
