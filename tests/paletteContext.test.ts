@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { ref } from "vue"
-import { createPaletteRegistry, mergePaletteCommands } from "../src/composables/usePaletteCommands"
+import { effectScope, ref } from "vue"
+import { createPaletteRegistry, mergePaletteCommands, usePaletteCommands } from "../src/composables/usePaletteCommands"
 import { searchCommandItems, parseCommandQuery, swapCommandLayout } from "../src/components/commandSearch"
 
 test("layout fallback works in either direction and retains operator filters", () => {
@@ -55,4 +55,19 @@ test("discovered commands keep their id across remounts and number a shared labe
   expect(registry.commands.value.map(c => c.id)).toContain("page/CPU")
   registry.register({ priority: 10, commands: () => [{ id: "page/CPU", label: "Manual CPU" }] })
   expect(registry.commands.value.filter(c => c.id === "page/CPU").map(c => c.label)).toEqual(["Manual CPU"])
+})
+
+test("a discovered command is found by the name of the scope it sits in", () => {
+  const registry = createPaletteRegistry()
+  const scope = { registry, id: "settings", label: "Settings", depth: 1, enabled: true, discover: true }
+  const run = effectScope()
+  run.run(() => {
+    usePaletteCommands(() => [{ id: "settings/save", label: "Save" }], { automatic: true, scope })
+    usePaletteCommands(() => [{ id: "settings/export", label: "Export", keywords: ["csv"] }], { scope })
+  })
+  const [manual, found] = registry.commands.value
+  expect(found!.keywords).toEqual(["Settings"])
+  expect(manual!.keywords).toEqual(["csv"])
+  expect(searchCommandItems(registry.commands.value, parseCommandQuery("settings save")).items.map(c => c.id)).toEqual(["settings/save"])
+  run.stop()
 })

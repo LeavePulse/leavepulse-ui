@@ -89,7 +89,13 @@ export function usePaletteCommands(commands: MaybeRefOrGetter<readonly Command[]
     automatic: options.automatic,
     priority: scope.depth * 100 + (options.automatic ? 0 : 10),
     commands: () => scope.enabled && (!options.automatic || scope.discover)
-      ? toValue(commands).map(command => ({ ...command, group: command.group ?? scope.label })) : [],
+      ? toValue(commands).map(command => ({
+        ...command,
+        group: command.group ?? scope.label,
+        // A discovered "Save" or "Restart" says nothing on its own: typing the
+        // page or card it sits in ("settings save") has to find it.
+        keywords: options.automatic ? [...(command.keywords ?? []), scope.label] : command.keywords,
+      })) : [],
   })
   onScopeDispose(unregister)
 }
