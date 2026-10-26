@@ -12,7 +12,7 @@
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
-import { scrollParent } from "../composables/scroll"
+import { atScrollEnd, scrollParent } from "../composables/scroll"
 import { usePillTransition } from "../composables/usePillTransition"
 
 export interface TocLink {
@@ -112,9 +112,7 @@ function setup() {
     const line = Math.max(props.offset, view / 4)
     for (const el of headings) if (el.getBoundingClientRect().top - top <= line + 1) current = el.id
     const scrolled = scroller ? scroller.scrollTop : window.scrollY
-    const end = scroller
-      ? scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
-      : window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2
+    const end = atScrollEnd(headings[0])
     if (scrolled > 0 && end) current = headings[headings.length - 1]!.id
     activeId.value = current
   }

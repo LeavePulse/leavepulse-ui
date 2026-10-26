@@ -3,6 +3,7 @@
 // appended to it, so opt out of the automatic pass-through that would add it
 // a second time, unmerged.
 export default { inheritAttrs: false }
+export type { UptimeEvent, UptimeSegment, UptimeStatus } from "./uptimeBar"
 </script>
 
 <script setup lang="ts">
@@ -15,15 +16,10 @@ import LpTooltip from "./LpTooltip.vue"
 import { TONES } from "./tone"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
+import { useLocale } from "../composables/useLocale"
+import { DEFAULT_UNIT_LABELS, formatTime, toEpoch, type TimeUnitLabels } from "./timeSpan"
+import { UPTIME_SEVERITY, uptimeFigure, uptimeRange, uptimeShare, type UptimeSegment, type UptimeStatus } from "./uptimeBar"
 
-export type UptimeStatus = "operational" | "degraded" | "down" | "maintenance" | "empty"
-
-export interface UptimeSegment {
-  /** Health of this slice. `empty` renders a faded placeholder (no data). */
-  status: UptimeStatus
-  /** Optional rich tooltip body; falls back to a humanised status. */
-  label?: string
-}
 
 const props = withDefaults(
   defineProps<{
@@ -35,6 +31,13 @@ const props = withDefaults(
     endLabel?: string
     /** Show the computed uptime % above the bar. */
     showUptime?: boolean
+    /**
+     * The uptime figure, when the app has a more exact one than the slices
+     * (a server that counted every minute). Otherwise it is worked out from
+     * the slices: their `durations`, else their spans, else their count.
+     */
+    uptime?: number | null
+    locale?: string
     /** Override the headline shown next to the uptime %. */
     title?: string
     /**
@@ -44,7 +47,7 @@ const props = withDefaults(
      */
     colors?: Partial<Record<UptimeStatus, string>>
     /** Status names, for the tooltip and screen readers. */
-    labels?: Partial<Record<UptimeStatus | "loading", string>>
+    labels?: Partial<Record<UptimeStatus | "loading" | "uptime", string>>
     /**
      * The history is on its way. The row of ticks pulses in place of the
      * slices (as many as `segments` already holds, else `skeletonSlices`) at
@@ -88,26 +91,18 @@ const statusLabel = useLabels(
     maintenance: "Maintenance",
     empty: "No data",
     loading: "Loading",
+    uptime: "uptime",
   },
   () => props.labels,
 )
 
 const skeletonCount = computed(() => props.segments.length || props.skeletonSlices)
 
-// Uptime counts only slices with data; operational + maintenance are "up".
-const uptimePct = computed(() => {
-  const tracked = props.segments.filter((s) => s.status !== "empty")
-  if (!tracked.length) return null
-  const up = tracked.filter((s) => s.status === "operational" || s.status === "maintenance").length
-  return (up / tracked.length) * 100
-})
+const locale = useLocale(() => props.locale)
+const units = useLabels<TimeUnitLabels>("time", DEFAULT_UNIT_LABELS)
 
-/*
- * Places actually needed, so trailing zeros stay trimmed: 100 rather than
- * 100.00, 99.9 rather than 99.90. The counter needs a fixed count per render —
- * it cannot "trim" mid-roll without changing the row's shape — so it is derived
- * from the value instead of hard-coded at two.
- */
+const uptimePct = computed(() => (props.uptime ?? null) !== null ? props.uptime! : uptimeShare(props.segments))
+
 /*
  * The gap is drawn INSIDE each slice, not between slices.
  *
@@ -136,7 +131,24 @@ const tip = computed(() => {
   if (i == null) return null
   const seg = props.segments[i]
   if (!seg) return null
-  return { status: seg.status, text: seg.label ?? statusLabel.value[seg.status] }
+  return {
+    status: seg.status,
+    text: seg.label ?? statusLabel.value[seg.status],
+    range: seg.start !== undefined ? uptimeRange(seg.start, seg.end, locale.value) : "",
+    parts: UPTIME_SEVERITY.filter((st) => (seg.durations?.[st] ?? 0) > 0).map((st) => ({
+      status: st,
+      text: statusLabel.value[st],
+      time: formatTime(seg.durations![st]!, "units", units.value, 2),
+    })),
+    events: (seg.events ?? []).slice(0, 4).map((e) => ({
+      status: e.status ?? seg.status,
+      text: e.text,
+      at: e.at !== undefined && Number.isFinite(toEpoch(e.at))
+        ? new Intl.DateTimeFormat(locale.value, { hour: "2-digit", minute: "2-digit" }).format(toEpoch(e.at))
+        : "",
+    })),
+    more: Math.max(0, (seg.events?.length ?? 0) - 4),
+  }
 })
 
 /*
@@ -165,12 +177,7 @@ function onSlotKeydown(e: KeyboardEvent, i: number) {
   slots.value[next]?.focus()
 }
 
-const uptimeDecimals = computed(() => {
-  const v = uptimePct.value
-  if (v == null) return 0
-  const trimmed = Number(v.toFixed(2))
-  return Number.isInteger(trimmed) ? 0 : String(trimmed).split(".")[1].length
-})
+const figure = computed(() => (uptimePct.value == null ? null : uptimeFigure(uptimePct.value)))
 
 // The bar sets its own gap between the strip and its caption, which a compact status row has to close.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -210,12 +217,29 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </LpSkeleton>
     <LpTooltip v-else :delay="80" follow-cursor side="top" :disabled="hovered === null">
       <template #content>
-        <span v-if="tip" class="flex items-center gap-1.5">
-          <span
-            class="size-1.5 shrink-0 rounded-full"
-            :style="{ backgroundColor: colorFor(tip.status) }"
-          />
-          <LpRollingText :value="tip.text" :duration="180" align="start" />
+        <span v-if="tip" class="flex min-w-36 flex-col gap-1">
+          <span class="flex items-center gap-1.5">
+            <span
+              class="size-1.5 shrink-0 rounded-full"
+              :style="{ backgroundColor: colorFor(tip.status) }"
+            />
+            <LpRollingText :value="tip.text" :duration="180" align="start" class="font-medium" />
+          </span>
+          <span v-if="tip.range" class="text-[0.7rem] opacity-70 tabular-nums">{{ tip.range }}</span>
+          <span v-if="tip.parts.length > 1 || (tip.parts.length === 1 && tip.parts[0].status !== tip.status)" class="mt-0.5 flex flex-col gap-0.5">
+            <span v-for="part in tip.parts" :key="part.status" class="flex items-center gap-1.5 tabular-nums">
+              <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: colorFor(part.status) }" />
+              <span class="flex-1">{{ part.text }}</span>
+              <span class="opacity-80">{{ part.time }}</span>
+            </span>
+          </span>
+          <span v-if="tip.events.length" class="mt-0.5 flex flex-col gap-0.5 border-t border-current/15 pt-1">
+            <span v-for="(event, n) in tip.events" :key="n" class="flex items-baseline gap-1.5">
+              <span v-if="event.at" class="shrink-0 tabular-nums opacity-70">{{ event.at }}</span>
+              <span>{{ event.text }}</span>
+            </span>
+            <span v-if="tip.more" class="opacity-70">+{{ tip.more }}</span>
+          </span>
         </span>
       </template>
 
@@ -235,7 +259,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           type="button"
           class="lp-uptime__slot min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :tabindex="i === tabStop ? 0 : -1"
-          :aria-label="seg.label ?? statusLabel[seg.status]"
+          :aria-label="[seg.label ?? statusLabel[seg.status], seg.start !== undefined ? uptimeRange(seg.start, seg.end, locale) : ''].filter(Boolean).join(', ')"
           @pointerenter="hovered = i"
           @focus="focusIndex = i; hovered = i"
           @blur="hovered === i && (hovered = null)"
@@ -275,13 +299,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           class="inline-block h-[0.9em] w-8 align-middle"
         />
         <LpNumberFlow
-          v-else-if="uptimePct != null"
-          :value="uptimePct"
-          :decimals="uptimeDecimals"
+          v-else-if="figure"
+          :value="figure.value"
+          :decimals="figure.decimals"
           suffix="%"
         />
         <template v-else>—</template>
-        <span class="text-muted"> uptime</span>
+        <span class="text-muted"> {{ statusLabel.uptime }}</span>
       </span>
       <span class="h-px flex-1 bg-line" />
       <span class="shrink-0">{{ endLabel }}</span>

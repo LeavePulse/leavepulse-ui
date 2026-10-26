@@ -1,5 +1,6 @@
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { prefersReducedMotion } from "./easing"
+import { atScrollEnd } from "./scroll"
 
 /*
  * "Has this element actually been SEEN yet?"
@@ -67,10 +68,16 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
   const revealed = ref(typeof window === "undefined")
 
   let observer: IntersectionObserver | null = null
+  let edge: IntersectionObserver | null = null
+  let onScroll: (() => void) | null = null
 
   function stop() {
     observer?.disconnect()
     observer = null
+    edge?.disconnect()
+    edge = null
+    if (onScroll) window.removeEventListener("scroll", onScroll, true)
+    onScroll = null
   }
 
   function reveal() {
@@ -103,6 +110,28 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
         { threshold, rootMargin },
       )
       observer.observe(node)
+
+      /*
+       * The margin shrinks the viewport from below, so the last element of a
+       * page sits in that strip for good: there is no more scroll to lift it
+       * out, and its count-up never started (a figure at the bottom of a
+       * dashboard stayed at 0). On screen with nowhere left to scroll is an
+       * arrival too.
+       */
+      let onScreen = false
+      const check = () => {
+        if (onScreen && atScrollEnd(node)) reveal()
+      }
+      edge = new IntersectionObserver(
+        (entries) => {
+          onScreen = entries.some((entry) => entry.isIntersecting)
+          check()
+        },
+        { threshold },
+      )
+      edge.observe(node)
+      onScroll = check
+      window.addEventListener("scroll", onScroll, { capture: true, passive: true })
     },
     { immediate: true, flush: "post" },
   )

@@ -26,6 +26,17 @@ export function scrollParent(el: Element | null | undefined, { axis = "y", self 
   return null
 }
 
+/**
+ * Whether `el`'s scroller (or the page) has no more room to scroll down.
+ * `slack` absorbs the pixel a rounded-up scrollHeight can sit above the sum.
+ */
+export function atScrollEnd(el: Element | null | undefined, slack = 2): boolean {
+  if (!el) return false
+  const box = scrollParent(el) ?? (el.ownerDocument.scrollingElement as HTMLElement | null)
+  if (!box) return true
+  return box.scrollTop + box.clientHeight >= box.scrollHeight - slack
+}
+
 export interface ScrollToElementOptions {
   /** `nearest` scrolls only when the element is out of view. */
   block?: "nearest" | "center" | "start"
