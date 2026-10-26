@@ -204,7 +204,7 @@ async function settle(t: ToastItem, run: () => void | Promise<void>) {
  */
 const copyable = (t: ToastItem) => t.variant === "error" || t.variant === "warning"
 // Read on click rather than bound, so a toast whose text is updated in place copies what it now says.
-const toastText = (t: ToastItem) => () => [t.title, t.message, t.details].filter(Boolean).join("\n")
+const toastText = (t: ToastItem) => () => [t.title, t.message, t.details, t.context].filter(Boolean).join("\n")
 
 function selecting(): boolean {
   return Boolean(window.getSelection()?.toString())

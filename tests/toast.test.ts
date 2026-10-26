@@ -45,3 +45,34 @@ describe("toast.promise", () => {
     expect(toast.queue.at(-1)?.details).toBe("GET /z · 500")
   })
 })
+
+describe("toast trace", () => {
+  const toast = useToast()
+  beforeEach(() => toast.clear())
+
+  test("a code fault without details copies its type and stack", () => {
+    const error = new TypeError("can't access property \"events\", pe is undefined")
+    error.stack = "me@https://x/assets/index.js:1:200\nqe@https://x/assets/index.js:1:300"
+    toast.error(error)
+    expect(toast.queue.at(-1)?.details).toBe(
+      "TypeError: can't access property \"events\", pe is undefined\nme@https://x/assets/index.js:1:200\nqe@https://x/assets/index.js:1:300",
+    )
+  })
+
+  test("a stack that already starts with the message keeps it once", () => {
+    const error = new Error("boom")
+    error.stack = "Error: boom\n    at f (a.js:1:1)"
+    toast.error("Not loaded", { cause: error })
+    expect(toast.queue.at(-1)?.details).toBe("Error: boom\n    at f (a.js:1:1)")
+  })
+
+  test("request details still win over the trace", () => {
+    toast.error(Object.assign(new Error("x"), { details: "GET /a · 500" }))
+    expect(toast.queue.at(-1)?.details).toBe("GET /a · 500")
+  })
+
+  test("an error toast notes when it came up", () => {
+    toast.error("Plain")
+    expect(toast.queue.at(-1)?.context).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+})

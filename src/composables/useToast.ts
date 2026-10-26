@@ -25,6 +25,8 @@ export interface ToastItem {
   onClick?: () => void | Promise<void>
   /** Copied with the message, not shown: what a bug report needs (request, status, ids). */
   details?: string
+  /** Page and moment an error toast came up, copied last: "it broke" rarely says where or when. */
+  context?: string
 }
 
 export interface ToastOptions {
@@ -61,9 +63,26 @@ function detailsOf(source: unknown, depth = 0): string | undefined {
   return detailsOf(cause, depth + 1)
 }
 
+// A code fault (TypeError and the like) has no request behind it, and its
+// message alone ("x is undefined") says nothing about where it happened: the
+// copy gets its type and stack instead. Firefox and Safari leave the message
+// out of `stack`, Chromium starts with it; the head is written once either way.
+function traceOf(source: unknown): string | undefined {
+  if (!(source instanceof Error)) return undefined
+  const head = `${source.name}: ${source.message}`
+  const frames = (source.stack ?? "").split("\n").filter((line) => line.trim() && line.trim() !== head)
+  const own = [head, ...frames].join("\n")
+  const inner = traceOf(source.cause)
+  return inner ? `${own}\nCaused by ${inner}` : own
+}
+
 function split(message: ToastMessage, options: ToastOptions): [string, ToastOptions] {
   const text = typeof message === "string" ? message : message.message
-  const details = options.details ?? (typeof message === "string" ? undefined : detailsOf(message)) ?? detailsOf(options.cause)
+  const details =
+    options.details ??
+    (typeof message === "string" ? undefined : detailsOf(message)) ??
+    detailsOf(options.cause) ??
+    traceOf(typeof message === "string" ? options.cause : message)
   return [text, { ...options, details }]
 }
 
@@ -101,6 +120,7 @@ function push(
     actions: options.actions,
     onClick: options.onClick,
     details: options.details,
+    context: variant === "error" ? [globalThis.location?.href, new Date().toISOString()].filter(Boolean).join(" · ") : undefined,
   }
 
   const same = options.key === undefined ? -1 : queue.findIndex((t) => t.key === options.key)
