@@ -281,6 +281,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :pill="false"
         :pill-id="pillId"
         compact
+        group
         :on-path="section.items.some((i) => itemActive(i) || onPath(i))"
         :preview-delay="previewDelay"
         :item-active="itemActive"

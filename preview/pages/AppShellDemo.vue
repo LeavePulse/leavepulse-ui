@@ -16,6 +16,7 @@ import {
   LpIcon,
   LpSegmented,
   LpStat,
+  LpTabs,
   type SidebarItem,
   type SidebarSection,
 } from "../../src"
@@ -53,6 +54,7 @@ const sections = computed<SidebarSection[]>(() => [
   },
   {
     title: "Account",
+    collapsible: true,
     items: [
       { id: "/team", label: "Team", icon: "lucide:users", badge: 3 },
       { id: "/settings", label: "Settings", icon: "lucide:settings" },
@@ -124,6 +126,9 @@ const drawer = ref(false)
               {{ sectionSubtitle }}
             </p>
           </div>
+          <!-- Tabs inside the eased title block: their marker still slides,
+               the block's own fades leave it alone. -->
+          <LpTabs v-model="section" :items="sectionOptions" variant="underline" label="Header section" class="ml-4 max-md:hidden" />
         </template>
 
         <template #header-actions>

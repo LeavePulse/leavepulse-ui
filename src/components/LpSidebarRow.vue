@@ -31,6 +31,8 @@ const props = withDefaults(
     pill: boolean
     pillId: string
     compact?: boolean
+    /** A folded group standing in for its pages: a click opens its card. */
+    group?: boolean
     /** A page under another: indented, a size smaller. */
     nested?: boolean
     menu?: ContextMenuItemDef[]
@@ -98,11 +100,25 @@ const initials = computed(() =>
 const hidden = computed(() => (props.compact || !props.expanded) && !!props.item.children?.some(waiting))
 const hasBadge = computed(() => props.item.badge != null || !!props.item.dot || hidden.value)
 const card = computed(() => !props.item.disabled && (props.compact || !!props.item.preview))
+
+// A folded group with no page of its own is reached only through its card, so
+// a click opens the card rather than waiting for the pointer to rest: a click
+// that does nothing on a nav icon reads as broken.
+const cardOpen = ref(false)
+const opensCard = computed(() => props.compact && props.group && !!props.item.children?.length)
+function press(): void {
+  if (opensCard.value) {
+    cardOpen.value = !cardOpen.value
+    return
+  }
+  emit("activate", props.item)
+}
 const delay = computed(() => (props.compact && !props.item.preview ? 250 : props.previewDelay))
 </script>
 
 <template>
   <LpHoverCard
+      v-model:open="cardOpen"
       :disabled="!card"
       side="right"
       align="start"
@@ -136,7 +152,8 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
                 ? 'text-ink'
                 : 'text-muted hover:text-ink',
           ]"
-          @click="emit('activate', item)"
+          :aria-expanded="opensCard ? cardOpen : undefined"
+          @click="press"
           @pointerenter="emit('hover', item)"
         >
           <span

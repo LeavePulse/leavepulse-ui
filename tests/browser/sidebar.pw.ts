@@ -44,3 +44,14 @@ test("arrows walk the rows, open the pages under one and type jumps to a row", a
   await page.keyboard.type("te")
   await expect(rail.getByRole("button", { name: /^Team/ })).toBeFocused()
 })
+
+test("a click on a folded group opens its pages, not only a rest of the pointer", async ({ page }) => {
+  await page.goto("/page/appshell")
+  const rail = page.getByRole("navigation", { name: "Sidebar" }).nth(1)
+  await rail.getByRole("button", { name: "Collapse the sidebar", exact: true }).click()
+  const group = rail.getByRole("button", { name: "Account", exact: true })
+  await group.dispatchEvent("click")
+  await expect(group).toHaveAttribute("aria-expanded", "true")
+  await expect(page.getByRole("button", { name: /^Team/ }).last()).toBeVisible()
+  await rail.getByRole("button", { name: "Expand the sidebar", exact: true }).click()
+})

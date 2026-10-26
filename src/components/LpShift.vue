@@ -57,9 +57,10 @@ const props = withDefaults(
      * Fade the box's own children in and out as they come and go. Without it
      * the box glides but a control still pops into being as the edge uncovers
      * it, and one that leaves is gone in a frame while its space closes up.
-     * Only direct children: what a child does inside itself is its own affair,
-     * so a control that changes its label carries the label as its `key` and
-     * is replaced, the old one fading as the new one arrives.
+     * Anything that takes room counts, at any depth, since controls often
+     * arrive by teleport into a wrapper inside the box; an absolutely placed
+     * overlay (a tab's marker) does not, it moves nothing and animates itself.
+     * Markup put back unchanged by a re-render is not animated either.
      */
     presence?: boolean
   }>(),
@@ -105,6 +106,7 @@ interface Seen {
   height: number
   x: number
   y: number
+  flow: boolean
 }
 
 const seen = new WeakMap<Element, Seen>()
@@ -129,15 +131,48 @@ function remember(box: HTMLElement) {
       height: r.height,
       x: r.left,
       y: r.top,
+      flow: inFlow(node),
     })
   }
+}
+
+// Only what takes room in the box comes and goes visibly. An overlay inside a
+// control (a tab's sliding marker, a badge pinned to a corner) moves nothing
+// around it and is animated by its own component; fading it in on top would
+// override that animation's transform, and the marker would pop instead of
+// sliding.
+function inFlow(node: Element): boolean {
+  const position = getComputedStyle(node).position
+  return position !== "absolute" && position !== "fixed"
+}
+
+// A re-render that puts back the same markup (a page redrawing its header
+// actions, a list re-keyed after a reload) is not a change anyone sees, so the
+// pair is left alone rather than flashing out and in.
+function signature(node: Node): string | undefined {
+  return node instanceof Element ? node.outerHTML : undefined
+}
+
+function unchanged(records: MutationRecord[]): Set<Node> {
+  const removed = new Map<string, Node[]>()
+  for (const record of records) record.removedNodes.forEach((node) => {
+    const key = signature(node)
+    if (key) removed.set(key, [...(removed.get(key) ?? []), node])
+  })
+  const same = new Set<Node>()
+  for (const record of records) record.addedNodes.forEach((node) => {
+    const key = signature(node)
+    const twin = key ? removed.get(key)?.shift() : undefined
+    if (twin) same.add(twin).add(node)
+  })
+  return same
 }
 
 const offset = () => (props.anchor === "end" ? -6 : 6)
 
 function ghost(box: HTMLElement, node: Element) {
   const at = seen.get(node)
-  if (!at || !(node instanceof HTMLElement) || node.hasAttribute(GHOST) || at.width === 0) return
+  if (!at || !at.flow || !(node instanceof HTMLElement) || node.hasAttribute(GHOST) || at.width === 0) return
   const copy = node.cloneNode(true) as HTMLElement
   copy.setAttribute(GHOST, "")
   copy.setAttribute("aria-hidden", "true")
@@ -172,7 +207,7 @@ function ghost(box: HTMLElement, node: Element) {
 }
 
 function arrive(node: Element) {
-  if (!(node instanceof HTMLElement) || node.hasAttribute(GHOST)) return
+  if (!(node instanceof HTMLElement) || node.hasAttribute(GHOST) || !inFlow(node)) return
   node.animate(
     [
       { opacity: 0, transform: `translateX(${offset()}px) scale(0.96)`, filter: "blur(2px)" },
@@ -208,11 +243,12 @@ watch(
       )
       if (real.length && !prefersReducedMotion()) {
         const added = new Set<Node>()
+        const same = unchanged(real)
         for (const record of real) {
-          record.removedNodes.forEach((node) => node instanceof Element && ghost(box, node))
+          record.removedNodes.forEach((node) => node instanceof Element && !same.has(node) && ghost(box, node))
           record.addedNodes.forEach((node) => {
             added.add(node)
-            if (node instanceof Element) arrive(node)
+            if (node instanceof Element && !same.has(node)) arrive(node)
           })
         }
         // Measured in the next frame, which still comes before the paint: by
