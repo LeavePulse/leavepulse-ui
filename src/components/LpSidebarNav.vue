@@ -12,19 +12,15 @@ export default { inheritAttrs: false }
  * in two shells — the static desktop rail and the swipeable mobile drawer —
  * without duplicating markup. Not exported on its own; an LpSidebar detail.
  */
-import { Motion } from "motion-v"
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from "reka-ui"
 import { computed, ref } from "vue"
-import { useLocale } from "../composables/useLocale"
-import { usePillTransition } from "../composables/usePillTransition"
 import LpBadge from "./LpBadge.vue"
 import LpContextMenu from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpSkeleton from "./LpSkeleton.vue"
+import LpSidebarRow from "./LpSidebarRow.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
-import { resolveLink, type ResolvedLink } from "./link"
-import { useLinkComponent } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
 const props = withDefaults(
@@ -52,22 +48,24 @@ const props = withDefaults(
      * short rail (an app switcher, a settings list) can turn it on.
      */
     hoverFollow?: boolean
+    /** Icons only, each row's name in a card beside it. */
+    compact?: boolean
+    /** Rows offer "Pin to top" in their menu; `pinned` are shown first. */
+    pinnable?: boolean
+    pinned?: SidebarItem[]
+    previewDelay?: number
+    labels: { pinned: string; pin: string; unpin: string; expand: string }
   }>(),
-  { skeletonRows: 6, skeletonHeader: true, collapsedKeys: () => [], hoverFollow: false },
+  { skeletonRows: 6, skeletonHeader: true, collapsedKeys: () => [], hoverFollow: false, pinned: () => [], previewDelay: 900 },
 )
 
 const emit = defineEmits<{
   (e: "activate", item: SidebarItem): void
   (e: "toggle-section", key: string, collapsed: boolean): void
+  (e: "toggle-pin", id: string): void
 }>()
 
 /** `key` when the app set one, else the title — see SidebarSection.key. */
-// A count reads in the app's locale like every other figure: "7 563", not "7563".
-const locale = useLocale()
-function badgeText(badge: number | string): string {
-  return typeof badge === "number" ? badge.toLocaleString(locale.value) : badge
-}
-
 function sectionKey(section: SidebarSection): string {
   return section.key ?? section.title ?? ""
 }
@@ -80,7 +78,7 @@ function sectionKey(section: SidebarSection): string {
 const foldedKeys = computed(() => {
   const holdsActive = new Set(
     props.groups
-      .filter((g) => g.items.some((i) => props.itemActive(i)))
+      .filter((g) => g.items.some((i) => props.itemActive(i) || onPath(i)))
       .map(sectionKey),
   )
   return new Set(
@@ -89,10 +87,9 @@ const foldedKeys = computed(() => {
 })
 
 function isOpen(section: SidebarSection): boolean {
-  return !foldedKeys.value.has(sectionKey(section))
+  // Compact, a group has no heading to unfold it by.
+  return props.compact || !foldedKeys.value.has(sectionKey(section))
 }
-
-const pillTransition = usePillTransition()
 
 const hovered = ref<string | null>(null)
 
@@ -105,16 +102,50 @@ function pillUnder(item: SidebarItem): boolean {
   return hovered.value ? hovered.value === item.id : props.itemActive(item)
 }
 
-const linkComponent = useLinkComponent()
+/** One of the item's pages is the current one. */
+function onPath(item: SidebarItem): boolean {
+  return !!item.children?.some((c) => props.itemActive(c))
+}
 
-/*
- * A disabled item is always a disabled button: an anchor cannot be disabled,
- * and the old enabled-button fallback for a disabled link stayed focusable.
- */
-function rowOf(item: SidebarItem): ResolvedLink {
-  const link = item.disabled ? null : resolveLink(linkComponent.value, { to: item.to, href: item.href })
-  if (link) return link
-  return { is: "button", props: { type: "button", disabled: item.disabled || undefined } }
+// Pages under a row open with the current page among them and otherwise when
+// asked; the asked-for ones are remembered for as long as the nav lives.
+const opened = ref(new Set<string>())
+function expanded(item: SidebarItem): boolean {
+  return onPath(item) || opened.value.has(item.id)
+}
+function toggle(item: SidebarItem) {
+  const next = new Set(opened.value)
+  if (next.has(item.id)) next.delete(item.id)
+  else next.add(item.id)
+  opened.value = next
+}
+
+const pinnedIds = computed(() => new Set(props.pinned.map((i) => i.id)))
+function menuOf(item: SidebarItem) {
+  const own = item.menu ?? []
+  if (!props.pinnable) return own
+  const pinned = pinnedIds.value.has(item.id)
+  return [
+    ...own,
+    {
+      label: pinned ? props.labels.unpin : props.labels.pin,
+      icon: pinned ? "lucide:pin-off" : "lucide:pin",
+      separatorBefore: own.length > 0,
+      onSelect: () => emit("toggle-pin", item.id),
+    },
+  ]
+}
+
+const SECTION = "lp-section:"
+function sectionItem(section: SidebarSection): SidebarItem {
+  const icon = section.icon ?? section.items.find((i) => i.icon)?.icon
+  return { id: `${SECTION}${sectionKey(section)}`, label: section.title ?? "", icon, children: section.items }
+}
+
+function activate(item: SidebarItem) {
+  if (item.id.startsWith(SECTION)) return
+  if (item.children?.length && !item.to && !item.href) toggle(item)
+  emit("activate", item)
 }
 
 // The nav fills the remaining height with a fixed gap between groups; a short sidebar needs both under the consumer's control.
@@ -151,12 +182,49 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <LpScrollArea
     v-else
     class="min-h-0 flex-1"
-    content-class="flex min-h-full flex-col gap-4"
+    :content-class="compact ? 'flex min-h-full flex-col gap-1' : 'flex min-h-full flex-col gap-4'"
     @pointerleave="hovered = null"
   >
+    <!-- Pinned pages come first and carry no pill: the same page further down
+         already holds it, and one pill shared by two rows would jump between
+         them. -->
+    <div v-if="pinned.length" class="flex flex-col gap-0.5">
+      <p v-if="!compact" class="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+        {{ labels.pinned }}
+      </p>
+      <LpSidebarRow
+        v-for="item in pinned"
+        :key="`pinned:${item.id}`"
+        :item="item"
+        :active="itemActive(item)"
+        :pill="false"
+        :pill-id="pillId"
+        :compact="compact"
+        :menu="menuOf(item)"
+        :preview-delay="previewDelay"
+        :item-active="itemActive"
+        @activate="activate"
+      />
+    </div>
+    <template v-for="(section, si) in groups" :key="si">
+    <!-- Compact, a group that folds is one icon: its pages open in the card
+         beside it, as a page's own pages do. A hundred initials in a column
+         would be no nav at all. -->
+    <div v-if="compact && section.collapsible && section.title" class="flex flex-col gap-0.5">
+      <LpSidebarRow
+        :item="sectionItem(section)"
+        :active="false"
+        :pill="false"
+        :pill-id="pillId"
+        compact
+        :on-path="section.items.some((i) => itemActive(i) || onPath(i))"
+        :preview-delay="previewDelay"
+        :item-active="itemActive"
+        @activate="activate"
+      />
+    </div>
     <CollapsibleRoot
-      v-for="(section, si) in groups"
-      :key="si"
+      v-else
       as="div"
       class="flex flex-col gap-0.5"
       :open="isOpen(section)"
@@ -165,8 +233,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     >
       <!-- A plain heading while the group is fixed; a control once it folds,
            because a thing that reacts to a click must look like one. -->
+      <div v-if="compact && (si > 0 || pinned.length)" class="mx-3 mb-1 border-t border-line" />
       <CollapsibleTrigger
-        v-if="section.title && section.collapsible"
+        v-else-if="!compact && section.title && section.collapsible"
         class="group/section mt-2 flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-ink/[0.04] hover:text-ink focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <LpIcon
@@ -197,7 +266,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         />
       </CollapsibleTrigger>
       <p
-        v-else-if="section.title"
+        v-else-if="!compact && section.title"
         class="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
       >
         {{ section.title }}
@@ -206,58 +275,51 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <CollapsibleContent
         class="flex flex-col gap-0.5 overflow-hidden data-[state=open]:animate-[collapsible-down_260ms_var(--ease-emphasized)] data-[state=closed]:animate-[collapsible-up_200ms_var(--ease-emphasized)] motion-reduce:animate-none"
       >
-      <!-- Optional right-click menu per item; passthrough when item.menu is
-           absent or empty, so the item keeps the native context menu. Headed
-           by the item's label and icon unless it names its own. -->
-      <LpContextMenu
-        v-for="item in section.items"
-        :key="item.id"
-        :items="item.menu ?? []"
-        :title="(item.menuTitle ?? item.label) || undefined"
-        :title-icon="item.icon"
-      >
-        <component
-          :is="rowOf(item).is"
-          v-bind="rowOf(item).props"
-          :aria-current="itemActive(item) ? 'page' : undefined"
-          :aria-disabled="item.disabled || undefined"
-          class="group/item relative flex items-center gap-3 rounded-control px-3 py-2 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          :class="item.disabled
-            ? 'cursor-not-allowed text-muted/50'
-            : itemActive(item) || hovered === item.id
-              ? 'text-ink'
-              : 'text-muted hover:text-ink'"
-          @click="emit('activate', item)"
-          @pointerenter="hover(item)"
+      <template v-for="item in section.items" :key="item.id">
+        <LpSidebarRow
+          :item="item"
+          :active="itemActive(item)"
+          :pill="pillUnder(item)"
+          :pill-id="pillId"
+          :compact="compact"
+          :menu="menuOf(item)"
+          :expandable="!compact && !!item.children?.length"
+          :expanded="expanded(item)"
+          :on-path="onPath(item)"
+          :preview-delay="previewDelay"
+          :hovered="hovered === item.id"
+          :expand-label="labels.expand"
+          :item-active="itemActive"
+          @activate="activate"
+          @hover="hover"
+          @toggle="toggle(item)"
         >
-          <!-- Sliding active pill -->
-          <Motion
-            v-if="pillUnder(item)"
-            :layout-id="pillId"
-            :transition="pillTransition"
-            class="absolute inset-0 z-0 rounded-control bg-brand-soft"
-          />
-          <!-- #item slot for fully custom rows; falls back to icon+label+badge. -->
-          <slot name="item" :item="item" :active="itemActive(item)">
-            <LpIcon
-              v-if="item.icon"
-              :name="item.icon"
-              :size="17"
-              class="relative z-10 shrink-0 transition-colors"
-              :class="itemActive(item) ? 'text-brand' : ''"
+          <template v-if="$slots.item" #default="slotProps"><slot name="item" v-bind="slotProps" /></template>
+        </LpSidebarRow>
+        <CollapsibleRoot v-if="!compact && item.children?.length" :open="expanded(item)">
+          <CollapsibleContent
+            class="flex flex-col gap-0.5 overflow-hidden data-[state=open]:animate-[collapsible-down_220ms_var(--ease-emphasized)] data-[state=closed]:animate-[collapsible-up_180ms_var(--ease-emphasized)] motion-reduce:animate-none"
+          >
+            <LpSidebarRow
+              v-for="child in item.children"
+              :key="child.id"
+              nested
+              :item="child"
+              :active="itemActive(child)"
+              :pill="pillUnder(child)"
+              :pill-id="pillId"
+              :menu="menuOf(child)"
+              :preview-delay="previewDelay"
+              :hovered="hovered === child.id"
+              :item-active="itemActive"
+              @activate="activate"
+              @hover="hover"
             />
-            <span class="relative z-10 min-w-0 flex-1 truncate text-left">{{ item.label }}</span>
-            <LpBadge
-              v-if="item.badge != null"
-              :tone="itemActive(item) ? 'brand' : 'neutral'"
-              class="relative z-10 shrink-0"
-            >
-              {{ badgeText(item.badge) }}
-            </LpBadge>
-          </slot>
-        </component>
-      </LpContextMenu>
+          </CollapsibleContent>
+        </CollapsibleRoot>
+      </template>
       </CollapsibleContent>
     </CollapsibleRoot>
+    </template>
   </LpScrollArea>
 </template>

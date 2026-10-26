@@ -82,11 +82,27 @@ const props = withDefaults(
     loading?: boolean
     /** Text overrides: the burger's name and the skip link. */
     labels?: Partial<{ openMenu: string; skipToContent: string }>
+    /** Icon-only rail (v-model:compact). Forwarded to LpSidebar. */
+    compact?: boolean
+    /** The person sizes the rail and folds it to icons. Forwarded to LpSidebar. */
+    resizable?: boolean
+    /** Rows can be pinned to the top (v-model:pinned). Forwarded to LpSidebar. */
+    pinnable?: boolean
+    pinned?: string[]
+    /** Remember folded groups, width, compact and pins under this key. Forwarded to LpSidebar. */
+    persist?: string
+    /** Rest time before a row's `preview` card opens. Forwarded to LpSidebar. */
+    previewDelay?: number
+    /** The key that folds the rail; false turns it off. Forwarded to LpSidebar. */
+    compactHotkey?: string | false
   }>(),
   {
     mobileBreakpoint: "lg",
     divider: true,
     contentClass: "mx-auto w-full max-w-6xl",
+    // Unset, not false: an absent boolean would hand the sidebar "expanded"
+    // and override the state it remembers.
+    compact: undefined,
   },
 )
 
@@ -94,11 +110,13 @@ const emit = defineEmits<{
   (e: "update:modelValue", id: string): void
   (e: "update:collapsed", keys: string[]): void
   (e: "select", item: SidebarItem): void
+  (e: "update:compact", value: boolean): void
+  (e: "update:pinned", ids: string[]): void
 }>()
 
 // Normalise items/sections to a flat list for the title computation.
 const flatItems = computed<SidebarItem[]>(() =>
-  props.sections ? props.sections.flatMap((s) => s.items) : (props.items ?? []),
+  (props.sections ? props.sections.flatMap((s) => s.items) : (props.items ?? [])).flatMap((i) => [i, ...(i.children ?? [])]),
 )
 
 // Default active test: exact match for "/", prefix match (on a segment
@@ -215,20 +233,29 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :loading="loading"
       :collapsed="collapsed"
       :auto-collapse-after="autoCollapseAfter"
+      :compact="compact"
+      :resizable="resizable"
+      :pinnable="pinnable"
+      :pinned="pinned"
+      :persist="persist"
+      :preview-delay="previewDelay"
+      :compact-hotkey="compactHotkey"
       class="shrink-0"
       @update:model-value="onModel"
+      @update:compact="(v) => emit('update:compact', v)"
+      @update:pinned="(v) => emit('update:pinned', v)"
       @update:open="(v) => (drawerOpen = v)"
       @update:collapsed="(v) => emit('update:collapsed', v)"
       @select="onSelect"
     >
-      <template v-if="$slots.logo" #header>
-        <slot name="logo" />
+      <template v-if="$slots.logo" #header="{ compact: folded }">
+        <slot name="logo" :compact="folded" />
       </template>
       <template v-if="$slots['sidebar-actions']" #actions>
         <slot name="sidebar-actions" />
       </template>
-      <template v-if="$slots['sidebar-footer']" #footer>
-        <slot name="sidebar-footer" />
+      <template v-if="$slots['sidebar-footer']" #footer="{ compact: folded }">
+        <slot name="sidebar-footer" :compact="folded" />
       </template>
       <template v-if="$slots['sidebar-item']" #item="slotProps">
         <slot name="sidebar-item" v-bind="slotProps" />

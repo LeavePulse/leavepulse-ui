@@ -4,6 +4,7 @@
  * Re-exported from LpSidebar.vue for back-compat with existing import sites.
  */
 
+import type { Component } from "vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 
 export interface SidebarItem {
@@ -34,6 +35,25 @@ export interface SidebarItem {
    * "invoice", a page found by the feature it used to be called.
    */
   keywords?: string[]
+  /**
+   * Pages under this one, one level deep: folded under the row and opened
+   * while one of them is the current page, so a section's tabs are a click
+   * away without opening the section first. In a compact sidebar they open in
+   * a card beside the icon.
+   */
+  children?: SidebarItem[]
+  /** A dot instead of a count: something new here that has no number to it. */
+  dot?: boolean
+  /**
+   * The keys that open this page ("G D"), shown at the row's end on hover and
+   * in the compact card. Display only: the app binds the keys.
+   */
+  hotkey?: string
+  /**
+   * What the page holds, shown in a card beside the row once the pointer has
+   * rested on it (`previewDelay`): a glance before going there.
+   */
+  preview?: Component
 }
 
 export interface SidebarSection {

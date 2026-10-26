@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from "vue"
+import { computed, defineComponent, h, markRaw, ref, watchEffect, type Component } from "vue"
 import {
   LpAppShell,
   LpButton,
@@ -90,18 +90,47 @@ const THEMES = Object.keys(presets) as PresetName[]
  * are the sidebar's groups, pages and the overview sit around them, and the
  * current URL is the active item.
  */
+/*
+ * A row rested on shows the component: the same live miniature as its card on
+ * the overview, and the first sentence of what it is for. Made once per entry,
+ * raw, so the nav's reactivity never walks into a component definition.
+ */
+const previews = new Map<string, Component>()
+function previewOf(entry: (typeof registry)[number]): Component {
+  let made = previews.get(entry.id)
+  if (!made) {
+    const lead = entry.description.split(/(?<=[.!?])\s/)[0]
+    made = markRaw(
+      defineComponent({
+        render: () =>
+          h("div", { class: "flex flex-col" }, [
+            h(ThumbView, { entry }),
+            h("div", { class: "border-t border-line px-3 py-2.5" }, [
+              h("p", { class: "text-sm font-medium text-ink" }, entry.name),
+              h("p", { class: "mt-0.5 line-clamp-2 text-xs text-muted" }, lead),
+            ]),
+          ]),
+      }),
+    )
+    previews.set(entry.id, made)
+  }
+  return made
+}
+
 const navSections = computed<SidebarSection[]>(() => [
   { items: [{ id: href({ kind: "home" }), label: "Overview", icon: "lucide:house", href: href({ kind: "home" }) }] },
   ...sections.map((section) => ({
     title: section.title,
+    icon: section.icon,
     collapsible: true,
     items: section.entries.map((entry) => {
       const link = href({ kind: "component", id: entry.id })
-      return { id: link, label: entry.name, href: link }
+      return { id: link, label: entry.name, href: link, preview: previewOf(entry) }
     }),
   })),
   {
     title: "Pages",
+    icon: "lucide:layout-dashboard",
     collapsible: true,
     items: Object.entries(PAGE_TITLES).map(([id, title]) => ({ id: pageLink(id), label: title, icon: "lucide:layout-dashboard", href: pageLink(id) })),
   },
@@ -221,13 +250,21 @@ const SITE_KEYS: ShortcutGroup[] = [
 
 <template>
   <LpCommandScope id="preview" label="LeavePulse UI" :discover="false" :theme="studio">
-  <LpAppShell :model-value="activeNav" :sections="navSections" :full-bleed="fullBleed" :auto-collapse-after="16">
-    <template #logo>
-      <a :href="href({ kind: 'home' })" class="flex items-center gap-2 font-semibold text-ink" @click="goHome">
-        <span class="grid size-7 place-items-center rounded-control bg-brand text-ink-inverse">
+  <LpAppShell
+    :model-value="activeNav"
+    :sections="navSections"
+    :full-bleed="fullBleed"
+    :auto-collapse-after="16"
+    resizable
+    pinnable
+    persist="preview-nav"
+  >
+    <template #logo="{ compact }">
+      <a :href="href({ kind: 'home' })" class="flex items-center gap-2 font-semibold text-ink" :aria-label="compact ? 'LeavePulse UI' : undefined" @click="goHome">
+        <span class="grid size-7 shrink-0 place-items-center rounded-control bg-brand text-ink-inverse">
           <LpIcon name="lucide:component" :size="16" />
         </span>
-        LeavePulse UI
+        <span v-if="!compact" class="truncate">LeavePulse UI</span>
       </a>
     </template>
 

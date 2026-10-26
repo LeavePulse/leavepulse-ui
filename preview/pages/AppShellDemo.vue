@@ -6,7 +6,7 @@
  * override lets it fill the frame instead of the viewport) to show it in context
  * without taking over the playground chrome.
  */
-import { computed, ref } from "vue"
+import { computed, onBeforeUnmount, ref } from "vue"
 import {
   LpAppShell,
   LpAvatar,
@@ -20,12 +20,34 @@ import {
   type SidebarSection,
 } from "../../src"
 
-const sections: SidebarSection[] = [
+/*
+ * A rail with everything a nav row can carry: pages under a page (Servers),
+ * a count that ticks while you watch (alerts), a dot with no number (Billing),
+ * the keys that open a page, and the rail itself resizable down to icons and
+ * pinnable.
+ */
+const alerts = ref(3)
+const tick = setInterval(() => (alerts.value += Math.random() < 0.6 ? 1 : 0), 4000)
+onBeforeUnmount(() => clearInterval(tick))
+
+const sections = computed<SidebarSection[]>(() => [
   {
     items: [
-      { id: "/", label: "Dashboard", icon: "lucide:layout-dashboard" },
-      { id: "/servers", label: "Servers", icon: "lucide:server", badge: 12 },
-      { id: "/billing", label: "Billing", icon: "lucide:credit-card" },
+      { id: "/", label: "Dashboard", icon: "lucide:layout-dashboard", hotkey: "G D" },
+      {
+        id: "/servers",
+        label: "Servers",
+        icon: "lucide:server",
+        badge: 12,
+        hotkey: "G S",
+        children: [
+          { id: "/servers/racks", label: "Racks", icon: "lucide:rows-3" },
+          { id: "/servers/power", label: "Power", icon: "lucide:zap" },
+          { id: "/servers/network", label: "Network", icon: "lucide:network" },
+        ],
+      },
+      { id: "/alerts", label: "Alerts", icon: "lucide:bell", badge: alerts.value },
+      { id: "/billing", label: "Billing", icon: "lucide:credit-card", dot: true },
     ],
   },
   {
@@ -35,7 +57,7 @@ const sections: SidebarSection[] = [
       { id: "/settings", label: "Settings", icon: "lucide:settings" },
     ],
   },
-]
+])
 
 // Drive the active item locally (no router here) — the shell derives the header
 // title from it.
@@ -84,11 +106,11 @@ const drawer = ref(false)
 <template>
   <div class="p-6">
     <div class="h-[640px] overflow-hidden rounded-card border border-line [&>div]:h-full">
-      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections">
-        <template #logo>
+      <LpAppShell v-model="active" v-model:open="drawer" :sections="sections" resizable pinnable persist="appshell-demo" :compact-hotkey="false">
+        <template #logo="{ compact }">
           <div class="flex items-center gap-2 font-semibold text-ink">
-            <LpIcon name="lucide:activity" :size="20" class="text-brand" />
-            <span>LeavePulse</span>
+            <LpIcon name="lucide:activity" :size="20" class="shrink-0 text-brand" />
+            <span v-if="!compact">LeavePulse</span>
           </div>
         </template>
 
@@ -119,10 +141,10 @@ const drawer = ref(false)
           <LpAvatar alt="Ada Lovelace" size="sm" />
         </template>
 
-        <template #sidebar-footer>
+        <template #sidebar-footer="{ compact }">
           <div class="flex items-center gap-2 px-1">
             <LpAvatar alt="Ada Lovelace" size="sm" />
-            <div class="min-w-0">
+            <div v-if="!compact" class="min-w-0">
               <p class="truncate text-sm text-ink">Ada Lovelace</p>
               <p class="truncate text-xs text-muted">admin@leavepulse.io</p>
             </div>
