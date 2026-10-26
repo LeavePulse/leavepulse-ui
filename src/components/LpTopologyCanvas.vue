@@ -20,9 +20,10 @@ import {
   type Connection,
   type Node,
   type NodeTypesObject,
+  type Padding,
 } from "@vue-flow/core"
 import { MiniMap } from "@vue-flow/minimap"
-import { computed, defineComponent, h, markRaw, watch, type Component } from "vue"
+import { computed, defineComponent, h, markRaw, ref, watch, type Component } from "vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 import LpLaneNode from "./LpLaneNode.vue"
 import LpServiceNode, { type ServiceNodeData } from "./LpServiceNode.vue"
@@ -325,6 +326,7 @@ const {
   getSelectedNodes,
   fitView,
   setViewport,
+  onNodesInitialized,
 } = useVueFlow()
 onNodeClick(({ node }) => emit("node-select", node.id))
 // A node usually has two levels of interest — pick it out, or open it — and a
@@ -389,13 +391,42 @@ onEdgeContextMenu(({ edge, event }) => {
 onPaneClick(() => emit("pane-click"))
 onConnect((conn) => emit("connect", conn))
 
+// The legend and the minimap float over the canvas, so a plain fit puts the
+// outermost nodes under them. Fitting reserves their corner instead: the side
+// they sit on gets their height on top of the usual margin. On a phone both
+// are hidden and only the margin is left.
+const legendBox = ref<HTMLElement | null>(null)
+const MINIMAP_HEIGHT = 165
+const FRAME = 24
+function framePadding(): Padding {
+  const wide = typeof window === "undefined" || window.matchMedia("(min-width: 640px)").matches
+  const legendHeight = wide && props.legend ? (legendBox.value?.offsetHeight ?? 0) + 15 : 0
+  const legendTop = props.legendPosition.startsWith("top")
+  const bottom = Math.max(legendTop ? 0 : legendHeight, wide && props.minimap ? MINIMAP_HEIGHT : 0)
+  return {
+    top: `${FRAME + (legendTop ? legendHeight : 0)}px`,
+    bottom: `${FRAME + bottom}px`,
+    left: `${FRAME}px`,
+    right: `${FRAME}px`,
+  }
+}
+function fitFramed(params: Parameters<typeof fitView>[0] = {}) {
+  return fitView({ padding: framePadding(), ...params })
+}
+let fitted = false
+onNodesInitialized(() => {
+  if (fitted) return
+  fitted = true
+  void fitFramed()
+})
+
 // Restore a saved viewport (pan/zoom). The host calls this after loading the
 // user's persisted CanvasViewport on mount.
 async function applyViewport(v: CanvasViewport): Promise<void> {
   await setViewport({ x: v.x, y: v.y, zoom: v.zoom })
 }
 
-defineExpose({ fitView, setViewport: applyViewport })
+defineExpose({ fitView: fitFramed, setViewport: applyViewport })
 </script>
 
 <template>
@@ -413,7 +444,6 @@ defineExpose({ fitView, setViewport: applyViewport })
     :default-viewport="{ zoom: 0.9 }"
     :min-zoom="0.3"
     :max-zoom="2"
-    fit-view-on-init
     class="lp-topology"
   >
     <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />
@@ -428,13 +458,14 @@ defineExpose({ fitView, setViewport: applyViewport })
       node-color="var(--color-surface-soft)"
       mask-color="rgba(0,0,0,0.55)"
     />
-    <Controls v-if="controls" />
+    <Controls v-if="controls" :fit-view-params="{ padding: framePadding() }" />
 
     <!-- Edge-type legend: makes the colour/dash encoding self-explanatory. -->
     <!-- On a phone the legend would sit on the graph itself; the edge styles
          stay readable without it there. -->
     <Panel v-if="legend" :position="legendPosition" :class="legendOffset" class="max-sm:hidden">
       <div
+        ref="legendBox"
         class="flex flex-col gap-1.5 rounded-card border border-line bg-surface-overlay/90 px-3 py-2 text-[11px] backdrop-blur"
       >
         <div

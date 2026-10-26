@@ -280,6 +280,8 @@ interface Cell {
   char: string
   /** A leading zero held open for a column the value hasn't reached yet. */
   isPad: boolean
+  /** A space between two digits: the locale's thousands separator. */
+  isGap: boolean
 }
 
 /*
@@ -338,7 +340,8 @@ const cells = computed<Cell[]>(() => {
     const digit = isDigit(char) ? char.charCodeAt(0) - 48 : null
     const isPad = leading && digit === 0 && i < intEnd - 1
     if (digit !== null && digit !== 0) leading = false
-    return { key: keys[i], digit, char, isPad }
+    const isGap = digit === null && /\s/.test(char) && isDigit(chars[i - 1] ?? "") && isDigit(chars[i + 1] ?? "")
+    return { key: keys[i], digit, char, isPad, isGap }
   })
 })
 
@@ -380,7 +383,7 @@ const label = computed(
           v-for="cell in cells"
           :key="cell.key"
           class="lp-nf__cell"
-          :class="cell.isPad ? 'lp-nf__cell--pad' : ''"
+          :class="{ 'lp-nf__cell--pad': cell.isPad, 'lp-nf__cell--gap': cell.isGap }"
         >
           <!-- A digit is a window onto its strip; a separator is just a glyph. -->
           <template v-if="cell.digit !== null">
@@ -486,6 +489,15 @@ const label = computed(
 
 /* Faded, so a held-open column reads as an empty wheel rather than a zero the
    number actually has. */
+/*
+ * A space separator (ru, fr, …) takes a whole column in a monospaced or
+ * tabular face, so "7 271" read as "7  271". It is drawn as the narrow gap
+ * the locale means.
+ */
+.lp-nf__cell--gap {
+  width: 0.25em;
+}
+
 .lp-nf__cell--pad {
   opacity: 0.18;
   transition: opacity var(--duration-fast, 160ms) linear;
