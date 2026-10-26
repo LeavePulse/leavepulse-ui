@@ -302,10 +302,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           v-else-if="figure"
           :value="figure.value"
           :decimals="figure.decimals"
+          grouped
           suffix="%"
         />
         <template v-else>—</template>
-        <span class="text-muted"> {{ statusLabel.uptime }}</span>
+        <span class="ml-1 text-muted">{{ statusLabel.uptime }}</span>
       </span>
       <span class="h-px flex-1 bg-line" />
       <span class="shrink-0">{{ endLabel }}</span>

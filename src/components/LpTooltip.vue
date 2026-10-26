@@ -120,6 +120,27 @@ const PassThrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 
 const target = { x: 0, y: 0 }
 const offset = ref({ x: 0, y: 0 })
+const tipBody = ref<HTMLElement | null>(null)
+
+/* reka's own collision padding, which the follow offset would otherwise undo. */
+const EDGE = 8
+
+/*
+ * reka keeps the tip inside the window for the box it was placed against; the
+ * follow offset is added after that, so near the right edge a wide tip (an
+ * uptime slice with its breakdown) slid half off screen. The offset is held to
+ * the room the window has on each side of where reka put the tip.
+ */
+function inView(x: number): number {
+  const panel = tipBody.value?.parentElement
+  if (!panel) return x
+  const rect = panel.getBoundingClientRect()
+  const placed = rect.left - offset.value.x
+  const width = panel.ownerDocument.defaultView?.innerWidth ?? window.innerWidth
+  const min = EDGE - placed
+  const max = width - EDGE - rect.width - placed
+  return max < min ? x : Math.min(max, Math.max(min, x))
+}
 
 /*
  * The spring constants come from the kit's shared "float" feel — the same ones
@@ -172,6 +193,7 @@ const onPointerMove = (e: PointerEvent) => {
   const half = props.side === "top" || props.side === "bottom" ? rect.height / 2 : 0
   const dir = props.side === "bottom" ? -1 : 1
   target.y = e.clientY - (rect.top + rect.height / 2) + half * dir
+  target.x = inView(target.x)
   // Without motion the tip goes straight to the reading instead of trailing.
   if (prefersReducedMotion()) {
     offset.value = { x: target.x, y: target.y }
@@ -272,7 +294,7 @@ const guardOutside = useOutsideGuard()
           ]"
           :style="followCursor ? { translate: `${offset.x}px ${offset.y}px` } : undefined"
         >
-          <slot name="content">{{ content }}</slot>
+          <div ref="tipBody"><slot name="content">{{ content }}</slot></div>
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
