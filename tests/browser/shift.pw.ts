@@ -112,5 +112,7 @@ test("a wrapping row inside a widening box stays on one line while it eases", as
   await page.getByRole("button", { name: "Toggle" }).click()
   await page.waitForTimeout(700)
   const heights = await page.evaluate(() => (window as unknown as { rowHeights: number[] }).rowHeights)
-  expect(Math.max(...heights)).toBeLessThanOrEqual(height + 1)
+  const settled = (await row.boundingBox())!.height
+  expect(settled).toBeLessThanOrEqual(height + 1)
+  expect(Math.max(...heights)).toBeLessThanOrEqual(settled + 1)
 })

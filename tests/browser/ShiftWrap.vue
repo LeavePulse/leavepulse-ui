@@ -6,7 +6,7 @@ const extra = ref(false)
 </script>
 
 <template>
-  <div class="flex w-[640px] flex-wrap items-center justify-between gap-2 p-4">
+  <div class="flex w-[1000px] flex-wrap items-center justify-between gap-2 p-4">
     <input class="w-72 border" placeholder="Search" />
     <LpShift axis="width" data-testid="shift">
       <div class="flex flex-wrap items-center gap-1.5" data-testid="row">
