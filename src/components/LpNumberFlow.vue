@@ -28,6 +28,8 @@
  */
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { easeOut, prefersReducedMotion } from "../composables/easing"
+import { useLocale } from "../composables/useLocale"
+import { decimalMark } from "./format"
 import { useRevealedValue } from "../composables/useRevealedValue"
 import { compactNumber } from "./format"
 
@@ -222,6 +224,14 @@ const { el: revealAnchor, target } = useRevealedValue(() => props.value, {
 watch(target, travel)
 onBeforeUnmount(stop)
 
+/*
+ * The app's locale (reka's ConfigProvider) when the counter has none of its
+ * own, the same rule the dates follow: a Russian app read "4,594" otherwise.
+ */
+const locale = useLocale(() => props.locale)
+// Only the grouped form is written in the locale; the others always use ".".
+const fractionMark = computed(() => (props.grouped && !props.format && !props.compact ? decimalMark(locale.value) : "."))
+
 const formatted = computed(() => formatAt(round(displayed.value), !settled.value))
 
 // Rounded first by the caller: every branch should render the shape the
@@ -246,7 +256,7 @@ function formatAt(v: number, padded: boolean): string {
   }
   const pad = padded ? Math.max(1, padTo.value) : 1
   if (props.grouped)
-    return v.toLocaleString(props.locale, {
+    return v.toLocaleString(locale.value, {
       minimumFractionDigits: props.decimals,
       maximumFractionDigits: props.decimals,
       minimumIntegerDigits: pad,
@@ -294,7 +304,7 @@ interface Cell {
  */
 const cells = computed<Cell[]>(() => {
   const chars = [...formatted.value]
-  const dot = chars.indexOf(".")
+  const dot = chars.indexOf(fractionMark.value)
   const intEnd = dot === -1 ? chars.length : dot
 
   const isDigit = (c: string) => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { compactNumber, formatBytes } from "../src/components/format"
+import { compactNumber, decimalMark, formatBytes } from "../src/components/format"
 import { formatModified } from "../src/components/fileTree"
 import { formatTick } from "../src/components/chart"
 import { formatClipTime } from "../src/components/videoBackdrop"
@@ -96,5 +96,13 @@ describe("formatClipTime", () => {
     expect(formatClipTime(3600 + 15 * 60)).toBe("75:00")
     expect(formatClipTime(4.6, true)).toBe("0:04.6")
     expect(formatClipTime(-3)).toBe("0:00")
+  })
+})
+
+describe("decimalMark", () => {
+  test("is the locale's own mark, not always a point", () => {
+    expect(decimalMark("en")).toBe(".")
+    expect(decimalMark("ru-RU")).toBe(",")
+    expect(decimalMark("de")).toBe(",")
   })
 })

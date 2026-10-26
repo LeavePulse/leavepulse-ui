@@ -134,3 +134,13 @@ export function compactNumber(value: number, options: CompactNumberOptions = {})
         }).format(scaled)
   return `${number}${COMPACT_UNITS[i][1]}`
 }
+
+/**
+ * The character a locale writes between the whole and the fractional part:
+ * "." in English, "," in Russian and German. A counter that splits a grouped
+ * figure into columns has to find the fraction by this mark, not by ".",
+ * because in German "." is the thousands separator.
+ */
+export function decimalMark(locale?: string): string {
+  return numberFormat(locale, {}).formatToParts(1.5).find((p) => p.type === "decimal")?.value ?? "."
+}
