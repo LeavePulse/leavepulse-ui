@@ -1250,6 +1250,10 @@ function onRowClick(event: MouseEvent, c: Command) {
 }
 
 async function run(row: Command | undefined) {
+  // A closing palette has already reset to its first rows, where the command
+  // just run sits again as recent: an Enter that lands during the fade ran it
+  // a second time (two snapshots for one pick).
+  if (!props.open) return
   if (!row || row.disabled || executing.value) return
   const c = fallbackOf.get(row) ?? row
   // The highlight stays on the same index, which is now the first row that
