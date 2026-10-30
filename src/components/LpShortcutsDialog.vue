@@ -18,6 +18,7 @@
 import { computed } from "vue"
 import LpKeys from "./LpKeys.vue"
 import LpModal from "./LpModal.vue"
+import type { OverlayHistoryMode } from "../composables/useOverlayHistory"
 import {
   activeShortcuts,
   mergeShortcutGroups,
@@ -36,6 +37,8 @@ const props = withDefaults(
     description?: string
     /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
+    /** Browser history for the dialog, passed to LpModal. Follows `provideOverlayHistory` when unset. */
+    history?: OverlayHistoryMode
     /**
      * A key that toggles the reference, e.g. "F1". Bound only while the dialog
      * is mounted, also inside inputs and over other overlays, and the browser's
@@ -43,7 +46,7 @@ const props = withDefaults(
      */
     hotkey?: string
   }>(),
-  { open: false, groups: () => [], live: false, title: undefined, glass: undefined },
+  { open: false, groups: () => [], live: false, title: undefined, glass: undefined, history: undefined },
 )
 
 const text = useLabels("shortcuts", {
@@ -75,6 +78,7 @@ useHotkeys(() =>
 <template>
   <LpModal
     :glass="props.glass"
+    :history="props.history"
     :open="props.open"
     size="lg"
     :title="props.title ?? text.title"

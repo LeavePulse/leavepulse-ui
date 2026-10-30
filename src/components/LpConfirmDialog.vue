@@ -5,6 +5,7 @@ import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpModal from "./LpModal.vue"
+import type { OverlayHistoryMode } from "../composables/useOverlayHistory"
 
 export type ConfirmLabels = {
   confirm: string
@@ -54,9 +55,11 @@ const props = withDefaults(
     action?: () => unknown
     /** Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset. */
     glass?: boolean
+    /** Browser history for the dialog, passed to LpModal. Follows `provideOverlayHistory` when unset. */
+    history?: OverlayHistoryMode
     labels?: Partial<ConfirmLabels>
   }>(),
-  { glass: undefined },
+  { glass: undefined, history: undefined },
 )
 
 const emit = defineEmits<{
@@ -128,6 +131,7 @@ function dismiss(open: boolean) {
 <template>
   <LpModal
     :glass="glass"
+    :history="history"
     :open="open"
     :title="title"
     :description="description"

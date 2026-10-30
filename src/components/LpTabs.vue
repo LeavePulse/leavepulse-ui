@@ -4,6 +4,7 @@ import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
 import { computed, nextTick, ref, useId, watch } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
+import { useStepHistory } from "../composables/useOverlayHistory"
 import { prefersReducedMotion } from "../composables/easing"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpSkeleton from "./LpSkeleton.vue"
@@ -65,8 +66,16 @@ const props = withDefaults(
      * icon keep their label.
      */
     compact?: boolean
+    /**
+     * Record each switch as a browser history entry, so Back returns to the
+     * previous tab. Unset follows the overlay the tabs sit in (a modal or a
+     * drawer with history on, see `provideOverlayHistory`) and is off
+     * elsewhere: a page's own tabs belong in its URL. `false` opts out inside
+     * an overlay, `true` opts in on a page that keeps no URL of its own.
+     */
+    history?: boolean
   }>(),
-  { variant: "contained", accent: false, block: false, hoverFollow: true, compact: false },
+  { variant: "contained", accent: false, block: false, hoverFollow: true, compact: false, history: undefined },
 )
 
 const bottom = computed(() => props.variant === "bottom")
@@ -110,9 +119,24 @@ watch(current, () => {
   })
 })
 
-function select(value: string) {
+function show(value: string) {
   if (props.modelValue === undefined) current.value = value
   emit("update:modelValue", value)
+}
+
+const { record } = useStepHistory({
+  mode: () => props.history,
+  set: show,
+  has: (value) => props.items.some((item) => item.value === value && !item.disabled),
+})
+
+function select(value: string) {
+  const from = current.value
+  show(value)
+  // Recorded once the switch took: a bound value the app refused is not a step.
+  void nextTick(() => {
+    if (from !== undefined && current.value === value) record(from, value)
+  })
 }
 
 // The pill sits under the hovered tab, falling back to the active one

@@ -11,6 +11,7 @@ import {
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
+import { useOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 import { useLabels } from "../composables/useLpConfig"
 import { useShift } from "../composables/useShift"
 import { useModalLayer } from "./modalDepth"
@@ -93,9 +94,16 @@ const props = withDefaults(
      * form's state, `:guard="form.dirty"`. See `useCloseGuard`.
      */
     guard?: CloseGuard
+    /**
+     * Browser Back closes it, and opening it adds a history entry. Unset
+     * follows `provideOverlayHistory` (off without one); `"reopen"` also
+     * opens it again on Forward; `false` keeps it out of history, for an
+     * overlay the app already drives from its route.
+     */
+    history?: OverlayHistoryMode
     labels?: Partial<{ close: string }>
   }>(),
-  { size: "md", autoFocus: "auto", glass: undefined, dismissible: true, guard: undefined },
+  { size: "md", autoFocus: "auto", glass: undefined, dismissible: true, guard: undefined, history: undefined },
 )
 
 const text = useLabels("modal", { close: "Close" }, () => props.labels)
@@ -120,6 +128,18 @@ async function onOpenChange(next: boolean) {
 function close() {
   void onOpenChange(false)
 }
+
+useOverlayHistory({
+  mode: () => props.history,
+  open: () => !!props.open,
+  close: async () => {
+    if (!(await allowClose())) return false
+    emit("update:open", false)
+    return true
+  },
+  reopen: () => emit("update:open", true),
+  navigated: () => emit("update:open", false),
+})
 defineExpose({ close })
 
 function onEscape(event: KeyboardEvent) {

@@ -18,7 +18,20 @@ entry is deleted, not ticked: the commit says what changed.
   Ship prop types consumers check, or warn in dev on an unknown prop of a kit
   component.
 
+- **Forward onto an overlay entry is a router visit.** With overlay history
+  on, Back from a kit entry mutes the router, but Forward starts from the
+  router's own entry, so vue-router runs its guards and `afterEach` for the
+  page it is already on (nothing remounts). Engines differ on listener order
+  on `window`, so the kit cannot stop that pop before the router sees it.
+  Marking the router's entry as well would let the kit mute it there too,
+  but Back from that entry to an earlier page would then reach the router
+  replayed, with its scroll key off by one.
+
 ## Ideas
+
+- **Overlay history for LpLightbox and LpCommandPalette.** They share the
+  modal stack but not `useOverlayHistory`; Back on a phone with the lightbox
+  open still leaves the page.
 
 - **Context switcher in the rail header**: server, workspace or machine, which
   every app now draws in the header slot itself.

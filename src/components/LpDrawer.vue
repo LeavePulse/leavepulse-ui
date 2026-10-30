@@ -37,6 +37,7 @@ import { CLOSE_ICON } from "./dropdown"
 import { prefersReducedMotion } from "../composables/easing"
 import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
+import { useOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 import { useLabels } from "../composables/useLpConfig"
 import { usePersisted } from "../composables/usePersisted"
 import LpIcon from "./LpIcon.vue"
@@ -132,9 +133,17 @@ const props = withDefaults(
     glass?: boolean
     /** Accessible name for a drawer without a visible `title`. */
     ariaLabel?: string
+    /**
+     * Browser Back closes it, and opening it adds a history entry. Unset
+     * follows `provideOverlayHistory` (off without one); `"reopen"` also
+     * opens it again on Forward; `false` keeps it out of history, for an
+     * overlay the app already drives from its route.
+     */
+    history?: OverlayHistoryMode
     labels?: Partial<{ close: string }>
   }>(),
   {
+    history: undefined,
     side: "right",
     size: "sm",
     dismissible: true,
@@ -213,6 +222,18 @@ async function requestClose() {
 // For the app's own "Cancel": closes through `guard`, as the drawer's own
 // ways out do. Handed to the body and footer slots, and exposed.
 defineExpose({ close: requestClose })
+
+useOverlayHistory({
+  mode: () => props.history,
+  open: () => !!props.open,
+  close: async () => {
+    if (!(await allowClose())) return false
+    emit("update:open", false)
+    return true
+  },
+  reopen: () => emit("update:open", true),
+  navigated: () => emit("update:open", false),
+})
 
 // The header's close button is vaul's own and would slide the panel away at
 // once; with a guard it asks first and closes through the same path as above.

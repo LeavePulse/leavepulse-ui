@@ -83,6 +83,50 @@ app.use(lpConfig({
 
 A component's own `labels` prop wins over the configuration.
 
+### Back and Forward for overlays
+
+`provideOverlayHistory()` (at the app root, like `provideGlass()`) makes the
+browser's Back button close overlays instead of leaving the page:
+
+```ts
+import { provideOverlayHistory } from "@leavepulse/ui"
+
+// in App.vue's setup; pass the router so a Back that only closes a dialog is not a navigation
+provideOverlayHistory(true, { router })
+```
+
+- Opening an `LpModal` or `LpDrawer` (and what is built on them:
+  `LpConfirmDialog`, `LpShortcutsDialog`) adds one history entry. Back closes
+  the topmost overlay; nested ones close one per press, top first.
+- Closing through the UI (close button, Escape, the scrim, the app setting
+  `open` to false) takes the entry back out, so Back is never spent on a step
+  that shows nothing. A `guard` that keeps the overlay open on Back keeps its
+  entry too.
+- `LpTabs` inside an open overlay record each switch: Back returns to the
+  previous tab before it closes the overlay. Page-level tabs stay out (an app
+  keeps those in its URL); `history` on `LpTabs` opts out inside an overlay or
+  in on a page without a router.
+- Forward after Back does nothing by default: the step is undone at once, so
+  no dead entry is left. The kit only sees a boolean `open`, and what the app
+  put into the overlay may be gone by then. `history="reopen"` (or
+  `provideOverlayHistory("reopen")`) re-opens it on Forward by emitting
+  `update:open` true while the overlay is still mounted.
+- `history` on a single overlay wins over the app-wide mode: `false` keeps an
+  overlay out of history, for one the app already opens from its route query
+  (it would otherwise take two entries for one dialog).
+- A real navigation (a link, `router.push` to another path) closes the open
+  overlays, and the entries they leave under the new page are skipped, so Back
+  from it lands on the page in one press. A push that keeps the path (a query
+  or hash, such as an overlay driven by the route query) leaves them open.
+
+The URL never changes and the router's own `history.state` data is copied into
+each entry. The `router` option is vue-router's instance (anything with a
+`listening` switch works): without it the router sees each Back that closes an
+overlay as a visit to the page it is already on (guards and `afterEach` run
+again, nothing remounts). A Forward onto a kit entry still reaches it that
+way, because the entry it starts from belongs to the router. Plain
+`pushState` and `popstate` only, so WebKit (Safari, WebKitGTK) works too.
+
 ### Nuxt
 
 ```ts

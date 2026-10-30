@@ -2265,6 +2265,13 @@
     "description": "Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset."
    },
    {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser history for the dialog, passed to LpModal. Follows `provideOverlayHistory` when unset."
+   },
+   {
     "name": "labels",
     "type": "Partial<ConfirmLabels> | undefined",
     "required": false
@@ -3192,6 +3199,13 @@
     "type": "string | undefined",
     "required": false,
     "description": "Accessible name for a drawer without a visible `title`."
+   },
+   {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser Back closes it, and opening it adds a history entry. Unset\nfollows `provideOverlayHistory` (off without one); `\"reopen\"` also\nopens it again on Forward; `false` keeps it out of history, for an\noverlay the app already drives from its route."
    },
    {
     "name": "labels",
@@ -5326,6 +5340,13 @@
     "required": false,
     "default": "undefined",
     "description": "Something would be lost by closing: `true` asks \"Discard changes?\" first\n(and warns on leaving the page), a function asks the app. Bind it to the\nform's state, `:guard=\"form.dirty\"`. See `useCloseGuard`."
+   },
+   {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser Back closes it, and opening it adds a history entry. Unset\nfollows `provideOverlayHistory` (off without one); `\"reopen\"` also\nopens it again on Forward; `false` keeps it out of history, for an\noverlay the app already drives from its route."
    },
    {
     "name": "labels",
@@ -7941,6 +7962,13 @@
     "description": "Frosted glass panel, passed to LpModal. Follows `provideGlass` when unset."
    },
    {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser history for the dialog, passed to LpModal. Follows `provideOverlayHistory` when unset."
+   },
+   {
     "name": "hotkey",
     "type": "string | undefined",
     "required": false,
@@ -9396,6 +9424,13 @@
     "required": false,
     "default": "false",
     "description": "Icons only, the label kept for screen readers and shown on hover. For a\nheader that cannot fit every label: a tab cut off at the edge, or hidden\nunder the actions beside it, cannot be reached at all. Tabs without an\nicon keep their label."
+   },
+   {
+    "name": "history",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Record each switch as a browser history entry, so Back returns to the\nprevious tab. Unset follows the overlay the tabs sit in (a modal or a\ndrawer with history on, see `provideOverlayHistory`) and is off\nelsewhere: a page's own tabs belong in its URL. `false` opts out inside\nan overlay, `true` opts in on a page that keeps no URL of its own."
    }
   ],
   "events": [
