@@ -158,3 +158,20 @@ test("mobile drawer validates, edits lists, guards closing and saves", async ({ 
   await page.getByRole("button", { name: "Close", exact: true }).click()
   await expect(dialog).toHaveCount(0)
 })
+
+for (const mode of ["card", "control"]) {
+  test(`dropzone content fills the zone and the dashes follow its ${mode} rounding`, async ({ page }) => {
+    await page.goto(`/tests/browser/?scenario=dropzone&mode=${mode}`)
+    const zone = page.locator(".lp-dropzone")
+    const fill = page.locator("[data-test-fill]")
+    await expect(fill).toBeVisible()
+    const zoneBox = (await zone.boundingBox())!
+    const fillBox = (await fill.boundingBox())!
+    expect(Math.abs(zoneBox.y + zoneBox.height - (fillBox.y + fillBox.height))).toBeLessThan(1)
+    const [rx, radius] = await zone.evaluate((el) => [
+      getComputedStyle(el.querySelector(".lp-dropzone__frame rect")!).rx,
+      getComputedStyle(el).borderTopLeftRadius,
+    ])
+    expect(rx).toBe(radius)
+  })
+}

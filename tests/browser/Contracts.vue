@@ -5,7 +5,7 @@ import {
   LpButton, LpConfirmHost, LpDatePicker, LpDateRangePicker, LpDrawer,
   LpEditable, LpFormField, LpInput, LpPasswordInput, LpRepeater,
   LpSecretField, LpSelect, LpDataList, LpChart, LpFrame,
-  LpContextMenu, LpDropdownMenu, LpPopover, useForm, type DateRange,
+  LpContextMenu, LpDropdownMenu, LpDropzone, LpPopover, useForm, type DateRange,
 } from "../../src"
 
 const params = new URLSearchParams(location.search)
@@ -102,6 +102,11 @@ const menuItems = [{ label: "Move to", children: [
       <LpEditable v-model="name" label="Name" :disabled="mode === 'disabled' && editingLocked" :readonly="mode === 'readonly' && editingLocked" :save="value => { saves.push(value) }" />
       <button @pointerdown.prevent @click="editingLocked = !editingLocked">Toggle lock</button>
       <output aria-label="Saved names">{{ JSON.stringify(saves) }}</output>
+    </template>
+    <template v-else-if="scenario === 'dropzone'">
+      <LpDropzone title="Drop a picture" :class="mode === 'control' ? 'rounded-control p-0' : 'p-0'">
+        <div data-test-fill class="h-40 w-full bg-surface-soft" />
+      </LpDropzone>
     </template>
     <template v-else-if="scenario === 'picker'">
       <LpFormField v-if="mode === 'range'" label="Date" :error="form.field('range').error">

@@ -406,6 +406,7 @@ let mounted = false
 onMounted(() => {
   mounted = true
   listen(props.pasteTarget)
+  measureRadius()
 })
 watch(
   () => props.pasteTarget,
@@ -429,6 +430,22 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => [
   over.value ? "lp-dropzone--over" : "",
   props.animate && !revealed.value ? "lp-dropzone--waiting" : "",
 ].join(" "))
+
+// The dashed frame is an SVG rect, which cannot inherit the box's
+// border-radius: a zone rounded by the consumer (`rounded-control`) kept the
+// card's curve on its dashes while the background clipped tighter. The kit's
+// own rounding stays a live token, so a theme that changes it still applies.
+const measuredRadius = ref("")
+const frameRadius = computed(() =>
+  rootClass.value.split(/\s+/).includes("rounded-card") || !measuredRadius.value
+    ? "var(--radius-card)"
+    : measuredRadius.value,
+)
+function measureRadius() {
+  const zone = revealAnchor.value as HTMLElement | null
+  if (zone) measuredRadius.value = getComputedStyle(zone).borderTopLeftRadius
+}
+watch(rootClass, () => nextTick(measureRadius))
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
 const portalTo = usePortalTarget()
@@ -473,7 +490,7 @@ const guardOutside = useOutsideGuard()
         y="0.5"
         width="calc(100% - 1px)"
         height="calc(100% - 1px)"
-        rx="var(--radius-card)"
+        :rx="frameRadius"
         fill="none"
         stroke-width="1"
         stroke-dasharray="6 5"
@@ -526,7 +543,9 @@ const guardOutside = useOutsideGuard()
     <!-- A zone too narrow for the field (a thumbnail beside its controls)
          keeps its picture and opens the field under itself instead. -->
     <PopoverRoot :open="linking && floating" @update:open="(open: boolean) => !open && stopLink(false)">
-      <PopoverAnchor :reference="revealAnchor ?? undefined" />
+      <!-- Positioned by `reference`; its own empty element must not be a flex
+           item, or the zone's gap adds a strip under the content. -->
+      <PopoverAnchor :reference="revealAnchor ?? undefined" class="hidden" />
       <PopoverPortal :to="portalTo">
         <PopoverContent
           @interact-outside="guardOutside"
