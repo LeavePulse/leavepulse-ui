@@ -349,7 +349,13 @@
     "name": "path",
     "type": "string | undefined",
     "required": false,
-    "description": "The current route path. Enables the built-in prefix-match active test and\nthe derived page title without the host wiring its own `isActive`. Pass\n`route.path`. Ignored when a custom `isActive` is provided."
+    "description": "The current route path. Enables the built-in prefix-match active test and\nthe derived page title without the host wiring its own `isActive`. Pass\n`route.path`. Ignored when a custom `isActive` is provided.\n\nA new path also places the page in the shell's scroll region: back and\nforward return to where it was left, a `hash` lands on that anchor\n(honouring its `scroll-margin-top`), anything else starts at the top."
+   },
+   {
+    "name": "hash",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The current route hash (`route.hash`). With `path` it lands a page on\nits anchor; a new hash on the same path glides there, after a dialog\nthat started the jump has closed."
    },
    {
     "name": "isActive",
@@ -409,6 +415,77 @@
     "description": "Text overrides: the burger's name and the skip link."
    },
    {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Icon-only rail (v-model:compact). Forwarded to LpSidebar."
+   },
+   {
+    "name": "resizable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The person sizes the rail and folds it to icons. Forwarded to LpSidebar."
+   },
+   {
+    "name": "pinnable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Rows can be pinned to the top (v-model:pinned). Forwarded to LpSidebar."
+   },
+   {
+    "name": "pinned",
+    "type": "string[] | undefined",
+    "required": false
+   },
+   {
+    "name": "persist",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Remember folded groups, width, compact and pins under this key. Forwarded to LpSidebar."
+   },
+   {
+    "name": "previewDelay",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Rest time before a row's `preview` card opens. Forwarded to LpSidebar."
+   },
+   {
+    "name": "compactHotkey",
+    "type": "string | false | undefined",
+    "required": false,
+    "description": "The key that folds the rail; false turns it off. Forwarded to LpSidebar."
+   },
+   {
+    "name": "contexts",
+    "type": "AppContext[] | undefined",
+    "required": false,
+    "description": "The app's contexts — a server, a workspace, a part of the product — each\nwith its own rail. With more than one, the rail's header becomes the\nswitcher between them (v-model:context), and the `logo` slot draws the\nswitcher's face with the current `context` in its props."
+   },
+   {
+    "name": "context",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "environment",
+    "type": "string | { label: string; tone?: \"danger\" | \"brand\" | \"warning\" | \"action\" | undefined; } | undefined",
+    "required": false,
+    "description": "Marks a non-production copy along the top of the rail. Forwarded to LpSidebar."
+   },
+   {
+    "name": "hints",
+    "type": "{ unreadNews: (page?: string | undefined) => readonly unknown[]; } | undefined",
+    "required": false,
+    "description": "The app's hint system; rows with a `hintPage` show unread news as a dot. Forwarded to LpSidebar."
+   },
+   {
+    "name": "bottomNav",
+    "type": "number | boolean | string[] | undefined",
+    "required": false,
+    "description": "On phones, the main pages along the bottom instead of the burger, with\n\"More\" for the rest (it opens the drawer). `true` takes the first four\npages, a number that many, a list of ids those pages."
+   },
+   {
     "name": "open",
     "type": "boolean | undefined",
     "required": false,
@@ -431,12 +508,24 @@
    {
     "name": "select",
     "type": "[item: SidebarItem]"
+   },
+   {
+    "name": "update:compact",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "update:pinned",
+    "type": "[ids: string[]]"
+   },
+   {
+    "name": "update:context",
+    "type": "[id: string]"
    }
   ],
   "slots": [
    {
     "name": "logo",
-    "type": "{}"
+    "type": "{ compact: boolean | undefined; context: AppContext; }"
    },
    {
     "name": "sidebar-actions",
@@ -444,7 +533,7 @@
    },
    {
     "name": "sidebar-footer",
-    "type": "{}"
+    "type": "{ compact: boolean | undefined; }"
    },
    {
     "name": "sidebar-item",
@@ -685,7 +774,7 @@
   "props": [
    {
     "name": "tone",
-    "type": "\"danger\" | \"brand\" | \"ok\" | \"warning\" | \"neutral\" | \"error\" | \"info\" | \"success\" | \"muted\" | \"action\" | \"accent\" | \"outline\" | undefined",
+    "type": "\"danger\" | \"brand\" | \"ok\" | \"warning\" | \"neutral\" | \"error\" | \"info\" | \"success\" | \"action\" | \"muted\" | \"accent\" | \"outline\" | undefined",
     "required": false,
     "choices": [
      "danger",
@@ -696,8 +785,8 @@
      "error",
      "info",
      "success",
-     "muted",
      "action",
+     "muted",
      "accent",
      "outline"
     ]
@@ -749,6 +838,61 @@
    }
   ]
  },
+ "LpBottomNav": {
+  "props": [
+   {
+    "name": "items",
+    "type": "SidebarItem[]",
+    "required": true
+   },
+   {
+    "name": "modelValue",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Active page id. Ignored when `isActive` is given."
+   },
+   {
+    "name": "isActive",
+    "type": "((item: SidebarItem) => boolean) | undefined",
+    "required": false
+   },
+   {
+    "name": "more",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "A last \"More\" entry that emits `more` (the shell opens its drawer)."
+   },
+   {
+    "name": "moreActive",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Marks \"More\" current: the page shown is one of those behind it."
+   },
+   {
+    "name": "label",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ nav: string; more: string; }> | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "select",
+    "type": "[item: SidebarItem]"
+   },
+   {
+    "name": "more",
+    "type": "[]"
+   }
+  ],
+  "slots": []
+ },
  "LpBreadcrumbs": {
   "props": [
    {
@@ -786,13 +930,13 @@
    },
    {
     "name": "variant",
-    "type": "\"danger\" | \"soft\" | \"muted\" | \"action\" | \"outline\" | \"solid\" | \"light\" | \"ghost\" | undefined",
+    "type": "\"danger\" | \"action\" | \"soft\" | \"muted\" | \"outline\" | \"solid\" | \"light\" | \"ghost\" | undefined",
     "required": false,
     "choices": [
      "danger",
+     "action",
      "soft",
      "muted",
-     "action",
      "outline",
      "solid",
      "light",
@@ -1705,6 +1849,24 @@
     "description": "Trigger text beside the swatch. Defaults to the colour's own value."
    },
    {
+    "name": "variant",
+    "type": "\"field\" | \"swatch\" | undefined",
+    "required": false,
+    "default": "\"field\"",
+    "description": "`swatch` makes the trigger a round chip of the colour alone, for a row of\npresets that ends in \"any colour\" or a toolbar with no room for a field.\nThe panel is the same.",
+    "choices": [
+     "field",
+     "swatch"
+    ]
+   },
+   {
+    "name": "selected",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "The swatch is the current choice. False draws it as \"any colour\" (a\ncolour wheel), for when the value came from presets beside it."
+   },
+   {
     "name": "ariaLabel",
     "type": "string | undefined",
     "required": false,
@@ -2199,6 +2361,45 @@
    }
   ]
  },
+ "LpContextSwitcher": {
+  "props": [
+   {
+    "name": "contexts",
+    "type": "AppContext[]",
+    "required": true
+   },
+   {
+    "name": "modelValue",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The current context's id (v-model)."
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "The icon rail: the trigger is a square with the icon or an initial."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ switch: string; title: string; }> | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "update:modelValue",
+    "type": "[id: string]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{ context: AppContext; compact: boolean; }"
+   }
+  ]
+ },
  "LpCopyButton": {
   "props": [
    {
@@ -2228,14 +2429,14 @@
    },
    {
     "name": "variant",
-    "type": "\"soft\" | \"muted\" | \"action\" | \"outline\" | \"solid\" | \"ghost\" | undefined",
+    "type": "\"action\" | \"soft\" | \"muted\" | \"outline\" | \"solid\" | \"ghost\" | undefined",
     "required": false,
     "default": "\"ghost\"",
     "description": "LpButton's look. `ghost` by default: a copy button is a helper beside something, not a call to action.",
     "choices": [
+     "action",
      "soft",
      "muted",
-     "action",
      "outline",
      "solid",
      "ghost"
@@ -3322,6 +3523,10 @@
   "events": [],
   "slots": [
    {
+    "name": "description",
+    "type": "{}"
+   },
+   {
     "name": "default",
     "type": "{}"
    }
@@ -3455,16 +3660,16 @@
     "type": "[node: FileNode]"
    },
    {
+    "name": "expand",
+    "type": "[node: FileNode]"
+   },
+   {
     "name": "update:selected",
     "type": "[id: string]"
    },
    {
     "name": "update:expanded",
     "type": "[ids: string[]]"
-   },
-   {
-    "name": "expand",
-    "type": "[node: FileNode]"
    },
    {
     "name": "collapse",
@@ -5897,6 +6102,11 @@
     "name": "studio",
     "type": "PreviewableThemeStudio",
     "required": true
+   },
+   {
+    "name": "hide",
+    "type": "ThemeStudioPart[] | undefined",
+    "required": false
    }
   ],
   "events": [],
@@ -7041,14 +7251,14 @@
    },
    {
     "name": "trigger",
-    "type": "\"hover\" | \"none\" | \"reveal\" | \"mount\" | undefined",
+    "type": "\"none\" | \"reveal\" | \"hover\" | \"mount\" | undefined",
     "required": false,
     "default": "\"reveal\"",
     "description": "What starts a scramble besides a change of `value`:\n`reveal` the first time it is on screen (a key below the fold decrypts\nwhen it is scrolled to), `mount` at once, `hover` each time the pointer\ncomes in (a teaser), `none` only on changes and `play()`.",
     "choices": [
-     "hover",
      "none",
      "reveal",
+     "hover",
      "mount"
     ]
    },
@@ -7613,6 +7823,24 @@
     "required": false,
     "default": "false",
     "description": "Turn the easing off entirely — the wrapper stays, the box resizes\ninstantly. For a box that is being driven by something else (a drag, a\ncanvas), where a tween would fight the thing already animating it."
+   },
+   {
+    "name": "anchor",
+    "type": "\"end\" | \"start\" | undefined",
+    "required": false,
+    "default": "\"start\"",
+    "description": "Which edge the content holds to while the box catches up, for a flex\nrow. A box pinned to the right (`ml-auto`) grows leftwards, and content\nlaid out from its left edge throws every unchanged control to the right\nfor the first frame and slides it back: the controls that did not change\nare the ones that jump. `\"end\"` keeps them where they are and lets the\nnew one come in from the free side.",
+    "choices": [
+     "end",
+     "start"
+    ]
+   },
+   {
+    "name": "presence",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Fade the box's own children in and out as they come and go. Without it\nthe box glides but a control still pops into being as the edge uncovers\nit, and one that leaves is gone in a frame while its space closes up.\nAnything that takes room counts, at any depth, since controls often\narrive by teleport into a wrapper inside the box; an absolutely placed\noverlay (a tab's marker) does not, it moves nothing and animates itself.\nMarkup put back unchanged by a re-render is not animated either."
    }
   ],
   "events": [],
@@ -7766,7 +7994,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ nav: string; search: string; }> | undefined",
+    "type": "Partial<{ nav: string; search: string; pinned: string; pin: string; unpin: string; expand: string; compact: string; expandRail: string; resize: string; }> | undefined",
     "required": false,
     "description": "Text overrides: `nav` names the landmark, `search` the filter field."
    },
@@ -7877,6 +8105,69 @@
     "required": false,
     "default": "false",
     "description": "The active pill follows the hovered item, as in LpTabs. Off by default;\nsee LpSidebarNav for why a tall nav keeps it pinned."
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Icons only (v-model:compact): each row's name, count and the pages under\nit move into a card beside the icon. With `resizable` the person decides,\nand the choice is remembered under `persist`."
+   },
+   {
+    "name": "resizable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The person sizes the rail: drag its edge (double-click resets), drag it\nnarrow enough and it folds to icons, and a button and Ctrl+B fold it\noutright. One mechanism, not two: a narrow rail that only truncates its\nlabels is the worst of both, so below a point it becomes the icon rail."
+   },
+   {
+    "name": "minWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "180",
+    "description": "Rail width bounds while resizing, in px."
+   },
+   {
+    "name": "maxWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "420"
+   },
+   {
+    "name": "compactHotkey",
+    "type": "string | false | undefined",
+    "required": false,
+    "default": "\"Ctrl+B\"",
+    "description": "The key that folds the rail when `resizable`. False turns it off."
+   },
+   {
+    "name": "pinnable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Rows offer \"Pin to top\" in their menu, and pinned pages lead the nav\n(v-model:pinned, ids; remembered under `persist` when unbound)."
+   },
+   {
+    "name": "pinned",
+    "type": "string[] | undefined",
+    "required": false
+   },
+   {
+    "name": "previewDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "900",
+    "description": "How long the pointer rests on a row with a `preview` before its card opens, in ms."
+   },
+   {
+    "name": "environment",
+    "type": "string | { label: string; tone?: \"danger\" | \"brand\" | \"warning\" | \"action\" | undefined; } | undefined",
+    "required": false,
+    "description": "Mark the app as not production: a coloured band along the top of the rail\nwith the label hanging from it (\"staging\", \"local\"). It is there so an\nedit on the test copy is not mistaken for one on the real thing; leave it\nunset in production."
+   },
+   {
+    "name": "hints",
+    "type": "{ unreadNews: (page?: string | undefined) => readonly unknown[]; } | undefined",
+    "required": false,
+    "description": "The app's hint system (createHintSystem). Rows that name a `hintPage`\nthen mark unread news on it with a dot, with nothing for the app to wire."
    }
   ],
   "events": [
@@ -7897,6 +8188,14 @@
     "type": "[item: SidebarItem]"
    },
    {
+    "name": "update:compact",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "update:pinned",
+    "type": "[ids: string[]]"
+   },
+   {
     "name": "update:search",
     "type": "[value: string]"
    }
@@ -7904,19 +8203,20 @@
   "slots": [
    {
     "name": "header",
-    "type": "{}"
+    "type": "{ compact?: boolean | undefined; }",
+    "description": "The brand; `compact` says the rail is down to icons."
+   },
+   {
+    "name": "actions",
+    "type": "{ compact?: boolean | undefined; }"
+   },
+   {
+    "name": "footer",
+    "type": "{ compact?: boolean | undefined; }"
    },
    {
     "name": "item",
     "type": "{ item: SidebarItem; active: boolean; }"
-   },
-   {
-    "name": "actions",
-    "type": "{}"
-   },
-   {
-    "name": "footer",
-    "type": "{}"
    }
   ]
  },
@@ -7969,16 +8269,49 @@
     "required": false,
     "default": "false",
     "description": "The active pill glides under the hovered item and springs back on leave,\nas in LpTabs and LpTableOfContents. Off by default here, unlike those:\na sidebar is tall and the pointer crosses it on the way to the page\nbeside it, so a pill chasing every pass would flicker through a dozen\nrows and hide the one thing a nav must keep in view, where you are. A\nshort rail (an app switcher, a settings list) can turn it on."
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Icons only, each row's name in a card beside it."
+   },
+   {
+    "name": "pinnable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Rows offer \"Pin to top\" in their menu; `pinned` are shown first."
+   },
+   {
+    "name": "pinned",
+    "type": "SidebarItem[] | undefined",
+    "required": false,
+    "default": "[]"
+   },
+   {
+    "name": "previewDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "900"
+   },
+   {
+    "name": "labels",
+    "type": "{ pinned: string; pin: string; unpin: string; expand: string; }",
+    "required": true
    }
   ],
   "events": [
    {
-    "name": "toggle-section",
-    "type": "[key: string, collapsed: boolean]"
-   },
-   {
     "name": "activate",
     "type": "[item: SidebarItem]"
+   },
+   {
+    "name": "toggle-pin",
+    "type": "[id: string]"
+   },
+   {
+    "name": "toggle-section",
+    "type": "[key: string, collapsed: boolean]"
    }
   ],
   "slots": [
@@ -7988,16 +8321,122 @@
    }
   ]
  },
+ "LpSidebarRow": {
+  "props": [
+   {
+    "name": "item",
+    "type": "SidebarItem",
+    "required": true
+   },
+   {
+    "name": "active",
+    "type": "boolean",
+    "required": true
+   },
+   {
+    "name": "pill",
+    "type": "boolean",
+    "required": true,
+    "description": "The pill sits under this row (active, or hovered while following hover)."
+   },
+   {
+    "name": "pillId",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "group",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A folded group standing in for its pages: a click opens its card."
+   },
+   {
+    "name": "nested",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A page under another: indented, a size smaller."
+   },
+   {
+    "name": "menu",
+    "type": "ContextMenuItemDef[] | undefined",
+    "required": false,
+    "default": "[]"
+   },
+   {
+    "name": "expandable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Has pages under it; `expanded` says whether they show."
+   },
+   {
+    "name": "expanded",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "onPath",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "One of its pages is the current one: the row reads as on the path."
+   },
+   {
+    "name": "previewDelay",
+    "type": "number | undefined",
+    "required": false,
+    "default": "900"
+   },
+   {
+    "name": "hovered",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "expandLabel",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "itemActive",
+    "type": "((item: SidebarItem) => boolean) | undefined",
+    "required": false
+   }
+  ],
+  "events": [
+   {
+    "name": "toggle",
+    "type": "[]"
+   },
+   {
+    "name": "hover",
+    "type": "[item: SidebarItem]"
+   },
+   {
+    "name": "activate",
+    "type": "[item: SidebarItem]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{ item: SidebarItem; active: boolean; }"
+   }
+  ]
+ },
  "LpSkeleton": {
   "props": [
    {
     "name": "rounded",
-    "type": "\"control\" | \"card\" | \"pill\" | undefined",
+    "type": "\"pill\" | \"card\" | \"control\" | undefined",
     "required": false,
     "choices": [
-     "control",
+     "pill",
      "card",
-     "pill"
+     "control"
     ]
    }
   ],
@@ -8240,6 +8679,13 @@
     "name": "grouped",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "animateOnMount",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Count up from zero when the tile first shows (the default), or show the\nvalue outright: a report or a screenshot wants the figure, not the run."
    },
    {
     "name": "decimals",
@@ -8554,6 +9000,32 @@
    }
   ]
  },
+ "LpTabFace": {
+  "props": [
+   {
+    "name": "item",
+    "type": "{ label: string; icon?: string | undefined; dot?: boolean | undefined; badge?: string | number | undefined; }",
+    "required": true
+   },
+   {
+    "name": "bottom",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "active",
+    "type": "boolean | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
  "LpTable": {
   "props": [
    {
@@ -8657,6 +9129,20 @@
     "description": "Active sort (v-model:sort). When set, the parent owns ordering (server\nside); otherwise the table sorts its own rows client-side."
    },
    {
+    "name": "filters",
+    "type": "TableFilters | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The header filters (v-model:filters): per column key, the values hidden.\nWhen set, the parent owns them, so a control above the table that\nfilters the same column (see `useTableFilterChoice`) and the column's\nfunnel are one state: each shows what the other picked, and the table's\nresets clear both. Left unset, the table keeps them itself. With\n`persist`, remembered filters fill only the columns the parent leaves\nunfiltered, and arrive through `update:filters`."
+   },
+   {
+    "name": "filtered",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "The rows are narrowed by filters outside the table (a search, a period).\nAn empty table then says nothing matches rather than that there is\nnothing at all, and its reset button also emits `resetFilters`, for the\nparent to clear its own."
+   },
+   {
     "name": "stickyHeader",
     "type": "boolean | undefined",
     "required": false,
@@ -8758,6 +9244,15 @@
    {
     "name": "update:sort",
     "type": "[SortState | null]"
+   },
+   {
+    "name": "update:filters",
+    "type": "[TableFilters]"
+   },
+   {
+    "name": "resetFilters",
+    "type": "[]",
+    "description": "The empty table's reset was pressed: clear the filters kept outside it."
    },
    {
     "name": "update:allMatching",
@@ -8894,6 +9389,13 @@
     "required": false,
     "default": "true",
     "description": "The marker glides under the hovered tab and springs back on leave (the\ndefault). False pins it to the selected tab: calmer for a dense header\nwhere the pointer crosses the bar on its way elsewhere."
+   },
+   {
+    "name": "compact",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Icons only, the label kept for screen readers and shown on hover. For a\nheader that cannot fit every label: a tab cut off at the edge, or hidden\nunder the actions beside it, cannot be reached at all. Tabs without an\nicon keep their label."
    }
   ],
   "events": [
@@ -9195,6 +9697,18 @@
     "type": "boolean | undefined",
     "required": false,
     "description": "Marks the label with the required indicator; the attribute still reaches\nthe <textarea> for native validation."
+   },
+   {
+    "name": "autosize",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Grows with what is typed, wrapped lines included, from `rows` up to\n`maxRows`, then scrolls; the drag handle goes, since the height is the\ntext's. For a composer, where a fixed box is either cramped or empty."
+   },
+   {
+    "name": "maxRows",
+    "type": "number | undefined",
+    "required": false,
+    "default": "8"
    }
   ],
   "events": [
@@ -9290,6 +9804,11 @@
     "name": "label",
     "type": "string",
     "required": true
+   },
+   {
+    "name": "inline",
+    "type": "boolean | undefined",
+    "required": false
    }
   ],
   "events": [],
@@ -9322,14 +9841,14 @@
    },
    {
     "name": "variant",
-    "type": "\"icon\" | \"pill\" | \"swatch\" | undefined",
+    "type": "\"icon\" | \"swatch\" | \"pill\" | undefined",
     "required": false,
     "default": "\"swatch\"",
     "description": "Trigger style:\n - \"swatch\" (default): a round chip previewing the theme's surface and brand.\n - \"icon\": a sun/moon icon following the active theme's mode.\n - \"pill\": the chip and the theme name in a rounded pill.",
     "choices": [
      "icon",
-     "pill",
-     "swatch"
+     "swatch",
+     "pill"
     ]
    },
    {

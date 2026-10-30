@@ -175,3 +175,34 @@ for (const mode of ["card", "control"]) {
     expect(rx).toBe(radius)
   })
 }
+
+test("a control above the table and the column funnel share one filter", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=table-filters")
+  const choice = page.locator('output[aria-label="Status choice value"]')
+  const state = page.locator('output[aria-label="Table filters"]')
+  const funnel = page.locator('[data-lp-filter="status"]')
+  await expect(page.getByRole("row")).toHaveCount(4)
+
+  await page.getByRole("button", { name: "Open", exact: true }).click()
+  await expect(page.getByRole("row")).toHaveCount(2)
+  await expect(funnel).toHaveClass(/text-brand/)
+  await expect(page.getByText("Status:", { exact: false })).toBeVisible()
+
+  await funnel.click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByRole("checkbox", { name: "archived" })).toBeVisible()
+  await dialog.getByRole("checkbox", { name: "closed" }).click()
+  await expect(choice).toHaveText("mixed")
+  await dialog.getByRole("checkbox", { name: "failed" }).click()
+  await dialog.getByRole("checkbox", { name: "open" }).click()
+  await expect(choice).toHaveText("done")
+  await page.keyboard.press("Escape")
+
+  await page.getByRole("textbox", { name: "Search orders" }).fill("zzz")
+  await expect(page.getByText("No rows match the filters")).toBeVisible()
+  await page.getByRole("button", { name: "Reset filters" }).click()
+  await expect(choice).toHaveText("all")
+  await expect(state).toHaveText("{}")
+  await expect(page.getByRole("textbox", { name: "Search orders" })).toHaveValue("")
+  await expect(page.getByRole("row")).toHaveCount(4)
+})

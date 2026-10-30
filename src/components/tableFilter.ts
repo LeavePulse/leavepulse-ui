@@ -27,6 +27,72 @@ export function unhideValues(hidden: ReadonlySet<unknown>, values: readonly unkn
   return next
 }
 
+/**
+ * A table's header filters as a consumer holds them (v-model:filters on
+ * LpTable): per column key, the values hidden. A column that is absent or has
+ * an empty list is not filtered. Hidden rather than shown for the same reason
+ * as inside the table: a value nobody has seen before shows up.
+ */
+export type TableFilters = Record<string, unknown[]>
+
+/** The hidden list that leaves only `keep` of `values` showing. */
+export function showOnly(values: readonly unknown[], keep: readonly unknown[]): unknown[] {
+  return [...onlyValues(values, keep)]
+}
+
+/** Which of `values` a column's filter still shows. */
+export function shownValues(values: readonly unknown[], hidden: readonly unknown[] | undefined): unknown[] {
+  if (!hidden?.length) return [...values]
+  const out = new Set(hidden)
+  return values.filter((v) => !out.has(v))
+}
+
+/**
+ * The rows a set of header filters leaves, for the same data drawn somewhere
+ * the table is not (cards on a phone, a CSV built by the page).
+ */
+export function filterRows<Row extends Record<string, unknown>>(rows: readonly Row[], filters: TableFilters): Row[] {
+  const active = Object.entries(filters).filter(([, hidden]) => hidden.length).map(([key, hidden]) => [key, new Set(hidden)] as const)
+  if (!active.length) return [...rows]
+  return rows.filter((row) => active.every(([key, hidden]) => !hidden.has(row[key])))
+}
+
+/** Sets per column, from the plain lists a consumer writes. */
+export function toHiddenSets(filters: TableFilters): Record<string, Set<unknown>> {
+  return Object.fromEntries(Object.entries(filters).map(([key, values]) => [key, new Set(values)]))
+}
+
+/** The plain lists a consumer reads, empty columns left out. */
+export function fromHiddenSets(hidden: Record<string, ReadonlySet<unknown>>): TableFilters {
+  return Object.fromEntries(Object.entries(hidden).filter(([, set]) => set.size).map(([key, set]) => [key, [...set]]))
+}
+
+/** Whether two filter states hide the same values, empty columns counting as absent. */
+export function sameHidden(a: Record<string, ReadonlySet<unknown>>, b: Record<string, ReadonlySet<unknown>>): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  for (const key of keys) {
+    const x = a[key]
+    const y = b[key]
+    if ((x?.size ?? 0) !== (y?.size ?? 0)) return false
+    if (x && y) for (const v of x) if (!y.has(v)) return false
+  }
+  return true
+}
+
+/**
+ * Persisted filters meeting the ones a parent already set: the parent's
+ * explicit state (a deep link, a control above the table) wins per column,
+ * and what was remembered fills only the columns it leaves alone.
+ */
+export function mergeRestored(
+  current: Record<string, ReadonlySet<unknown>>,
+  restored: Record<string, unknown[]>,
+): Record<string, Set<unknown>> {
+  const out: Record<string, Set<unknown>> = Object.fromEntries(Object.entries(current).map(([k, v]) => [k, new Set(v)]))
+  for (const [key, values] of Object.entries(restored)) if (!out[key]?.size) out[key] = new Set(values)
+  return out
+}
+
 /** Lower-cased and stripped of accents, so "cafe" finds "Café". */
 export function foldText(text: string): string {
   return text.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase()

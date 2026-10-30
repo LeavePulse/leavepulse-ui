@@ -32,7 +32,16 @@ import { useResizeObserver } from "../composables/useResizeObserver"
 import { compareValues } from "./tableSort"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
-import { parseTableState, serializeTableState, summarizeShown } from "./tableFilter"
+import {
+  fromHiddenSets,
+  mergeRestored,
+  parseTableState,
+  sameHidden,
+  serializeTableState,
+  summarizeShown,
+  toHiddenSets,
+  type TableFilters,
+} from "./tableFilter"
 import { resolveRowMenu, type TableRowMenuResult } from "./tableRowMenu"
 
 export interface TableColumn<Row> {
@@ -64,6 +73,21 @@ export interface TableColumn<Row> {
    * vocabulary; the menu should say what the column itself says.
    */
   valueLabel?: (value: unknown) => string
+  /**
+   * The column's whole vocabulary, when it is known apart from the rows. The
+   * funnel lists these first and then anything else the rows hold, so a value
+   * is offered even while nothing on the page has it: the rows may already be
+   * narrowed by the same column upstream (a control above the table, a server
+   * query), and a funnel built only from what arrived could not widen it again.
+   */
+  filterValues?: readonly unknown[]
+  /**
+   * Show how many rows hold each value in the funnel (the default). Turn off
+   * when the rows are already narrowed by this column before they reach the
+   * table: the counts would then claim that the values filtered out upstream
+   * hold no rows at all.
+   */
+  filterCounts?: boolean
   /** The value a CSV export writes for this column; the raw cell by default. */
   exportValue?: (row: Row) => unknown
   /** Keep this column out of the show/hide list — an actions column has no
@@ -209,6 +233,23 @@ const props = withDefaults(
     /** Active sort (v-model:sort). When set, the parent owns ordering (server
      *  side); otherwise the table sorts its own rows client-side. */
     sort?: SortState | null
+    /**
+     * The header filters (v-model:filters): per column key, the values hidden.
+     * When set, the parent owns them, so a control above the table that
+     * filters the same column (see `useTableFilterChoice`) and the column's
+     * funnel are one state: each shows what the other picked, and the table's
+     * resets clear both. Left unset, the table keeps them itself. With
+     * `persist`, remembered filters fill only the columns the parent leaves
+     * unfiltered, and arrive through `update:filters`.
+     */
+    filters?: TableFilters
+    /**
+     * The rows are narrowed by filters outside the table (a search, a period).
+     * An empty table then says nothing matches rather than that there is
+     * nothing at all, and its reset button also emits `resetFilters`, for the
+     * parent to clear its own.
+     */
+    filtered?: boolean
     /** Pin the header while the body scrolls. Pair with a height on the wrapper. */
     stickyHeader?: boolean
     /** Per-row right-click menu. Return [] (or omit the prop) to disable it for
@@ -264,6 +305,8 @@ const props = withDefaults(
     // undefined, not null: null is a parent saying "unsorted", undefined is no
     // parent at all, and only the latter lets the table keep its own sort.
     sort: undefined,
+    filters: undefined,
+    filtered: false,
   },
 )
 
@@ -337,6 +380,9 @@ const scrollAttrs = computed(() => {
 const emit = defineEmits<{
   (e: "update:selected", value: RowKey[]): void
   (e: "update:sort", value: SortState | null): void
+  (e: "update:filters", value: TableFilters): void
+  /** The empty table's reset was pressed: clear the filters kept outside it. */
+  (e: "resetFilters"): void
   (e: "update:allMatching", value: boolean): void
   (e: "rowClick", row: T): void
 }>()
@@ -474,7 +520,25 @@ async function holdHeight() {
  * being invisible until someone notices the list has an unticked entry they
  * never saw.
  */
-const hiddenValues = ref<Record<string, Set<unknown>>>({})
+const ownHidden = ref<Record<string, Set<unknown>>>({})
+let lastHidden: Record<string, Set<unknown>> = {}
+/*
+ * The parent's lists become sets once per real change: a parent handing back
+ * an equal state as a new object (its v-model echo, a computed that rebuilt)
+ * must not refetch a server page or replay the rows' motion.
+ */
+const hiddenValues = computed<Record<string, Set<unknown>>>(() => {
+  const next = props.filters !== undefined ? toHiddenSets(props.filters) : ownHidden.value
+  if (sameHidden(next, lastHidden)) return lastHidden
+  lastHidden = next
+  return next
+})
+
+function writeHidden(next: Record<string, Set<unknown>>) {
+  if (sameHidden(next, hiddenValues.value)) return
+  ownHidden.value = next
+  emit("update:filters", fromHiddenSets(next))
+}
 
 /*
  * Rows animate only when the table itself reshuffles them — a header filter or
@@ -520,32 +584,27 @@ const localFacets = useTableFacets({
 })
 
 function valuesOf(col: TableColumn<T>): unknown[] {
-  if (props.load) return facets.value[col.key] ?? [...new Set(sourceRows.value.map((row) => row[col.key]))]
-  return localFacets.distinct(col.key)
+  const found = props.load
+    ? facets.value[col.key] ?? [...new Set(sourceRows.value.map((row) => row[col.key]))]
+    : localFacets.distinct(col.key)
+  return col.filterValues ? [...new Set([...col.filterValues, ...found])] : found
 }
 
 function isValueHidden(key: string, value: unknown): boolean {
   return hiddenValues.value[key]?.has(value) ?? false
 }
 
-function toggleValue(key: string, value: unknown) {
-  withMotion(() => applyToggle(key, value))
-}
-
-function applyToggle(key: string, value: unknown) {
-  const next = new Set(hiddenValues.value[key] ?? [])
-  if (next.has(value)) next.delete(value)
-  else next.add(value)
-  hiddenValues.value = { ...hiddenValues.value, [key]: next }
-}
-
 function showAllValues(key: string) {
-  withMotion(() => (hiddenValues.value = { ...hiddenValues.value, [key]: new Set() }))
+  writeHidden({ ...hiddenValues.value, [key]: new Set() })
 }
 
 function setHidden(key: string, next: Set<unknown>) {
-  withMotion(() => (hiddenValues.value = { ...hiddenValues.value, [key]: next }))
+  writeHidden({ ...hiddenValues.value, [key]: next })
 }
+
+// Whoever changed the filters, the funnel or a control of the parent's, the
+// rows they hide and reveal move the same way.
+watch(hiddenValues, () => withMotion(() => {}))
 
 function labelOf(col: TableColumn<T>, value: unknown): string {
   return col.valueLabel?.(value) ?? String(value ?? "—")
@@ -558,7 +617,7 @@ function labelOf(col: TableColumn<T>, value: unknown): string {
  */
 const facetOptions = computed(() => new Map(props.columns.filter((col) => col.filterable).map((col) => {
   return [col.key, computed(() => {
-    const counts = props.load ? undefined : localFacets.counts(col.key)
+    const counts = props.load || col.filterCounts === false ? undefined : localFacets.counts(col.key)
     return valuesOf(col).map((value) => ({
       value,
       label: labelOf(col, value),
@@ -579,7 +638,12 @@ const activeFilters = computed(() =>
 )
 
 function clearAllFilters() {
-  withMotion(() => (hiddenValues.value = {}))
+  writeHidden({})
+}
+
+function resetFilters() {
+  clearAllFilters()
+  emit("resetFilters")
 }
 
 function filterLabels() {
@@ -816,9 +880,7 @@ onMounted(() => {
         ownSort.value = state.sort
         emit("update:sort", state.sort)
       }
-      if (state.hidden) {
-        hiddenValues.value = Object.fromEntries(Object.entries(state.hidden).map(([k, v]) => [k, new Set(v)]))
-      }
+      if (state.hidden) writeHidden(mergeRestored(hiddenValues.value, state.hidden))
       if (state.columns) hiddenColumns.value = new Set(state.columns)
     }
   }
@@ -991,6 +1053,7 @@ const showBar = computed(
 )
 const filteredOut = computed(() => {
   if (busy.value || failed.value || displayRows.value.length) return false
+  if (props.filtered) return true
   if (props.load) return Object.values(hiddenValues.value).some((set) => set.size)
   return props.rows.length > 0
 })
@@ -1364,7 +1427,7 @@ usePaletteCommands(() => {
               :icon="failed ? 'lucide:circle-alert' : filteredOut ? 'lucide:filter-x' : emptyIcon"
               :title="failed ? text.error : filteredOut ? text.noMatches : text.empty"
             >
-              <LpButton v-if="filteredOut" variant="outline" size="sm" @click="clearAllFilters">
+              <LpButton v-if="filteredOut" variant="outline" size="sm" @click="resetFilters">
                 {{ text.resetFilters }}
               </LpButton>
             </LpEmptyState>

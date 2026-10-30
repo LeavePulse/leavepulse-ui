@@ -5,7 +5,8 @@ import {
   LpButton, LpConfirmHost, LpDatePicker, LpDateRangePicker, LpDrawer,
   LpEditable, LpFormField, LpInput, LpPasswordInput, LpRepeater,
   LpSecretField, LpSelect, LpDataList, LpChart, LpFrame,
-  LpContextMenu, LpDropdownMenu, LpDropzone, LpPopover, useForm, type DateRange,
+  LpContextMenu, LpDropdownMenu, LpDropzone, LpPopover, LpSegmented, LpTable, useForm,
+  useTableFilterChoice, type DateRange, type TableFilters,
 } from "../../src"
 
 const params = new URLSearchParams(location.search)
@@ -41,6 +42,19 @@ const rows = ref([
 ])
 const newRow = () => ({ name: "New", children: [] as { name: string }[] })
 const pickedEnvironment = ref("")
+const tableFilters = ref<TableFilters>({})
+const statusChoice = useTableFilterChoice(tableFilters, "status", { all: null, open: ["open"], done: ["closed", "failed"] })
+const tableSearch = ref("")
+const orders = [
+  { id: "A-1", status: "open" },
+  { id: "A-2", status: "closed" },
+  { id: "A-3", status: "failed" },
+]
+const visibleOrders = () => orders.filter((o) => o.id.toLowerCase().includes(tableSearch.value.toLowerCase()))
+const tableColumns = [
+  { key: "id", label: "Order" },
+  { key: "status", label: "Status", filterable: true, filterValues: ["open", "closed", "failed", "archived"] },
+]
 const menuItems = [{ label: "Move to", children: [
   { label: "Production", onSelect: () => { pickedEnvironment.value = "Production" } },
   { label: "Staging", onSelect: () => { pickedEnvironment.value = "Staging" } },
@@ -102,6 +116,13 @@ const menuItems = [{ label: "Move to", children: [
       <LpEditable v-model="name" label="Name" :disabled="mode === 'disabled' && editingLocked" :readonly="mode === 'readonly' && editingLocked" :save="value => { saves.push(value) }" />
       <button @pointerdown.prevent @click="editingLocked = !editingLocked">Toggle lock</button>
       <output aria-label="Saved names">{{ JSON.stringify(saves) }}</output>
+    </template>
+    <template v-else-if="scenario === 'table-filters'">
+      <LpInput v-model="tableSearch" aria-label="Search orders" />
+      <LpSegmented v-model="statusChoice" aria-label="Status choice" :options="[{ value: 'all', label: 'All' }, { value: 'open', label: 'Open' }, { value: 'done', label: 'Done' }]" />
+      <LpTable v-model:filters="tableFilters" :columns="tableColumns" :rows="visibleOrders()" row-key="id" :filtered="!!tableSearch" @reset-filters="tableSearch = ''" />
+      <output aria-label="Table filters">{{ JSON.stringify(tableFilters) }}</output>
+      <output aria-label="Status choice value">{{ statusChoice ?? "mixed" }}</output>
     </template>
     <template v-else-if="scenario === 'dropzone'">
       <LpDropzone title="Drop a picture" :class="mode === 'control' ? 'rounded-control p-0' : 'p-0'">

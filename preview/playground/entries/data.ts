@@ -1,4 +1,4 @@
-import { reactive } from "vue"
+import { reactive, ref } from "vue"
 import {
   confirm,
   LpMediaGallery,
@@ -27,6 +27,8 @@ import {
   LpTable,
   LpSegmented,
   LpUptimeBar,
+  useTableFilterChoice,
+  type TableFilters,
 } from "../../../src"
 import { ConfigScope } from "../demos"
 import { type ComponentEntry } from "./shared"
@@ -658,9 +660,10 @@ export const data: ComponentEntry[] = [
     id: "table",
     name: "Table",
     description:
-      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu` (return `{ title, subtitle, icon, items }` to head it with the row's name), `loading` for rows a parent fetches (skeleton rows in the shape of the columns while empty, dimmed while refreshing), stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off. A column's `hideBelow` leaves it out while the table is narrower than that (Status below 520px here).",
-    components: { LpTable, LpBadge, LpButton, LpIcon, LpSwitch },
+      "Data-driven table: typed columns (align/width/sortable), row key, empty state, per-column scoped cell slots (`#cell-<key>`), client/server sorting via v-model:sort, row selection via v-model:selected (press a row's tick and drag down the column to tick a run; Ctrl+A ticks all, Escape clears), a per-row right-click menu via `rowMenu` (return `{ title, subtitle, icon, items }` to head it with the row's name), `loading` for rows a parent fetches (skeleton rows in the shape of the columns while empty, dimmed while refreshing), stickyHeader, and a server-backed mode via `load` (paging, sort and header filters done by the server, debounced and abortable). A column's `sortValue` maps a row to what it sorts by, and `compare` takes over the ordering entirely. A `filterable` column gets a funnel in its header: a searchable list of its values with counts, `Only` on each value, All / None / Invert, and after a search the matches as a whole; filters in force show as chips above the table with the row count. `selectable=\"hold\"` hides the tick column until a long press on a row selects it (keep holding and drag to select more), after which clicks toggle rows and Escape clears; the `#bulk` slot holds actions for the selection. `density`, `summary` and `persist` (sort, filters and hidden columns remembered across visits) round it off. The header filters can be owned by the page (`v-model:filters`, the hidden values per column), so a control above the table that filters the same column is one state with its funnel: `useTableFilterChoice` turns a column into a choice for LpSegmented or tiles, a column's `filterValues` keeps every value on offer when the rows are already narrowed upstream, `filterCounts: false` drops counts that would mislead then, and `filtered` with `@reset-filters` lets the empty table's reset clear the page's own search too. A column's `hideBelow` leaves it out while the table is narrower than that (Status below 520px here).",
+    components: { LpTable, LpBadge, LpButton, LpIcon, LpInput, LpSegmented, LpSwitch },
     state: () => {
+      const issueFilters = ref<TableFilters>({})
       const s = reactive({
         loading: false,
         sort: { key: "amount", dir: "desc" },
@@ -722,6 +725,13 @@ export const data: ComponentEntry[] = [
           points: [1, 2, 3, 5, 8, 13][(i * 3) % 6],
         })),
         issueSelection: [] as number[],
+        issueFilters,
+        issueStage: useTableFilterChoice(issueFilters, "status", {
+          all: null,
+          active: ["Open", "Triaged", "In progress", "In review", "Blocked", "QA", "Ready", "Reopened"],
+          done: ["Released", "Won't fix", "Duplicate", "Closed"],
+        }),
+        issueSearch: "",
         closeSelected() {
           for (const issue of s.issues) if (s.issueSelection.includes(issue.id)) issue.status = "Closed"
           s.issueSelection = []
@@ -809,10 +819,17 @@ export const data: ComponentEntry[] = [
   <p class="text-xs text-muted">Sorted by {{ sort?.key ?? '—' }} {{ sort?.dir ?? '' }} · {{ selected.length }} selected · right-click a row, or open its menu from the button</p>
 
   <!-- Fixed height + stickyHeader: scrolls via LpScrollArea, header pins to top. -->
-  <p class="mt-2 text-xs font-medium text-muted">Many values — open the funnel on Status or Owner. To select: hover a row and click the box at its left edge, or press and hold a row, then keep holding and drag over others; once rows are selected a click adds or removes one, Escape clears:</p>
+  <p class="mt-2 text-xs font-medium text-muted">Many values — open the funnel on Status or Owner; the Stage switch above and the Status funnel are one filter (v-model:filters with useTableFilterChoice). To select: hover a row and click the box at its left edge, or press and hold a row, then keep holding and drag over others; once rows are selected a click adds or removes one, Escape clears:</p>
+  <div class="flex flex-wrap items-center gap-2">
+    <LpInput v-model="issueSearch" size="sm" icon="lucide:search" placeholder="Search issues" aria-label="Search issues" class="w-56" />
+    <LpSegmented v-model="issueStage" size="sm" :options="[{ value: 'all', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'done', label: 'Done' }]" aria-label="Stage" />
+  </div>
   <LpTable
     :columns="issueColumns"
-    :rows="issues"
+    :rows="issueSearch ? issues.filter((i) => i.title.toLowerCase().includes(issueSearch.toLowerCase())) : issues"
+    v-model:filters="issueFilters"
+    :filtered="!!issueSearch"
+    @reset-filters="issueSearch = ''"
     row-key="id"
     selectable="hold"
     sticky-header
