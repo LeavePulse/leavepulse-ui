@@ -4,7 +4,7 @@ import { LpAutocomplete } from "../../src"
 
 const text = ref("")
 const picked = ref("")
-const people = ["Sunny", "Theroer", "Lighter"]
+const people = ["Sunny", "THEROER", "Lighter"]
 const options = computed(() => people.filter((name) => name.toLowerCase().includes(text.value.toLowerCase())))
 
 function choose(value: string) {
