@@ -27,6 +27,12 @@ entry is deleted, not ticked: the commit says what changed.
   but Back from that entry to an earlier page would then reach the router
   replayed, with its scroll key off by one.
 
+- **`patterns.pw.ts` › "loading example reserves the content and action
+  geometry" fails on CI now and then:** the action button is caught at x 16
+  instead of 707 for one read, then the rerun passes. It failed on both the
+  v0.77.0 and v0.77.1 runs and never locally against the preview. Likely the
+  button is measured mid-mount of the example frame, before the row lays out.
+
 ## Ideas
 
 - **Overlay history for LpLightbox and LpCommandPalette.** They share the
