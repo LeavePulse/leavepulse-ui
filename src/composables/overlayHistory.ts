@@ -31,6 +31,11 @@
  *    entries keep working once Back returns past it.
  *  - Someone else's `replaceState` on a kit entry keeps the kit's key, so a
  *    router saving its scroll position does not orphan the entry.
+ *  - An app that keeps an overlay in its query through `replace` rewrites the
+ *    address of the kit's entry when the overlay closes, and the entry under it
+ *    still holds the old one. Taking the entry out lands there, so the address
+ *    the app left is put back on it and the step never reaches the router:
+ *    handed over, it would navigate to the old query and open the overlay again.
  */
 
 const KEY = "__lpOverlay"
@@ -79,6 +84,8 @@ interface EngineState {
   dead: Map<string, Tracked>
   /** Pops the kit started itself and swallows on arrival. */
   silent: number
+  /** What the page showed before the kit took entries out, to be kept where the step lands. */
+  keep: { href: string; state: unknown } | null
   waiting: Array<() => void>
   href: string
   serial: number
@@ -98,6 +105,7 @@ const fresh: EngineState = {
   closed: new Map(),
   dead: new Map(),
   silent: 0,
+  keep: null,
   waiting: [],
   href: "",
   serial: 0,
@@ -174,6 +182,9 @@ function handlePop(event: PopStateEvent) {
   s.href = location.href
   if (s.silent > 0) {
     s.silent--
+    const keep = s.silent === 0 ? s.keep : null
+    if (s.silent === 0) s.keep = null
+    if (keep && keep.href !== location.href) restore(keep, event)
     if (before === location.href) event.stopImmediatePropagation()
     flushWaiting()
     return
@@ -227,6 +238,16 @@ function handlePop(event: PopStateEvent) {
   } else if (pathOf(before) !== pathOf(location.href)) {
     leavePage()
   }
+}
+
+/* The address the app left on the entry the kit took out, put back where the step landed. */
+function restore(keep: { href: string; state: unknown }, event: PopStateEvent) {
+  const mark = markOf(event.state)
+  const base = keep.state && typeof keep.state === "object" ? { ...(keep.state as Record<string, unknown>) } : {}
+  delete base[KEY]
+  own(() => history.replaceState(mark ? { ...base, [KEY]: mark } : base, "", keep.href))
+  s.href = location.href
+  event.stopImmediatePropagation()
 }
 
 /* Buried entries are kept by token; the oldest go first, history this deep is never walked back. */
@@ -364,6 +385,7 @@ export function dropEntry(entry: HistoryEntry): void {
   const positioned = onTop()
   const removed = s.live.splice(at)
   if (positioned) {
+    s.keep = { href: location.href, state: history.state }
     silentGo(-removed.length)
     return
   }

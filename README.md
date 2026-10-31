@@ -113,7 +113,10 @@ provideOverlayHistory(true, { router })
   `update:open` true while the overlay is still mounted.
 - `history` on a single overlay wins over the app-wide mode: `false` keeps an
   overlay out of history, for one the app already opens from its route query
-  (it would otherwise take two entries for one dialog).
+  (it would otherwise take two entries for one dialog). An overlay the app
+  writes into the query with `router.replace` needs nothing: when it closes,
+  the address the app left is kept, and the overlay does not open again from
+  the entry under it.
 - A real navigation (a link, `router.push` to another path) closes the open
   overlays, and the entries they leave under the new page are skipped, so Back
   from it lands on the page in one press. A push that keeps the path (a query

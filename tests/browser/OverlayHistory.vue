@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { defineComponent, h, ref } from "vue"
-import { createRouter, createWebHistory, RouterLink, RouterView } from "vue-router"
+import { computed, defineComponent, h, ref } from "vue"
+import { createRouter, createWebHistory, RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import { getCurrentInstance } from "vue"
 import { LpButton, LpConfirmHost, LpDrawer, LpModal, LpTabs, provideOverlayHistory } from "../../src"
 
@@ -24,6 +24,15 @@ const pageTab = ref("one")
 const Home = defineComponent({
   setup() {
     stats.homeSetups++
+    const route = useRoute()
+    const nav = useRouter()
+    const item = computed({
+      get: () => (typeof route.query.item === "string" ? route.query.item : ""),
+      set: (value: string) => {
+        const { item: _, ...rest } = route.query
+        void nav.replace({ query: value ? { ...rest, item: value } : rest })
+      },
+    })
     return () =>
       h("div", { class: "p-4 flex flex-col gap-2" }, [
         h("p", "Home page"),
@@ -33,6 +42,12 @@ const Home = defineComponent({
         h(LpButton, { onClick: () => (routed.value = true) }, () => "Open routed"),
         h(LpButton, { onClick: () => (drawer.value = true) }, () => "Open drawer"),
         h(LpButton, { onClick: () => (guarded.value = true) }, () => "Open guarded"),
+        h(LpButton, { onClick: () => (item.value = "7") }, () => "Open in query"),
+        h(
+          LpModal,
+          { open: Boolean(item.value), "onUpdate:open": (v: boolean) => !v && (item.value = ""), title: `Item ${item.value}` },
+          () => h("p", "Lives in the route query"),
+        ),
         h(
           LpModal,
           { open: guarded.value, "onUpdate:open": (v: boolean) => (guarded.value = v), title: "Guarded", guard: true },
