@@ -141,3 +141,19 @@ test("text ticking inside the box does not move it once the box has eased to fit
   })
   expect(heights).toHaveLength(1)
 })
+
+test("the shell's header actions keep their row; the eased box takes the layout the shell gives it", async ({ page }) => {
+  await page.goto("/page/appshell")
+  const header = page.locator("header").nth(1)
+  await expect(header).toBeVisible()
+  const tops = await header.evaluate((bar) =>
+    [...bar.querySelectorAll("button")]
+      .filter((button) => button.getBoundingClientRect().width > 0)
+      .map((button) => {
+        const box = button.getBoundingClientRect()
+        return Math.round(box.top + box.height / 2)
+      }),
+  )
+  expect(tops.length).toBeGreaterThan(1)
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(8)
+})

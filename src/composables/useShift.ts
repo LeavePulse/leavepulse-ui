@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
+import { nextTick, onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { prefersReducedMotion } from "./easing"
 
 /*
@@ -235,8 +235,16 @@ export function useShift(
       if (wantsWidth()) node.style.width = ""
       // Re-read rather than trusting the target: the layout around may have
       // moved meanwhile, and the next tween has to start from where it sits.
-      lastHeight = node.offsetHeight
-      lastWidth = node.offsetWidth
+      // Read after the render that drops the tween's clip, not before: the
+      // clip holds a child's margin inside the box, so a box measured with it
+      // still on came out taller than it settles (a banner with `mb-4`: 54
+      // against 38), and every text change after that, a ticking counter,
+      // eased between the two figures once a tick.
+      void nextTick(() => {
+        if (inFlight) return
+        lastHeight = node.offsetHeight
+        lastWidth = node.offsetWidth
+      })
     }, wait)
   }
 
