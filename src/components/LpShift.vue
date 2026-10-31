@@ -295,8 +295,15 @@ defineExpose({ resizing })
        content spills past the easing edge. Dropped once settled, so nothing
        that legitimately overflows — a dropdown, a focus ring — is clipped at
        rest. -->
+  <!-- `flow-root` always: a child's margin stays inside the box whether or not
+       it is clipping. Without it the margin collapsed through the box at rest
+       but was held in while `overflow-hidden` was on, so the box measured
+       taller mid-tween than settled, and any text change inside (a ticking
+       counter) set off a tween to the other figure, every time: a pause
+       banner with `mb-4` jumped 16px once a second. -->
   <div
     ref="el"
+    class="flow-root"
     :class="[
       tweening && !disabled
         ? `${transitionClass} duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none`

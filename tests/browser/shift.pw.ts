@@ -124,3 +124,20 @@ test("the shell's header comes to rest after the page loads", async ({ page }) =
   }))
   expect(changes).toBe(0)
 })
+
+test("text ticking inside the box does not move it once the box has eased to fit new content", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=shift-tick")
+  const box = page.getByTestId("box")
+  await expect(page.getByTestId("banner")).toBeVisible()
+  await page.waitForTimeout(600)
+  const heights = await box.evaluate(async (el) => {
+    const seen = new Set<number>()
+    const until = performance.now() + 1600
+    while (performance.now() < until) {
+      seen.add(Math.round(el.getBoundingClientRect().height))
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+    return [...seen]
+  })
+  expect(heights).toHaveLength(1)
+})
