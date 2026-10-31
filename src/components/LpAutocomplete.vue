@@ -389,6 +389,10 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       </button>
     </ComboboxAnchor>
 
+    <!-- A press on the list keeps focus in the field. Otherwise the field
+         blurs before the click lands, and a host that settles its text on
+         blur (back to the last pick) empties the list under the pointer: the
+         option clicked is gone and the choice is lost. -->
     <ComboboxPortal :to="portalTo">
       <ComboboxContent
         @interact-outside="guardOutside"
@@ -398,6 +402,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
         :side-offset="6"
         :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"
         @open-auto-focus.prevent
+        @mousedown.prevent
       >
         <ComboboxViewport class="max-h-72 overflow-y-auto p-1">
           <div v-if="loading" class="px-3 py-4 text-center text-sm italic text-muted">
