@@ -37,3 +37,7 @@ entry is deleted, not ticked: the commit says what changed.
   every app now draws in the header slot itself.
 - **Reorder pins** by dragging within the pinned block, and pin by dragging a
   row into it.
+- **Call the viewer back to a hidden tab** (`useAttention`): a system
+  notification when permission is granted plus a flashing tab title until the
+  tab regains focus, nothing while it is focused. BotEco's panel has it as
+  `lib/attention.ts` for a resumed quiz; any app with a live wait wants it.

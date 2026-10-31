@@ -499,11 +499,19 @@ export const basics: ComponentEntry[] = [
   {
     id: "scrollarea",
     name: "ScrollArea",
-    description: "Drawn overlay scrollbar (themed, hover-grow). `fade` softens edges; `content-class` styles the scrollable content (gap/padding). The kit uses this for its own scroll regions (Table, Modal/Drawer body, Sidebar) so native bars never reserve viewport width. For app-level scroll: `.lp-scrollbar-none` hides a bar on any element; add `lp-scroll-hide` to <html> to drop the page's native bar site-wide; or import `@leavepulse/ui/scrollbar` to skin native bars to the kit look.",
+    description: "Drawn overlay scrollbar (themed, hover-grow). `fade` softens edges; `floating` is for a region inside a card rather than against a wall: the bar keeps a gap from the edge and is rounded at both ends; `content-class` styles the scrollable content (gap/padding). The kit uses this for its own scroll regions (Table, Modal/Drawer body, Sidebar) so native bars never reserve viewport width. For app-level scroll: `.lp-scrollbar-none` hides a bar on any element; add `lp-scroll-hide` to <html> to drop the page's native bar site-wide; or import `@leavepulse/ui/scrollbar` to skin native bars to the kit look.",
     components: { LpScrollArea },
-    template: `<LpScrollArea fade class="h-40 w-72 rounded-card border border-line" content-class="flex flex-col gap-2 p-3">
-  <p v-for="i in 12" :key="i" class="rounded-md bg-surface-soft px-3 py-2 text-sm text-muted">Row {{ i }}</p>
-</LpScrollArea>`,
+    template: `<div class="flex flex-wrap gap-6">
+  <LpScrollArea fade class="h-40 w-72 rounded-card border border-line" content-class="flex flex-col gap-2 p-3">
+    <p v-for="i in 12" :key="i" class="rounded-md bg-surface-soft px-3 py-2 text-sm text-muted">Row {{ i }}</p>
+  </LpScrollArea>
+  <div class="w-72 rounded-card border border-line p-3">
+    <p class="mb-2 text-xs uppercase tracking-wide text-muted">Inside a card: floating</p>
+    <LpScrollArea floating class="h-32" content-class="flex flex-col gap-2 pr-3">
+      <p v-for="i in 12" :key="i" class="rounded-md bg-surface-soft px-3 py-2 text-sm text-muted">Row {{ i }}</p>
+    </LpScrollArea>
+  </div>
+</div>`,
     thumb: `<LpScrollArea fade class="h-32 w-56 rounded-card border border-line" content-class="flex flex-col gap-1.5 p-2">
   <p v-for="i in 8" :key="i" class="m-0 rounded-md bg-surface-soft px-3 py-1.5 text-xs text-muted">Row {{ i }}</p>
 </LpScrollArea>`,

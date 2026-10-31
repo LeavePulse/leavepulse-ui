@@ -23,6 +23,10 @@ import { prefersReducedMotion } from "../composables/easing"
 // `contentClass` styles the scrollable CONTENT container (the viewport's inner
 // wrapper) — put list layout here (display:grid / gap / padding), not on the
 // component root, since items live inside reka's viewport.
+// `floating` is for a region that sits inside a card or a panel rather than
+// against a wall: the bar keeps a gap from the edge and its thumb is rounded at
+// both ends. Flush to a wall, a half-rounded thumb reads as part of the frame;
+// in the middle of a card the same thumb looks sliced off.
 // `barInsetTop` (any CSS length) pulls the vertical scrollbar down by that much,
 // so it doesn't run under a sticky header pinned at the top of the viewport.
 // Wheel and keyboard scrolling ease by default. `instant` opts back out, and
@@ -35,10 +39,11 @@ const props = withDefaults(
   defineProps<{
     fade?: boolean
     instant?: boolean
+    floating?: boolean
     contentClass?: string
     barInsetTop?: string
   }>(),
-  { fade: true, instant: false },
+  { fade: true, instant: false, floating: false },
 )
 
 // Re-emit the native scroll event of the underlying viewport so consumers that
@@ -251,8 +256,8 @@ function onThumbPointerDown() {
     <ScrollAreaScrollbar
       orientation="vertical"
       force-mount
-      class="group z-1 flex w-3.5 touch-none select-none justify-end py-px pl-2.5 pr-px"
-      :class="barFade"
+      class="group z-1 flex touch-none select-none justify-end pl-2.5"
+      :class="[barFade, floating ? 'w-4 py-1 pr-1' : 'w-3.5 py-px pr-px']"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
       @pointerdown.capture="onTrackPointerDown($event, 'y')"
     >
@@ -264,20 +269,22 @@ function onThumbPointerDown() {
            the positioning reka owns. -->
       <ScrollAreaThumb
         data-lp-thumb
-        class="relative min-w-1 rounded-l-pill bg-brand/40 before:absolute before:inset-y-0 before:right-0 before:-left-2.5 before:content-[''] transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
+        class="relative min-w-1 bg-brand/40 before:absolute before:inset-y-0 before:right-0 before:-left-2.5 before:content-[''] transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
+        :class="floating ? 'rounded-pill' : 'rounded-l-pill'"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>
 
     <ScrollAreaScrollbar
       orientation="horizontal"
-      class="group z-1 flex h-3.5 flex-col touch-none select-none justify-end px-px pb-px pt-2.5"
-      :class="barFade"
+      class="group z-1 flex flex-col touch-none select-none justify-end pt-2.5"
+      :class="[barFade, floating ? 'h-4 px-1 pb-1' : 'h-3.5 px-px pb-px']"
       @pointerdown.capture="onTrackPointerDown($event, 'x')"
     >
       <ScrollAreaThumb
         data-lp-thumb
-        class="relative min-h-1 rounded-t-pill bg-brand/40 before:absolute before:inset-x-0 before:bottom-0 before:-top-2.5 before:content-[''] transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
+        class="relative min-h-1 bg-brand/40 before:absolute before:inset-x-0 before:bottom-0 before:-top-2.5 before:content-[''] transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
+        :class="floating ? 'rounded-pill' : 'rounded-t-pill'"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>

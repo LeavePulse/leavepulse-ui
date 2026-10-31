@@ -7345,6 +7345,12 @@
     "default": "false"
    },
    {
+    "name": "floating",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   },
+   {
     "name": "contentClass",
     "type": "string | undefined",
     "required": false
