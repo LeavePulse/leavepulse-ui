@@ -6,12 +6,13 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
 import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
-import { isAttrOn, mergeDescribedBy, useFieldControl } from "../composables/useField"
+import { isAttrOn, mergeDescribedBy, useOwnField } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -22,6 +23,8 @@ const props = withDefaults(defineProps<{
   /** Mixed state (e.g. a "select all" with a partial selection). Shows a dash. */
   indeterminate?: boolean
   disabled?: boolean
+  /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+  error?: string
   label?: string
   /** Secondary line under the label, as on LpSwitch. */
   description?: string
@@ -67,8 +70,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
     "group/check inline-flex cursor-pointer gap-2 text-sm text-ink",
     props.description ? "items-start" : "items-center",
-  ].join(" "),
-)
+  ].join(" "), () => ownAttrs())
 
 /*
  * The box is the control, so what describes it (aria-*, name, title) goes to
@@ -89,9 +91,7 @@ const parts = computed(() => {
   return { label, control }
 })
 
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: props.id,
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, id: props.id,
   required: isAttrOn(rest.value.required),
   disabled: props.disabled,
 }))
@@ -104,6 +104,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <label
     :class="rootClass"
     v-bind="parts.label">
@@ -143,4 +144,5 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
     </span>
     <slot v-else>{{ label }}</slot>
   </label>
+  </FieldWrapper>
 </template>

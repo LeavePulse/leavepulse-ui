@@ -6,7 +6,7 @@ export default { inheritAttrs: false }
 import { nodeWindow } from "../composables/realm"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, nextTick, onMounted, ref, useAttrs, watch } from "vue"
-import { fieldWrapperBinds, useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { wrapsItself, useField, fieldWrapperBinds, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
 
@@ -37,7 +37,8 @@ const props = withDefaults(defineProps<{
 
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
-const hasField = computed(() => !!props.label || !!props.hint || !!props.error)
+const outerFieldOf = useField()
+const hasField = computed(() => wrapsItself(props, outerFieldOf))
 
 // class/style lay out the field when there is one, and style the <textarea>
 // when it stands alone; every other attr (name, maxlength, autofocus, @blur…)

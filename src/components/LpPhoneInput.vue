@@ -36,6 +36,7 @@ export type PhoneInputLabels = {
  * is what a form should store. Until the library arrives the field takes digits
  * as before, unformatted.
  */
+import FieldWrapper from "./FieldWrapper.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import {
   ComboboxAnchor,
@@ -48,8 +49,8 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, onMounted, ref, shallowRef } from "vue"
-import { useField, useAttrsField, mergeDescribedBy } from "../composables/useField"
+import { computed, onMounted, ref, shallowRef, useAttrs } from "vue"
+import { useField, useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
@@ -101,6 +102,8 @@ const props = withDefaults(
     placeholder?: string
     disabled?: boolean
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     size?: "sm" | "md" | "lg"
     emptyText?: string
     searchPlaceholder?: string
@@ -322,7 +325,8 @@ const sizeClass = CONTROL_SIZE
 // placing it in a narrow column has to change, so `class="w-48"` must win.
 // style lays out the frame; every other attr (name, autocomplete, @blur…)
 // belongs to the number <input>.
-const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid || flagged.value, disabled: props.disabled }))
+const attrs = useAttrs()
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid || flagged.value, disabled: props.disabled }))
 const text = useLabels<PhoneInputLabels>("phoneInput", {
   selectCountry: "Select country",
   placeholder: "Phone number",
@@ -345,8 +349,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
       : "border-line focus-within:border-brand",
     field.value.disabled ? "cursor-not-allowed opacity-55" : "",
-  ].join(" "),
-)
+  ].join(" "), () => ownAttrs())
 const inputAttrs = computed(() => {
   const { style: _s, ...others } = rest.value
   return others
@@ -360,10 +363,11 @@ const guardOutside = useOutsideGuard()
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <div
     data-lp-ring-owner
     :class="rootClass"
-    :style="attrs.style as never"
+    :style="ownAttrs() ? (attrs.style as never) : undefined"
   >
     <!-- reset-search-term-on-{select,blur}: as in LpSelect, the trigger shows
          the selection and the box only filters, so reka seeding the chosen value
@@ -460,4 +464,5 @@ const guardOutside = useOutsideGuard()
     />
     <LpFieldNotice v-if="ownNotice" :notice="notice" :id="noticeId" />
   </div>
+  </FieldWrapper>
 </template>

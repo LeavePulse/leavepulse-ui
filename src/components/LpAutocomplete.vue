@@ -10,6 +10,7 @@ export type AutocompleteLabels = {
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import IconCloseButton from "./IconCloseButton.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
@@ -35,8 +36,8 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, nextTick, ref, useId, watch } from "vue"
-import { useAttrsField, mergeDescribedBy } from "../composables/useField"
+import { computed, nextTick, ref, useId, watch, useAttrs } from "vue"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { CLOSE_ICON, OPTION_ITEM, optionStagger, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
@@ -64,6 +65,8 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg"
     icon?: string
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     emptyText?: string
     loading?: boolean
     loadingText?: string
@@ -122,7 +125,8 @@ const inputAttrs = computed(() => {
   return rest
 })
 
-const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid || isInvalid(props.modelValue), disabled: props.disabled }))
+const attrs = useAttrs()
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid || isInvalid(props.modelValue), disabled: props.disabled }))
 const isInvalidState = computed(() => field.value.invalid)
 const labels = useLabels<AutocompleteLabels>(
   "autocomplete",
@@ -270,14 +274,15 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <ComboboxRoot
     :open="open"
     :ignore-filter="true"
     :reset-search-term-on-blur="false"
     :reset-search-term-on-select="false"
     :disabled="field.disabled"
-    :class="['relative', attrs.class]"
-    :style="attrs.style as never"
+    :class="['relative', ownAttrs() ? attrs.class : undefined]"
+    :style="ownAttrs() ? (attrs.style as never) : undefined"
     @update:open="onOpenChange"
   >
     <ComboboxAnchor
@@ -410,4 +415,5 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       </ComboboxContent>
     </ComboboxPortal>
   </ComboboxRoot>
+  </FieldWrapper>
 </template>

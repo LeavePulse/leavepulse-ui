@@ -7,7 +7,7 @@ import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
-import { fieldWrapperBinds, isAttrOn, mergeDescribedBy, useFieldControl } from "../composables/useField"
+import { fieldWrapperBinds, isAttrOn, mergeDescribedBy, useField, useFieldControl, wrapsItself } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useInputFilter } from "../composables/useInputFilter"
 import { DEFAULT_MASK_TOKENS, useInputMask, type MaskSpec, type MaskTokens } from "../composables/useInputMask"
@@ -138,9 +138,8 @@ const slots = useSlots()
 const attrs = useAttrs()
 const hasLeading = computed(() => !!slots.leading || !!props.icon)
 const hasTrailing = computed(() => !!slots.trailing || showClear.value)
-const hasField = computed(
-  () => !!props.label || !!props.hint || !!props.error,
-)
+const outerFieldOf = useField()
+const hasField = computed(() => wrapsItself(props, outerFieldOf))
 const field = useFieldControl(() => ({
   wrapped: hasField.value,
   hasMessage: !!props.error || !!props.hint,

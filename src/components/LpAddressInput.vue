@@ -18,6 +18,7 @@ export default { inheritAttrs: false }
  * the picker is an async component, so the tile maths stays out of the bundle
  * of every form that never shows a map.
  */
+import FieldWrapper from "./FieldWrapper.vue"
 import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import {
@@ -41,7 +42,7 @@ import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 import LpModal from "./LpModal.vue"
 import LpSelect from "./LpSelect.vue"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -68,6 +69,8 @@ const props = withDefaults(
     disabled?: boolean
     /** Mark every part of the address invalid (also set by a surrounding LpFormField's error). */
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     size?: "sm" | "md" | "lg"
     /** Hide the map button when picking a point makes no sense. */
     hideMap?: boolean
@@ -289,15 +292,15 @@ function confirmPoint() {
  * every part: each inner field provides its own context, which would otherwise
  * hide the outer one from the controls.
  */
-const field = useFieldControl(() => ({ wrapped: false, invalid: props.invalid, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid, disabled: props.disabled }))
 
 // The group stacks its fields on a fixed gap that a tighter form has to close.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex flex-col gap-3",
-)
+  "flex flex-col gap-3", () => ownAttrs())
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <div
     role="group"
     :aria-labelledby="field.labelId"
@@ -428,4 +431,5 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </template>
     </LpModal>
   </div>
+  </FieldWrapper>
 </template>

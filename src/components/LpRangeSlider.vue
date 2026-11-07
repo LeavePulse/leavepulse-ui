@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import SliderRail from "./SliderRail.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
@@ -16,7 +17,7 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
  * focused or dragged, so the numbers are readable without a second readout.
  */
 import { SliderRoot, SliderThumb } from "reka-ui"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
@@ -31,6 +32,8 @@ const props = withDefaults(
     /** The least distance the two ends keep between them, in model units. */
     minGap?: number
     disabled?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     /** Accessible names for the two thumbs when there's no visible label. */
     ariaLabels?: [string, string]
     /** Label over each thumb while it is in use: `(value) => "1:05"`. */
@@ -58,11 +61,10 @@ function onCommit(v: number[] | undefined) {
   if (value) emit("change", value)
 }
 
-const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`,
-)
+  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
 const { dragging, onPointerDown } = useSliderDrag()
 
 const thumbClass =
@@ -74,6 +76,7 @@ usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <SliderRoot
     :model-value="[props.modelValue[0], props.modelValue[1]]"
     :min="min"
@@ -101,4 +104,5 @@ usePaletteControl({ disabled: () => field.value.disabled })
       <span v-if="format" :class="labelClass">{{ format(props.modelValue[index]) }}</span>
     </SliderThumb>
   </SliderRoot>
+  </FieldWrapper>
 </template>

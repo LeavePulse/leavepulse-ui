@@ -39,7 +39,7 @@ import {
   TagsInputRoot,
 } from "reka-ui"
 import { computed, ref, useAttrs, useId, watch } from "vue"
-import { fieldWrapperBinds, fieldMessageId, useField, useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { wrapsItself, fieldWrapperBinds, fieldMessageId, useField, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { prefersReducedMotion } from "../composables/easing"
 import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
 import { useShift } from "../composables/useShift"
@@ -137,7 +137,8 @@ const text = useLabels<TagsInputLabels>(
 )
 
 const attrs = useAttrs()
-const hasField = computed(() => !!props.label || !!props.hint || !!props.error)
+const outerFieldOf = useField()
+const hasField = computed(() => wrapsItself(props, outerFieldOf))
 /*
  * Notes go to the field that frames the control, which fades its own hint out
  * under them: this component's own LpFormField when it has a label or hint,
@@ -145,7 +146,7 @@ const hasField = computed(() => !!props.label || !!props.hint || !!props.error)
  * alone.
  */
 const notice = useFieldNotice()
-const outerField = useField()
+const outerField = outerFieldOf
 type FieldHandle = { notify: (text: string, options?: FieldNoticeOptions) => void; clearNotice: () => void }
 const ownField = ref<FieldHandle | null>(null)
 function bindField(c: unknown): void {

@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import { isHTMLElement } from "../composables/useView"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
@@ -19,7 +20,7 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
 import { Motion } from "motion-v"
 import { ToggleGroupItem, ToggleGroupRoot } from "reka-ui"
 import { ref, useId } from "vue"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { usePillTransition } from "../composables/usePillTransition"
 import AttentionDot from "./AttentionDot.vue"
@@ -47,6 +48,8 @@ const props = withDefaults(
     /** Stretch to fill the container with equal-width segments. */
     block?: boolean
     disabled?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     /**
      * The pill glides under the hovered segment and springs back on leave (the
      * default, as in LpTabs). False pins it to the selected segment and hover
@@ -80,10 +83,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     // `w-fit`, not left to the parent: in a column a flex item stretches, and
     // the options sat on the left of an empty bar (the theme studio met it).
     props.block ? "flex w-full" : "w-fit",
-  ].join(" "),
-)
+  ].join(" "), () => ownAttrs())
 
-const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 
 const pillId = `lp-segmented-${useId()}`
 const pillTransition = usePillTransition()
@@ -114,6 +116,7 @@ usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <ToggleGroupRoot
     :model-value="modelValue"
     type="single"
@@ -152,4 +155,5 @@ usePaletteControl({ disabled: () => field.value.disabled })
       <AttentionDot v-if="opt.dot && opt.label" class="mt-1.5" />
     </ToggleGroupItem>
   </ToggleGroupRoot>
+  </FieldWrapper>
 </template>

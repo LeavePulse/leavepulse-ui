@@ -39,7 +39,8 @@ import {
   ComboboxViewport,
 } from "reka-ui"
 import { computed, nextTick, reactive, ref, useAttrs, useId, watch } from "vue"
-import { useFieldBlur, useFieldControl, mergeDescribedBy } from "../composables/useField"
+import FieldWrapper from "./FieldWrapper.vue"
+import { useFieldBlur, useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
@@ -75,6 +76,8 @@ const props = withDefaults(
     clearable?: boolean
     disabled?: boolean
     invalid?: boolean
+    /** A message under the select, as on LpInput: it marks the select invalid (what `form.field()` hands it). */
+    error?: string
     emptyText?: string
     // Server-side search: bind with `v-model:searchTerm`. When provided, the
     // parent owns filtering (fetches matching `options` per term), so the
@@ -110,11 +113,7 @@ const props = withDefaults(
 const SIZE_HEIGHT = CONTROL_SIZE
 const anchorHeight = computed(() => SIZE_HEIGHT[props.size])
 
-const field = useFieldControl(() => ({
-  wrapped: false,
-  invalid: props.invalid,
-  disabled: props.disabled,
-}))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid, disabled: props.disabled }))
 const labels = useLabels<SelectLabels>(
   "select",
   {
@@ -136,7 +135,7 @@ const emptyLabel = computed(() => props.emptyText ?? labels.value.empty)
 const loadingLabel = computed(() => props.loadingText ?? labels.value.loading)
 
 // The consumer's `class="w-40"` has to beat the root's own layout.
-const { class: rootClass, attrs: rootAttrs } = useMergedAttrs("relative")
+const { class: rootClass, attrs: rootAttrs } = useMergedAttrs("relative", ownAttrs)
 
 const emit = defineEmits<{
   // Full v-model state (single value, array for multiple, or empty).
@@ -450,6 +449,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
        the seeding left the list pinned to one option until it was cleared by
        hand. Both flags default true and reach the same writer, so both must go:
        we own the term (`query`) and reka must not write to it. -->
+  <FieldWrapper v-bind="wrapper">
   <ComboboxRoot
     :model-value="comboModel"
     :multiple="multiple"
@@ -635,4 +635,5 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       </ComboboxContent>
     </ComboboxPortal>
   </ComboboxRoot>
+  </FieldWrapper>
 </template>

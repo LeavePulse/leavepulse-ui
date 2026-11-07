@@ -6,12 +6,13 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import SliderRail from "./SliderRail.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Single-value slider (reka Slider). reka models value as an array; we expose
 // a plain number for the common single-thumb case. Themed via tokens.
 import { SliderRoot, SliderThumb } from "reka-ui"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
@@ -24,6 +25,8 @@ const props = withDefaults(
     max?: number
     step?: number
     disabled?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     /** Accessible name for the thumb when there's no visible label. */
     ariaLabel?: string
   }>(),
@@ -44,18 +47,18 @@ function onCommit(v: number[] | undefined) {
   if (v && v.length) emit("change", v[0])
 }
 
-const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 
 // A slider is full-width by default; putting one in a toolbar means constraining it, and a fixed h-5 has to yield to a denser row.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`,
-)
+  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
 const { dragging, onPointerDown } = useSliderDrag()
 
 usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <SliderRoot
     :model-value="[props.modelValue]"
     :min="min"
@@ -78,4 +81,5 @@ usePaletteControl({ disabled: () => field.value.disabled })
       class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
     />
   </SliderRoot>
+  </FieldWrapper>
 </template>

@@ -154,6 +154,58 @@ export function fieldWrapperBinds(
   return { wrapped, id: field.id, label, hint, error, required, class: attrs.class, style: attrs.style }
 }
 
+/**
+ * Whether a control with these props draws its own LpFormField. A label or a
+ * hint is its own; an error alone is, except inside an outer LpFormField, which
+ * owns the label (its `for` points at the control) and the message line: a
+ * second field in it showed the message twice and took the label's control id.
+ * There the error only marks the control invalid.
+ */
+export function wrapsItself(
+  own: { label?: string; hint?: string; error?: string },
+  outer: ComputedRef<FieldContext> | null,
+): boolean {
+  if (own.label || own.hint) return true
+  return !!own.error && !outer?.value
+}
+
+/**
+ * A control that takes `label`, `hint` and `error` the way LpInput does: given
+ * any of them it wraps itself in LpFormField (FieldWrapper, bound to
+ * `wrapper`), an error marks it invalid, and the consumer's class and style lay
+ * out that field instead of the control (`ownAttrs` says whether the control's
+ * root still takes them). Without them it is the bare control, as before. So
+ * `v-bind="form.field('x')"`, which hands every control `error`, shows the
+ * message on any of them.
+ * Inside an outer LpFormField an error alone does not wrap (wrapsItself).
+ */
+export function useOwnField(
+  state: () => { label?: string; hint?: string; error?: string; required?: boolean; invalid?: boolean; disabled?: boolean; id?: string },
+) {
+  const attrs = useAttrs()
+  const outer = useField()
+  const wrapped = computed(() => wrapsItself(state(), outer))
+  const field = useFieldControl(() => {
+    const own = state()
+    return {
+      wrapped: wrapped.value,
+      hasMessage: !!own.error || !!own.hint,
+      id: own.id ?? (typeof attrs.id === "string" ? attrs.id : undefined),
+      invalid: !!own.invalid || !!own.error,
+      required: own.required,
+      disabled: own.disabled,
+    }
+  })
+  const wrapper = computed(() => fieldWrapperBinds(wrapped.value, field.value, state(), attrs))
+  /* The attributes for the control itself: all of them, less the class and style the wrapper takes. */
+  const controlAttrs = computed(() => {
+    if (!wrapped.value) return attrs
+    const { class: _class, style: _style, ...rest } = attrs
+    return rest
+  })
+  return { wrapped, field, wrapper, controlAttrs, ownAttrs: () => !wrapped.value }
+}
+
 /** The state of a control that takes its id from the app and draws no wrapper of its own. */
 export function useAttrsField(state: () => { invalid?: boolean; disabled?: boolean }) {
   const attrs = useAttrs()

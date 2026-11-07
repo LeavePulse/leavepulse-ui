@@ -19,9 +19,10 @@ export default { inheritAttrs: false }
  * size's width and no further, and shrinks with the row when the container is
  * narrower, so eight cells fit a phone instead of running off its edge.
  */
+import FieldWrapper from "./FieldWrapper.vue"
 import { PinInputInput, PinInputRoot } from "reka-ui"
 import { computed, ref, watch } from "vue"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { groupBreaks, joinCells, splitCode, upperCells, type OtpCells } from "./otp"
 
@@ -50,6 +51,8 @@ const props = withDefaults(
     group?: number | number[]
     /** Error state — tints the cells red (e.g. wrong code). */
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     size?: "sm" | "md" | "lg"
   }>(),
   { length: 6, size: "md", alphanumeric: false, uppercase: undefined },
@@ -97,9 +100,7 @@ const cells = computed<string[]>({
   },
 })
 
-const field = useFieldControl(() => ({
-  wrapped: false,
-  invalid: props.invalid,
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid,
   disabled: props.disabled,
 }))
 
@@ -144,11 +145,11 @@ const cellSize = {
 }
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex min-w-0 max-w-full items-center gap-1.5 sm:gap-2",
-)
+  "flex min-w-0 max-w-full items-center gap-1.5 sm:gap-2", () => ownAttrs())
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <PinInputRoot
     ref="root"
     v-model="cells"
@@ -188,4 +189,5 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       />
     </template>
   </PinInputRoot>
+  </FieldWrapper>
 </template>

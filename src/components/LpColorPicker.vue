@@ -29,6 +29,7 @@
  * keeps the colours settled on in browser storage and offers them back above
  * the presets.
  */
+import FieldWrapper from "./FieldWrapper.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import { clamp } from "../composables/clamp"
 import {
@@ -41,7 +42,7 @@ import {
 import { computed, nextTick, ref, useAttrs, watch } from "vue"
 import { useKitStorage } from "../composables/usePersisted"
 import { prefersReducedMotion } from "../composables/easing"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import {
   clampHsv,
   DEFAULT_SWATCHES,
@@ -103,6 +104,8 @@ const props = withDefaults(
     hideInput?: boolean
     disabled?: boolean
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     size?: "sm" | "md" | "lg"
     /** Trigger text beside the swatch. Defaults to the colour's own value. */
     label?: string
@@ -623,9 +626,7 @@ const menuItems = computed<ContextMenuItemDef[]>(() => {
 })
 
 const attrs = useAttrs()
-const field = useFieldControl(() => ({
-  wrapped: false,
-  invalid: props.invalid,
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid,
   disabled: props.disabled,
 }))
 
@@ -639,6 +640,7 @@ const guardOutside = useOutsideGuard()
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <PopoverRoot v-model:open="open">
     <!-- reka supports chaining `as-child` triggers onto one element, but only
          when each link forwards the props down — and LpContextMenu is a wrapper
@@ -879,4 +881,5 @@ const guardOutside = useOutsideGuard()
       </PopoverContent>
     </PopoverPortal>
   </PopoverRoot>
+  </FieldWrapper>
 </template>

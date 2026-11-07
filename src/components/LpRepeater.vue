@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends object">
+import FieldWrapper from "./FieldWrapper.vue"
 import { nextTick, ref } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useRepeater, type RepeaterItemKey } from "../composables/useRepeater"
@@ -17,6 +18,8 @@ const props = defineProps<{
   itemKey?: RepeaterItemKey<T>
   label?: string
   disabled?: boolean
+  /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+  error?: string
   labels?: Partial<{ add: string; remove: string; empty: string }>
 }>()
 const model = defineModel<T[]>({ default: () => [] })
@@ -25,7 +28,7 @@ defineSlots<{
   empty?(): unknown
 }>()
 
-const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 const text = useLabels("repeater", { add: "Add item", remove: "Remove item {index}", empty: "No items" }, () => props.labels)
 const list = useRepeater({
   value: () => model.value,
@@ -78,11 +81,19 @@ async function remove(index: number) {
   else (addButton.value?.$el as HTMLElement | undefined)?.focus({ preventScroll: true })
 }
 defineExpose({ add, remove, update: list.update })
-const { class: rootClass, attrs: rest } = useMergedAttrs("flex min-w-0 flex-col gap-2")
+const { class: rootClass, attrs: rest } = useMergedAttrs("flex min-w-0 flex-col gap-2", () => ownAttrs())
 </script>
 
 <template>
-  <div v-bind="rest" :class="rootClass">
+  <FieldWrapper v-bind="wrapper">
+  <!-- A group, named by its label, so the field's message is read with it. -->
+  <div
+    v-bind="rest"
+    role="group"
+    :aria-label="label || undefined"
+    :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
+    :class="rootClass"
+  >
     <div class="flex items-center justify-between gap-2">
       <span v-if="label" class="text-sm font-medium text-ink">{{ label }}</span>
       <LpButton ref="addButton" size="xs" variant="ghost" :disabled="field.disabled" @click="add">
@@ -105,6 +116,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs("flex min-w-0 flex-col 
       </div>
     </LpShift>
   </div>
+  </FieldWrapper>
 </template>
 
 <style>

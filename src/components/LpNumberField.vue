@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Numeric input with stepper buttons (reka NumberField). Themed via tokens.
@@ -15,10 +16,10 @@ import {
   NumberFieldInput,
   NumberFieldRoot,
 } from "reka-ui"
-import { computed, useId } from "vue"
+import { computed, useId, useAttrs } from "vue"
 import FieldLeading from "./FieldLeading.vue"
 import LpIcon from "./LpIcon.vue"
-import { focusLeft, useAttrsField, mergeDescribedBy } from "../composables/useField"
+import { focusLeft, useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedClass } from "../composables/useMergedClass"
 
@@ -71,6 +72,8 @@ const props = withDefaults(defineProps<{
   /** A leading icon, as on LpInput; the `leading` slot replaces it. */
   icon?: string
   invalid?: boolean
+  /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+  error?: string
   /** Control height, matching LpInput. */
   size?: "sm" | "md" | "lg"
   labels?: Partial<NumberFieldLabels>
@@ -99,7 +102,8 @@ const text = useLabels<NumberFieldLabels>(
 
 const SIZE = CONTROL_SIZE
 
-const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
+const attrs = useAttrs()
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid, disabled: props.disabled }))
 const describedBy = computed(
   () => mergeDescribedBy(attrs["aria-describedby"], field.value.describedBy, props.unit ? unitId : undefined),
 )
@@ -126,13 +130,13 @@ const rootClass = useMergedClass(() =>
     field.value.invalid
       ? "border-danger focus-within:border-danger focus-within:ring-danger-soft"
       : "border-line focus-within:border-brand focus-within:ring-ring",
-  ].join(" "),
-)
+  ].join(" "), () => ownAttrs())
 
 usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <NumberFieldRoot
     :model-value="modelValue ?? undefined"
     :min="min"
@@ -149,7 +153,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
     :required="field.required"
     data-lp-ring-owner
     :class="rootClass"
-    :style="attrs.style"
+    :style="ownAttrs() ? attrs.style : undefined"
     :name="typeof attrs.name === 'string' ? attrs.name : undefined"
     @update:model-value="(v) => emit('update:modelValue', Number.isNaN(v) ? null : (v ?? null))"
     @focusout="onFocusOut"
@@ -192,4 +196,5 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       />
     </NumberFieldIncrement>
   </NumberFieldRoot>
+  </FieldWrapper>
 </template>

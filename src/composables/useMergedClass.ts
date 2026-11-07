@@ -62,11 +62,13 @@ function merge(...classes: (string | undefined | null | false)[]): string {
  */
 export function useMergedClass(
   own: MaybeRefOrGetter<string | undefined>,
+  /** False while something else takes the consumer's class (a field wrapper). */
+  takesAttrs: () => boolean = () => true,
 ): ComputedRef<string> {
   const attrs = useAttrs()
   // `cn` returns undefined when everything it was given was empty; a class
   // binding is happier with "" than with undefined.
-  return computed(() => merge(toValue(own), attrs.class as string | undefined))
+  return computed(() => merge(toValue(own), takesAttrs() ? (attrs.class as string | undefined) : undefined))
 }
 
 /**
@@ -85,16 +87,20 @@ export function useMergedClass(
  * Vue appends that second `class` to the merged one, and stylesheet order —
  * not the caller — decides which wins.
  */
-export function useMergedAttrs(own: MaybeRefOrGetter<string | undefined>): {
+export function useMergedAttrs(
+  own: MaybeRefOrGetter<string | undefined>,
+  /** False while a field wrapper takes the consumer's class and style (useOwnField's `ownAttrs`). */
+  takesAttrs: () => boolean = () => true,
+): {
   class: ComputedRef<string>
   attrs: ComputedRef<Record<string, unknown>>
 } {
   const attrs = useAttrs()
   return {
-    class: useMergedClass(own),
+    class: useMergedClass(own, takesAttrs),
     attrs: computed(() => {
-      const { class: _omitted, ...rest } = attrs
-      return rest
+      const { class: _omitted, style, ...rest } = attrs
+      return takesAttrs() ? { ...rest, ...(style === undefined ? {} : { style }) } : rest
     }),
   }
 }

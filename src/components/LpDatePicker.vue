@@ -32,8 +32,9 @@ export interface DatePickerLabels extends Record<string, string> {
  * week") and, unlike the range picker's, are opt-in, so forms that already use
  * the picker keep the plain calendar they were laid out around.
  */
-import { computed, ref } from "vue"
-import { useAttrsField } from "../composables/useField"
+import FieldWrapper from "./FieldWrapper.vue"
+import { computed, ref, useAttrs } from "vue"
+import { useOwnField } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import type { CalendarLabels, PickerFieldProps } from "./calendar"
@@ -131,7 +132,8 @@ function clear() {
   emit("update:modelValue", undefined)
 }
 
-const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
+const attrs = useAttrs()
+const { field, wrapper, controlAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid, disabled: props.disabled }))
 const text = useLabels<DatePickerLabels>(
   "datePicker",
   {
@@ -172,8 +174,9 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <PickerField
-    v-bind="attrs"
+    v-bind="controlAttrs"
     v-model:open="open"
     :field="field"
     :display="display"
@@ -221,4 +224,5 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
       </div>
     </div>
   </PickerField>
+  </FieldWrapper>
 </template>

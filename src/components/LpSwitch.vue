@@ -6,10 +6,11 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
-import { mergeDescribedBy, useFieldControl } from "../composables/useField"
+import { mergeDescribedBy, useOwnField } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -20,6 +21,8 @@ const props = withDefaults(
     palette?: PaletteControlOptions
     modelValue?: boolean
     disabled?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     label?: string
     /** Secondary line under the label. */
     description?: string
@@ -67,13 +70,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => {
   return props.labelPosition === "start"
     ? "flex w-full cursor-pointer items-center justify-between gap-3 text-sm text-ink"
     : "inline-flex cursor-pointer items-center gap-2 text-sm text-ink"
-})
+}, () => ownAttrs())
 
 // Whatever is not class (name, aria-*, @focus…) belongs to the switch itself,
 // labelled or not: on the label row it would land on the <label>.
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof rest.value.id === "string" ? rest.value.id : undefined,
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, id: typeof rest.value.id === "string" ? rest.value.id : undefined,
   disabled: props.disabled,
 }))
 const descriptionId = `${useId()}-description`
@@ -89,6 +90,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <component :is="labelled ? 'label' : 'span'" :class="labelled ? [rootClass, field.disabled && 'cursor-not-allowed'] : 'contents'">
     <span v-if="labelled && labelPosition === 'start'" class="flex min-w-0 flex-col">
       <slot>{{ label }}</slot>
@@ -121,4 +123,5 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
       <span v-if="description" :id="descriptionId" class="text-xs text-muted">{{ description }}</span>
     </span>
   </component>
+  </FieldWrapper>
 </template>

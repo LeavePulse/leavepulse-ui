@@ -52,6 +52,8 @@ export interface PickerFieldProps {
   clearable?: boolean
   disabled?: boolean
   invalid?: boolean
+  /** A message under the picker, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+  error?: string
   size?: "sm" | "md" | "lg"
   /** Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser. */
   locale?: string

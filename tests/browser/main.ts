@@ -7,6 +7,7 @@ import Contracts from "./Contracts.vue"
 import ChartToolkit from "./ChartToolkit.vue"
 import DataContracts from "./DataContracts.vue"
 import FileTreeFeatures from "./FileTreeFeatures.vue"
+import FieldErrors from "./FieldErrors.vue"
 import Fields from "./Fields.vue"
 import HotkeyFrame from "./HotkeyFrame.vue"
 import LinkedView from "./LinkedView.vue"
@@ -24,12 +25,10 @@ import TriggerNesting from "./TriggerNesting.vue"
 import Workspace from "./Workspace.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
-const SCENARIOS = { "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
+const SCENARIOS = { "field-errors": FieldErrors, "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
 // A kit component handed an attribute nothing under it takes fails the test
 // (the fixture fails on a console error), so a misspelt prop in a fixture and a
 // false report from the check itself both surface here.
 createApp(SCENARIOS[scenario as keyof typeof SCENARIOS] ?? Contracts)
-  // `error` from form.field() is taken by only some field controls; recorded
-  // in docs/flaws.md, and ignored here until every control takes it.
-  .use(lpPropCheck, { ignore: ["error"], warn: (message) => console.error(message) })
+  .use(lpPropCheck, { warn: (message) => console.error(message) })
   .mount("#app")

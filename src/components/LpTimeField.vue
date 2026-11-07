@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
@@ -22,7 +23,7 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
 import { Time } from "@internationalized/date"
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui"
 import { computed } from "vue"
-import { focusLeft, useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { focusLeft, useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 
@@ -34,6 +35,8 @@ const props = withDefaults(
     modelValue?: string
     disabled?: boolean
     invalid?: boolean
+    /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+    error?: string
     size?: "sm" | "md" | "lg"
     /** 24 or 12-hour clock, independent of the browser locale. */
     hourCycle?: 12 | 24
@@ -68,9 +71,7 @@ function onUpdate(next: unknown) {
   emit("update:modelValue", `${pad(next.hour)}:${pad(next.minute)}`)
 }
 
-const field = useFieldControl(() => ({
-  wrapped: false,
-  invalid: props.invalid,
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid,
   disabled: props.disabled,
 }))
 
@@ -82,13 +83,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     "flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
     shellSize[props.size],
     field.value.invalid ? "border-danger focus-within:ring-danger-soft" : "border-line focus-within:border-brand",
-  ].join(" "),
-)
+  ].join(" "), () => ownAttrs())
 
 usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.value.invalid })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <TimeFieldRoot
     v-slot="{ segments }"
     :model-value="value"
@@ -121,4 +122,5 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       </TimeFieldInput>
     </template>
   </TimeFieldRoot>
+  </FieldWrapper>
 </template>

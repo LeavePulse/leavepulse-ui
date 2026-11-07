@@ -6,10 +6,11 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import FieldWrapper from "./FieldWrapper.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { RadioGroupIndicator, RadioGroupItem, RadioGroupRoot } from "reka-ui"
 import { useId } from "vue"
-import { useFieldControl, mergeDescribedBy } from "../composables/useField"
+import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 import type { LpOptionBase } from "./options"
@@ -22,21 +23,23 @@ export interface RadioOption extends LpOptionBase<string> {
 // a disabled option stays visible but cannot be picked. For anything richer
 // (badges, custom layout) pass <LpRadio> children in the default slot instead —
 // they share the same RadioGroupRoot, so selection still flows through v-model.
-const props = withDefaults(defineProps<{ palette?: PaletteControlOptions; modelValue?: string; options?: RadioOption[]; disabled?: boolean }>(), { palette: undefined })
+const props = withDefaults(defineProps<{ palette?: PaletteControlOptions; modelValue?: string; options?: RadioOption[]; disabled?: boolean
+  /** A message under the group, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
+  error?: string }>(), { palette: undefined })
 defineEmits<{ (e: "update:modelValue", value: string): void }>()
 
-const field = useFieldControl(() => ({ wrapped: false, disabled: props.disabled }))
+const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 const uid = useId()
 
 // A radio group stacks with a fixed gap; a dense settings list needs it smaller, and a horizontal layout needs it gone.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex flex-col gap-2",
-)
+  "flex flex-col gap-2", () => ownAttrs())
 
 usePaletteControl({ disabled: () => field.value.disabled })
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <RadioGroupRoot
     :model-value="modelValue"
     :disabled="field.disabled"
@@ -82,4 +85,5 @@ usePaletteControl({ disabled: () => field.value.disabled })
       </label>
     </slot>
   </RadioGroupRoot>
+  </FieldWrapper>
 </template>

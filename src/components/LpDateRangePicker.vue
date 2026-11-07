@@ -9,8 +9,9 @@ export default { inheritAttrs: false }
  * Picking the second end or a preset fills the field and closes the popover.
  * Two months sit side by side where there is room, one on a phone.
  */
-import { computed, ref } from "vue"
-import { useAttrsField } from "../composables/useField"
+import FieldWrapper from "./FieldWrapper.vue"
+import { computed, ref, useAttrs } from "vue"
+import { useOwnField } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import { useMediaQuery } from "../composables/useMediaQuery"
@@ -121,7 +122,8 @@ function presetFits(preset: DateRangePreset): boolean {
 
 const wide = useMediaQuery("(min-width: 640px)")
 
-const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
+const attrs = useAttrs()
+const { field, wrapper, controlAttrs } = useOwnField(() => ({ error: props.error, invalid: props.invalid, disabled: props.disabled }))
 const showClear = computed(() => props.clearable && !!value.value && !field.value.disabled)
 
 const presetOptions = computed(() => presetList.value.map((preset) => ({
@@ -133,8 +135,9 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
 </script>
 
 <template>
+  <FieldWrapper v-bind="wrapper">
   <PickerField
-    v-bind="attrs"
+    v-bind="controlAttrs"
     v-model:open="open"
     :field="field"
     :display="display"
@@ -163,4 +166,5 @@ const presetOptions = computed(() => presetList.value.map((preset) => ({
       @update:model-value="pick"
     />
   </PickerField>
+  </FieldWrapper>
 </template>
