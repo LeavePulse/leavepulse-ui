@@ -317,6 +317,14 @@ export type { Dir, LayoutNode, Leaf, Side, Split } from "./layout/tree"
 export { blockTitle, defineBlocks } from "./layout/registry"
 export type { BlockDef, BlockRegistry } from "./layout/registry"
 export { useLayout } from "./layout/useLayout"
+export { useWorkspaces } from "./layout/useWorkspaces"
+export type { UseWorkspaces, UseWorkspacesOptions, WorkspaceEntry, WorkspaceExport, WorkspaceSeed, WorkspaceSummary } from "./layout/useWorkspaces"
+export { default as LpWorkspaceSwitcher } from "./components/LpWorkspaceSwitcher.vue"
+export { default as LpInspector } from "./components/LpInspector.vue"
+export type { InspectorSection } from "./components/LpInspector.vue"
+export { default as LpWindow } from "./components/LpWindow.vue"
+export { WINDOW_DOCKS, clampRect, dockAt, dockedRect, isWindowRect, resizeRect, snapRect, useWindowLayer } from "./composables/windowing"
+export type { WindowBounds, WindowDock, WindowEdge, WindowLayer, WindowRect, WindowViewport } from "./composables/windowing"
 export type { UseLayout, UseLayoutOptions } from "./layout/useLayout"
 
 // theme engine — themes are JSON (TokenSet), applied at runtime
@@ -590,6 +598,8 @@ export type { UseSpotlight, UseSpotlightOptions } from "./composables/useSpotlig
 
 export { default as LpCommandScope } from "./components/LpCommandScope.vue"
 export { createPaletteRegistry, usePaletteCommands, mergePaletteCommands } from "./composables/usePaletteCommands"
+export { commandShortcuts, commandToHotkey, commandToMenuItem, commandToPalette, useCommands } from "./composables/useCommands"
+export type { AppCommand, UseCommandsOptions } from "./composables/useCommands"
 export type { PaletteRegistry, PaletteControlOptions } from "./composables/usePaletteCommands"
 export { PALETTE_MODES } from "./components/commandPalette"
 export type { PaletteMode } from "./components/commandPalette"

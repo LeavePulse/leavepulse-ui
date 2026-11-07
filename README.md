@@ -238,6 +238,22 @@ bun run dev:dist     # rebuild dist on change (for a linked consumer)
 `release:minor`) bumps the version and pushes the tag; CI tests, builds and
 publishes it.
 
+### Workspaces, inspector and windows
+
+`useWorkspaces` keeps several named layouts over one `useLayout`; bind
+`spaces.controller.layout` to `LayoutCanvas` as usual. Edits save to the active
+workspace on their own, and `persist` keeps them across visits. A switch clears
+undo: history belongs to one workspace. `LpWorkspaceSwitcher` is the menu for it.
+
+`LpInspector` is the panel beside a table or graph for the selected thing:
+`sections` of facts, `#section-<key>` for editing fields, `#empty` with nothing
+selected. It sits in the layout. On a phone, put it in an `LpDrawer`.
+
+`LpWindow` is a floating panel the page keeps working under: move, resize, dock
+on a screen edge, snap to other windows, `persist` for its place. It stays out
+of the modal stack and under dropdowns; it is not a window manager (no
+minimising, no taskbar).
+
 ### Repeatable form rows
 
 `LpRepeater` supplies add/remove controls and stable row identity. Its slot owns
