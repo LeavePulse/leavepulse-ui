@@ -1,4 +1,4 @@
-import type { ComponentPublicInstance, Plugin } from "vue"
+import { Teleport, type ComponentPublicInstance, type Plugin, type VNode } from "vue"
 
 /*
  * Development check for a misspelt prop on a kit component.
@@ -61,11 +61,26 @@ export function unknownAttributes(
   })
 }
 
+/*
+ * The elements a component rendered at its top. Not `$el`: with several roots
+ * (a trigger and its portal) that is the fragment's empty text anchor, which
+ * made every attribute look unknown. A teleport's content is left out, since
+ * nothing a caller passes lands there.
+ */
+function rootElements(vnode: VNode | null | undefined, out: Element[] = []): Element[] {
+  if (!vnode || vnode.type === Teleport) return out
+  if (vnode.component) return rootElements(vnode.component.subTree, out)
+  const el = vnode.el as Node | null
+  if (el?.nodeType === 1) {
+    out.push(el as Element)
+    return out
+  }
+  if (Array.isArray(vnode.children)) for (const child of vnode.children) if (child && typeof child === "object") rootElements(child as VNode, out)
+  return out
+}
+
 function renderedElements(instance: ComponentPublicInstance): Element[] {
-  const root = instance.$el as Node | null
-  if (root?.nodeType !== 1) return []
-  const el = root as Element
-  return [el, ...el.querySelectorAll(FORWARD_TARGETS)]
+  return rootElements(instance.$.subTree).flatMap((el) => [el, ...el.querySelectorAll(FORWARD_TARGETS)])
 }
 
 export const lpPropCheck: Plugin<[PropCheckOptions?]> = {

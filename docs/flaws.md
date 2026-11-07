@@ -7,6 +7,15 @@ entry is deleted, not ticked: the commit says what changed.
 
 ## Flaws
 
+- **`form.field()` binds `error` to controls that do not take it.** It hands
+  every control `error` and `invalid`, but only LpInput, LpPasswordInput,
+  LpTagsInput, LpTextarea and LpSecretField declare `error`; on the others
+  (LpSelect, LpDatePicker, LpDateRangePicker, LpSwitch, LpCheckbox, LpSlider
+  and more) the message falls through as an attribute and only `invalid`
+  marks the field. lpPropCheck reports it; the browser fixtures ignore `error`
+  until it is fixed. Let every field control take `error` (at least as
+  invalid, with the message shown by LpFormField), or have `field()` leave
+  it out for a control wrapped in LpFormField.
 - **Forward onto an overlay entry is a router visit.** With overlay history
   on, Back from a kit entry mutes the router, but Forward starts from the
   router's own entry, so vue-router runs its guards and `afterEach` for the

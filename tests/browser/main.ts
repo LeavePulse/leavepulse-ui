@@ -1,4 +1,5 @@
 import { createApp } from "vue"
+import { lpPropCheck } from "../../src"
 import TableFeatures from "./TableFeatures.vue"
 import "../../preview/preview-tailwind.css"
 import AutocompleteBlur from "./AutocompleteBlur.vue"
@@ -24,4 +25,11 @@ import Workspace from "./Workspace.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
 const SCENARIOS = { "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
-createApp(SCENARIOS[scenario as keyof typeof SCENARIOS] ?? Contracts).mount("#app")
+// A kit component handed an attribute nothing under it takes fails the test
+// (the fixture fails on a console error), so a misspelt prop in a fixture and a
+// false report from the check itself both surface here.
+createApp(SCENARIOS[scenario as keyof typeof SCENARIOS] ?? Contracts)
+  // `error` from form.field() is taken by only some field controls; recorded
+  // in docs/flaws.md, and ignored here until every control takes it.
+  .use(lpPropCheck, { ignore: ["error"], warn: (message) => console.error(message) })
+  .mount("#app")
