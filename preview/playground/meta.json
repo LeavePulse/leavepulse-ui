@@ -403,6 +403,17 @@
     "description": "Full-bleed main: render the page slot directly into main with NO\nscroll-area wrapper and NO padding, so the page owns the whole region\n(for a canvas / map / graph that fills the viewport and pans internally)."
    },
    {
+    "name": "scroll",
+    "type": "\"document\" | \"region\" | undefined",
+    "required": false,
+    "default": "\"document\"",
+    "description": "What scrolls. `\"document\"` (the default): the window, with the rail,\nheader and bottom bar sticky; a page that filled main with `h-full`\ngrows with its content now, so a page meant to fill the screen asks for\n`min-h-[calc(100dvh-4rem)]` or `fullBleed`. `\"region\"`: the shell is\nthe viewport and the page scrolls inside main. Read once: changing it\nremounts the page.",
+    "choices": [
+     "document",
+     "region"
+    ]
+   },
+   {
     "name": "loading",
     "type": "boolean | undefined",
     "required": false,
@@ -410,7 +421,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ openMenu: string; skipToContent: string; }> | undefined",
+    "type": "Partial<{ openMenu: string; skipToContent: string; backToTop: string; aside: string; contextNav: string; }> | undefined",
     "required": false,
     "description": "Text overrides: the burger's name and the skip link."
    },
@@ -483,7 +494,55 @@
     "name": "bottomNav",
     "type": "number | boolean | string[] | undefined",
     "required": false,
-    "description": "On phones, the main pages along the bottom instead of the burger, with\n\"More\" for the rest (it opens the drawer). `true` takes the first four\npages, a number that many, a list of ids those pages."
+    "description": "On phones, the main pages along the bottom instead of the burger, with\n\"More\" for the rest (it opens the drawer). `true` takes the first four\npages, a number that many, a list of ids those pages. Top-level pages\nonly: an id from `children` is ignored, and such a page stays behind \"More\"."
+   },
+   {
+    "name": "headerCollapse",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The header leaves as the page scrolls down and returns on the way up,\ngiving a small screen its height back. A keyboard user tabbing into it\nbrings it back too. A full-bleed page owns its scrolling, so the header\nstays there."
+   },
+   {
+    "name": "backToTop",
+    "type": "number | boolean | undefined",
+    "required": false,
+    "description": "A button back to the top of a long page; a number sets how far down it appears, in px."
+   },
+   {
+    "name": "density",
+    "type": "ShellDensity | undefined",
+    "required": false,
+    "description": "How tight the page sits in main. Unset keeps the shell's own padding."
+   },
+   {
+    "name": "pageTransition",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A new `path` fades the page and the header's title and actions in as one,\non the same clock, so actions arriving by teleport do not land apart from\ntheir page. Nothing is remounted. Skipped under reduced motion."
+   },
+   {
+    "name": "safeArea",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Keep the header and the page's end clear of a notch and a home bar\n(`viewport-fit=cover`). The bottom bar always does."
+   },
+   {
+    "name": "asideBreakpoint",
+    "type": "NavBreakpoint | undefined",
+    "required": false,
+    "description": "Tailwind breakpoint below which the #aside region is hidden. Defaults to `mobileBreakpoint`."
+   },
+   {
+    "name": "asideClass",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Classes for the #aside region, its width above all."
+   },
+   {
+    "name": "adaptiveNav",
+    "type": "AdaptiveNav | undefined",
+    "required": false,
+    "description": "One model for the navigation across widths; see `NavMode`. Below\n`mobileBreakpoint` it is `bottomNav` or the drawer, as ever; this adds the\nfold to icons in between and the row of sub-pages where the rail is gone.\nA `compact` the app controls wins, and a person folding the rail by hand\nholds until the width crosses into another mode."
    },
    {
     "name": "open",
@@ -520,6 +579,10 @@
    {
     "name": "update:context",
     "type": "[id: string]"
+   },
+   {
+    "name": "nav-mode",
+    "type": "[mode: NavMode]"
    }
   ],
   "slots": [
@@ -548,7 +611,15 @@
     "type": "{}"
    },
    {
+    "name": "context-nav",
+    "type": "{ items: SidebarItem[]; mode: NavMode; }"
+   },
+   {
     "name": "default",
+    "type": "{}"
+   },
+   {
+    "name": "aside",
     "type": "{}"
    },
    {
@@ -871,6 +942,19 @@
     "description": "Marks \"More\" current: the page shown is one of those behind it."
    },
    {
+    "name": "moreExpanded",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Whether what \"More\" opens is open now, told to assistive tech."
+   },
+   {
+    "name": "moreControls",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The id of what \"More\" opens, while it is in the page."
+   },
+   {
     "name": "label",
     "type": "string | undefined",
     "required": false
@@ -973,7 +1057,7 @@
     "name": "as",
     "type": "string | Component | undefined",
     "required": false,
-    "description": "Root element/component. Defaults to a native <button>, or a link when\n`to`/`href` is set (the link component from provideLpConfig for internal\ntargets). Pass a component or \"a\" to override."
+    "description": "Root element/component. Defaults to a native <button>, or a link when\n`to`/`href` is set (the link component from provideLpConfig for internal\ntargets). Pass a component or \"a\" to override. A component must render\none interactive root element and pass attributes to it: `disabled` here\nis `aria-disabled` plus a blocked click on that root, the hotkey clicks\nit, and a fragment root has neither. A component that handles keys\nitself has to honour `aria-disabled` on its own."
    },
    {
     "name": "to",
@@ -1013,7 +1097,7 @@
     "name": "action",
     "type": "(() => unknown) | undefined",
     "required": false,
-    "description": "Work the click starts. While it runs the button shows `loading` and\nignores further clicks; a failure is reported as an error toast with\nthe error's details, unless the app listens to `error` itself. The\nstate the work was for (a form, a switch) is the app's to roll back."
+    "description": "Work the click starts. While it runs the button shows `loading` and\nignores further clicks; a failure is reported as an error toast with\nthe error's details, unless the app listens to `error` itself. The\nstate the work was for (a form, a switch) is the app's to roll back.\n`@click` still fires at once and says nothing of the result: `done` and\n`error` report how the work ended."
    },
    {
     "name": "hotkey",
@@ -1391,6 +1475,57 @@
     "description": "Vertical markers at x positions (deploys, incidents)."
    },
    {
+    "name": "bands",
+    "type": "ChartBand[] | undefined",
+    "required": false,
+    "default": "[]",
+    "description": "Stretches of the x axis, drawn under the data (maintenance, incidents)."
+   },
+   {
+    "name": "annotations",
+    "type": "ChartAnnotation[] | undefined",
+    "required": false,
+    "default": "[]",
+    "description": "Notes pinned to single readings."
+   },
+   {
+    "name": "range",
+    "type": "ChartRange | null | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The window of the data on show, by point index (`v-model:range`). Unset\nand null are the whole series. Exports and `dataTable` always hold all of it."
+   },
+   {
+    "name": "rangeSelector",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The overview under the plot, for moving and resizing the window."
+   },
+   {
+    "name": "zoomable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Zoom on the plot: drag across it, Ctrl+wheel or pinch, the + and - keys.\nDouble click, 0 or the reset button show the whole series."
+   },
+   {
+    "name": "downsample",
+    "type": "false | ChartDownsample | undefined",
+    "required": false,
+    "description": "Thin a series longer than the plot is wide, for line and area charts.\n`minmax` keeps each bucket's extremes, so a one-point spike survives;\n`lttb` keeps the shape of a smooth curve and can lose one. Off by default.\nCurves are drawn straight while thinned: `smooth` would overshoot."
+   },
+   {
+    "name": "maxPoints",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Points to thin to. Defaults to one a pixel of the chart's width."
+   },
+   {
+    "name": "syncGroup",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Charts of one group mark the same x label on hover. Matched by label, so\nthey may hold different windows of the same timeline."
+   },
+   {
     "name": "ariaLabel",
     "type": "string | undefined",
     "required": false,
@@ -1424,6 +1559,10 @@
    {
     "name": "pointContextMenu",
     "type": "[payload: ChartPointEvent]"
+   },
+   {
+    "name": "update:range",
+    "type": "[range: ChartRange | null]"
    }
   ],
   "slots": [
@@ -1487,7 +1626,7 @@
     "name": "action",
     "type": "((value: boolean) => unknown) | undefined",
     "required": false,
-    "description": "Saves the new state, as LpSwitch's `action`: the box ticks at once and\nspins while this runs; a failure unticks it and becomes an error toast\n(or the `error` event, when the app listens)."
+    "description": "Saves the new state, as LpSwitch's `action`: the box ticks at once and\nspins while this runs; a failure unticks it and becomes an error toast\n(or the `error` event, when the app listens). From the mixed state,\n`v-model:indeterminate` gets it back as well."
    }
   ],
   "events": [
@@ -1502,6 +1641,10 @@
    {
     "name": "error",
     "type": "[error: unknown]"
+   },
+   {
+    "name": "update:indeterminate",
+    "type": "[value: boolean]"
    },
    {
     "name": "change",
@@ -1969,6 +2112,13 @@
     "name": "open",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser Back closes it, and opening it adds a history entry. Unset\nfollows `provideOverlayHistory` (off without one); `\"reopen\"` also opens\nit again on Forward; `false` keeps it out of history."
    },
    {
     "name": "commands",
@@ -2603,13 +2753,13 @@
    },
    {
     "name": "layout",
-    "type": "\"stacked\" | \"auto\" | \"horizontal\" | undefined",
+    "type": "\"auto\" | \"stacked\" | \"horizontal\" | undefined",
     "required": false,
     "default": "\"auto\"",
     "description": "`auto` (default) is side by side, stacking when the list itself is\nnarrower than ~20rem. `horizontal` and `stacked` fix one.",
     "choices": [
-     "stacked",
      "auto",
+     "stacked",
      "horizontal"
     ]
    },
@@ -2650,6 +2800,38 @@
  "LpDatePicker": {
   "props": [
    {
+    "name": "clearable",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "invalid",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser."
+   },
+   {
     "name": "modelValue",
     "type": "string | undefined",
     "required": false,
@@ -2686,38 +2868,6 @@
     "type": "boolean | DatePreset[] | undefined",
     "required": false,
     "description": "Shortcut days beside the calendar. `true` shows the built-in set (Today,\nTomorrow, In a week); a list replaces it. Off by default."
-   },
-   {
-    "name": "clearable",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "disabled",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "invalid",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "size",
-    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
-    "required": false,
-    "default": "\"md\"",
-    "choices": [
-     "md",
-     "sm",
-     "lg"
-    ]
-   },
-   {
-    "name": "locale",
-    "type": "string | undefined",
-    "required": false,
-    "description": "Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser."
    },
    {
     "name": "format",
@@ -2767,6 +2917,38 @@
  "LpDateRangePicker": {
   "props": [
    {
+    "name": "clearable",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "invalid",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"md\"",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
+   },
+   {
+    "name": "locale",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser."
+   },
+   {
     "name": "modelValue",
     "type": "DateRange | undefined",
     "required": false,
@@ -2808,37 +2990,6 @@
     "type": "DateRangePreset[] | undefined",
     "required": false,
     "description": "Shortcut ranges; an empty list hides them. Defaults to the built-in set."
-   },
-   {
-    "name": "clearable",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "disabled",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "invalid",
-    "type": "boolean | undefined",
-    "required": false
-   },
-   {
-    "name": "size",
-    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
-    "required": false,
-    "default": "\"md\"",
-    "choices": [
-     "md",
-     "sm",
-     "lg"
-    ]
-   },
-   {
-    "name": "locale",
-    "type": "string | undefined",
-    "required": false
    },
    {
     "name": "format",
@@ -3579,7 +3730,7 @@
     "name": "expanded",
     "type": "string[] | undefined",
     "required": false,
-    "description": "Expanded directory ids (v-model:expanded). Omit to let the tree own it."
+    "description": "Expanded directory ids (v-model:expanded). Omit to let the tree own it.\nUnbinding it later keeps the last set shown; it does not go back to `persist`."
    },
    {
     "name": "persist",
@@ -3604,7 +3755,7 @@
     "name": "checked",
     "type": "string[] | undefined",
     "required": false,
-    "description": "Ticked node ids (v-model:checked)."
+    "description": "Ticked node ids (v-model:checked). An id no longer in `nodes` stays ticked:\nwith lazy children it may only be unloaded, so dropping a deleted one is\nthe app's call."
    },
    {
     "name": "showSize",
@@ -3662,6 +3813,73 @@
     "name": "labels",
     "type": "Partial<FileTreeLabels> | undefined",
     "required": false
+   },
+   {
+    "name": "filter",
+    "type": "FileTreeFilter | undefined",
+    "required": false,
+    "description": "Narrow the tree by name, path, type, size or date. Combined with `searchable`."
+   },
+   {
+    "name": "searchable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A search field above the tree."
+   },
+   {
+    "name": "query",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The search text (v-model:query). Omit to let the tree own it."
+   },
+   {
+    "name": "breadcrumb",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The path of the selected row above the tree, each step a way back to it."
+   },
+   {
+    "name": "load",
+    "type": "((node: FileNode, signal: AbortSignal) => Promise<FileNode[]>) | undefined",
+    "required": false,
+    "description": "Fetch a folder when it first opens; the result is kept by the tree and\n`children` in `nodes` win over it. `signal` aborts when the folder is\nclosed first. Rejecting emits `load-error` and the next open tries again.\n`expand` still fires. Without this, `expand` is yours to answer."
+   },
+   {
+    "name": "multiple",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Ctrl/Cmd and Shift pick several rows into `selection`."
+   },
+   {
+    "name": "selection",
+    "type": "string[] | undefined",
+    "required": false,
+    "description": "Picked ids (v-model:selection), kept while their folders close or filter away."
+   },
+   {
+    "name": "movable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Drag rows onto a folder. Emits `move`; the app changes `nodes`. Mouse only."
+   },
+   {
+    "name": "renamable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "F2 renames the focused row in place. Emits `rename`; the app changes `nodes`."
+   },
+   {
+    "name": "virtual",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Render only the rows in view. See the note above on what it changes."
+   },
+   {
+    "name": "rowHeight",
+    "type": "number | undefined",
+    "required": false,
+    "default": "DEFAULT_ROW_HEIGHT",
+    "description": "Height of every row in `virtual` mode, in px."
    }
   ],
   "events": [
@@ -3676,6 +3894,10 @@
    {
     "name": "expand",
     "type": "[node: FileNode]"
+   },
+   {
+    "name": "rename",
+    "type": "[node: FileNode, name: string]"
    },
    {
     "name": "update:selected",
@@ -3696,6 +3918,22 @@
    {
     "name": "summary",
     "type": "[summary: FileTreeSummary]"
+   },
+   {
+    "name": "update:query",
+    "type": "[value: string]"
+   },
+   {
+    "name": "update:selection",
+    "type": "[ids: string[]]"
+   },
+   {
+    "name": "move",
+    "type": "[move: FileTreeMove]"
+   },
+   {
+    "name": "load-error",
+    "type": "[node: FileNode, error: unknown]"
    }
   ],
   "slots": [
@@ -3781,9 +4019,72 @@
     "name": "showModified",
     "type": "boolean",
     "required": true
+   },
+   {
+    "name": "selectedIds",
+    "type": "ReadonlySet<string> | undefined",
+    "required": false,
+    "description": "Rows picked with Ctrl and Shift, in `multiple` mode."
+   },
+   {
+    "name": "multiple",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "flat",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "The root flattens the tree to window it: this row renders alone, with its place stated."
+   },
+   {
+    "name": "setSize",
+    "type": "number | undefined",
+    "required": false
+   },
+   {
+    "name": "posInSet",
+    "type": "number | undefined",
+    "required": false
+   },
+   {
+    "name": "movable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Rows can be dragged; the root decides where they land."
+   },
+   {
+    "name": "dropTargetId",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "renamingId",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The row being renamed, the text in its field and whether that text can stand."
+   },
+   {
+    "name": "renameValue",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "renameInvalid",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "renameLabel",
+    "type": "string | undefined",
+    "required": false
    }
   ],
   "events": [
+   {
+    "name": "pick",
+    "type": "[node: FileNode, mode: \"range\" | \"toggle\"]"
+   },
    {
     "name": "select",
     "type": "[node: FileNode]"
@@ -3799,6 +4100,38 @@
    {
     "name": "check",
     "type": "[node: FileNode, value: boolean]"
+   },
+   {
+    "name": "move-start",
+    "type": "[node: FileNode, event: DragEvent]"
+   },
+   {
+    "name": "move-over",
+    "type": "[node: FileNode, event: DragEvent]"
+   },
+   {
+    "name": "move-leave",
+    "type": "[node: FileNode]"
+   },
+   {
+    "name": "move-drop",
+    "type": "[node: FileNode]"
+   },
+   {
+    "name": "move-end",
+    "type": "[]"
+   },
+   {
+    "name": "rename-input",
+    "type": "[value: string]"
+   },
+   {
+    "name": "rename-commit",
+    "type": "[blurred?: boolean | undefined]"
+   },
+   {
+    "name": "rename-cancel",
+    "type": "[]"
    }
   ],
   "slots": [
@@ -4252,6 +4585,12 @@
     "name": "size",
     "type": "string | number | undefined",
     "required": false
+   },
+   {
+    "name": "fallback",
+    "type": "string | undefined",
+    "required": false,
+    "description": "An icon to show if `name` is unknown or its chunk fails to load; it must already be registered."
    }
   ],
   "events": [],
@@ -4516,6 +4855,125 @@
    }
   ]
  },
+ "LpInspector": {
+  "props": [
+   {
+    "name": "subject",
+    "type": "T | null | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The thing inspected, handed to the slots. Empty state when nothing else is given either."
+   },
+   {
+    "name": "title",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "subtitle",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "sections",
+    "type": "InspectorSection[] | undefined",
+    "required": false
+   },
+   {
+    "name": "side",
+    "type": "\"right\" | \"left\" | undefined",
+    "required": false,
+    "default": "\"right\"",
+    "description": "Which side of the content it sits on: the resize grip goes on the other.",
+    "choices": [
+     "right",
+     "left"
+    ]
+   },
+   {
+    "name": "width",
+    "type": "number | undefined",
+    "required": false,
+    "default": "320",
+    "description": "Default width in px."
+   },
+   {
+    "name": "resizable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Drag the inner edge to resize, or use arrow keys on it."
+   },
+   {
+    "name": "minWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "240"
+   },
+   {
+    "name": "maxWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "640"
+   },
+   {
+    "name": "persist",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Remember the dragged width under this key, across visits."
+   },
+   {
+    "name": "closable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "guard",
+    "type": "CloseGuard",
+    "required": false,
+    "description": "Unsaved edits: `true` asks before closing, a function asks the app."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ close: string; empty: string; resize: string; region: string; }> | undefined",
+    "required": false
+   },
+   {
+    "name": "open",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[value: boolean]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "title",
+    "type": "{}"
+   },
+   {
+    "name": "actions",
+    "type": "{}"
+   },
+   {
+    "name": "empty",
+    "type": "{}"
+   },
+   {
+    "name": "default",
+    "type": "{ subject: T | null | undefined; }"
+   },
+   {
+    "name": "footer",
+    "type": "{ subject: T | null | undefined; close: () => Promise<void>; }"
+   }
+  ]
+ },
  "LpKeys": {
   "props": [
    {
@@ -4562,6 +5020,13 @@
  },
  "LpLightbox": {
   "props": [
+   {
+    "name": "history",
+    "type": "OverlayHistoryMode | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Browser Back closes it, and opening it adds a history entry. Unset\nfollows `provideOverlayHistory` (off without one); `\"reopen\"` also opens\nit again on Forward; `false` keeps it out of history."
+   },
    {
     "name": "open",
     "type": "boolean | undefined",
@@ -4808,6 +5273,29 @@
    }
   ]
  },
+ "LpLogInspector": {
+  "props": [
+   {
+    "name": "message",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The entry's text. Its JSON, if it holds any, becomes the tree."
+   },
+   {
+    "name": "value",
+    "type": "object | undefined",
+    "required": false,
+    "description": "A parsed payload, instead of reading one from `message`."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<LogInspectorLabels> | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
  "LpLogViewer": {
   "props": [
    {
@@ -4937,6 +5425,48 @@
     "description": "Remember the level chips across visits under this key (the kit's\nstorage, see `usePersisted`): someone who only ever reads errors should\nnot pick them again every time."
    },
    {
+    "name": "tools",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Adds to the toolbar what reading a busy stream calls for: a regular\nexpression toggle, source chips, folding repeats, and copy and download\nof the selection. Each is also its own model or prop."
+   },
+   {
+    "name": "timeRange",
+    "type": "LogTimeRange | undefined",
+    "required": false,
+    "description": "Only lines inside this span (inclusive). A line with no readable time stays."
+   },
+   {
+    "name": "group",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Fold every repeat of a message into its first line with a count, wherever\nthey sit: numbers, ids and hashes are blanked first, so \"job 41 failed\"\nand \"job 42 failed\" count as one. Stronger than `compact`, which keeps\nchronology by folding runs of the same text only."
+   },
+   {
+    "name": "linkIds",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Make trace, request, span and correlation ids in a message clickable (`id-click`)."
+   },
+   {
+    "name": "selectable",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Click selects a line, Shift+click a range (`v-model:selection`, `select`)."
+   },
+   {
+    "name": "inspector",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Show the selected line in an LpLogInspector under the stream. Needs `selectable`."
+   },
+   {
+    "name": "fileName",
+    "type": "string | undefined",
+    "required": false,
+    "description": "File name for a download, without its extension."
+   },
+   {
     "name": "labels",
     "type": "Partial<LogViewerLabels> | undefined",
     "required": false
@@ -4954,6 +5484,27 @@
     "required": false,
     "default": "[]",
     "description": "Levels to show. Empty shows every level."
+   },
+   {
+    "name": "regex",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Read the search as a regular expression."
+   },
+   {
+    "name": "sources",
+    "type": "string[] | undefined",
+    "required": false,
+    "default": "[]",
+    "description": "Sources to show. Empty shows every source."
+   },
+   {
+    "name": "selection",
+    "type": "[number, number] | null | undefined",
+    "required": false,
+    "default": "null",
+    "description": "The selected span as original line numbers, first to last."
    }
   ],
   "events": [
@@ -4962,16 +5513,36 @@
     "type": "[by: { source?: string | undefined; level?: LogLevel | undefined; }]"
    },
    {
+    "name": "select",
+    "type": "[payload: { line: LogLine; index: number; }]"
+   },
+   {
     "name": "update:search",
     "type": "[value: string]"
+   },
+   {
+    "name": "update:selection",
+    "type": "[value: [number, number] | null]"
    },
    {
     "name": "update:levels",
     "type": "[value: LogLevel[]]"
    },
    {
+    "name": "update:regex",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "update:sources",
+    "type": "[value: string[]]"
+   },
+   {
     "name": "reach-top",
     "type": "[]"
+   },
+   {
+    "name": "id-click",
+    "type": "[payload: { kind: LogIdKind; value: string; line: LogLine; }]"
    }
   ],
   "slots": []
@@ -5170,13 +5741,13 @@
    },
    {
     "name": "aspect",
-    "type": "\"square\" | \"auto\" | \"video\" | undefined",
+    "type": "\"auto\" | \"square\" | \"video\" | undefined",
     "required": false,
     "default": "\"square\"",
     "description": "Shape of each cell. `auto` lets the image decide its own height.",
     "choices": [
-     "square",
      "auto",
+     "square",
      "video"
     ]
    },
@@ -5302,7 +5873,7 @@
     "type": "string | undefined",
     "required": false,
     "default": "\"auto\"",
-    "description": "Where the keyboard lands when the dialog opens. Default `\"auto\"` picks\nthe first meaningful control in the body — a field to type in, or failing\nthat the primary action — instead of the close button, which is what\nhappens if the DOM order is left to decide.\n\n`\"none\"` leaves reka's own behaviour alone; pass a CSS selector to name\nthe element yourself."
+    "description": "Where the keyboard lands when the dialog opens. Default `\"auto\"` picks\nthe first meaningful control in the body — a field to type in, or failing\nthat the primary action — instead of the close button, which is what\nhappens if the DOM order is left to decide.\n\n`\"none\"` leaves reka's own behaviour alone; pass a CSS selector to name\nthe element yourself. A custom control the list cannot recognise (a\ncanvas editor, a composite widget) marks its entry point with\n`data-lp-autofocus` and a tabindex."
    },
    {
     "name": "glass",
@@ -6544,7 +7115,7 @@
     "name": "follow",
     "type": "boolean | undefined",
     "required": false,
-    "description": "Keep the current step (see `currentStepIndex`) scrolled into view as the\nrun advances: a long job list, or a horizontal strip wider than its box."
+    "description": "Keep the current step (see `currentStepIndex`) scrolled into view as the\nrun advances: a long job list, or a horizontal strip wider than its box.\nIt moves only when the current step changes, so a status update inside a\nstep leaves the reader's scroll alone."
    },
    {
     "name": "autoExpand",
@@ -6628,7 +7199,7 @@
     "name": "ariaLabel",
     "type": "string | undefined",
     "required": false,
-    "description": "Accessible name of the panel, which reka exposes as a dialog."
+    "description": "Accessible name of the panel, which reka exposes as a dialog. Without\none the trigger names it. A heading inside the panel names it better:\npass `aria-labelledby` with its id."
    },
    {
     "name": "open",
@@ -8131,7 +8702,7 @@
     "type": "number | undefined",
     "required": false,
     "default": "14",
-    "description": "Fold collapsible groups automatically once the nav has more than this\nmany rows, counting headings and items alike.\n\nThe reason is the reader, not the pixels: a short nav is taken in at a\nglance, a long one has to be searched, and searching a list you did not\nchoose to have is the part that grates. Past the threshold the groups\nthat are not today's work fold themselves, and the one holding the\ncurrent page always stays open.\n\n0 turns it off — the app then owns the state through `collapsed`."
+    "description": "Fold collapsible groups automatically once the nav has more than this\nmany rows, counting headings, items and the pages under them alike.\n\nThe reason is the reader, not the pixels: a short nav is taken in at a\nglance, a long one has to be searched, and searching a list you did not\nchoose to have is the part that grates. Past the threshold the groups\nthat are not today's work fold themselves, and the one holding the\ncurrent page always stays open.\n\n0 turns it off — the app then owns the state through `collapsed`."
    },
    {
     "name": "hoverFollow",
@@ -9267,7 +9838,98 @@
     "type": "boolean | undefined",
     "required": false,
     "default": "false",
-    "description": "With `load`: the user chose \"select all N\" beyond the loaded page\n(v-model:allMatching). The keys in `selected` are then only the loaded\nones; acting on everything that matches is the consumer's to do."
+    "description": "With `load`: the user chose \"select all N\" beyond the loaded page\n(v-model:allMatching). The keys in `selected` are then only the loaded\nones; acting on everything that matches is the consumer's to do.\n\nIt holds only while every loaded row is ticked: a new page, sort or\nfilter brings unticked rows and clears it, so a bulk action never runs\non a set the user can no longer see."
+   },
+   {
+    "name": "selectionToken",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Keep \"select all N\" across pages and sorts, and let the user untick rows\nout of it: the selection is then the query and its exceptions, emitted\nas `update:selectionToken` for a bulk action to send, with no need for\nids the client never loaded. `selected` stays the loaded keys. A change\nof filter means a different set of rows, so it clears the selection."
+   },
+   {
+    "name": "multiSort",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Sort by several columns: Shift-click adds a column (v-model:sorts)."
+   },
+   {
+    "name": "sorts",
+    "type": "SortState[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Sort keys in order (v-model:sorts), with `multiSort`. Left unset the table keeps them."
+   },
+   {
+    "name": "resizableColumns",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Drag a column's edge, or focus it and use the arrows, to set its width;\ndouble-click clears it. Sets a fixed table layout once a width is set."
+   },
+   {
+    "name": "columnWidths",
+    "type": "Record<string, number> | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Widths in px by column key (v-model:columnWidths)."
+   },
+   {
+    "name": "columnPresets",
+    "type": "readonly ColumnPreset[] | undefined",
+    "required": false,
+    "description": "Named sets of columns, offered in the table's menu."
+   },
+   {
+    "name": "columnPreset",
+    "type": "string | null | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The chosen preset's id (v-model:columnPreset)."
+   },
+   {
+    "name": "groupBy",
+    "type": "string | ((row: T) => unknown) | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Group rows under a heading: a column key or a function. Client side, so\nwith `load` it groups the loaded page. Groups follow the row order, so\nsort by the same column to keep them put."
+   },
+   {
+    "name": "groupLabel",
+    "type": "((value: unknown, rows: T[]) => string) | undefined",
+    "required": false
+   },
+   {
+    "name": "collapsedGroups",
+    "type": "string[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Collapsed group ids, `String(value)` (v-model:collapsedGroups)."
+   },
+   {
+    "name": "expandable",
+    "type": "boolean | ((row: T) => boolean) | undefined",
+    "required": false,
+    "description": "Rows open a panel beneath them, drawn by the `expanded` slot. A function\nsays which rows can. Ignored with `virtualRowHeight`."
+   },
+   {
+    "name": "expanded",
+    "type": "RowKey[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Open row keys (v-model:expanded)."
+   },
+   {
+    "name": "virtualRowHeight",
+    "type": "number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Draw only the rows in view, for thousands of them, at this height in px.\nGive the table a `max-height`, or a limited parent: with room for every\nrow, every row is in view and all of them are drawn.\n\nThe price of drawing a window:\n- Every row, group heading included, must be exactly this tall: keep cells\n  on one line (`nowrap`). A taller row drifts the scroll position.\n- Row enter, leave and move animations are off.\n- `expandable` is ignored: a panel has no fixed height.\n- Arrow keys and typeahead reach the rows drawn, not the whole list.\n- Sweeping ticks reaches the rows drawn; Ctrl+A and the header tick do\n  cover all of them.\n- Find in page sees the rows drawn.\n`stickyHeader`, pins and the row menu work as usual."
+   },
+   {
+    "name": "virtualOverscan",
+    "type": "number | undefined",
+    "required": false,
+    "default": "6",
+    "description": "Rows drawn beyond each edge of the view."
    }
   ],
   "events": [
@@ -9293,6 +9955,34 @@
     "type": "[boolean]"
    },
    {
+    "name": "update:selectionToken",
+    "type": "[TableSelectionToken | null]"
+   },
+   {
+    "name": "update:sorts",
+    "type": "[SortState[]]"
+   },
+   {
+    "name": "update:columnWidths",
+    "type": "[Record<string, number>]"
+   },
+   {
+    "name": "update:columnPreset",
+    "type": "[string | null]"
+   },
+   {
+    "name": "update:collapsedGroups",
+    "type": "[string[]]"
+   },
+   {
+    "name": "update:expanded",
+    "type": "[RowKey[]]"
+   },
+   {
+    "name": "cellEdit",
+    "type": "[TableCellEdit<T>]"
+   },
+   {
     "name": "rowClick",
     "type": "[T]"
    }
@@ -9301,6 +9991,14 @@
    {
     "name": "bulk",
     "type": "{ selected: RowKey[]; allMatching: boolean; clear: () => void; }"
+   },
+   {
+    "name": "group",
+    "type": "{ value: unknown; rows: T[]; label: string; collapsed: boolean; toggle: () => void; }"
+   },
+   {
+    "name": "expanded",
+    "type": "{ row: T; close: () => void; }"
    }
   ]
  },
@@ -9765,7 +10463,8 @@
    {
     "name": "theme",
     "type": "TokenSet",
-    "required": true
+    "required": true,
+    "description": "Replace the object to change the theme: a mutation inside it is not seen."
    },
    {
     "name": "as",
@@ -10280,9 +10979,123 @@
     "type": "boolean | undefined",
     "required": false,
     "default": "true"
+   },
+   {
+    "name": "edgeFilter",
+    "type": "((edge: TopologyEdge) => boolean) | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Hide edges this returns false for, by kind, state or anything else."
+   },
+   {
+    "name": "highlightNeighbors",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Picking a node fades everything not directly connected to it."
+   },
+   {
+    "name": "path",
+    "type": "[string, string] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Two node ids: the shortest path between them stands out, the rest fades.\nThe result arrives in `path-change`. Goes by `directedPath` and by what\n`edgeFilter` leaves visible."
+   },
+   {
+    "name": "directedPath",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Walk the path along edge direction only. Default: a wire goes both ways."
+   },
+   {
+    "name": "groupBy",
+    "type": "TopologyGroupBy | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Draw a lane around each group of nodes, keyed by a `meta` field, a `data`\nfield or a function. `autoLayout` then keeps the groups apart."
+   },
+   {
+    "name": "search",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A search box that finds a node by name or id and brings it into view."
+   },
+   {
+    "name": "keyboardNav",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Arrow keys walk between nodes instead of nudging the focused one."
+   },
+   {
+    "name": "selectionActions",
+    "type": "TopologySelectionAction[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Buttons shown while two or more nodes are selected."
+   },
+   {
+    "name": "compareTo",
+    "type": "TopologySnapshot | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "An earlier version: what differs is marked on the graph drawn now."
+   },
+   {
+    "name": "timeline",
+    "type": "TopologySnapshot[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Versions of the graph, oldest first: a slider steps through them and\neach is drawn with what changed since the one before. `nodes` and `edges`\nare not drawn meanwhile."
+   },
+   {
+    "name": "fitOnResize",
+    "type": "\"always\" | \"never\" | undefined",
+    "required": false,
+    "default": "\"never\"",
+    "description": "Fit the graph again whenever the canvas changes size. Default \"never\": the view is the user's.",
+    "choices": [
+     "always",
+     "never"
+    ]
+   },
+   {
+    "name": "dataRevision",
+    "type": "string | number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Change it when a new dataset arrives, to fit the graph to it once."
+   },
+   {
+    "name": "autoSizeGroups",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Grow each group frame to hold its services, however the data sized it."
+   },
+   {
+    "name": "detail",
+    "type": "\"auto\" | DetailLevel | undefined",
+    "required": false,
+    "default": "\"full\"",
+    "description": "How much to draw. \"simple\" leaves services out, with their edges moved to\ntheir hosts; \"overview\" folds each `groupBy` group into one node; \"auto\"\npicks by zoom. Default \"full\"."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<TopologyLabels> | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
+    "name": "timelineIndex",
+    "type": "number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Index into `timeline`; unset follows the newest version."
    }
   ],
   "events": [
+   {
+    "name": "update:timelineIndex",
+    "type": "[value: number | undefined]"
+   },
    {
     "name": "connect",
     "type": "[value: Connection]"
@@ -10318,6 +11131,14 @@
    {
     "name": "node-drag-stop",
     "type": "[value: { id: string; position: { x: number; y: number; }; }]"
+   },
+   {
+    "name": "path-change",
+    "type": "[value: GraphPath | null]"
+   },
+   {
+    "name": "selection-action",
+    "type": "[value: { action: string; ids: string[]; }]"
    },
    {
     "name": "viewport-change",
@@ -10738,6 +11559,142 @@
    {
     "name": "markerEnd",
     "type": "string | undefined",
+    "required": false
+   }
+  ],
+  "events": [],
+  "slots": []
+ },
+ "LpWindow": {
+  "props": [
+   {
+    "name": "title",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "ariaLabel",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Accessible name for a window without a visible `title`."
+   },
+   {
+    "name": "defaultRect",
+    "type": "Partial<WindowRect> | undefined",
+    "required": false,
+    "description": "Where it first opens, and at what size. Centred when unset."
+   },
+   {
+    "name": "minWidth",
+    "type": "number | undefined",
+    "required": false,
+    "default": "240"
+   },
+   {
+    "name": "minHeight",
+    "type": "number | undefined",
+    "required": false,
+    "default": "160"
+   },
+   {
+    "name": "dockFraction",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.5",
+    "description": "Share of the view (0–1) a docked side takes."
+   },
+   {
+    "name": "resizable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "dockable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Offer docking when dragged to a screen edge."
+   },
+   {
+    "name": "snap",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Pull toward the view's edges and other windows while moving."
+   },
+   {
+    "name": "closable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "persist",
+    "type": "string | undefined",
+    "required": false,
+    "description": "Remember place, size and dock under this key, across visits (see `usePersisted`)."
+   },
+   {
+    "name": "guard",
+    "type": "CloseGuard",
+    "required": false,
+    "description": "Something would be lost by closing: `true` asks first, a function asks the app."
+   },
+   {
+    "name": "glass",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Frosted glass instead of a solid panel. Unset follows `provideGlass`."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ close: string; move: string; }> | undefined",
+    "required": false
+   },
+   {
+    "name": "open",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "change",
+    "type": "[value: { rect: WindowRect; dock: WindowDock | null; }]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "title",
+    "type": "{}"
+   },
+   {
+    "name": "actions",
+    "type": "{}"
+   },
+   {
+    "name": "default",
+    "type": "{ close: () => Promise<void>; }"
+   }
+  ]
+ },
+ "LpWorkspaceSwitcher": {
+  "props": [
+   {
+    "name": "workspaces",
+    "type": "UseWorkspaces",
+    "required": true
+   },
+   {
+    "name": "labels",
+    "type": "Partial<{ menu: string; create: string; duplicate: string; rename: string; remove: string; name: string; save: string; cancel: string; required: string; }> | undefined",
     "required": false
    }
   ],
