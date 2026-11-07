@@ -6492,6 +6492,12 @@
     "required": false
    },
    {
+    "name": "icon",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A leading icon, as on LpInput; the `leading` slot replaces it."
+   },
+   {
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
@@ -6524,7 +6530,12 @@
     "type": "[event: FocusEvent]"
    }
   ],
-  "slots": []
+  "slots": [
+   {
+    "name": "leading",
+    "type": "{}"
+   }
+  ]
  },
  "LpNumberFlow": {
   "props": [
@@ -9681,6 +9692,24 @@
     "type": "boolean | undefined",
     "required": false,
     "description": "The figure is still on its way. The tile keeps its shape and every line\nits height: the value and the delta pulse as blocks set in their own type\nsize, so the tile is exactly as tall loading as loaded and the row of\ntiles does not move when the numbers land. A known label stays readable\n(it names the tile, it is not data); an empty one pulses too."
+   },
+   {
+    "name": "tone",
+    "type": "ToneName | undefined",
+    "required": false,
+    "description": "Colour of the figure, from the kit's tones (`danger` for offenders,\n`success`, `warning`…). Unset, it is ink. The delta keeps its own colour."
+   },
+   {
+    "name": "size",
+    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "required": false,
+    "default": "\"lg\"",
+    "description": "Size of the figure: `lg` (the tile's own, text-3xl), `md` or `sm` for a dense row.",
+    "choices": [
+     "md",
+     "sm",
+     "lg"
+    ]
    }
   ],
   "events": [],
