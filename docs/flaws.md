@@ -16,6 +16,13 @@ entry is deleted, not ticked: the commit says what changed.
   but Back from that entry to an earlier page would then reach the router
   replayed, with its scroll key off by one.
 
+- **`shift.pw.ts` › "a header action leaving fades where it stood" failed
+  once on CI** (run for 80c5bd6): the ghost was first seen 8 px from where
+  the action stood, at the test's limit of under 8; the rerun passed, and 20
+  local runs passed. The page's MutationObserver reads the ghost a frame or two
+  into its fade on a slow runner. Read its place from the clone's own style
+  (it is placed there, then animated) rather than its box, or widen the limit.
+
 - **`patterns.pw.ts` › "loading example reserves the content and action
   geometry" fails on CI now and then:** the action button is caught at x 16
   instead of 707 for one read, then the rerun passes. It failed on both the
