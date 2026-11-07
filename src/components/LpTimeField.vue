@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Time-of-day field: hour and minute segments, typed or stepped with the arrow
@@ -21,7 +22,7 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
 import { Time } from "@internationalized/date"
 import { TimeFieldInput, TimeFieldRoot } from "reka-ui"
 import { computed } from "vue"
-import { focusLeft, useFieldControl } from "../composables/useField"
+import { focusLeft, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 
@@ -73,11 +74,7 @@ const field = useFieldControl(() => ({
   disabled: props.disabled,
 }))
 
-const shellSize = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const shellSize = CONTROL_SIZE
 
 // `w-full` is the default, not a rule: a time column of `w-28` must win over it.
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
@@ -101,10 +98,10 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
     :disabled="field.disabled"
     :required="field.required"
     :aria-invalid="field.invalid || undefined"
-    :aria-describedby="field.describedBy"
     :aria-labelledby="field.labelId"
     :class="rootClass"
     v-bind="rest"
+    :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
     @update:model-value="onUpdate"
     @focusout="onFocusOut"
   >

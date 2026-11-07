@@ -9,8 +9,8 @@ export default { inheritAttrs: false }
  * Picking the second end or a preset fills the field and closes the popover.
  * Two months sit side by side where there is room, one on a phone.
  */
-import { computed, ref, useAttrs } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { computed, ref } from "vue"
+import { useAttrsField } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import { useMediaQuery } from "../composables/useMediaQuery"
@@ -23,7 +23,7 @@ import {
   normalizeRange,
   sameRange,
 } from "./dateRange"
-import type { CalendarLabels } from "./calendar"
+import type { CalendarLabels, PickerFieldProps } from "./calendar"
 import PickerField from "./PickerField.vue"
 import LpRangeCalendar, { type RangeChange } from "./LpRangeCalendar.vue"
 
@@ -39,7 +39,7 @@ export interface DateRangePickerLabels extends Record<string, string> {
 }
 
 const props = withDefaults(
-  defineProps<{
+  defineProps<PickerFieldProps & {
     /** Selected range (v-model). */
     modelValue?: DateRange
     placeholder?: string
@@ -51,11 +51,6 @@ const props = withDefaults(
     maximumDays?: number
     /** Shortcut ranges; an empty list hides them. Defaults to the built-in set. */
     presets?: DateRangePreset[]
-    clearable?: boolean
-    disabled?: boolean
-    invalid?: boolean
-    size?: "sm" | "md" | "lg"
-    locale?: string
     /** Intl format for the displayed ends. */
     format?: Intl.DateTimeFormatOptions
     /**
@@ -126,13 +121,7 @@ function presetFits(preset: DateRangePreset): boolean {
 
 const wide = useMediaQuery("(min-width: 640px)")
 
-const attrs = useAttrs()
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid,
-  disabled: props.disabled,
-}))
+const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
 const showClear = computed(() => props.clearable && !!value.value && !field.value.disabled)
 
 const presetOptions = computed(() => presetList.value.map((preset) => ({

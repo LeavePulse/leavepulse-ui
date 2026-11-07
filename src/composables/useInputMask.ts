@@ -1,4 +1,5 @@
 import { computed, toValue, type MaybeRefOrGetter } from "vue"
+import { isElement } from "./useView"
 
 /*
  * Format-as-you-type for a native <input> without losing the caret.
@@ -193,6 +194,10 @@ export interface UseInputMaskOptions {
   onChange?: (masked: string, raw: string, complete: boolean) => void
 }
 
+/* By tag: a field of an LpFrame is no instance of this window's classes. */
+const isInput = (target: EventTarget | null): target is HTMLInputElement =>
+  isElement(target) && target.tagName === "INPUT"
+
 /**
  * Bind `onBeforeInput`, `onInput` and `onCompositionEnd` to the input, and show
  * `format(model).masked` as its value.
@@ -224,7 +229,7 @@ export function useInputMask(options: UseInputMaskOptions) {
   function onBeforeInput(event: InputEvent): void {
     const s = spec.value
     const el = event.target
-    if (!s || event.isComposing || !(el instanceof HTMLInputElement)) return
+    if (!s || event.isComposing || !isInput(el)) return
     const backward = event.inputType === "deleteContentBackward"
     if (!backward && event.inputType !== "deleteContentForward") return
     const start = el.selectionStart
@@ -242,12 +247,12 @@ export function useInputMask(options: UseInputMaskOptions) {
 
   /** Attach to `input`. Composition is left alone until it ends. */
   function onInput(event: Event): void {
-    if ((event as InputEvent).isComposing || !(event.target instanceof HTMLInputElement)) return
+    if ((event as InputEvent).isComposing || !isInput(event.target)) return
     reformat(event.target)
   }
 
   function onCompositionEnd(event: CompositionEvent): void {
-    if (event.target instanceof HTMLInputElement) reformat(event.target)
+    if (isInput(event.target)) reformat(event.target)
   }
 
   return { active: computed(() => !!spec.value), format, onBeforeInput, onInput, onCompositionEnd }

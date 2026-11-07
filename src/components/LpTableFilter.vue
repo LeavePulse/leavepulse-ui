@@ -80,7 +80,7 @@ const paint = usePaintSelect<unknown>({
 function onListKeydown(event: KeyboardEvent) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
   const boxes = [...(list.value?.querySelectorAll<HTMLElement>("[role=checkbox]") ?? [])]
-  const at = boxes.indexOf(document.activeElement as HTMLElement)
+  const at = boxes.indexOf(list.value?.ownerDocument.activeElement as HTMLElement)
   const next = boxes[at + (event.key === "ArrowDown" ? 1 : -1)]
   if (!next) return
   event.preventDefault()

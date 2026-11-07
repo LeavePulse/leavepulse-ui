@@ -29,6 +29,8 @@
  * keeps the colours settled on in browser storage and offers them back above
  * the presets.
  */
+import { CONTROL_SIZE } from "./controlSize"
+import { clamp } from "../composables/clamp"
 import {
   PopoverAnchor,
   PopoverContent,
@@ -36,10 +38,10 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui"
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, ref, useAttrs, watch } from "vue"
 import { useKitStorage } from "../composables/usePersisted"
 import { prefersReducedMotion } from "../composables/easing"
-import { useFieldControl } from "../composables/useField"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import {
   clampHsv,
   DEFAULT_SWATCHES,
@@ -277,7 +279,7 @@ function trackPointer(e: PointerEvent, onMove: (x: number, y: number) => void) {
   const at = (ev: PointerEvent) => {
     const x = rect.width === 0 ? 0 : (ev.clientX - rect.left) / rect.width
     const y = rect.height === 0 ? 0 : (ev.clientY - rect.top) / rect.height
-    onMove(Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y)))
+    onMove(clamp(x, 0, 1), clamp(y, 0, 1))
   }
 
   el.setPointerCapture(e.pointerId)
@@ -388,11 +390,7 @@ function tickClass(value: string) {
 const SWATCH_SIZE = { sm: "size-6", md: "size-7", lg: "size-8" }
 const ANY_COLOUR = "conic-gradient(from 90deg, #ff5c5c, #ffd23f, #39e58c, #2dd4bf, #00bcff, #7c5cff, #ff5ca8, #ff5c5c)"
 
-const triggerSize = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const triggerSize = CONTROL_SIZE
 
 // The colour the swatch/preview paints, alpha included so a translucent pick
 // reads as translucent against the checkerboard behind it.
@@ -624,6 +622,7 @@ const menuItems = computed<ContextMenuItemDef[]>(() => {
     : builtin
 })
 
+const attrs = useAttrs()
 const field = useFieldControl(() => ({
   wrapped: false,
   invalid: props.invalid,
@@ -674,7 +673,7 @@ const guardOutside = useOutsideGuard()
           :disabled="field.disabled"
           :aria-label="ariaLabel"
           :aria-invalid="field.invalid || undefined"
-          :aria-describedby="field.describedBy"
+          :aria-describedby="mergeDescribedBy(attrs['aria-describedby'], field.describedBy)"
           class="group inline-flex w-full items-center gap-2 rounded-control border bg-surface-soft px-2 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
           :class="[
             triggerSize[size],

@@ -16,6 +16,8 @@ export type SelectLabels = {
 </script>
 
 <script setup lang="ts" generic="V extends SelectValue = string">
+import IconCloseButton from "./IconCloseButton.vue"
+import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * One select to rule them all — built on reka-ui Combobox.
@@ -37,7 +39,7 @@ import {
   ComboboxViewport,
 } from "reka-ui"
 import { computed, nextTick, reactive, ref, useAttrs, useId, watch } from "vue"
-import { useFieldBlur, useFieldControl } from "../composables/useField"
+import { useFieldBlur, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
@@ -45,8 +47,8 @@ import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
 import LpRollingText from "./LpRollingText.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
-import { fitChips, toggledValues } from "./select"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { evictOldest, fitChips, toggledValues } from "./select"
+import { nodeWindow, useOutsideGuard, usePortalTarget } from "../composables/useView"
 import { useResizeObserver } from "../composables/useResizeObserver"
 
 export type SelectValue = string | number
@@ -105,11 +107,7 @@ const props = withDefaults(
 )
 
 /* The text steps with the height, as in every other kit field: a small select beside a small input read a size larger. */
-const SIZE_HEIGHT = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-} as const
+const SIZE_HEIGHT = CONTROL_SIZE
 const anchorHeight = computed(() => SIZE_HEIGHT[props.size])
 
 const field = useFieldControl(() => ({
@@ -189,7 +187,38 @@ async function openFromKeyboard(event: KeyboardEvent) {
   const items = panel?.querySelectorAll<HTMLElement>('[role="option"]:not([data-disabled])')
   const selected = panel?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not([data-disabled])')
   const target = search ?? selected ?? (event.key === "ArrowUp" ? items?.[items.length - 1] : items?.[0])
-  target?.focus()
+  // Something else may have kept the list shut: nothing to move into then.
+  if (isOpen.value) target?.focus()
+}
+
+/*
+ * reka reads the arrow keys from the search box. A list without one takes focus
+ * on an option, where its own handling put focus straight back on the option
+ * the list opened on, so that was all a keyboard could ever pick. Taken here,
+ * ahead of it.
+ */
+const LIST_KEYS = ["ArrowDown", "ArrowUp", "Home", "End", "Enter"]
+
+function moveInList(event: KeyboardEvent) {
+  if (props.searchable || serverSide.value || !LIST_KEYS.includes(event.key)) return
+  const list = event.currentTarget as HTMLElement
+  const items = Array.from(list.querySelectorAll<HTMLElement>('[role="option"]:not([data-disabled])'))
+  if (!items.length) return
+  event.preventDefault()
+  event.stopPropagation()
+  const at = items.indexOf(list.ownerDocument.activeElement as HTMLElement)
+  if (event.key === "Enter") {
+    items[at]?.click()
+    return
+  }
+  const last = items.length - 1
+  const next = {
+    ArrowDown: at === last ? 0 : at + 1,
+    ArrowUp: at <= 0 ? last : at - 1,
+    Home: 0,
+    End: last,
+  }[event.key]
+  items[next ?? 0]?.focus()
 }
 
 // Leaving the field, not moving between its parts: the trigger and the list
@@ -219,7 +248,9 @@ function onListFocusOut(event: FocusEvent) {
  * The trigger's name. reka hard-codes aria-label="Show popup" on it, which hid
  * the field's label and the chosen value; aria-labelledby outranks aria-label,
  * so inside a labelled field the name is the label plus the value. On its own,
- * the consumer's aria-label, else the value or placeholder.
+ * the consumer's aria-label plus the value, else the value or placeholder: the
+ * name has to hold the text the button shows, or a voice user who says what
+ * they see ("click Alpha") cannot reach it (WCAG 2.5.3).
  */
 const attrs = useAttrs()
 const valueId = `lp-select-${useId()}-value`
@@ -227,7 +258,7 @@ const valueText = computed(() => (chips.value.length ? chipNames.value : display
 const triggerName = computed(() =>
   field.value.labelId
     ? { "aria-labelledby": `${field.value.labelId} ${valueId}`, "aria-label": undefined }
-    : { "aria-label": (attrs["aria-label"] as string | undefined) ?? valueText.value },
+    : { "aria-label": [attrs["aria-label"] as string | undefined, valueText.value].filter(Boolean).join(", ") },
 )
 
 // reka's Combobox forbids an empty-string item value (it reserves "" for
@@ -281,6 +312,7 @@ const filtered = computed(() => {
 type Shown = { label: string; hint?: string; image?: string; icon?: string }
 
 const remembered = reactive(new Map<SelectValue, Shown>())
+const REMEMBERED_LIMIT = 500
 
 function fromOption(o: SelectOption<V>): Shown {
   return { label: o.label, hint: o.description, image: o.image, icon: o.icon }
@@ -291,6 +323,7 @@ function remember(values: readonly SelectValue[]) {
     const o = props.options.find((x) => x.value === v)
     if (o) remembered.set(v, fromOption(o))
   }
+  evictOldest(remembered, new Set(values), REMEMBERED_LIMIT)
 }
 
 const modelList = computed<V[]>(() => {
@@ -355,7 +388,7 @@ function measure() {
   if (!row || !probe) return
   const kids = Array.from(probe.children) as HTMLElement[]
   const more = kids.pop()
-  const gap = Number.parseFloat(getComputedStyle(probe).columnGap) || 0
+  const gap = Number.parseFloat(nodeWindow(probe).getComputedStyle(probe).columnGap) || 0
   fit.value = fitChips(
     kids.map((k) => k.offsetWidth),
     row.clientWidth,
@@ -365,6 +398,9 @@ function measure() {
 }
 
 useResizeObserver(chipRow, () => measure())
+// The chips can change width while the row keeps its own: a web font arriving,
+// a theme. The probe is as wide as they are, so it notices.
+useResizeObserver(probeRow, () => measure())
 watch(chips, () => void nextTick(measure), { flush: "post", deep: true })
 
 const shownChips = computed(() => chips.value.slice(0, fit.value))
@@ -451,7 +487,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
         @keydown="openFromKeyboard"
         v-bind="triggerName"
         :aria-invalid="field.invalid || undefined"
-        :aria-describedby="field.describedBy"
+        :aria-describedby="mergeDescribedBy(rootAttrs['aria-describedby'], field.describedBy)"
         class="flex min-w-0 flex-1 items-center gap-2 outline-none"
       >
         <!-- Several picks read as chips (picture + name) that collapse into
@@ -527,20 +563,13 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
           </LpRollingText>
         </template>
       </ComboboxTrigger>
-      <button
+      <IconCloseButton
         v-if="clearable && hasValue && !field.disabled"
-        type="button"
-        class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
-        :aria-label="labels.clear"
+        inline
+        :label="labels.clear"
         @pointerdown.prevent
         @click="clear"
-      >
-        <LpIcon
-          name="lucide:x"
-          :size="16"
-          class="transition-transform duration-200 ease-[var(--ease-emphasized)] group-hover:rotate-90 group-active:scale-90 motion-reduce:group-hover:rotate-0"
-        />
-      </button>
+      />
       <!-- A second way in for the pointer only: the main trigger already owns
            focus and the accessible name, so this one stays out of the tab order
            and the accessibility tree. -->
@@ -565,6 +594,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       <ComboboxContent
         :data-lp-field-part="partId"
         @focusout="onListFocusOut"
+        @keydown.capture="moveInList"
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         position="popper"

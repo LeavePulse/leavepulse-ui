@@ -12,6 +12,7 @@ export interface SecretFieldLabels extends Record<string, string> {
 </script>
 
 <script setup lang="ts">
+import { isElement } from "../composables/useView"
 import { suppressPaletteDiscovery } from "../composables/usePaletteCommands"
 /*
  * A value someone must be able to read and copy but should not have on screen
@@ -159,7 +160,7 @@ const field = ref<{ $el?: Element } | null>(null)
 watch(revealed, () => {
   if (!props.input || prefersReducedMotion()) return
   const el = field.value?.$el
-  const input = el instanceof Element ? el.querySelector("input") : null
+  const input = isElement(el) ? el.querySelector("input") : null
   input?.animate([{ filter: "blur(4px)", opacity: 0.35 }, { filter: "blur(0)", opacity: 1 }], {
     duration: 260,
     easing: "cubic-bezier(0.2, 0, 0, 1)",

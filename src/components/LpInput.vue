@@ -3,10 +3,11 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, ref, useAttrs, useSlots } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { fieldWrapperBinds, isAttrOn, mergeDescribedBy, useFieldControl } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useInputFilter } from "../composables/useInputFilter"
 import { DEFAULT_MASK_TOKENS, useInputMask, type MaskSpec, type MaskTokens } from "../composables/useInputMask"
@@ -29,11 +30,7 @@ const shell = tv({
     "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-55",
   ],
   variants: {
-    size: {
-      sm: "h-(--size-control-sm) text-xs",
-      md: "h-(--size-control-md) text-sm",
-      lg: "h-(--size-control-lg) text-sm",
-    },
+    size: CONTROL_SIZE,
     invalid: {
       true: "border-danger focus-within:border-danger focus-within:ring-danger-soft",
     },
@@ -113,22 +110,24 @@ const shown = computed(() => (masking.active.value ? masking.format(props.modelV
 function onBefore(event: InputEvent): void {
   onBeforeInput(event)
   if (!event.defaultPrevented) masking.onBeforeInput(event)
-  if (event.defaultPrevented && masking.active.value && event.target instanceof HTMLInputElement) {
-    emit("update:modelValue", event.target.value)
+  if (event.defaultPrevented && masking.active.value) {
+    emit("update:modelValue", (event.target as HTMLInputElement).value)
   }
 }
 
 function onInputEvent(event: Event): void {
+  // `restrict` first: it sees what was typed, and the mask then lays out what
+  // is left, putting back any literal the clean-up took along.
+  filterInput(event)
   if (masking.active.value) masking.onInput(event)
-  else filterInput(event)
   emit("update:modelValue", (event.target as HTMLInputElement).value)
 }
 
 function onComposed(event: CompositionEvent): void {
-  if (masking.active.value) {
-    masking.onCompositionEnd(event)
-    emit("update:modelValue", (event.target as HTMLInputElement).value)
-  } else onCompositionEnd(event)
+  onCompositionEnd(event)
+  if (!masking.active.value) return
+  masking.onCompositionEnd(event)
+  emit("update:modelValue", (event.target as HTMLInputElement).value)
 }
 
 // Pattern failure folds into the same invalid state as the explicit prop/error.
@@ -150,7 +149,7 @@ const field = useFieldControl(() => ({
   disabled: props.disabled,
 }))
 const text = useLabels("input", { clear: "Clear" }, () => props.labels)
-const showClear = computed(() => props.clearable && !!props.modelValue && !field.value.disabled && (attrs.readonly === undefined || attrs.readonly === false))
+const showClear = computed(() => props.clearable && !!props.modelValue && !field.value.disabled && !isAttrOn(attrs.readonly) && !isAttrOn(attrs.readOnly))
 const isInvalidState = computed(() => field.value.invalid)
 const shellClass = computed(() =>
   shell({ size: props.size, invalid: isInvalidState.value }),
@@ -183,14 +182,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
 
 <template>
   <FieldWrapper
-    :wrapped="hasField"
-    :id="field.id"
-    :label="label"
-    :hint="hint"
-    :error="error"
-    :required="required"
-    :class="attrs.class"
-    :style="attrs.style"
+    v-bind="fieldWrapperBinds(hasField, field, $props, attrs)"
   >
     <div
       data-lp-ring-owner
@@ -210,7 +202,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
         :disabled="field.disabled"
         :required="field.required || undefined"
         :aria-invalid="isInvalidState || undefined"
-        :aria-describedby="field.describedBy"
+        :aria-describedby="mergeDescribedBy(attrs['aria-describedby'], field.describedBy)"
         :class="[
           'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
           clearable && '[&::-webkit-search-cancel-button]:hidden',

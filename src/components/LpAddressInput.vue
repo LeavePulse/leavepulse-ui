@@ -41,7 +41,7 @@ import LpIcon from "./LpIcon.vue"
 import LpInput from "./LpInput.vue"
 import LpModal from "./LpModal.vue"
 import LpSelect from "./LpSelect.vue"
-import { useFieldControl } from "../composables/useField"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -301,10 +301,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
   <div
     role="group"
     :aria-labelledby="field.labelId"
-    :aria-describedby="field.describedBy"
     :aria-invalid="field.invalid || undefined"
     :class="rootClass"
-    v-bind="rest">
+    v-bind="rest"
+    :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)">
     <LpFormField :label="text.line">
       <!-- Typing is the fast path and stands on its own; the map is one button
            away for when an address is easier pointed at than spelled. -->

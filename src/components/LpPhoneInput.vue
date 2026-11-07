@@ -36,6 +36,7 @@ export type PhoneInputLabels = {
  * is what a form should store. Until the library arrives the field takes digits
  * as before, unformatted.
  */
+import { CONTROL_SIZE } from "./controlSize"
 import {
   ComboboxAnchor,
   ComboboxContent,
@@ -47,13 +48,13 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, onMounted, ref, shallowRef, useAttrs } from "vue"
-import { useField, useFieldControl } from "../composables/useField"
+import { computed, onMounted, ref, shallowRef } from "vue"
+import { useField, useAttrsField, mergeDescribedBy } from "../composables/useField"
 import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { type Country, filterCountries, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
-import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
+import { OPTION_ITEM, optionStagger, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpIcon from "./LpIcon.vue"
 import {
@@ -315,23 +316,13 @@ function onBlur() {
   say(reason.replace("{country}", name), { tone: "danger", duration: 0 })
 }
 
-const sizeClass = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const sizeClass = CONTROL_SIZE
 
 // The control is full-width with its own frame — the two things a consumer
 // placing it in a narrow column has to change, so `class="w-48"` must win.
 // style lays out the frame; every other attr (name, autocomplete, @blur…)
 // belongs to the number <input>.
-const attrs = useAttrs()
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid || flagged.value,
-  disabled: props.disabled,
-}))
+const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid || flagged.value, disabled: props.disabled }))
 const text = useLabels<PhoneInputLabels>("phoneInput", {
   selectCountry: "Select country",
   placeholder: "Phone number",
@@ -406,10 +397,8 @@ const guardOutside = useOutsideGuard()
         <ComboboxContent
           @interact-outside="guardOutside"
           @escape-key-down="guardOutside"
-          :collision-padding="8"
-          position="popper"
+          v-bind="COMBOBOX_PANEL"
           align="start"
-          :side-offset="6"
           :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-72 overflow-hidden']"
         >
           <div class="border-b border-line p-2">
@@ -460,7 +449,7 @@ const guardOutside = useOutsideGuard()
       :disabled="field.disabled"
       :required="field.required || undefined"
       :aria-invalid="field.invalid || undefined"
-      :aria-describedby="[field.describedBy, notice.message.value ? noticeId : ''].filter(Boolean).join(' ') || undefined"
+      :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy, notice.message.value ? noticeId : undefined)"
       class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent px-3 outline-none placeholder:text-muted"
       @beforeinput="onBeforeEdit"
       @paste="onPaste"

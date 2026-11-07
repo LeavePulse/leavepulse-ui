@@ -81,7 +81,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 const control = ref<HTMLElement | null>(null)
 const LABELABLE = "input, button, select, textarea, meter, output, progress"
 function focusControl() {
-  const target = document.getElementById(id.value)
+  const target = control.value?.ownerDocument.getElementById(id.value)
   if (target?.matches(LABELABLE)) return
   const first = control.value?.querySelector<HTMLElement>(
     'input:not([type="hidden"]):not([disabled]), button:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]',

@@ -21,7 +21,7 @@ export default { inheritAttrs: false }
  */
 import { PinInputInput, PinInputRoot } from "reka-ui"
 import { computed, ref, watch } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { groupBreaks, joinCells, splitCode, upperCells, type OtpCells } from "./otp"
 
@@ -166,7 +166,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         :index="i - 1"
         :id="i === 1 ? field.id : undefined"
         :aria-invalid="field.invalid || undefined"
-        :aria-describedby="field.describedBy"
+        :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
         :autocapitalize="upper ? 'characters' : 'none'"
         autocorrect="off"
         :spellcheck="false"

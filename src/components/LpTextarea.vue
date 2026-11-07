@@ -3,9 +3,10 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { nodeWindow } from "../composables/realm"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, nextTick, onMounted, ref, useAttrs, watch } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { fieldWrapperBinds, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
 
@@ -63,7 +64,7 @@ const box = ref<HTMLTextAreaElement | null>(null)
 function fit() {
   const el = box.value
   if (!props.autosize || !el) return
-  const style = getComputedStyle(el)
+  const style = nodeWindow(el).getComputedStyle(el)
   const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4
   const borders = parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)
   const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
@@ -91,14 +92,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
 
 <template>
   <FieldWrapper
-    :wrapped="hasField"
-    :id="field.id"
-    :label="label"
-    :hint="hint"
-    :error="error"
-    :required="required"
-    :class="attrs.class"
-    :style="attrs.style"
+    v-bind="fieldWrapperBinds(hasField, field, $props, attrs)"
   >
     <textarea
       ref="box"
@@ -110,7 +104,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
       :disabled="field.disabled"
       :required="field.required || undefined"
       :aria-invalid="field.invalid || undefined"
-      :aria-describedby="field.describedBy"
+      :aria-describedby="mergeDescribedBy(attrs['aria-describedby'], field.describedBy)"
       :class="textareaClass"
       :style="hasField ? undefined : (attrs.style as never)"
       @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value); fit()"

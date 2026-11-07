@@ -9,7 +9,7 @@ export default { inheritAttrs: false }
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { RadioGroupIndicator, RadioGroupItem, RadioGroupRoot } from "reka-ui"
 import { useId } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LpIcon from "./LpIcon.vue"
 import type { LpOptionBase } from "./options"
@@ -42,10 +42,10 @@ usePaletteControl({ disabled: () => field.value.disabled })
     :disabled="field.disabled"
     :required="field.required"
     :aria-labelledby="field.labelId"
-    :aria-describedby="field.describedBy"
     :aria-invalid="field.invalid || undefined"
     :class="rootClass"
     v-bind="rest"
+    :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
     @update:model-value="(v) => $emit('update:modelValue', v as string)"
   >
     <slot>

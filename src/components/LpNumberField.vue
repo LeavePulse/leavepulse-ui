@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Numeric input with stepper buttons (reka NumberField). Themed via tokens.
 import {
@@ -14,9 +15,9 @@ import {
   NumberFieldInput,
   NumberFieldRoot,
 } from "reka-ui"
-import { computed, useAttrs, useId } from "vue"
+import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
-import { focusLeft, useFieldControl } from "../composables/useField"
+import { focusLeft, useAttrsField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedClass } from "../composables/useMergedClass"
 
@@ -93,21 +94,11 @@ const text = useLabels<NumberFieldLabels>(
   () => props.labels,
 )
 
-const SIZE = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const SIZE = CONTROL_SIZE
 
-const attrs = useAttrs()
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid,
-  disabled: props.disabled,
-}))
+const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
 const describedBy = computed(
-  () => [field.value.describedBy, props.unit ? unitId : undefined].filter(Boolean).join(" ") || undefined,
+  () => mergeDescribedBy(attrs["aria-describedby"], field.value.describedBy, props.unit ? unitId : undefined),
 )
 
 // The frame takes the consumer's class and style, and `name` goes to reka's

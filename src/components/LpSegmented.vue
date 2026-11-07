@@ -6,6 +6,8 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { CONTROL_SIZE } from "./controlSize"
+import { isHTMLElement } from "../composables/useView"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Segmented control — a compact bar of mutually-exclusive options with a sliding
@@ -17,7 +19,7 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
 import { Motion } from "motion-v"
 import { ToggleGroupItem, ToggleGroupRoot } from "reka-ui"
 import { ref, useId } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { usePillTransition } from "../composables/usePillTransition"
 import AttentionDot from "./AttentionDot.vue"
@@ -66,11 +68,7 @@ function onChange(v: unknown) {
   if (typeof v === "string" && v) emit("update:modelValue", v)
 }
 
-const sizeCls = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const sizeCls = CONTROL_SIZE
 
 // The bar sizes itself from `size` and `block`, which is right until a consumer
 // needs it flush against something — `class="p-0"` and `class="rounded-none"`
@@ -109,7 +107,7 @@ function pillUnder(value: string): boolean {
  */
 function releaseFocusAfterPointer(event: PointerEvent) {
   const target = event.currentTarget
-  if (target instanceof HTMLElement) target.blur()
+  if (isHTMLElement(target)) target.blur()
 }
 
 usePaletteControl({ disabled: () => field.value.disabled })
@@ -121,10 +119,10 @@ usePaletteControl({ disabled: () => field.value.disabled })
     type="single"
     :disabled="field.disabled"
     :aria-labelledby="field.labelId"
-    :aria-describedby="field.describedBy"
     :rovingFocus="true"
     :class="rootClass"
     v-bind="rest"
+    :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
     @update:model-value="onChange"
     @pointerleave="hovered = null"
   >

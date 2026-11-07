@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fitChips, toggledValues } from "../src/components/select"
+import { evictOldest, fitChips, toggledValues } from "../src/components/select"
 
 describe("fitChips", () => {
   test("shows everything that fits", () => {
@@ -26,5 +26,28 @@ describe("toggledValues", () => {
   })
   test("several moved at once: added first, then removed", () => {
     expect(toggledValues(["a", "b"], ["b", "c"])).toEqual(["c", "a"])
+  })
+})
+
+describe("evictOldest", () => {
+  test("drops the oldest past the limit and keeps what is selected", () => {
+    const cache = new Map([["a", 1], ["b", 2], ["c", 3], ["d", 4]])
+    evictOldest(cache, new Set(["a"]), 2)
+    expect([...cache.keys()]).toEqual(["a", "d"])
+  })
+
+  test("never drops a kept entry, even over the limit", () => {
+    const cache = new Map([["a", 1], ["b", 2]])
+    evictOldest(cache, new Set(["a", "b"]), 1)
+    expect(cache.size).toBe(2)
+  })
+
+  test("leaves an empty or small cache alone", () => {
+    const empty = new Map<string, number>()
+    evictOldest(empty, new Set(), 2)
+    expect(empty.size).toBe(0)
+    const small = new Map([["a", 1]])
+    evictOldest(small, new Set(), 2)
+    expect(small.size).toBe(1)
   })
 })

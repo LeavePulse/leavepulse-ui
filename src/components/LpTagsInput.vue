@@ -13,6 +13,7 @@ export type TagsInputLabels = {
 </script>
 
 <script setup lang="ts">
+import { isNode, isInputElement } from "../composables/realm"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Free-form list of short values: emails, labels, hostnames. Typing a
@@ -38,7 +39,7 @@ import {
   TagsInputRoot,
 } from "reka-ui"
 import { computed, ref, useAttrs, useId, watch } from "vue"
-import { fieldMessageId, useField, useFieldControl } from "../composables/useField"
+import { fieldWrapperBinds, fieldMessageId, useField, useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { prefersReducedMotion } from "../composables/easing"
 import { useFieldNotice, type FieldNoticeOptions } from "../composables/useFieldNotice"
 import { useShift } from "../composables/useShift"
@@ -177,13 +178,12 @@ const field = useFieldControl(() => ({
 
 const describedBy = computed(
   () =>
-    [
+    mergeDescribedBy(
+      attrs["aria-describedby"],
       field.value.describedBy,
       hasField.value && field.value.id ? `${field.value.id}-notice` : undefined,
       standalone.value && notice.message.value ? noticeId : undefined,
-    ]
-      .filter(Boolean)
-      .join(" ") || undefined,
+    ),
 )
 
 const rootAttrs = computed(() => {
@@ -336,7 +336,7 @@ function choose(opt: LpOptionBase<string>): void {
 function keepOpenInside(event: Event): void {
   guardOutside(event)
   const target = event.target
-  if (target instanceof Node && boxEl.value?.contains(target)) event.preventDefault()
+  if (isNode(target) && boxEl.value?.contains(target)) event.preventDefault()
 }
 
 function isDelimiter(data: string): boolean {
@@ -346,7 +346,7 @@ function isDelimiter(data: string): boolean {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.isComposing || !(event.target instanceof HTMLInputElement)) return
+  if (event.isComposing || !isInputElement(event.target)) return
   const count = suggestions.value.length
   if (listOpen.value && count) {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -369,7 +369,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 function onBeforeInput(event: InputEvent): void {
-  if (event.isComposing || !(event.target instanceof HTMLInputElement)) return
+  if (event.isComposing || !isInputElement(event.target)) return
   if (event.inputType === "insertText" && event.data && isDelimiter(event.data)) {
     event.preventDefault()
     commit(event.target)
@@ -377,7 +377,7 @@ function onBeforeInput(event: InputEvent): void {
 }
 
 function onInput(event: Event): void {
-  if (event.target instanceof HTMLInputElement) sync(event.target)
+  if (isInputElement(event.target)) sync(event.target)
   if (!stuck.value) return
   stuck.value = false
   unsay()
@@ -385,7 +385,7 @@ function onInput(event: Event): void {
 
 function onPaste(event: ClipboardEvent): void {
   const pasted = event.clipboardData?.getData("text") ?? ""
-  if (!(event.target instanceof HTMLInputElement) || !pasted) return
+  if (!isInputElement(event.target) || !pasted) return
   if (splitTags(pasted, props.delimiter).length < 2) return
   event.preventDefault()
   const el = event.target
@@ -397,7 +397,7 @@ function onPaste(event: ClipboardEvent): void {
 function onBlur(event: FocusEvent): void {
   focused.value = false
   emit("blur", event)
-  if (props.addOnBlur && event.target instanceof HTMLInputElement && event.target.value.trim()) commit(event.target)
+  if (props.addOnBlur && isInputElement(event.target) && event.target.value.trim()) commit(event.target)
 }
 
 function onFocus(): void {
@@ -433,15 +433,8 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
 
 <template>
   <FieldWrapper
-    :wrapped="hasField"
+    v-bind="fieldWrapperBinds(hasField, field, $props, attrs)"
     :ref="bindField"
-    :id="field.id"
-    :label="label"
-    :hint="hint"
-    :error="error"
-    :required="required"
-    :class="attrs.class"
-    :style="attrs.style"
   >
     <div class="relative">
       <TagsInputRoot

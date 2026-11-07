@@ -11,7 +11,7 @@ import { CheckboxIndicator, CheckboxRoot } from "reka-ui"
 import { computed, useId } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
-import { useFieldControl } from "../composables/useField"
+import { isAttrOn, mergeDescribedBy, useFieldControl } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
@@ -30,12 +30,14 @@ const props = withDefaults(defineProps<{
   /**
    * Saves the new state, as LpSwitch's `action`: the box ticks at once and
    * spins while this runs; a failure unticks it and becomes an error toast
-   * (or the `error` event, when the app listens).
+   * (or the `error` event, when the app listens). From the mixed state,
+   * `v-model:indeterminate` gets it back as well.
    */
   action?: (value: boolean) => unknown
 }>(), { palette: undefined })
 const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void
+  (e: "update:indeterminate", value: boolean): void
   (e: "change", value: boolean): void
   /** The `action` finished. */
   (e: "done", value: boolean): void
@@ -43,20 +45,21 @@ const emit = defineEmits<{
   (e: "error", error: unknown): void
 }>()
 
-const { pending, set } = useOptimisticToggle(() => props.action, emit)
+// The box was mixed when this save began: a boolean rollback cannot say so.
+let wasMixed = false
+const { pending, set } = useOptimisticToggle(() => props.action, emit, () => {
+  if (wasMixed) emit("update:indeterminate", true)
+})
 
 function onUpdate(v: boolean | "indeterminate") {
   const checked = v === true
   if (pending.value) return
+  wasMixed = !!props.indeterminate
+  if (wasMixed) emit("update:indeterminate", false)
   void set(checked)
   emit("change", checked)
 }
 
-const field = useFieldControl(() => ({ wrapped: false, id: props.id, disabled: props.disabled }))
-const descriptionId = `${useId()}-description`
-const describedBy = computed(
-  () => [props.description ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
-)
 
 // The label sits a fixed distance from the box; a dense list of options needs that closer.
 // With a description the box aligns with the first line rather than the middle of two.
@@ -67,14 +70,45 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   ].join(" "),
 )
 
+/*
+ * The box is the control, so what describes it (aria-*, name, title) goes to
+ * the box, as on LpSwitch: on the <label> a reader never hears it. Focus does
+ * not bubble, so its listeners go there too. The other listeners stay on the
+ * label, the whole hit area: a press on the text must reach them as well.
+ */
+const FOCUS_LISTENER = /^on(Focus|Blur)/
+const LISTENER = /^on[A-Z]/
+const parts = computed(() => {
+  const label: Record<string, unknown> = {}
+  const control: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(rest.value)) {
+    const onLabel = key === "style" || (LISTENER.test(key) && !FOCUS_LISTENER.test(key))
+    if (onLabel) label[key] = value
+    else control[key] = value
+  }
+  return { label, control }
+})
+
+const field = useFieldControl(() => ({
+  wrapped: false,
+  id: props.id,
+  required: isAttrOn(rest.value.required),
+  disabled: props.disabled,
+}))
+const descriptionId = `${useId()}-description`
+const describedBy = computed(() =>
+  mergeDescribedBy(rest.value["aria-describedby"], props.description ? descriptionId : undefined, field.value.describedBy),
+)
+
 usePaletteControl({ label: () => props.label, disabled: () => field.value.disabled || pending.value, editorProps: () => ({ action: undefined, 'onUpdate:modelValue': onUpdate, onChange: undefined }) })
 </script>
 
 <template>
   <label
     :class="rootClass"
-    v-bind="rest">
+    v-bind="parts.label">
     <CheckboxRoot
+      v-bind="parts.control"
       :id="field.id"
       :name="name"
       :model-value="indeterminate ? 'indeterminate' : modelValue"

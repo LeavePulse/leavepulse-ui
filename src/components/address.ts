@@ -1,3 +1,5 @@
+import { clamp } from "../composables/clamp"
+
 /*
  * Postal-address types, tile maths and the pluggable geocoder behind
  * LpAddressInput / LpMapPicker.
@@ -232,7 +234,7 @@ export const MAX_LATITUDE = 85.05112878
 
 export function project(lat: number, lon: number, zoom: number, tileSize = 256) {
   const size = tileSize * 2 ** zoom
-  const clamped = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, lat))
+  const clamped = clamp(lat, -MAX_LATITUDE, MAX_LATITUDE)
   const sin = Math.sin((clamped * Math.PI) / 180)
   return {
     x: ((lon + 180) / 360) * size,

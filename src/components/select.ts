@@ -4,6 +4,20 @@
  */
 
 /**
+ * Drop the oldest entries past `limit`, never one of `keep`. For a cache that
+ * must outlive the list it was read from, in a long session over a big catalog.
+ */
+export function evictOldest<K, V>(cache: Map<K, V>, keep: ReadonlySet<K>, limit: number): void {
+  let excess = cache.size - limit
+  for (const key of cache.keys()) {
+    if (excess <= 0) return
+    if (keep.has(key)) continue
+    cache.delete(key)
+    excess--
+  }
+}
+
+/**
  * How many chips of a multiple pick fit in one row before the rest collapse
  * into a "+N" chip.
  *

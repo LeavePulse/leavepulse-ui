@@ -1,4 +1,5 @@
 import { computed, type MaybeRefOrGetter, toValue } from "vue"
+import { isElement } from "./useView"
 
 /*
  * Cursor- and IME-safe input filtering + pattern validation for native <input>.
@@ -111,12 +112,14 @@ export function useInputFilter(options: UseInputFilterOptions = {}) {
   function sanitize(target: EventTarget | null): boolean {
     const re = restrict.value
     if (!re) return false
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return false
-    const { text, caret } = stripDisallowed(target.value, re, target.selectionStart ?? target.value.length)
-    if (text === target.value) return false
-    target.value = text
+    // By tag: a field of an LpFrame is no instance of this window's classes.
+    if (!isElement(target) || !["INPUT", "TEXTAREA"].includes(target.tagName)) return false
+    const field = target as HTMLInputElement | HTMLTextAreaElement
+    const { text, caret } = stripDisallowed(field.value, re, field.selectionStart ?? field.value.length)
+    if (text === field.value) return false
+    field.value = text
     try {
-      target.setSelectionRange(caret, caret)
+      field.setSelectionRange(caret, caret)
     } catch {
       // Input types without a selection (number, email) cannot place a caret.
     }

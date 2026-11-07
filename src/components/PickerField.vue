@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAttrs } from "vue"
-import { useFieldBlur, type useFieldControl } from "../composables/useField"
+import { mergeDescribedBy, useFieldBlur, type useFieldControl } from "../composables/useField"
 import { mergeClass } from "../composables/useMergedClass"
 import { PICKER_CLEAR, PICKER_PRESET, PICKER_PRESETS, PICKER_SIZE, PICKER_TRIGGER, pickerTone } from "./calendar"
 import LpIcon from "./LpIcon.vue"
@@ -36,7 +36,7 @@ const attrs = useAttrs()
           type="button"
           :disabled="field.disabled"
           :aria-invalid="field.invalid || undefined"
-          :aria-describedby="field.describedBy"
+          :aria-describedby="mergeDescribedBy(attrs['aria-describedby'], field.describedBy)"
           :class="[PICKER_TRIGGER, PICKER_SIZE[size], pickerTone(field.invalid)]"
         >
           <LpIcon :name="icon" :size="16" class="shrink-0 text-muted" />

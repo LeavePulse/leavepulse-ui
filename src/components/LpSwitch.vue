@@ -9,7 +9,7 @@ export default { inheritAttrs: false }
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { computed, useId, useSlots } from "vue"
 import { SwitchRoot, SwitchThumb } from "reka-ui"
-import { useFieldControl } from "../composables/useField"
+import { mergeDescribedBy, useFieldControl } from "../composables/useField"
 import { useOptimisticToggle } from "../composables/useOptimisticToggle"
 import LpLoader from "./LpLoader.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -49,6 +49,8 @@ const emit = defineEmits<{
 
 const { pending, set } = useOptimisticToggle(() => props.action, emit)
 
+// A given default slot counts as the name whether or not it renders anything:
+// a slot that may come out empty leaves the switch unnamed, so pass `aria-label`.
 const slots = useSlots()
 const labelled = computed(() => Boolean(props.label || props.description || slots.default))
 
@@ -75,8 +77,8 @@ const field = useFieldControl(() => ({
   disabled: props.disabled,
 }))
 const descriptionId = `${useId()}-description`
-const describedBy = computed(
-  () => [props.description && labelled.value ? descriptionId : "", field.value.describedBy ?? ""].filter(Boolean).join(" ") || undefined,
+const describedBy = computed(() =>
+  mergeDescribedBy(rest.value["aria-describedby"], props.description && labelled.value ? descriptionId : undefined, field.value.describedBy),
 )
 
 function onUpdate(value: boolean) {

@@ -32,11 +32,11 @@ export interface DatePickerLabels extends Record<string, string> {
  * week") and, unlike the range picker's, are opt-in, so forms that already use
  * the picker keep the plain calendar they were laid out around.
  */
-import { computed, ref, useAttrs } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { computed, ref } from "vue"
+import { useAttrsField } from "../composables/useField"
 import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
-import type { CalendarLabels } from "./calendar"
+import type { CalendarLabels, PickerFieldProps } from "./calendar"
 import { type DatePreset, dayAllowed, defaultDatePresets } from "./dateRange"
 import LpCalendar from "./LpCalendar.vue"
 import LpIcon from "./LpIcon.vue"
@@ -44,7 +44,7 @@ import PickerField from "./PickerField.vue"
 import LpTimeField from "./LpTimeField.vue"
 
 const props = withDefaults(
-  defineProps<{
+  defineProps<PickerFieldProps & {
     /** Selected date "YYYY-MM-DD" (v-model). */
     modelValue?: string
     placeholder?: string
@@ -58,12 +58,6 @@ const props = withDefaults(
      * Tomorrow, In a week); a list replaces it. Off by default.
      */
     presets?: DatePreset[] | boolean
-    clearable?: boolean
-    disabled?: boolean
-    invalid?: boolean
-    size?: "sm" | "md" | "lg"
-    /** Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser. */
-    locale?: string
     /** Intl format for the displayed date. */
     format?: Intl.DateTimeFormatOptions
     /** Also pick a minute; the model becomes "YYYY-MM-DDTHH:mm". */
@@ -137,13 +131,7 @@ function clear() {
   emit("update:modelValue", undefined)
 }
 
-const attrs = useAttrs()
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid,
-  disabled: props.disabled,
-}))
+const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid, disabled: props.disabled }))
 const text = useLabels<DatePickerLabels>(
   "datePicker",
   {

@@ -10,6 +10,8 @@ export type AutocompleteLabels = {
 </script>
 
 <script setup lang="ts">
+import IconCloseButton from "./IconCloseButton.vue"
+import { CONTROL_SIZE } from "./controlSize"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Free-text autocomplete — a text field that suggests as you type but never
@@ -33,11 +35,11 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui"
-import { computed, nextTick, ref, useAttrs, useId, watch } from "vue"
-import { useFieldControl } from "../composables/useField"
+import { computed, nextTick, ref, useId, watch } from "vue"
+import { useAttrsField, mergeDescribedBy } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
-import { CLOSE_ICON, OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
+import { CLOSE_ICON, OPTION_ITEM, optionStagger, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
@@ -115,18 +117,12 @@ const text = computed<string>({
 
 // class/style lay out the whole control; every other attr (name, autocomplete,
 // @blur, @keydown…) belongs to the text <input>.
-const attrs = useAttrs()
 const inputAttrs = computed(() => {
   const { class: _c, style: _s, ...rest } = attrs
   return rest
 })
 
-const field = useFieldControl(() => ({
-  wrapped: false,
-  id: typeof attrs.id === "string" ? attrs.id : undefined,
-  invalid: props.invalid || isInvalid(props.modelValue),
-  disabled: props.disabled,
-}))
+const { attrs, field } = useAttrsField(() => ({ invalid: props.invalid || isInvalid(props.modelValue), disabled: props.disabled }))
 const isInvalidState = computed(() => field.value.invalid)
 const labels = useLabels<AutocompleteLabels>(
   "autocomplete",
@@ -179,7 +175,7 @@ watch(
 // reader is told who it is through a description.
 const selectedId = useId()
 const describedBy = computed(() =>
-  [field.value.describedBy, showSelected.value ? selectedId : undefined].filter(Boolean).join(" ") || undefined,
+  mergeDescribedBy(attrs["aria-describedby"], field.value.describedBy, showSelected.value ? selectedId : undefined),
 )
 
 // Threshold met AND something to show → the list is allowed to open.
@@ -210,11 +206,7 @@ function onOpenChange(next: boolean) {
 
 const hasValue = computed(() => (props.modelValue ?? "").length > 0)
 
-const anchorSize = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-}
+const anchorSize = CONTROL_SIZE
 
 function onInput(event: Event) {
   filterInput(event)
@@ -373,20 +365,13 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
           </span>
         </Transition>
       </div>
-      <button
+      <IconCloseButton
         v-if="clearable && hasValue && !field.disabled"
-        type="button"
-        class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
-        :aria-label="labels.clear"
+        inline
+        :label="labels.clear"
         @pointerdown.prevent
         @click="clear"
-      >
-        <LpIcon
-          name="lucide:x"
-          :size="16"
-          :class="CLOSE_ICON"
-        />
-      </button>
+      />
     </ComboboxAnchor>
 
     <!-- A press on the list keeps focus in the field. Otherwise the field
@@ -397,9 +382,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       <ComboboxContent
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
-        :collision-padding="8"
-        position="popper"
-        :side-offset="6"
+        v-bind="COMBOBOX_PANEL"
         :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"
         @open-auto-focus.prevent
         @mousedown.prevent
