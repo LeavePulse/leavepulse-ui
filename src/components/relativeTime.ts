@@ -68,6 +68,18 @@ function formatterFor(locale: string | undefined, style: Intl.RelativeTimeFormat
   return f
 }
 
+/*
+ * Some locales' narrow form drops the words for past and future and keeps a
+ * bare sign: ru narrow is "-4 мин" and "+3 ч", where short says "4 мин. назад"
+ * and "через 3 ч". A sign reads as arithmetic, not as "ago", so such a text
+ * is said in the short form instead.
+ */
+const SIGNED = /^[-+\u2212]/
+function say(fmt: Intl.RelativeTimeFormat, locale: string | undefined, style: Intl.RelativeTimeFormatStyle, value: number, unit: Intl.RelativeTimeFormatUnit): string {
+  const text = fmt.format(value, unit)
+  return style === "narrow" && SIGNED.test(text) ? formatterFor(locale, "short").format(value, unit) : text
+}
+
 /** Never sleep longer than this: a laptop waking from sleep should not show "2 h ago" for an hour. */
 const MAX_REFRESH = HOUR
 const MIN_REFRESH = SECOND
@@ -111,7 +123,7 @@ export function formatRelativeTime(
   const unitChange = diff < 0 ? step.until - abs : index > 0 ? abs - SCALE[index - 1].until : Infinity
   const refreshIn = Math.min(diff < 0 ? boundary - abs : abs - boundary, unitChange)
 
-  return { text: fmt.format(value, step.unit), unit: step.unit, value, refreshIn: clampRefresh(refreshIn) }
+  return { text: say(fmt, locale, style, value, step.unit), unit: step.unit, value, refreshIn: clampRefresh(refreshIn) }
 }
 
 function clampRefresh(ms: number): number {

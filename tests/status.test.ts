@@ -151,3 +151,18 @@ describe("formatRelativeTime", () => {
     expect(formatRelativeTime("not a date", now, en).text).toBe("")
   })
 })
+
+describe("formatRelativeTime narrow", () => {
+  const now = Date.UTC(2026, 10, 7, 12)
+  test("a locale whose narrow form is a bare sign says it in the short form instead", () => {
+    const past = formatRelativeTime(now - 4 * 60_000, now, { locale: "ru", style: "narrow" }).text
+    const future = formatRelativeTime(now + 3 * 3_600_000, now, { locale: "ru", style: "narrow" }).text
+    expect(past).not.toMatch(/^[-+−]/)
+    expect(past).toContain("назад")
+    expect(future).toContain("через")
+  })
+  test("a narrow form that keeps its words stays narrow", () => {
+    expect(formatRelativeTime(now - 4 * 60_000, now, { locale: "en", style: "narrow" }).text).toBe("4m ago")
+    expect(formatRelativeTime(now - 4 * 60_000, now, { locale: "uk", style: "narrow" }).text).toBe("4 хв тому")
+  })
+})
