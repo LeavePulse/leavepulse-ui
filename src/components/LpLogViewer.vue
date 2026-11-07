@@ -14,6 +14,7 @@ export default { inheritAttrs: false }
  * viewport element and re-emits the native scroll event — exactly what tailing
  * needs.
  */
+import { clamp } from "../composables/clamp"
 import {
   computed,
   nextTick,
@@ -38,7 +39,27 @@ import LpScrollArea from "./LpScrollArea.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 import { useResizeObserver } from "../composables/useResizeObserver"
+import { inTextField } from "../composables/textEntry"
+import { isElement, nodeWindow } from "../composables/useView"
 import { countLevels, matchPositions, ringWindow, stepMatch } from "./logSearch"
+import { downloadFile } from "./exportData"
+import LpLogInspector from "./LpLogInspector.vue"
+import {
+  compilePattern,
+  exportLines,
+  findIds,
+  groupRepeats,
+  inTimeRange,
+  messageParts,
+  nearestByTime,
+  patternPositions,
+  rowSpan,
+  termRanges,
+  type LogExportFormat,
+  type LogId,
+  type LogTimeRange,
+  type MessagePart,
+} from "./logTools"
 import { TONES, toneLook, type ToneName } from "./tone"
 
 export interface LogViewerLabels {
@@ -66,6 +87,13 @@ export interface LogViewerLabels {
   matchCount: string
   noMatches: string
   levels: string
+  /** Toggle for reading the search as a regular expression. */
+  regex: string
+  invalidPattern: string
+  sources: string
+  groupRepeats: string
+  download: string
+  copySelection: string
 }
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "success"
@@ -157,6 +185,29 @@ const props = withDefaults(
      * not pick them again every time.
      */
     persist?: string
+    /**
+     * Adds to the toolbar what reading a busy stream calls for: a regular
+     * expression toggle, source chips, folding repeats, and copy and download
+     * of the selection. Each is also its own model or prop.
+     */
+    tools?: boolean
+    /** Only lines inside this span (inclusive). A line with no readable time stays. */
+    timeRange?: LogTimeRange
+    /**
+     * Fold every repeat of a message into its first line with a count, wherever
+     * they sit: numbers, ids and hashes are blanked first, so "job 41 failed"
+     * and "job 42 failed" count as one. Stronger than `compact`, which keeps
+     * chronology by folding runs of the same text only.
+     */
+    group?: boolean
+    /** Make trace, request, span and correlation ids in a message clickable (`id-click`). */
+    linkIds?: boolean
+    /** Click selects a line, Shift+click a range (`v-model:selection`, `select`). */
+    selectable?: boolean
+    /** Show the selected line in an LpLogInspector under the stream. Needs `selectable`. */
+    inspector?: boolean
+    /** File name for a download, without its extension. */
+    fileName?: string
     labels?: Partial<LogViewerLabels>
   }>(),
   {
@@ -180,12 +231,25 @@ const emit = defineEmits<{
    * fires once. The viewer keeps the scroll anchored when the page prepends.
    */
   (e: "reach-top"): void
+  /** A line was selected: the link to whatever else on the page follows it. */
+  (e: "select", payload: { line: LogLine; index: number }): void
+  /** A correlation id was clicked (`linkIds`). */
+  (e: "id-click", payload: { kind: LogId["kind"]; value: string; line: LogLine }): void
 }>()
 
 /** The toolbar's search term. Without the toolbar, `highlight` is the term. */
 const query = defineModel<string>("search", { default: "" })
 /** Levels to show. Empty shows every level. */
 const levels = defineModel<LogLevel[]>("levels", { default: () => [] })
+/** Read the search as a regular expression. */
+const regex = defineModel<boolean>("regex", { default: false })
+/** Sources to show. Empty shows every source. */
+const sources = defineModel<string[]>("sources", { default: () => [] })
+/** The selected span as original line numbers, first to last. */
+const selection = defineModel<[number, number] | null>("selection", { default: null })
+/** Fold repeats; the prop sets it, the toolbar's toggle flips it. */
+const grouped = ref(!!props.group)
+watch(() => props.group, (on) => (grouped.value = !!on))
 const storedLevels = usePersisted<string[] | null>(
   () => props.persist && `lp-log-viewer:${props.persist}:levels`,
   null,
@@ -221,6 +285,12 @@ const text = useLabels<LogViewerLabels>(
     matchCount: "{current} / {total}",
     noMatches: "No matches",
     levels: "Levels",
+    regex: "Regular expression",
+    invalidPattern: "Invalid pattern",
+    sources: "Sources",
+    groupRepeats: "Group repeats",
+    download: "Download",
+    copySelection: "Copy selection",
   },
   () => props.labels,
 )
@@ -354,12 +424,9 @@ function freeze(): boolean {
   // page and swallowing it would break them all.
   if (!hovered.value && !focusWithin()) return false
   if (frozen.value) return true
-  // Snapshotted by reference, not copied: the array the consumer hands over is
-  // replaced wholesale on every update, so holding the old one is enough — and
-  // a copy of ten thousand lines on every keypress is not.
-  // A capped stream is usually one array pushed into in place, which a
-  // reference would not hold still; its window is small enough to copy.
-  frozenLines.value = props.maxLines ? props.lines.slice(-props.maxLines) : props.lines
+  // Copied, whatever the cap: a stream pushed into in place would move under a
+  // reference. This runs once per hold, not per keypress or per line.
+  frozenLines.value = props.maxLines ? props.lines.slice(-props.maxLines) : props.lines.slice()
   frozen.value = true
   return true
 }
@@ -382,7 +449,7 @@ const hovered = ref(false)
 
 function focusWithin() {
   const el = root.value
-  return !!el && el.contains(document.activeElement)
+  return !!el && el.contains(el.ownerDocument.activeElement)
 }
 
 // `when` rather than a bare decline: several viewers on one page all bind these
@@ -401,13 +468,21 @@ function onKeyup(event: KeyboardEvent) {
   if (event.key === "Control" || event.key === "Meta") thaw()
 }
 
+// Inside an LpFrame the keyup lands in whichever window holds the focus: the
+// frame's, or the page's, which is where a hold over the frame can start.
+let keyWindows: Window[] = []
 onMounted(() => {
-  window.addEventListener("keyup", onKeyup)
-  window.addEventListener("blur", thaw)
+  keyWindows = [...new Set<Window>([window, root.value ? nodeWindow(root.value) : window])]
+  for (const win of keyWindows) {
+    win.addEventListener("keyup", onKeyup as EventListener)
+    win.addEventListener("blur", thaw)
+  }
 })
 onBeforeUnmount(() => {
-  window.removeEventListener("keyup", onKeyup)
-  window.removeEventListener("blur", thaw)
+  for (const win of keyWindows) {
+    win.removeEventListener("keyup", onKeyup as EventListener)
+    win.removeEventListener("blur", thaw)
+  }
 })
 
 const parsedLines = computed<LogLine[]>(() =>
@@ -418,13 +493,28 @@ const parsedLines = computed<LogLine[]>(() =>
 // truthful when filtering, plus a `count` for compact mode (1 unless folded).
 // With filterMatches + a search term, keep only lines whose message contains it
 // (case-insensitive); otherwise pass everything.
+const compiled = computed(() => (regex.value && term.value ? compilePattern(term.value) : null))
+const pattern = computed(() => compiled.value?.pattern ?? null)
+const patternFailed = computed(() => !!compiled.value?.error)
+
 const visibleLines = computed<{ line: LogLine; n: number; count: number }[]>(() => {
   const needle = props.filterMatches ? term.value.toLowerCase() : ""
+  const wantedSources = sources.value.length ? new Set(sources.value) : null
+  const inRegex = regex.value && !!needle
   const shown = levels.value.length ? new Set<LogLevel>(levels.value) : null
   const filtered = parsedLines.value
     .map((line, n) => ({ line, n }))
     .filter(({ line }) => !shown || shown.has(line.level ?? "info"))
-    .filter(({ line }) => !needle || matchPositions([line], needle).length > 0)
+    .filter(({ line }) => !wantedSources || (line.source !== undefined && wantedSources.has(line.source)))
+    .filter(({ line }) => inTimeRange(line.time, props.timeRange))
+    .filter(({ line }) => inRegex || !needle || matchPositions([line], needle).length > 0)
+
+  if (inRegex) {
+    const found = pattern.value ? patternPositions(filtered.map((row) => row.line), pattern.value) : []
+    const kept = found.map((i) => filtered[i])
+    return grouped.value ? groupRepeats(kept) : kept.map((row) => ({ ...row, count: 1 }))
+  }
+  if (grouped.value) return groupRepeats(filtered)
 
   if (!props.compact) return filtered.map((row) => ({ ...row, count: 1 }))
 
@@ -470,6 +560,13 @@ function lineKey(n: number): number {
 const LEVEL_ORDER: LogLevel[] = ["trace", "debug", "info", "success", "warn", "error", "fatal"]
 const levelCounts = computed(() => countLevels<LogLevel>(parsedLines.value, "info"))
 const presentLevels = computed(() => LEVEL_ORDER.filter((l) => levelCounts.value.has(l)))
+const presentSources = computed(() => [...new Set(parsedLines.value.flatMap((l) => (l.source ? [l.source] : [])))].sort())
+
+function toggleSource(source: string) {
+  sources.value = sources.value.includes(source)
+    ? sources.value.filter((s) => s !== source)
+    : [...sources.value, source]
+}
 
 function toggleLevel(level: LogLevel) {
   levels.value = levels.value.includes(level)
@@ -477,7 +574,11 @@ function toggleLevel(level: LogLevel) {
     : [...levels.value, level]
 }
 
-const matches = computed(() => matchPositions(visibleLines.value.map((r) => r.line), term.value))
+const matches = computed(() => {
+  const rows = visibleLines.value.map((r) => r.line)
+  if (!regex.value) return matchPositions(rows, term.value)
+  return pattern.value ? patternPositions(rows, pattern.value) : []
+})
 const current = ref(-1)
 const currentRow = computed(() => {
   const pos = matches.value[current.value]
@@ -492,6 +593,7 @@ watch(matches, (list) => {
 
 const matchLabel = computed(() => {
   if (!term.value) return ""
+  if (patternFailed.value) return text.value.invalidPattern
   const total = matches.value.length
   if (!total) return text.value.noMatches
   return text.value.matchCount
@@ -542,10 +644,62 @@ useHotkeys(() => [
   { key: "f3", shift: true, allowInInput: true, when: searching, handler: () => step(-1) },
 ])
 
+// ── selection, export, jump ─────────────────────────────────────────
+let selectAnchor: number | null = null
+
+function onRowClick(event: MouseEvent) {
+  if (!props.selectable || !isElement(event.target)) return
+  // The end of a drag across text is the user copying it, not choosing a line.
+  if (nodeWindow(event.target).getSelection()?.isCollapsed === false) return
+  if (event.target.closest("button")) return
+  const el = event.target.closest<HTMLElement>("[data-log-row]")
+  const n = el ? Number(el.dataset.logRow) : Number.NaN
+  const line = parsedLines.value[n]
+  if (!line) return
+  const range = event.shiftKey && selectAnchor !== null
+  if (!range) selectAnchor = n
+  selection.value = range ? rowSpan(selectAnchor as number, n) : [n, n]
+  emit("select", { line, index: n })
+}
+
+const isSelected = (n: number) => !!selection.value && n >= selection.value[0] && n <= selection.value[1]
+const selectedLine = computed(() => (selection.value ? parsedLines.value[selection.value[0]] : undefined))
+
+// What a selection covers, or everything shown when nothing is selected. Hidden
+// lines inside the span stay out: what is exported is what was on screen.
+function chosenLines(): LogLine[] {
+  const span = selection.value
+  const rows = visibleLines.value.filter((row) => !span || (row.n >= span[0] && row.n <= span[1]))
+  return rows.map((row) => row.line)
+}
+
+function copySelection() {
+  return copy(exportLines(chosenLines(), "text", lineText))
+}
+
+function downloadSelection(format: LogExportFormat = "text") {
+  const extension = format === "ndjson" ? "ndjson" : "log"
+  downloadFile(`${props.fileName ?? "logs"}.${extension}`, exportLines(chosenLines(), format, lineText), undefined, root.value?.ownerDocument)
+}
+
+/** Scrolls to the line closest to `time` and selects it. False when no line has a readable time. */
+function jumpToTime(time: number | string): boolean {
+  const position = nearestByTime(visibleLines.value.map((row) => row.line), time)
+  if (position < 0) return false
+  const { n } = visibleLines.value[position]
+  selection.value = [n, n]
+  pinned.value = false
+  nextTick(() => revealMatch(position))
+  return true
+}
+
 defineExpose({
   next: () => step(1),
   previous: () => step(-1),
   focusSearch: () => searchEl.value?.focus(),
+  jumpToTime,
+  copySelection,
+  downloadSelection,
 })
 
 // True when filtering has emptied an otherwise non-empty stream.
@@ -642,11 +796,12 @@ function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
 
 // Split a message around the (case-insensitive) highlight term so we can wrap
 // matches in <mark> without v-html. Empty/absent term → single plain part.
-interface Part {
-  text: string
-  hit: boolean
-}
+type Part = MessagePart
 function splitHighlight(message: string): Part[] {
+  if (props.linkIds || regex.value) {
+    const hits = regex.value ? (pattern.value?.ranges(message) ?? []) : termRanges(message, term.value)
+    return messageParts(message, hits, props.linkIds ? findIds(message) : [])
+  }
   if (!term.value) return [{ text: message, hit: false }]
   const parts: Part[] = []
   const lower = message.toLowerCase()
@@ -859,7 +1014,7 @@ function rideToBottom() {
   const ease = tokenEase("ease-emphasized")
   const started = performance.now()
   const step = (now: number) => {
-    const t = Math.min(1, Math.max(0, (now - started) / ms))
+    const t = clamp((now - started) / ms, 0, 1)
     el.scrollTop = from + (end() - from) * ease(t)
     glide = t < 1 ? requestAnimationFrame(step) : 0
   }
@@ -897,27 +1052,31 @@ function onWheel(event: WheelEvent) {
 const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"])
 
 function onKeydown(event: KeyboardEvent) {
-  const field = event.target instanceof HTMLElement && event.target.closest("input, textarea, [contenteditable]")
-  if (!field && UPWARD_KEYS.has(event.key)) leaveTail()
+  if (!inTextField(event.target) && UPWARD_KEYS.has(event.key)) leaveTail()
 }
+
+let holdWindow: Window | null = null
 
 function release() {
   holding = false
-  window.removeEventListener("pointerup", release)
-  window.removeEventListener("pointercancel", release)
-  window.removeEventListener("touchend", release)
+  holdWindow?.removeEventListener("pointerup", release)
+  holdWindow?.removeEventListener("pointercancel", release)
+  holdWindow?.removeEventListener("touchend", release)
+  holdWindow = null
 }
 
 function hold(event: Event) {
   // The scroll area's root, so its scrollbar (a sibling of the viewport)
   // counts, and the toolbar and jump pill above it do not.
   const area = viewport()?.parentElement
-  if (!area || !(event.target instanceof Node) || !area.contains(event.target)) return
+  if (!area || !isElement(event.target) || !area.contains(event.target)) return
   stopGlide()
+  release()
   holding = true
-  window.addEventListener("pointerup", release)
-  window.addEventListener("pointercancel", release)
-  window.addEventListener("touchend", release)
+  holdWindow = nodeWindow(area)
+  holdWindow.addEventListener("pointerup", release)
+  holdWindow.addEventListener("pointercancel", release)
+  holdWindow.addEventListener("touchend", release)
 }
 
 function scrollToBottom() {
@@ -1141,6 +1300,43 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           <span class="font-normal tabular-nums text-muted">{{ levelCounts.get(level) }}</span>
         </button>
       </div>
+      <template v-if="tools">
+        <button
+          type="button"
+          class="rounded-xs px-1.5 py-0.5 font-mono text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="regex ? 'bg-surface-soft text-ink' : 'text-muted hover:text-ink'"
+          :aria-label="text.regex"
+          :aria-pressed="regex"
+          @click="regex = !regex"
+        >.*</button>
+        <button
+          type="button"
+          class="rounded-xs p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :class="grouped ? 'bg-surface-soft text-ink' : 'text-muted hover:text-ink'"
+          :aria-label="text.groupRepeats"
+          :aria-pressed="grouped"
+          @click="grouped = !grouped"
+        >
+          <LpIcon name="lucide:layers" :size="14" />
+        </button>
+        <button type="button" class="rounded-xs p-1 text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring" :aria-label="text.copySelection" @click="copySelection">
+          <LpIcon name="lucide:copy" :size="14" />
+        </button>
+        <button type="button" class="rounded-xs p-1 text-muted outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring" :aria-label="text.download" @click="downloadSelection()">
+          <LpIcon name="lucide:download" :size="14" />
+        </button>
+        <div v-if="presentSources.length > 1" role="group" :aria-label="text.sources" class="flex flex-wrap items-center gap-1">
+          <button
+            v-for="source in presentSources"
+            :key="source"
+            type="button"
+            class="rounded-pill border px-2 py-0.5 text-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+            :class="sources.includes(source) ? 'border-line-strong bg-surface-soft text-ink' : 'border-line text-muted hover:text-ink'"
+            :aria-pressed="sources.includes(source)"
+            @click="toggleSource(source)"
+          >{{ source }}</button>
+        </div>
+      </template>
     </div>
 
     <!-- `instant`: this viewer decides for itself when a jump animates (see
@@ -1196,6 +1392,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
         :is="virtualise ? 'ol' : TransitionGroup"
         v-bind="virtualise ? {} : transitionProps"
         class="py-1"
+        @click="onRowClick"
         @contextmenu="onRowContext"
         @pointerdown="onRowPointerDown"
       >
@@ -1210,8 +1407,9 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
           :key="lineKey(n)"
           :data-log-row="n"
           class="group relative flex items-start gap-0 px-0 leading-5 transition-colors hover:bg-surface-soft/60"
-          :class="[metaFor(line.level).sel, n === currentRow ? 'bg-accent/15' : '', isFresh(n) ? 'lp-log-row-fresh' : '']"
+          :class="[metaFor(line.level).sel, n === currentRow ? 'bg-accent/15' : '', isFresh(n) ? 'lp-log-row-fresh' : '', isSelected(n) ? 'bg-brand/15' : '']"
           :aria-current="n === currentRow ? 'true' : undefined"
+          :data-selected="isSelected(n) ? '' : undefined"
         >
           <!-- level rail -->
           <!-- Level rail: absolutely positioned so it spans the FULL row height
@@ -1262,8 +1460,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
               v-for="(part, p) in splitHighlight(virtualise ? line.message.replace(/\r?\n/g, ' ↵ ') : line.message)"
               :key="p"
             >
+              <button
+                v-if="part.id"
+                type="button"
+                class="rounded-xs text-brand underline outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                @click="emit('id-click', { kind: part.id.kind, value: part.id.value, line })"
+              >{{ part.text }}</button>
               <mark
-                v-if="part.hit"
+                v-else-if="part.hit"
                 class="rounded-xs bg-accent/30 text-ink"
               >{{ part.text }}</mark>
               <template v-else>{{ part.text }}</template>
@@ -1295,6 +1499,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
       </LpContextMenu>
       </template>
     </LpScrollArea>
+
+    <LpLogInspector
+      v-if="inspector && selectedLine"
+      :message="selectedLine.message"
+      class="max-h-64 overflow-auto border-t border-line p-3"
+    />
 
     <!-- jump-to-latest: shown only when tailing and scrolled away. The
          Transition rides an outer wrapper so its transform/opacity don't fight
