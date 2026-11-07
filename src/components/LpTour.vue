@@ -67,7 +67,7 @@ import { hints } from "../composables/useHints"
 import { useHotkeys } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
 import { useMediaQuery } from "../composables/useMediaQuery"
-import { useView, viewDocument, viewWindow } from "../composables/useView"
+import { isElement, useView, viewDocument, viewWindow } from "../composables/useView"
 import { scrollToElement } from "../composables/scroll"
 import { PANEL_SURFACE } from "./dropdown"
 import TourCard from "./TourCard.vue"
@@ -160,7 +160,7 @@ const reference = {
 }
 const last = computed(() => index.value >= props.steps.length - 1)
 const progress = computed(() => labels.value.progress.replace("{n}", String(index.value + 1)).replace("{total}", String(props.steps.length)))
-const smooth = () => !prefersReducedMotion()
+const smooth = () => !prefersReducedMotion(win())
 
 function resolve(raw: TourStep["target"]): Element | null {
   if (!raw) return null
@@ -194,7 +194,7 @@ function controlRadius(): number {
   const probe = doc().createElement("div")
   probe.style.cssText = "position:absolute;visibility:hidden;border-top-left-radius:var(--radius-control)"
   doc().body.append(probe)
-  const px = parseFloat(getComputedStyle(probe).borderTopLeftRadius)
+  const px = parseFloat(win().getComputedStyle(probe).borderTopLeftRadius)
   probe.remove()
   return Number.isFinite(px) ? px : 8
 }
@@ -241,7 +241,7 @@ function glideTo(el: Element | null) {
   target.value = el
   gliding.value = true
   clearTimeout(glide)
-  glide = window.setTimeout(() => (gliding.value = false), durationToken("duration-medium") + 40)
+  glide = window.setTimeout(() => (gliding.value = false), durationToken("duration-medium", undefined, doc()) + 40)
 }
 
 function measure() {
@@ -367,12 +367,14 @@ function dismiss() {
 
 function onTargetClick(event: Event) {
   if (!step.value?.try || !target.value) return
-  if (event.target instanceof Node && target.value.contains(event.target)) setTimeout(next, TRY_SETTLE_MS)
+  if (isElement(event.target) && target.value.contains(event.target)) setTimeout(next, TRY_SETTLE_MS)
 }
 
 watch(
   open,
   (value) => {
+    // The server has no page to walk, and this runs there on setup.
+    if (typeof document === "undefined") return
     if (value) {
       direction = 1
       box.value = null

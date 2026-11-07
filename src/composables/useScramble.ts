@@ -65,15 +65,26 @@ export interface UseScramble {
   settle: () => void
 }
 
+const SEED_MULTIPLIER = 16807
+const SEED_MODULUS = 2147483647
+
+/* A small Lehmer generator: the same numbers in every render. */
+function seededRandom(seed = 1): () => number {
+  return () => (seed = (seed * SEED_MULTIPLIER) % SEED_MODULUS) / SEED_MODULUS
+}
+
 export function useScramble(source: MaybeRefOrGetter<string>, options: UseScrambleOptions = {}): UseScramble {
   const random = options.random ?? Math.random
+  // The masked first frame is drawn on the server too, so it may not differ
+  // from the client's: it rolls a fixed sequence, the animation a live one.
+  const firstRoll = options.random ?? seededRandom()
   const tick = options.tick ?? 50
   const glyphs = () => toValue(options.glyphs) || SCRAMBLE_GLYPHS
 
   const initial = toValue(source)
   const cells = shallowRef<ScrambleFrameCell[]>(
     options.start === "masked"
-      ? scrambleFrame(planScramble(initial, initial, { duration: 1, keep: options.keep }, random), 0, random, glyphs())
+      ? scrambleFrame(planScramble(initial, initial, { duration: 1, keep: options.keep }, firstRoll), 0, firstRoll, glyphs())
       : settledCells(initial),
   )
   const running = shallowRef(false)

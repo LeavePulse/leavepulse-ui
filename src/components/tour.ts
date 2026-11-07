@@ -1,3 +1,4 @@
+import { nodeWindow } from "../composables/realm"
 /*
  * Geometry for LpTour, kept out of the component so it can be tested without a
  * DOM: where the spotlight hole goes and what the dim panels around it cover.
@@ -71,8 +72,9 @@ export function holeClip(hole: Box | null, viewport: Size, radius: number): stri
  */
 export function openContextMenu(el: Element): () => void {
   const box = el.getBoundingClientRect()
+  const win = nodeWindow(el)
   el.dispatchEvent(
-    new MouseEvent("contextmenu", {
+    new win.MouseEvent("contextmenu", {
       bubbles: true,
       cancelable: true,
       button: 2,
@@ -83,7 +85,7 @@ export function openContextMenu(el: Element): () => void {
   return () => {
     const outside = { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }
     const body = el.ownerDocument.body
-    body.dispatchEvent(new PointerEvent("pointerdown", outside))
-    body.dispatchEvent(new PointerEvent("pointerup", outside))
+    body.dispatchEvent(new win.PointerEvent("pointerdown", outside))
+    body.dispatchEvent(new win.PointerEvent("pointerup", outside))
   }
 }

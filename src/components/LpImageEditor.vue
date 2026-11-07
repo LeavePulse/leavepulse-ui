@@ -175,6 +175,8 @@ watch(
   () => props.file,
   async (file) => {
     revoke()
+    // Decoding needs the browser; on the server the editor renders empty.
+    if (typeof document === "undefined") return
     rotation.value = 0
     zoom.reset()
     failed.value = false
@@ -278,7 +280,7 @@ async function decode(
 const sourceSize = computed(() => {
   const s = source.value
   if (!s) return null
-  return s instanceof HTMLImageElement
+  return "naturalWidth" in s
     ? { width: s.naturalWidth, height: s.naturalHeight }
     : { width: s.width, height: s.height }
 })
@@ -287,7 +289,8 @@ function revoke() {
   if (ownedUrl) URL.revokeObjectURL(ownedUrl)
   ownedUrl = ""
   objectUrl.value = ""
-  if (source.value instanceof ImageBitmap) source.value.close()
+  // By what it can do: the class is absent on the server and differs per window.
+    if (source.value && "close" in source.value) source.value.close()
   source.value = null
 }
 
