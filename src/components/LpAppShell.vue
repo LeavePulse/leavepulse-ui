@@ -7,13 +7,22 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 /*
- * Full application shell: a fixed-height (h-dvh) flex frame holding the side
- * navigation rail, a top header bar, and a single scrollable main region.
+ * Full application shell: the side navigation rail, a top header bar and the
+ * page, which is what scrolls.
+ *
+ * By default the page is the document: it scrolls the window, and the rail,
+ * the header and the bottom bar are sticky beside and above it. So everything
+ * a browser does with a long page keeps working — a full-page screenshot,
+ * printing, the phone's address bar folding away, pull to refresh, a tap on
+ * the status bar. `scroll="region"` keeps the older frame instead: the shell
+ * is exactly the viewport and the page scrolls inside main (LpScrollArea),
+ * which suits a shell embedded in a page of its own. A `fullBleed` page is
+ * held to the viewport in either.
  *
  * It owns the things every product's cabinet/console layout was re-implementing
  * by hand — and getting subtly wrong:
- *  - the rail is full viewport height and never scrolls with the page (only
- *    `main` scrolls, via LpScrollArea), so the sidebar footer stays pinned;
+ *  - the rail is full viewport height and never scrolls with the page, so the
+ *    sidebar footer stays pinned;
  *  - a responsive burger that drives LpSidebar's mobile drawer;
  *  - a default `isActive` (path prefix-match) and a default page title derived
  *    from the nav items, so the header title and the active pill never drift.
@@ -35,7 +44,7 @@ export default { inheritAttrs: false }
  * them is what it always was: `headerCollapse`, `backToTop`, `density`,
  * `pageTransition`, `safeArea`, the #aside region and `adaptiveNav`.
  */
-import { computed, onBeforeUnmount, onMounted, ref, useId, useSlots, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, useSlots, watch } from "vue"
 import { easingToken, durationToken, prefersReducedMotion } from "../composables/easing"
 import { useLabels } from "../composables/useLpConfig"
 import { useScrollMemory } from "../composables/scrollMemory"
@@ -112,6 +121,15 @@ const props = withDefaults(
      * (for a canvas / map / graph that fills the viewport and pans internally).
      */
     fullBleed?: boolean
+    /**
+     * What scrolls. `"document"` (the default): the window, with the rail,
+     * header and bottom bar sticky; a page that filled main with `h-full`
+     * grows with its content now, so a page meant to fill the screen asks for
+     * `min-h-[calc(100dvh-4rem)]` or `fullBleed`. `"region"`: the shell is
+     * the viewport and the page scrolls inside main. Read once: changing it
+     * remounts the page.
+     */
+    scroll?: "document" | "region"
     /** Loading skeleton for the nav. */
     loading?: boolean
     /** Text overrides: the burger's name and the skip link. */
@@ -187,6 +205,7 @@ const props = withDefaults(
     mobileBreakpoint: "lg",
     divider: true,
     contentClass: "mx-auto w-full max-w-6xl",
+    scroll: "document",
     // Unset, not false: an absent boolean would hand the sidebar "expanded"
     // and override the state it remembers.
     compact: undefined,
@@ -268,10 +287,14 @@ const text = useLabels(
  */
 const scrollArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
 const asideArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
+const pageEl = ref<HTMLElement | null>(null)
 const bleedId = `lp-shell-bleed-${useId()}`
 const mounted = ref(false)
 onMounted(() => (mounted.value = true))
 const bleeding = computed(() => props.fullBleed && mounted.value)
+const documentScroll = props.scroll !== "region"
+// The window scrolls the page; a full-bleed page holds the shell to the viewport.
+const windowScrolls = computed(() => documentScroll && !props.fullBleed)
 const mainId = `lp-main-${useId()}`
 
 // Focus instead of following the hash, which a router would treat as a navigation.
@@ -287,10 +310,18 @@ watch(
     headerCollapsed.value = false
   },
 )
+function pageScroller(): HTMLElement | null | undefined {
+  if (bleeding.value) return null
+  if (!documentScroll) return scrollArea.value?.viewportEl
+  return (pageEl.value?.ownerDocument.scrollingElement as HTMLElement | null | undefined) ?? null
+}
 useScrollMemory(
-  () => (bleeding.value ? null : scrollArea.value?.viewportEl),
+  pageScroller,
   () => props.path,
   () => props.hash,
+  "",
+  // The sticky header covers the top of the window; a region starts below it.
+  () => (documentScroll && !bleeding.value ? (headerEl.value?.offsetHeight ?? 0) : 0),
 )
 // The side region keeps its own place on the same address.
 useScrollMemory(
@@ -305,23 +336,61 @@ const scrolledFar = ref(false)
 const backToTopAfter = computed(() => (typeof props.backToTop === "number" ? props.backToTop : BACK_TO_TOP_AFTER_PX))
 let lastTop = 0
 
-function onMainScroll(event: Event) {
+function onScrolled(top: number, max: number) {
   if (!props.headerCollapse && !props.backToTop) return
-  const view = event.target as HTMLElement
-  const top = view.scrollTop
-  if (props.headerCollapse) {
-    headerCollapsed.value = headerCollapsedAfter(headerCollapsed.value, lastTop, top, view.scrollHeight - view.clientHeight)
-  }
+  if (props.headerCollapse) headerCollapsed.value = headerCollapsedAfter(headerCollapsed.value, lastTop, top, max)
   scrolledFar.value = top > backToTopAfter.value
   lastTop = top
+}
+function onMainScroll(event: Event) {
+  const view = event.target as HTMLElement
+  onScrolled(view.scrollTop, view.scrollHeight - view.clientHeight)
+}
+function onWindowScroll() {
+  const view = pageScroller()
+  if (view) onScrolled(view.scrollTop, view.scrollHeight - view.clientHeight)
 }
 
 const headerHidden = computed(() => headerCollapsed.value && !bleeding.value)
 const HEADER_HEIGHT = "4rem"
 const headerHeight = computed(() => (props.safeArea ? `calc(${HEADER_HEIGHT} + env(safe-area-inset-top))` : HEADER_HEIGHT))
 
+/*
+ * A full-bleed page shrinks the document to the viewport, which loses the
+ * place; it is taken back on the way out, unless the page changed in between.
+ *
+ * No scroll-padding-top on the document for the sticky header: with it the
+ * browser counts the header as covered by itself, and a control in it taking
+ * focus scrolled the page (by 350 px, measured). Anchors get the header's
+ * height from scroll memory instead.
+ */
+let bleedTop: number | undefined
+watch(
+  () => props.path,
+  () => (bleedTop = undefined),
+)
+watch(bleeding, (bleed) => {
+  if (!documentScroll) return
+  const view = pageEl.value?.ownerDocument.scrollingElement
+  if (!view) return
+  if (bleed) bleedTop = view.scrollTop
+  else if (bleedTop !== undefined) {
+    const top = bleedTop
+    bleedTop = undefined
+    void nextTick(() => view.scrollTo({ top, behavior: "instant" }))
+  }
+})
+let releaseDocument: (() => void) | undefined
+onMounted(() => {
+  if (!documentScroll || !pageEl.value) return
+  const win = nodeWindow(pageEl.value)
+  win.addEventListener("scroll", onWindowScroll, { passive: true })
+  releaseDocument = () => win.removeEventListener("scroll", onWindowScroll)
+})
+onBeforeUnmount(() => releaseDocument?.())
+
 function scrollToTop() {
-  const view = scrollArea.value?.viewportEl
+  const view = pageScroller()
   if (!view) return
   view.scrollTo({ top: 0, behavior: prefersReducedMotion(nodeWindow(view)) ? "instant" : "smooth" })
   // The button is about to leave, and focus must not leave with it.
@@ -331,7 +400,9 @@ function scrollToTop() {
 const headerClass = computed(() =>
   mergeClass(
     "relative flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:px-6",
-    props.headerCollapse && "transition-[margin-top] duration-[var(--duration-medium)] ease-[var(--ease-settle)]",
+    windowScrolls.value && `${STICKY} top-0`,
+    props.headerCollapse &&
+      (windowScrolls.value ? "transition-transform" : "transition-[margin-top]") + " duration-[var(--duration-medium)] ease-[var(--ease-settle)]",
     props.safeArea &&
       "h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))]",
   ),
@@ -351,7 +422,7 @@ const bleedEl = ref<HTMLElement | null>(null)
 watch(
   () => props.path,
   () => {
-    const content = bleeding.value ? bleedEl.value : scrollArea.value?.viewportEl
+    const content = bleeding.value ? bleedEl.value : documentScroll ? pageEl.value : scrollArea.value?.viewportEl
     if (!props.pageTransition || !content || prefersReducedMotion(nodeWindow(content))) return
     const timing = { duration: durationToken("duration-medium", undefined, content), easing: easingToken("ease-settle", undefined, content) }
     // Title and actions; the burger is the frame, not the page.
@@ -371,7 +442,13 @@ const ASIDE_VISIBLE: Record<NavBreakpoint, string> = {
   "2xl": "hidden 2xl:flex",
 }
 const asideClasses = computed(() =>
-  mergeClass("min-h-0 w-80 flex-col border-l border-line bg-surface", ASIDE_VISIBLE[props.asideBreakpoint ?? props.mobileBreakpoint], props.asideClass),
+  mergeClass(
+    "min-h-0 w-80 flex-col border-l border-line bg-surface",
+    windowScrolls.value &&
+      "sticky top-(--lp-shell-top) h-[calc(100dvh-var(--lp-shell-top))] self-start transition-[top,height] duration-[var(--duration-medium)] ease-[var(--ease-settle)]",
+    ASIDE_VISIBLE[props.asideBreakpoint ?? props.mobileBreakpoint],
+    props.asideClass,
+  ),
 )
 
 /*
@@ -380,9 +457,10 @@ const asideClasses = computed(() =>
  * sub-page row and the bottom bar span both columns.
  */
 const columnClass = computed(() => (hasAside.value ? "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto]" : "flex min-w-0 flex-1 flex-col"))
-const columnStyle = computed(() =>
-  hasAside.value ? { gridTemplateRows: `auto ${contextVisible.value ? "auto " : ""}minmax(0,1fr) auto` } : undefined,
-)
+const columnStyle = computed(() => ({
+  ...(hasAside.value ? { gridTemplateRows: `auto ${contextVisible.value ? "auto " : ""}minmax(0,1fr) auto` } : {}),
+  ...(windowScrolls.value ? { "--lp-shell-top": shellTop.value } : {}),
+}))
 const spanClass = computed(() => (hasAside.value ? "col-span-2" : undefined))
 
 // One width rather than a media query per breakpoint: those report one by one,
@@ -457,9 +535,31 @@ function onBottom(item: SidebarItem) {
 const _openDrawer = () => (drawerOpen.value = true)
 defineExpose({ openDrawer: _openDrawer, navMode })
 
-// The shell claims the full viewport height, which is wrong when it is embedded in a page that already has a header of its own.
-const { class: rootClass, attrs: rest } = useMergedAttrs(
-  "flex h-dvh overflow-hidden bg-surface text-ink",
+// In region mode the shell claims the full viewport height, which is wrong when it is embedded in a page that already has a header of its own.
+// The document mode clips sideways with `clip`, not `hidden`: a hidden overflow would make the root the sticky children's scroller.
+const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
+  windowScrolls.value ? "flex min-h-dvh overflow-x-clip bg-surface text-ink" : "flex h-dvh overflow-hidden bg-surface text-ink",
+)
+
+/*
+ * What stays in view while the window scrolls the page. The header sits on
+ * top; the row of sub-pages and the aside sit under it, following it out
+ * when it collapses (--lp-shell-top is how much of the header is showing).
+ */
+const STICKY = "sticky z-(--z-sticky)"
+const railClass = computed(() => (windowScrolls.value ? "sticky top-0 flex h-dvh shrink-0 self-start" : "contents"))
+const shellTop = computed(() => (headerHidden.value ? "0px" : headerHeight.value))
+const BACK_TO_TOP_ABOVE_BAR: Record<NavBreakpoint, string> = {
+  sm: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
+  md: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
+  lg: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
+  xl: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] xl:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
+  "2xl": "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] 2xl:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
+}
+const backToTopClass = computed(() =>
+  windowScrolls.value
+    ? ["fixed right-6 z-(--z-sticky)", props.bottomNav ? BACK_TO_TOP_ABOVE_BAR[props.mobileBreakpoint] : "bottom-[calc(1rem+env(safe-area-inset-bottom))]"]
+    : "absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] right-6",
 )
 </script>
 
@@ -474,6 +574,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     >
       {{ text.skipToContent }}
     </a>
+    <!-- The rail's own box: a viewport-tall sticky column while the window
+         scrolls the page, and no box at all (contents) in the region frame,
+         where the rail is the frame's full height already. -->
+    <div :class="railClass">
     <LpSidebar
       :model-value="modelValue"
       :items="items"
@@ -529,6 +633,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <slot name="sidebar-item" v-bind="slotProps" />
       </template>
     </LpSidebar>
+    </div>
 
     <!-- Main column: header + the single scroll region. -->
     <div :class="columnClass" :style="columnStyle">
@@ -541,7 +646,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <header
         ref="headerEl"
         :class="[headerClass, spanClass]"
-        :style="headerHidden ? { marginTop: `calc(-1 * ${headerHeight})` } : undefined"
+        :style="headerHidden ? (windowScrolls ? { transform: 'translateY(-100%)' } : { marginTop: `calc(-1 * ${headerHeight})` }) : undefined"
         @focusin="headerCollapsed = false"
       >
         <LpButton
@@ -599,7 +704,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <template v-if="contextVisible">
         <slot name="context-nav" :items="contextItems" :mode="navMode">
           <AppShellContextNav
-            :class="spanClass"
+            :class="[spanClass, windowScrolls && `${STICKY} top-(--lp-shell-top) transition-[top] duration-[var(--duration-medium)] ease-[var(--ease-settle)]`]"
             :items="contextItems"
             :is-active="activeTest"
             :label="text.contextNav"
@@ -609,7 +714,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </template>
       <main ref="mainEl" :id="mainId" tabindex="-1" :data-lp-density="density" :class="['flex min-h-0 flex-1 flex-col outline-none', backToTop && 'relative']">
         <div ref="bleedEl" v-show="bleeding" :id="bleedId" class="min-h-0 flex-1 overflow-hidden" />
+        <div v-if="documentScroll" v-show="!bleeding" ref="pageEl" :class="['flex-1', pageClass]">
+          <Teleport :to="`#${bleedId}`" :disabled="!bleeding" defer>
+            <slot />
+          </Teleport>
+        </div>
         <LpScrollArea
+          v-else
           v-show="!bleeding"
           ref="scrollArea"
           class="min-h-0 flex-1"
@@ -622,7 +733,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </LpScrollArea>
         <LpButton
           v-if="backToTop && scrolledFar && !bleeding"
-          class="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] right-6"
+          :class="backToTopClass"
           variant="outline"
           size="sm"
           square
@@ -639,7 +750,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       </aside>
       <LpBottomNav
         v-if="bottomNav"
-        :class="[burgerHidden[mobileBreakpoint], spanClass]"
+        :class="[burgerHidden[mobileBreakpoint], spanClass, windowScrolls && `${STICKY} bottom-0`]"
         :items="bottomItems"
         :is-active="activeTest"
         more

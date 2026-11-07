@@ -3,9 +3,12 @@ import { nextTick, onBeforeUnmount, onMounted, watch } from "vue"
 import { scrollMarginTop } from "./scroll"
 
 /*
- * Where a page lands when the shell's own scroll region changes page. The
- * region is not the window, so a router's scrollBehavior never reaches it, and
- * the shell has to answer the questions a browser answers for a plain site:
+ * Where a page lands when the shell changes page. In its own scroll region a
+ * router's scrollBehavior never reaches the page, and the shell has to answer
+ * the questions a browser answers for a plain site. When the document scrolls
+ * (the viewport is the document's scrollingElement) it answers them the same
+ * way, so a router without a scrollBehavior behaves as one with it, and one
+ * with it lands in the same place:
  *
  *  - back and forward return to where the page was left;
  *  - an address with a hash lands on that anchor, and stays on it while the
@@ -36,6 +39,15 @@ export function rememberPosition(store: Map<string, number>, key: string, top: n
 }
 
 /** The element id a hash names. A malformed escape ("#%E0%A4%A") is taken as written. */
+/* The document's own scroller: its box moves with the scroll, the window's does not. */
+function isDocument(view: Element): boolean {
+  return view === view.ownerDocument.scrollingElement
+}
+
+function frameTop(view: Element): number {
+  return isDocument(view) ? 0 : view.getBoundingClientRect().top
+}
+
 export function hashTargetId(value: string): string {
   const id = value.replace(/^#/, "")
   try {
@@ -55,6 +67,12 @@ export function useScrollMemory(
   hash: () => string | undefined,
   /** Sets a second region's positions apart from the first's on the same address. */
   scope = "",
+  /**
+   * What covers the top of the viewport (a sticky header), in px: an anchor
+   * lands below it. Not scroll-padding-top on the document, which also makes
+   * the browser scroll the page whenever a control in that header takes focus.
+   */
+  covered: () => number = () => 0,
 ): void {
   if (typeof window === "undefined") return
   let current = addressKey(scope)
@@ -77,7 +95,7 @@ export function useScrollMemory(
     const view = viewport()
     const target = anchor(value)
     if (!view || !target || !view.contains(target)) return false
-    const top = target.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop - scrollMarginTop(target)
+    const top = target.getBoundingClientRect().top - frameTop(view) + view.scrollTop - scrollMarginTop(target) - covered()
     view.scrollTo({ top: Math.max(0, top), behavior })
     return true
   }
@@ -86,7 +104,7 @@ export function useScrollMemory(
   function hold(land: () => void) {
     stopHold?.()
     const view = viewport()
-    const content = view?.firstElementChild
+    const content = view && (isDocument(view) ? view.ownerDocument.body : view.firstElementChild)
     land()
     if (!content) return
     const watcher = new (nodeWindow(content).ResizeObserver)(land)

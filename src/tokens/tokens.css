@@ -173,6 +173,8 @@
    for it, and below the toasts one on a toast's own button (the error
    toast's copy) opened underneath the toast stacked above it. */
 @theme {
+  /* The app shell's header, rail and bars over a page that scrolls under them. */
+  --z-sticky: 40;
   --z-dropdown: 50;
   --z-overlay: 100;
   --z-modal: 110;

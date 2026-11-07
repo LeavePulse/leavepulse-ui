@@ -16,6 +16,7 @@ import {
 } from "../../src"
 
 const mode = new URLSearchParams(location.search).get("mode") ?? "frame"
+const shellScroll = new URLSearchParams(location.search).get("scroll") === "region" ? "region" : "document"
 
 const rows: SidebarItem[] = [{ id: "a", label: "Alpha" }, { id: "b", label: "Beta" }, { id: "c", label: "Gamma" }]
 const shellRows: SidebarItem[] = [{ id: "/a", label: "Alpha" }, { id: "/b", label: "Beta" }]
@@ -67,7 +68,7 @@ Object.assign(window, { shell: { openBoth, dropFirstSection, addSheet, changeShe
 </script>
 
 <template>
-  <LpAppShell v-if="mode === 'shell'" :items="shellRows" path="/a//" :full-bleed="bleed" bottom-nav>
+  <LpAppShell v-if="mode === 'shell'" :items="shellRows" path="/a//" :full-bleed="bleed" :scroll="shellScroll" bottom-nav>
     <p v-for="n in 60" :key="n" class="py-4">Line {{ n }}</p>
   </LpAppShell>
 

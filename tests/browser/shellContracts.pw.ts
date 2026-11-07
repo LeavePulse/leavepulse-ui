@@ -121,17 +121,23 @@ test.describe("the shell", () => {
     await expect(page.locator("main")).toBeFocused()
   })
 
-  test("full bleed and back keeps the page and where it was", async ({ page }) => {
-    const view = page.locator("main [data-reka-scroll-area-viewport]")
-    await view.evaluate((el) => el.scrollTo({ top: 800 }))
-    await shell(page, (api) => (api.bleed.value = true))
-    await expect(view).toBeHidden()
-    await expect(page.getByText("Line 60", { exact: true })).toBeAttached()
-    await shell(page, (api) => (api.bleed.value = false))
-    await expect(view).toBeVisible()
-    await expect(page.getByText("Line 60", { exact: true })).toBeAttached()
-    await expect.poll(() => view.evaluate((el) => el.scrollTop)).toBe(800)
-  })
+  for (const scroll of ["document", "region"] as const) {
+    test(`full bleed and back keeps the page and where it was, scrolling the ${scroll}`, async ({ page }) => {
+      if (scroll === "region") {
+        await page.goto("/tests/browser/?scenario=shell-frame&mode=shell&scroll=region")
+        await expect(page.getByText("Line 1", { exact: true })).toBeAttached()
+      }
+      const view = scroll === "document" ? page.locator("html") : page.locator("main [data-reka-scroll-area-viewport]")
+      await view.evaluate((el) => el.scrollTo({ top: 800, behavior: "instant" }))
+      await shell(page, (api) => (api.bleed.value = true))
+      await expect(page.getByText("Line 60", { exact: true })).toBeAttached()
+      // Held to the viewport, the shell has nothing of its own to scroll.
+      if (scroll === "document") await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true)
+      await shell(page, (api) => (api.bleed.value = false))
+      await expect(page.getByText("Line 60", { exact: true })).toBeAttached()
+      await expect.poll(() => view.evaluate((el) => el.scrollTop)).toBe(800)
+    })
+  }
 })
 
 test.describe("alone on a page", () => {

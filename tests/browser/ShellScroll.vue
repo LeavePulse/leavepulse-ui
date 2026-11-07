@@ -24,8 +24,10 @@ function show(page: string, next: string) {
   timer = setTimeout(() => (late.value = true), LATE_MS)
 }
 
+const scroll = new URLSearchParams(location.search).get("scroll") === "region" ? "region" : "document"
+
 function go(page: string, next = "") {
-  history.pushState({}, "", `?scenario=shell-scroll&page=${page}${next}`)
+  history.pushState({}, "", `?scenario=shell-scroll&scroll=${scroll}&page=${page}${next}`)
   show(page, next)
 }
 
@@ -40,7 +42,7 @@ Object.assign(window, { shellGo: go })
 </script>
 
 <template>
-  <LpAppShell :sections="sections" :path="path" :hash="hash" @select="(item) => go(item.id)">
+  <LpAppShell :sections="sections" :path="path" :hash="hash" :scroll="scroll" @select="(item) => go(item.id)">
     <div v-if="path === 'a'" data-page="a">
       <p v-for="n in 60" :key="n" class="py-4">Paragraph A{{ n }}</p>
       <h2 id="a-deep" class="scroll-mt-6">Deep in A</h2>
