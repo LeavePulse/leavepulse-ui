@@ -228,6 +228,12 @@
     "description": "Mark every part of the address invalid (also set by a surrounding LpFormField's error)."
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "size",
     "type": "\"md\" | \"sm\" | \"lg\" | undefined",
     "required": false,
@@ -692,6 +698,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "emptyText",
@@ -1609,6 +1621,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "label",
     "type": "string | undefined",
     "required": false
@@ -1642,12 +1660,12 @@
     "type": "[value: boolean]"
    },
    {
-    "name": "update:modelValue",
-    "type": "[value: boolean]"
-   },
-   {
     "name": "error",
     "type": "[error: unknown]"
+   },
+   {
+    "name": "update:modelValue",
+    "type": "[value: boolean]"
    },
    {
     "name": "update:indeterminate",
@@ -1980,6 +1998,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "size",
@@ -2822,6 +2846,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the picker, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "size",
     "type": "\"md\" | \"sm\" | \"lg\" | undefined",
     "required": false,
@@ -2937,6 +2967,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the picker, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "size",
@@ -3646,6 +3682,10 @@
   ],
   "events": [
    {
+    "name": "error",
+    "type": "[error: unknown]"
+   },
+   {
     "name": "cancel",
     "type": "[]"
    },
@@ -3656,10 +3696,6 @@
    {
     "name": "edit",
     "type": "[]"
-   },
-   {
-    "name": "error",
-    "type": "[error: unknown]"
    },
    {
     "name": "saved",
@@ -6503,6 +6539,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "size",
     "type": "\"md\" | \"sm\" | \"lg\" | undefined",
     "required": false,
@@ -6665,6 +6707,12 @@
     "type": "boolean | undefined",
     "required": false,
     "description": "Error state — tints the cells red (e.g. wrong code)."
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "size",
@@ -7070,6 +7118,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "size",
@@ -7678,6 +7732,12 @@
     "name": "disabled",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the group, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    }
   ],
   "events": [
@@ -7812,6 +7872,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "ariaLabels",
     "type": "[string, string] | undefined",
     "required": false,
@@ -7903,6 +7969,12 @@
     "name": "disabled",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "labels",
@@ -8428,6 +8500,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "hoverFollow",
     "type": "boolean | undefined",
     "required": false,
@@ -8500,6 +8578,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the select, as on LpInput: it marks the select invalid (what `form.field()` hands it)."
    },
    {
     "name": "emptyText",
@@ -9425,6 +9509,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "ariaLabel",
     "type": "string | undefined",
     "required": false,
@@ -9907,6 +9997,12 @@
     "required": false
    },
    {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
+   },
+   {
     "name": "label",
     "type": "string | undefined",
     "required": false
@@ -9941,12 +10037,12 @@
     "type": "[value: boolean]"
    },
    {
-    "name": "update:modelValue",
-    "type": "[value: boolean]"
-   },
-   {
     "name": "error",
     "type": "[error: unknown]"
+   },
+   {
+    "name": "update:modelValue",
+    "type": "[value: boolean]"
    }
   ],
   "slots": [
@@ -11097,6 +11193,12 @@
     "name": "invalid",
     "type": "boolean | undefined",
     "required": false
+   },
+   {
+    "name": "error",
+    "type": "string | undefined",
+    "required": false,
+    "description": "A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it)."
    },
    {
     "name": "size",
