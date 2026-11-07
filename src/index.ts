@@ -55,6 +55,8 @@ export type { ChartAnnotation, ChartBand, ChartMarker, ChartThreshold } from "./
 export { chartView, lttbIndices, minMaxBuckets, panRange, slotOf, sourceOf, zoomRange } from "./components/chartWindow"
 export type { ChartDownsample, ChartRange, ChartView } from "./components/chartWindow"
 export { useChartSync } from "./composables/useChartSync"
+export { createLinkedView, linkChart, linkLog, linkPipeline, linkTable, linkTopology, provideLinkedView, useLinkedView } from "./composables/useLinkedView"
+export type { LinkChartOptions, LinkLogOptions, LinkPipelineOptions, LinkedCanvas, LinkedEntity, LinkedId, LinkedMoment, LinkedView } from "./composables/useLinkedView"
 export { default as LpCheckbox } from "./components/LpCheckbox.vue"
 export { default as LpCodeBlock } from "./components/LpCodeBlock.vue"
 export type { CodeLang } from "./components/codeHighlight"

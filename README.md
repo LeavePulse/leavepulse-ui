@@ -238,6 +238,30 @@ bun run dev:dist     # rebuild dist on change (for a linked consumer)
 `release:minor`) bumps the version and pushes the tag; CI tests, builds and
 publishes it.
 
+### Linked views
+
+A monitoring screen shares one selection, one stretch of time and one followed
+trace. `provideLinkedView()` holds them, and each `link*` binder turns them into
+the props and listeners of a component it already has, for `v-bind`:
+
+```ts
+const view = provideLinkedView()
+const canvas = ref()
+const table = linkTable(view, { kind: "server" })
+const graph = linkTopology(view, canvas, { kind: "server" })
+const log = linkLog(view, { kind: "server" })
+const chart = linkChart(view, { times })
+const pipeline = linkPipeline(view, { kind: "deployment", steps })
+```
+
+Picking a row focuses the node and filters the log to its source; a picked log
+line becomes a chart annotation; a clicked trace id fills the log search; the
+chart's window is the time range the log shows; selecting a deployment opens its
+failed steps. A binder with a `kind` answers only to that kind. The log needs
+`selectable` and `link-ids`, a chart `zoomable` or `range-selector` to change
+the range. `useLinkedView()` reads the view from a child; with none provided it
+is private to that panel. The table link holds one row at a time.
+
 ### Workspaces, inspector and windows
 
 `useWorkspaces` keeps several named layouts over one `useLayout`; bind
