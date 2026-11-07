@@ -16,6 +16,7 @@ import {
   NumberFieldRoot,
 } from "reka-ui"
 import { computed, useId } from "vue"
+import FieldLeading from "./FieldLeading.vue"
 import LpIcon from "./LpIcon.vue"
 import { focusLeft, useAttrsField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
@@ -67,6 +68,8 @@ const props = withDefaults(defineProps<{
   // "Depth", "Weight" tells the reader nothing about which one wants grams.
   // Not part of the value: it is never typed, selected, or submitted.
   unit?: string
+  /** A leading icon, as on LpInput; the `leading` slot replaces it. */
+  icon?: string
   invalid?: boolean
   /** Control height, matching LpInput. */
   size?: "sm" | "md" | "lg"
@@ -151,6 +154,9 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
     @update:model-value="(v) => emit('update:modelValue', Number.isNaN(v) ? null : (v ?? null))"
     @focusout="onFocusOut"
   >
+    <FieldLeading :icon="icon" class="pl-2.5">
+      <template v-if="$slots.leading" #default><slot name="leading" /></template>
+    </FieldLeading>
     <NumberFieldDecrement
       v-if="steppers"
       :aria-label="text.decrease"
@@ -168,7 +174,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       :aria-describedby="describedBy"
       :aria-invalid="field.invalid || undefined"
       class="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-      :class="steppers ? 'text-center @max-[8.5rem]:px-3 @max-[8.5rem]:text-left' : 'px-3'"
+      :class="steppers ? 'text-center @max-[8.5rem]:px-3 @max-[8.5rem]:text-left' : icon || $slots.leading ? 'pl-2 pr-3' : 'px-3'"
     />
     <!-- The unit sits between the value and the increment button, so a long one
          narrows the field rather than covering the digits. Not focusable and

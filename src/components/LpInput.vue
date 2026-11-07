@@ -13,6 +13,7 @@ import { useInputFilter } from "../composables/useInputFilter"
 import { DEFAULT_MASK_TOKENS, useInputMask, type MaskSpec, type MaskTokens } from "../composables/useInputMask"
 import { mergeClass } from "../composables/useMergedClass"
 import FieldWrapper from "./FieldWrapper.vue"
+import FieldLeading from "./FieldLeading.vue"
 import LpIcon from "./LpIcon.vue"
 
 // Single source of truth for the field shell — bare input and adorned input
@@ -189,9 +190,9 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
       :class="mergeClass(shellClass, hasLeading ? 'pl-2.5' : '', hasTrailing ? 'pr-1.5' : '', hasField ? '' : (attrs.class as string))"
       :style="hasField ? undefined : attrs.style"
     >
-      <span v-if="hasLeading" class="flex shrink-0 items-center text-muted">
-        <slot name="leading"><LpIcon v-if="icon" :name="icon" :size="16" /></slot>
-      </span>
+      <FieldLeading :icon="icon">
+        <template v-if="$slots.leading" #default><slot name="leading" /></template>
+      </FieldLeading>
       <input
         ref="inputEl"
         v-bind="inputAttrs"

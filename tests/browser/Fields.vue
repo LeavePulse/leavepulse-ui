@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { defineComponent, h, ref } from "vue"
-import { LpButton, LpCheckbox, LpInput, LpPopover, LpSelect, LpSwitch, LpTextarea } from "../../src"
+import { LpButton, LpCheckbox, LpIcon, LpInput, LpNumberField, LpPopover, LpSelect, LpSwitch, LpTextarea } from "../../src"
 
 const masked = ref("")
 const raw = ref("")
@@ -60,5 +60,10 @@ const FragmentRoot = defineComponent({ inheritAttrs: false, setup: (_, { slots }
       <template #trigger><LpButton>Open named</LpButton></template>
       <p>Body</p>
     </LpPopover>
+    <LpNumberField aria-label="Voice" icon="lucide:headphones" :model-value="3" />
+    <LpNumberField aria-label="Messages" :model-value="5">
+      <template #leading><LpIcon data-test-own-leading name="lucide:message-square" :size="16" /></template>
+    </LpNumberField>
+    <LpInput aria-label="Searched" icon="lucide:search" />
   </main>
 </template>

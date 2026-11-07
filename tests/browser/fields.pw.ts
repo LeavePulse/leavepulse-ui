@@ -99,3 +99,17 @@ test("a popover is named by a heading inside it or by its label", async ({ page 
   await page.getByRole("button", { name: "Open named" }).click()
   await expect(page.getByRole("dialog", { name: "Named panel" })).toBeVisible()
 })
+
+test("a number field leads with an icon, and its leading slot replaces it, the way an input does", async ({ page }) => {
+  const shell = (role: "spinbutton" | "textbox", name: string) =>
+    page.getByRole(role, { name, exact: true }).locator("xpath=ancestor::*[@data-lp-ring-owner][1]")
+  // The icon, then the minus and plus.
+  await expect(shell("spinbutton", "Voice").locator("svg")).toHaveCount(3)
+  const icon = await shell("spinbutton", "Voice").locator("svg").first().boundingBox()
+  const input = await page.getByRole("spinbutton", { name: "Voice" }).boundingBox()
+  expect(icon!.x + icon!.width).toBeLessThan(input!.x)
+  await expect(shell("spinbutton", "Messages").locator("[data-test-own-leading]")).toHaveCount(1)
+  await expect(shell("spinbutton", "Messages").locator("svg")).toHaveCount(3)
+  // LpInput draws its icon through the same part, unchanged.
+  await expect(shell("textbox", "Searched").locator("svg")).toHaveCount(1)
+})
