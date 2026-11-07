@@ -1,4 +1,4 @@
-import { expect, test as base, type Page } from "@playwright/test"
+import { expect, test as base, type Locator, type Page } from "@playwright/test"
 
 /*
  * Chromium drops every request in flight when the machine's network changes,
@@ -10,6 +10,7 @@ import { expect, test as base, type Page } from "@playwright/test"
  */
 const NETWORK_CHANGED = "net::ERR_NETWORK_CHANGED"
 const NAVIGATION_TRIES = 3
+const RESOURCE_FAILED = "Failed to load resource"
 
 function retryingGoto(page: Page, errors: string[]) {
   const goto = page.goto.bind(page)
@@ -34,11 +35,31 @@ function retryingGoto(page: Page, errors: string[]) {
   }
 }
 
+/*
+ * The box of something that has stopped moving. A page lays out after it
+ * mounts: coordinates read before that land beside what they were read from.
+ */
+export async function settledBox(target: Locator) {
+  let last = await target.boundingBox()
+  await expect.poll(async () => {
+    const now = await target.boundingBox()
+    const still = JSON.stringify(now) === JSON.stringify(last)
+    last = now
+    return still
+  }).toBe(true)
+  return last!
+}
+
 export { expect }
 export const test = base.extend({
   page: async ({ page }, use) => {
     const errors: string[] = []
     page.on("pageerror", (error) => errors.push(error.message))
+    // A resource that failed is the test's own business (some provoke it); what
+    // is logged as an error by the code under test is a failure.
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith(RESOURCE_FAILED)) errors.push(`console: ${message.text()}`)
+    })
     page.goto = retryingGoto(page, errors)
     page.reload = async (options) => page.goto(page.url(), options)
     await use(page)

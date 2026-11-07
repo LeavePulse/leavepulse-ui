@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures"
+import { expect, settledBox, test } from "./fixtures"
 
 test("number field and slider edit the same capacity", async ({ page }) => {
   await page.goto("/component/numbers-together")
@@ -34,6 +34,9 @@ test("loading example reserves the content and action geometry", async ({ page }
     return { x, y, width, height }
   })
   await expect(button).toHaveAttribute("aria-busy", "true")
+  // The example frame lays out after it mounts: read the box only once it stands
+  // still, or the "before" is a row that has not placed its button yet.
+  await settledBox(button)
   const before = await rect()
   await frame.getByRole("switch", { name: "Loading", exact: true }).click()
   await expect(button).not.toHaveAttribute("aria-busy", "true")
