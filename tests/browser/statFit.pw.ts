@@ -23,3 +23,14 @@ test("a stat's figure shrinks to its tile instead of running past the edge, and 
   await expect(figure(huge)).toHaveAttribute("title", "Nothing received from any source")
   expect(cut.font).toBeGreaterThanOrEqual(plain.font * 0.6 - 0.5)
 })
+
+test("a stat's figure takes a tone and a smaller size", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=stat-fit")
+  const figure = page.getByTestId("toned").locator(".font-mono").first()
+  await expect(figure).toHaveClass(/\btext-danger\b/)
+  await expect(figure).toHaveClass(/\btext-lg\b/)
+  await expect(figure).not.toHaveClass(/\btext-3xl\b/)
+  const plain = page.getByTestId("short").locator(".font-mono").first()
+  await expect(plain).toHaveClass(/\btext-3xl\b/)
+  await expect(plain).toHaveClass(/\btext-ink\b/)
+})

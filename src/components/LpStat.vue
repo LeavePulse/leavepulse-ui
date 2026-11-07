@@ -15,7 +15,7 @@ import LpSkeleton from "./LpSkeleton.vue"
 import LpStatus from "./LpStatus.vue"
 import { useFitScale } from "../composables/useFitScale"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { TONES } from "./tone"
+import { TONES, toneOf, type ToneName } from "./tone"
 
 const props = withDefaults(
   defineProps<{
@@ -59,9 +59,25 @@ const props = withDefaults(
      * (it names the tile, it is not data); an empty one pulses too.
      */
     loading?: boolean
+    /**
+     * Colour of the figure, from the kit's tones (`danger` for offenders,
+     * `success`, `warning`…). Unset, it is ink. The delta keeps its own colour.
+     */
+    tone?: ToneName
+    /** Size of the figure: `lg` (the tile's own, text-3xl), `md` or `sm` for a dense row. */
+    size?: "sm" | "md" | "lg"
   }>(),
-  { trend: "auto", decimals: 0, animateOnMount: true },
+  { trend: "auto", decimals: 0, animateOnMount: true, size: "lg" },
 )
+
+/* The figure's type, and the variable its fit to the tile scales from. */
+const FIGURE_SIZE = {
+  sm: { class: "text-lg", font: "var(--text-lg, 1.125rem)", line: "var(--text-lg--line-height, 1.55)" },
+  md: { class: "text-2xl", font: "var(--text-2xl, 1.5rem)", line: "var(--text-2xl--line-height, 1.33)" },
+  lg: { class: "text-3xl", font: "var(--text-3xl, 1.875rem)", line: "var(--text-3xl--line-height, 1.2)" },
+} as const
+const figureSize = computed(() => FIGURE_SIZE[props.size])
+const figureColor = computed(() => (props.tone ? TONES[toneOf(props.tone)].text : "text-ink"))
 
 // Resolve the trend direction: explicit wins; "auto" reads a numeric delta.
 const dir = computed<"up" | "down" | "flat">(() => {
@@ -136,7 +152,11 @@ const FIT_MIN = 0.6
 const row = ref<HTMLElement | null>(null)
 const figure = ref<HTMLElement | null>(null)
 const fit = useFitScale(row, figure, FIT_MIN)
-const figureStyle = computed(() => (fit.scale.value < 1 ? { fontSize: `calc(var(--text-3xl, 1.875rem) * ${fit.scale.value})`, lineHeight: "calc(var(--text-3xl, 1.875rem) * var(--text-3xl--line-height, 1.2))" } : undefined))
+const figureStyle = computed(() => {
+  if (fit.scale.value >= 1) return undefined
+  const { font, line } = figureSize.value
+  return { fontSize: `calc(${font} * ${fit.scale.value})`, lineHeight: `calc(${font} * ${line})` }
+})
 const figureTitle = computed(() => (fit.clipped.value && !props.loading ? `${props.prefix ?? ""}${props.value}${props.valueSuffix ?? ""}` : undefined))
 
 // A stat tile spaces its label and value on a fixed gap; a dense KPI row needs that tighter.
@@ -168,8 +188,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
            is the real one: the tile cannot change height when the figure lands. -->
       <span
         ref="figure"
-        class="max-w-full whitespace-nowrap font-mono text-3xl font-medium tracking-tight text-ink"
-        :class="fit.clipped.value ? 'inline-block overflow-hidden text-ellipsis align-bottom' : ''"
+        class="max-w-full whitespace-nowrap font-mono font-medium tracking-tight"
+        :class="[figureSize.class, figureColor, fit.clipped.value ? 'inline-block overflow-hidden text-ellipsis align-bottom' : '']"
         :style="figureStyle"
         :title="figureTitle"
       >
