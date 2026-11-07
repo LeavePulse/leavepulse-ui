@@ -8,7 +8,9 @@ import { useLabels } from "./useLpConfig"
  * - `true`: there is something unsaved. Closing asks "Discard changes?" through
  *   the kit's confirm, and leaving the page asks the browser's own question.
  * - a function: the app asks its own question (or saves first) and answers
- *   whether the window may close.
+ *   whether the window may close. It covers the window's own ways out only:
+ *   a browser cannot wait for it, so closing the tab or reloading goes
+ *   unguarded. Only `true` raises the browser's question.
  * - `false` / unset: nothing to lose, the window closes as always.
  *
  * Usually bound straight to a form's state: `:guard="form.dirty"`.
@@ -39,6 +41,13 @@ export function useCloseGuard(
   )
 
   let asking = false
+  /*
+   * Counts every open and close. An answer takes as long as the person does,
+   * and meanwhile the window can close another way and open again: a "yes"
+   * given about that earlier window must not close the new one.
+   */
+  let session = 0
+  watch(() => !!toValue(open), () => (session += 1), { flush: "sync" })
 
   /** Whether the window may close now. Asks at most once at a time. */
   async function allowClose(): Promise<boolean> {
@@ -46,16 +55,19 @@ export function useCloseGuard(
     if (!current) return true
     if (asking) return false
     asking = true
+    const mine = session
     try {
-      if (typeof current === "function") return await current()
-      return await confirm({
-        title: labels.value.title,
-        description: labels.value.description,
-        danger: true,
-        icon: "lucide:triangle-alert",
-        confirmLabel: labels.value.discard,
-        cancelLabel: labels.value.keep,
-      })
+      const allowed = await (typeof current === "function"
+        ? current()
+        : confirm({
+            title: labels.value.title,
+            description: labels.value.description,
+            danger: true,
+            icon: "lucide:triangle-alert",
+            confirmLabel: labels.value.discard,
+            cancelLabel: labels.value.keep,
+          }))
+      return allowed && mine === session
     } finally {
       asking = false
     }

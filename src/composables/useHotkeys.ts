@@ -9,6 +9,9 @@ import {
   type MaybeRefOrGetter,
 } from "vue"
 import { topModalElement } from "../components/modalDepth"
+import { isDev } from "./devWarn"
+import { isNode } from "./realm"
+import { isTextEntry } from "./textEntry"
 
 /*
  * One keydown listener over a registry of bindings, so a shortcut is declared
@@ -29,7 +32,9 @@ import { topModalElement } from "../components/modalDepth"
  *     except for the few that mean something in a field (Escape, a palette).
  *
  * Modifier note: Ctrl and Meta are one modifier here, since macOS binds ⌘ where
- * the rest bind Ctrl. Label the difference in the UI, not in the binding.
+ * the rest bind Ctrl. Label the difference in the UI, not in the binding. These
+ * are cross-platform commands, not a model of the keyboard: Ctrl+Meta+K apart
+ * from Ctrl+K cannot be written.
  *
  * Sequences ("g i", as on GitHub and Gmail) are bindings with `sequence`. A key
  * that starts a sequence is held while the next one is awaited: if it
@@ -160,31 +165,6 @@ export function appleModifierLabel(key: string, apple = isAppleKeyboard): string
   if (key === "Ctrl") return "⌘"
   if (key === "Alt") return "⌥"
   return key
-}
-
-const TEXT_INPUT_TYPES = new Set([
-  "text",
-  "search",
-  "email",
-  "number",
-  "password",
-  "tel",
-  "url",
-])
-
-/**
- * Whether the event lands in something the user is typing into. Checked off the
- * event target rather than `document.activeElement` so it stays right inside a
- * dialog's focus trap.
- */
-function isTextEntry(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  if (target.isContentEditable) return true
-  if (target instanceof HTMLTextAreaElement) return true
-  if (target instanceof HTMLInputElement) {
-    return TEXT_INPUT_TYPES.has(target.type)
-  }
-  return false
 }
 
 const MODIFIER_KEYS = new Set(["control", "meta", "shift", "alt"])
@@ -325,12 +305,13 @@ const mounted = state.mounted
 function inScope(target: EventTarget | null, scope: MountedHotkeys["scope"]): boolean {
   const el = toValue(scope)
   if (!el) return true
-  const node = target instanceof Node ? target : null
-  return !!node && (el === node || el.contains(node))
+  return isNode(target) && (el === target || el.contains(target))
 }
 
-function topLayer(): Element | null {
-  const layers = document.querySelectorAll("[data-dismissable-layer]")
+/* The layer on top in the document the key came from: a frame has its own. */
+function topLayer(origin: EventTarget | null): Element | null {
+  const doc = isNode(origin) ? (origin.ownerDocument ?? document) : document
+  const layers = doc.querySelectorAll("[data-dismissable-layer]")
   return layers[layers.length - 1] ?? null
 }
 
@@ -364,7 +345,7 @@ function snapshot(event: KeyboardEvent): KeyLike {
 
 function eligible(event: KeyboardEvent): HotkeyBinding[] {
   const inTextEntry = isTextEntry(event.target)
-  const blocker = event.key === "Escape" ? topLayer() : topModalElement()
+  const blocker = event.key === "Escape" ? topLayer(event.target) : topModalElement()
   const entries = [...mounted].sort(
     (a, b) => Number(toValue(b.priority) || 0) - Number(toValue(a.priority) || 0) || b.order - a.order,
   )
@@ -407,6 +388,9 @@ function flushHeld() {
 function onKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.defaultPrevented) return
   if (pressed.length && MODIFIER_KEYS.has(event.key.toLowerCase())) return
+  // A key held down is one press: its auto-repeat must not end the wait, or
+  // complete a "g g" nobody typed.
+  if (pressed.length && event.repeat) return
   if (pressed.length && event.key === "Escape") {
     resetSequence()
   }
@@ -463,7 +447,7 @@ export function useHotkeys(
     order: ++state.order,
     host: () => {
       const el = instance?.vnode.el
-      return el instanceof Node ? el : null
+      return isNode(el) ? el : null
     },
   }
   onMounted(() => {
@@ -477,11 +461,13 @@ export function useHotkeys(
   })
   onBeforeUnmount(() => {
     mounted.delete(entry)
+    // What is held may be the handler of the component going away; a sequence
+    // waits for up to its timeout, and must not run into a dead component.
+    resetSequence()
     if (!mounted.size && state.listening) {
       window.removeEventListener("keydown", onKeydown)
       window.removeEventListener("blur", resetSequence)
       state.listening = false
-      resetSequence()
     }
   })
 }
@@ -575,21 +561,6 @@ export const hotkeyConflicts = computed<HotkeyConflict[]>(() =>
 )
 
 const warned = new Set<string>()
-
-declare const process: { env: { NODE_ENV?: string } }
-
-/*
- * Written as the literal `process.env.NODE_ENV` so the consumer's bundler
- * replaces it (Vite and webpack both do for dependencies); where nothing
- * replaces it and no `process` exists, the warning simply stays off.
- */
-function isDev(): boolean {
-  try {
-    return process.env.NODE_ENV !== "production"
-  } catch {
-    return false
-  }
-}
 
 function warnConflicts() {
   if (!isDev()) return

@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 import { nextTick, onBeforeUnmount, onMounted, watch } from "vue"
 import { scrollMarginTop } from "./scroll"
 
@@ -22,20 +23,41 @@ import { scrollMarginTop } from "./scroll"
 const SETTLE_MS = 1500
 const DIALOG_WAIT_MS = 2000
 const SETTLE_STOP = ["wheel", "touchstart", "keydown", "pointerdown"] as const
+/* Addresses remembered; a long session over /devices/:id must not grow forever. */
+const MAX_POSITIONS = 200
 
 const positions = new Map<string, number>()
 
-function addressKey(): string {
-  return `${location.pathname}${location.search}`
+/** Records a position, dropping the address visited longest ago past `limit`. */
+export function rememberPosition(store: Map<string, number>, key: string, top: number, limit = MAX_POSITIONS): void {
+  store.delete(key)
+  store.set(key, top)
+  if (store.size > limit) store.delete(store.keys().next().value as string)
+}
+
+/** The element id a hash names. A malformed escape ("#%E0%A4%A") is taken as written. */
+export function hashTargetId(value: string): string {
+  const id = value.replace(/^#/, "")
+  try {
+    return decodeURIComponent(id)
+  } catch {
+    return id
+  }
+}
+
+function addressKey(scope: string): string {
+  return `${scope}${location.pathname}${location.search}`
 }
 
 export function useScrollMemory(
   viewport: () => HTMLElement | null | undefined,
   path: () => string | undefined,
   hash: () => string | undefined,
+  /** Sets a second region's positions apart from the first's on the same address. */
+  scope = "",
 ): void {
   if (typeof window === "undefined") return
-  let current = addressKey()
+  let current = addressKey(scope)
   let shown = path()
   let travelled = false
   let stopHold: (() => void) | undefined
@@ -48,8 +70,7 @@ export function useScrollMemory(
 
   function anchor(value: string | undefined): HTMLElement | null {
     if (!value || value === "#") return null
-    const id = decodeURIComponent(value.replace(/^#/, ""))
-    return document.getElementById(id)
+    return document.getElementById(hashTargetId(value))
   }
 
   function reach(value: string | undefined, behavior: ScrollBehavior): boolean {
@@ -68,7 +89,7 @@ export function useScrollMemory(
     const content = view?.firstElementChild
     land()
     if (!content) return
-    const watcher = new ResizeObserver(land)
+    const watcher = new (nodeWindow(content).ResizeObserver)(land)
     const timer = window.setTimeout(() => stop(), SETTLE_MS)
     const stop = () => {
       watcher.disconnect()
@@ -84,7 +105,7 @@ export function useScrollMemory(
   function arrive() {
     const back = travelled
     travelled = false
-    current = addressKey()
+    current = addressKey(scope)
     shown = path()
     const view = viewport()
     if (!view) return
@@ -108,7 +129,9 @@ export function useScrollMemory(
     const mine = ++pending
     const tick = () => {
       if (mine !== pending) return
-      const locked = document.querySelector('[role="dialog"]') || getComputedStyle(document.body).overflow === "hidden"
+      // The document the shell scrolls in: a dialog of the page is not one of a frame's.
+      const doc = viewport()?.ownerDocument ?? document
+      const locked = doc.querySelector('[role="dialog"]') || nodeWindow(doc).getComputedStyle(doc.body).overflow === "hidden"
       if (locked && performance.now() - since < DIALOG_WAIT_MS) requestAnimationFrame(tick)
       else run()
     }
@@ -119,7 +142,7 @@ export function useScrollMemory(
     path,
     () => {
       const view = viewport()
-      if (view) positions.set(current, view.scrollTop)
+      if (view) rememberPosition(positions, current, view.scrollTop)
       void nextTick(() => requestAnimationFrame(arrive))
     },
     { flush: "pre" },
@@ -140,6 +163,7 @@ export function useScrollMemory(
 
   onBeforeUnmount(() => {
     stopHold?.()
+    pending += 1
     window.removeEventListener("popstate", onPop)
   })
 }

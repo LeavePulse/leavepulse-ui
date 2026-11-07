@@ -8,6 +8,12 @@ import { getCurrentScope, onScopeDispose, ref } from "vue"
  * fresher one, and a response landing after the control moved on. The token
  * guards both — the abort signal only asks the consumer to stop, it cannot
  * promise they did.
+ *
+ * What is guarded is `apply` and `fail`, not the task: whatever it does past
+ * the point it honours the signal (a cache write after the fetch) still runs,
+ * and an error from a superseded run is dropped unseen. It is also one slot:
+ * a new `run` replaces the last, and `pending` speaks for the latest only, so
+ * independent requests each need their own `useAsyncTask`.
  */
 export function useAsyncTask<T>() {
   const pending = ref(false)

@@ -77,6 +77,26 @@ export interface OverlayHistoryOptions {
 }
 
 /** Wire an overlay's `open` to a history entry. */
+/** The wiring of an overlay driven by a v-model: closing asks its guard first. */
+export function useModelOverlayHistory(options: {
+  mode: OverlayHistoryOptions["mode"]
+  open: () => boolean
+  setOpen: (open: boolean) => void
+  allowClose: () => Promise<boolean>
+}): void {
+  useOverlayHistory({
+    mode: options.mode,
+    open: options.open,
+    close: async () => {
+      if (!(await options.allowClose())) return false
+      options.setOpen(false)
+      return true
+    },
+    reopen: () => options.setOpen(true),
+    navigated: () => options.setOpen(false),
+  })
+}
+
 export function useOverlayHistory(options: OverlayHistoryOptions): void {
   const inherited = inject(MODE, false)
   const mode = computed<OverlayHistoryMode>(() => options.mode() ?? toValue(inherited))

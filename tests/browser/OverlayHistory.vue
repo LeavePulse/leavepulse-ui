@@ -2,7 +2,8 @@
 import { computed, defineComponent, h, ref } from "vue"
 import { createRouter, createWebHistory, RouterLink, RouterView, useRoute, useRouter } from "vue-router"
 import { getCurrentInstance } from "vue"
-import { LpButton, LpConfirmHost, LpDrawer, LpModal, LpTabs, provideOverlayHistory } from "../../src"
+import { LpButton, LpCommandPalette, LpConfirmHost, LpDrawer, LpLightbox, LpModal, LpTabs, provideOverlayHistory } from "../../src"
+import { pushEntry } from "../../src/composables/overlayHistory"
 
 const stats = { navigations: 0, homeSetups: 0 }
 
@@ -18,6 +19,9 @@ const reopenable = ref(false)
 const routed = ref(false)
 const drawer = ref(false)
 const guarded = ref(false)
+const lightbox = ref(false)
+const palette = ref(false)
+const IMAGE = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
 const tab = ref("one")
 const pageTab = ref("one")
 
@@ -42,6 +46,10 @@ const Home = defineComponent({
         h(LpButton, { onClick: () => (routed.value = true) }, () => "Open routed"),
         h(LpButton, { onClick: () => (drawer.value = true) }, () => "Open drawer"),
         h(LpButton, { onClick: () => (guarded.value = true) }, () => "Open guarded"),
+        h(LpButton, { onClick: () => (lightbox.value = true) }, () => "Open lightbox"),
+        h(LpButton, { onClick: () => (palette.value = true) }, () => "Open palette"),
+        h(LpLightbox, { open: lightbox.value, "onUpdate:open": (v: boolean) => (lightbox.value = v), items: [{ src: IMAGE, title: "Dot" }] }),
+        h(LpCommandPalette, { open: palette.value, "onUpdate:open": (v: boolean) => (palette.value = v), commands: [{ id: "one", label: "One" }] }),
         h(LpButton, { onClick: () => (item.value = "7") }, () => "Open in query"),
         h(
           LpModal,
@@ -89,6 +97,9 @@ const Home = defineComponent({
 })
 
 const Other = defineComponent({ setup: () => () => h("p", { class: "p-4" }, "Other page") })
+
+// `order=late`: the engine's listeners go on before the router's, the other way round from an app.
+if (new URLSearchParams(location.search).get("order") === "late") pushEntry({ back: () => {}, alive: false })
 
 const router = createRouter({
   history: createWebHistory("/tests/browser/"),

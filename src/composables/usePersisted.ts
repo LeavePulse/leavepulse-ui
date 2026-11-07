@@ -59,6 +59,16 @@ export interface PersistedOptions<T> {
  *
  * A changed key reads the new key's value, so one component instance can
  * follow the thing it shows (a drawer per record).
+ *
+ * Made for small preferences, and this is the contract:
+ * - JSON values only, `initial` included. A Map, Set or Date does not survive
+ *   the round trip, a key holding `undefined` is dropped, and a BigInt or a
+ *   cycle throws here, however `T` reads.
+ * - Every change walks the value and rewrites it whole, synchronously. A large
+ *   document wants its own saving: debounced, with dirty state and versions.
+ * - One owner per key. Two refs on one key do not see each other's writes
+ *   (the `storage` event only reaches other tabs) and the last write wins, so
+ *   share the ref instead.
  */
 export function usePersisted<T>(
   key: MaybeRefOrGetter<string | false | null | undefined>,

@@ -40,6 +40,8 @@
 
 const KEY = "__lpOverlay"
 const SETTLE_MS = 300
+/* Far longer than a traversal takes: past it, the step the kit asked for is not coming. */
+const STEP_TIMEOUT_MS = 1500
 
 export interface HistoryEntry {
   /** Back left this entry: undo what it recorded (close the overlay, restore the tab). */
@@ -91,6 +93,8 @@ interface EngineState {
   serial: number
   internal: boolean
   settle: number
+  /** Timer that gives up on `silent` pops the browser never delivers. */
+  stalled: number
 }
 
 const STATE_KEY = Symbol.for("@leavepulse/ui:overlay-history")
@@ -111,6 +115,7 @@ const fresh: EngineState = {
   serial: 0,
   internal: false,
   settle: 0,
+  stalled: 0,
 }
 const s = (g[STATE_KEY] ??= fresh)
 
@@ -142,8 +147,23 @@ function own<T>(run: () => T): T {
 function silentGo(delta: number) {
   if (delta === 0) return
   s.silent++
+  window.clearTimeout(s.stalled)
+  s.stalled = window.setTimeout(abandonSteps, STEP_TIMEOUT_MS)
   mute()
   own(() => history.go(delta))
+}
+
+/*
+ * `go` reports nothing: with no entry to go to, or a traversal the browser
+ * dropped, no pop ever comes. Left waiting, the engine would swallow the user's
+ * next Back, hold every push in `waiting` and keep the router muted for good.
+ */
+function abandonSteps() {
+  s.silent = 0
+  s.keep = null
+  s.href = location.href
+  flushWaiting()
+  mute()
 }
 
 /* Pushes wait for a pop the kit started: a push between `go` and its arrival would land on the wrong entry. */
@@ -182,6 +202,7 @@ function handlePop(event: PopStateEvent) {
   s.href = location.href
   if (s.silent > 0) {
     s.silent--
+    if (s.silent === 0) window.clearTimeout(s.stalled)
     const keep = s.silent === 0 ? s.keep : null
     if (s.silent === 0) s.keep = null
     if (keep && keep.href !== location.href) restore(keep, event)
@@ -322,6 +343,9 @@ export function setHistoryRouter(router: HistoryRouter | null): void {
   if (s.router && s.router !== router) s.router.listening = true
   s.router = router
   if (typeof window === "undefined") return
+  // Now, not at the first overlay: a page reloaded on a kit entry mutes the
+  // router below, and only the engine's listeners ever switch it back on.
+  install()
   // After the router's own listener, which it added when it was created.
   window.removeEventListener("popstate", afterPop)
   window.addEventListener("popstate", afterPop)

@@ -67,6 +67,12 @@ export interface UseFormDraftOptions<T> {
   maxAgeMs?: number
   /** Skip the write without tearing the composable out of the component. */
   disabled?: MaybeRefOrGetter<boolean>
+  /**
+   * Accept a stored value or reject it. The envelope's version follows the
+   * kit, not this form: a draft written before the form changed shape needs
+   * this to be turned away. A rejected draft reads as no draft.
+   */
+  validate?: (value: unknown) => value is T
 }
 
 export interface UseFormDraft<T> {
@@ -86,8 +92,13 @@ export interface UseFormDraft<T> {
    * what to do with each field, because only it knows the form's shape.
    */
   read: () => T | null
-  /** Forget the draft. Call after applying it, and after a successful save. */
-  discard: () => void
+  /**
+   * Forget the draft. Call after applying it, and after a successful save.
+   * With no argument it acts on the key as it is now; a callback that may
+   * outlive the subject (an awaited save) passes the key it started under, so
+   * it cannot delete the draft of whatever the form moved on to.
+   */
+  discard: (key?: string) => void
   /** Write now, ignoring `dirty` and a pending draft. For "save and come back to this later". */
   save: () => void
 }
@@ -128,19 +139,28 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
   const savedAt = ref<string | null>(null)
   const maxAge = options.maxAgeMs ?? WEEK_MS
 
+  function normalizeKey(key: unknown): string {
+    return String(key || "").trim()
+  }
+
   function currentKey(): string {
-    return String(toValue(options.key) || "").trim()
+    return normalizeKey(toValue(options.key))
   }
 
   // An envelope still worth offering, or null. No side effects: the key watcher
   // only looks, and `read` decides what to clear.
+  //
+  // Only this composable writes these, so a missing value or an unreadable
+  // stamp is damage rather than a draft of unknown age: offering it would make
+  // it immortal, since its age could never pass `maxAge`. A stamp from the
+  // future is measured the same way as one from the past, so a clock corrected
+  // by minutes keeps the draft and a stamp years ahead cannot outlive `maxAge`.
   function fresh(parsed: DraftEnvelope<T> | null): boolean {
-    if (!parsed || parsed.version !== ENVELOPE_VERSION) return false
-    if (maxAge <= 0) return true
-    // NaN when the stamp is unreadable, and NaN > maxAge is false — an
-    // unreadable stamp is treated as "no idea how old", which errs towards
-    // offering the draft rather than throwing away somebody's typing.
-    return !(Date.now() - Date.parse(parsed.savedAt) > maxAge)
+    if (!parsed || parsed.version !== ENVELOPE_VERSION || !("value" in Object(parsed))) return false
+    const stamp = typeof parsed.savedAt === "string" ? Date.parse(parsed.savedAt) : Number.NaN
+    if (Number.isNaN(stamp)) return false
+    if (options.validate && !options.validate(parsed.value)) return false
+    return maxAge <= 0 || Math.abs(Date.now() - stamp) <= maxAge
   }
 
   function read(): T | null {
@@ -178,11 +198,15 @@ export function useFormDraft<T>(options: UseFormDraftOptions<T>): UseFormDraft<T
     )
   }
 
-  function discard() {
-    const key = currentKey()
-    hasDraft.value = false
-    savedAt.value = null
-    if (key) store.remove(key)
+  function discard(key?: string) {
+    const current = currentKey()
+    // Not a string when bound straight to an event: `@click="draft.discard"`.
+    const target = typeof key === "string" ? normalizeKey(key) : current
+    if (target === current) {
+      hasDraft.value = false
+      savedAt.value = null
+    }
+    if (target) store.remove(target)
   }
 
   function save() {

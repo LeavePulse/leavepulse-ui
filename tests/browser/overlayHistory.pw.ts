@@ -236,3 +236,227 @@ test("an overlay the app keeps in the query through replace stays closed when cl
   expect(await page.evaluate(() => location.search)).toBe("?scenario=overlay-history")
   expect((await stats(page)).homeSetups).toBe(1)
 })
+
+type Engine = { silent: number; waiting: unknown[]; live: unknown[]; dead: Map<string, unknown>; closed: Map<string, unknown> }
+const engine = (page: Page) =>
+  page.evaluate(() => {
+    const s = (globalThis as unknown as Record<symbol, Engine>)[Symbol.for("@leavepulse/ui:overlay-history")]!
+    return { silent: s.silent, waiting: s.waiting.length, live: s.live.length, dead: s.dead.size, closed: s.closed.size }
+  })
+const push = (page: Page, path: string) => page.evaluate((to) => (window as unknown as { overlayRouter: { push(to: string): Promise<unknown> } }).overlayRouter.push(to), path)
+const other = (page: Page) => page.getByText("Other page")
+const home = (page: Page) => page.getByText("Home page")
+const onKitEntry = (page: Page) => page.evaluate(() => history.state?.__lpOverlay ?? null)
+
+async function open(page: Page, name = "Outer") {
+  await page.getByRole("button", { name: `Open ${name.toLowerCase()}` }).click()
+  await expect(dialog(page, name)).toBeVisible()
+}
+
+for (const installed of ["before", "after"]) {
+  test(`another wrapper of pushState added ${installed} the engine's works alongside it`, async ({ page }) => {
+    await start(page)
+    const wrap = () =>
+      page.evaluate(() => {
+        const calls = { push: 0, replace: 0 }
+        Object.assign(window, { wrapperCalls: calls })
+        const { pushState, replaceState } = history
+        history.pushState = function (...args: Parameters<History["pushState"]>) {
+          calls.push++
+          return pushState.apply(history, args)
+        }
+        history.replaceState = function (...args: Parameters<History["replaceState"]>) {
+          calls.replace++
+          return replaceState.apply(history, args)
+        }
+      })
+    if (installed === "before") await wrap()
+    await open(page)
+    await page.goBack()
+    await expect(dialog(page, "Outer")).toBeHidden()
+    if (installed === "after") await wrap()
+
+    await open(page)
+    await push(page, "/other")
+    await expect(other(page)).toBeVisible()
+    await expect.poll(async () => (await engine(page)).live).toBe(0)
+    await page.goBack()
+    await expect(home(page)).toBeVisible()
+    await expect.poll(() => onKitEntry(page)).toBeNull()
+    expect(await page.evaluate(() => (window as unknown as { wrapperCalls: { push: number } }).wrapperCalls.push)).toBeGreaterThan(0)
+  })
+}
+
+test("a step the browser never carries out does not stall the engine", async ({ page }) => {
+  await start(page)
+  await open(page)
+  await page.evaluate(() => {
+    const go = history.go
+    history.go = function () {
+      history.go = go
+    }
+  })
+  await page.keyboard.press("Escape")
+  await expect(dialog(page, "Outer")).toBeHidden()
+  await expect.poll(async () => (await engine(page)).silent, { timeout: 5000 }).toBe(0)
+
+  await open(page)
+  await expect.poll(async () => (await engine(page)).live).toBe(1)
+  await page.goBack()
+  await expect(dialog(page, "Outer")).toBeHidden()
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+})
+
+test("hundreds of opens and closes leave nothing behind", async ({ page }) => {
+  await start(page)
+  const position = (await page.evaluate(() => history.state)).position
+  await page.evaluate(async () => {
+    const { setOuter } = window as unknown as { setOuter(v: boolean): void }
+    const until = async (done: () => boolean) => {
+      while (!done()) await new Promise((next) => setTimeout(next, 2))
+    }
+    const marked = () => !!history.state?.__lpOverlay
+    for (let i = 0; i < 250; i++) {
+      setOuter(true)
+      await until(marked)
+      setOuter(false)
+      await until(() => !marked())
+    }
+  })
+  await expect.poll(() => engine(page)).toEqual({ silent: 0, waiting: 0, live: 0, dead: 0, closed: 0 })
+  expect((await page.evaluate(() => history.state)).position).toBe(position)
+  await open(page)
+  await page.goBack()
+  await expect(dialog(page, "Outer")).toBeHidden()
+})
+
+test("past the limit of buried entries the recent ones are still skipped", async ({ page }) => {
+  test.setTimeout(90_000)
+  await start(page)
+  await page.evaluate(async () => {
+    const { setOuter, overlayRouter } = window as unknown as { setOuter(v: boolean): void; overlayRouter: { push(to: string): Promise<unknown> } }
+    const until = async (done: () => boolean) => {
+      while (!done()) await new Promise((next) => setTimeout(next, 2))
+    }
+    const marked = () => !!history.state?.__lpOverlay
+    for (let i = 0; i < 205; i++) {
+      setOuter(true)
+      await until(marked)
+      await overlayRouter.push("/other")
+      history.back()
+      await until(() => !location.pathname.endsWith("/other") && !marked())
+      await until(() => !!document.querySelector("button"))
+    }
+  })
+  await expect.poll(async () => (await engine(page)).dead).toBe(200)
+  await open(page)
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+  await expect.poll(() => onKitEntry(page)).toBeNull()
+})
+
+test("Forward through an entry buried by a route change reaches that page", async ({ page }) => {
+  await start(page)
+  await open(page)
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+  await expect.poll(() => onKitEntry(page)).toBeNull()
+  await page.goForward()
+  await expect(other(page)).toBeVisible()
+  expect((await engine(page)).live).toBe(0)
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+})
+
+test("an overlay Back closed does not come back past a route change", async ({ page }) => {
+  await start(page)
+  await open(page, "Reopenable")
+  await page.goBack()
+  await expect(dialog(page, "Reopenable")).toBeHidden()
+  expect((await engine(page)).closed).toBe(1)
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+  expect((await engine(page)).closed).toBe(0)
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+  await expect(dialog(page, "Reopenable")).toBeHidden()
+  await page.goForward()
+  await expect(other(page)).toBeVisible()
+})
+
+test("a reload on an overlay's entry leaves the router listening for the next page", async ({ page }) => {
+  await start(page)
+  await open(page)
+  await page.reload()
+  await expect(home(page)).toBeVisible()
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+})
+
+test("the router still navigates when the engine's listeners came first", async ({ page }) => {
+  await page.goto(`${URL}&order=late`)
+  await expect(home(page)).toBeVisible()
+  await open(page)
+  await page.goBack()
+  await expect(dialog(page, "Outer")).toBeHidden()
+  expect((await stats(page)).homeSetups).toBe(1)
+  await open(page)
+  await push(page, "/other")
+  await expect(other(page)).toBeVisible()
+  await page.goBack()
+  await expect(home(page)).toBeVisible()
+})
+
+test("Back pressed twice in a row closes nested overlays without a navigation", async ({ page }) => {
+  await start(page)
+  await open(page)
+  await page.getByRole("button", { name: "Open inner" }).click()
+  await expect(dialog(page, "Inner")).toBeVisible()
+  await page.evaluate(() => {
+    history.back()
+    history.back()
+  })
+  await expect(dialog(page, "Outer")).toBeHidden()
+  await expect(dialog(page, "Inner")).toBeHidden()
+  await expect.poll(async () => (await engine(page)).live).toBe(0)
+  expect((await stats(page)).navigations).toBe(1)
+})
+
+test("Back pressed while the engine's own step is on its way does not wedge it", async ({ page }) => {
+  await start(page)
+  await push(page, "/other")
+  await push(page, "/")
+  await expect(home(page)).toBeVisible()
+  await open(page)
+  await page.evaluate(() => {
+    ;(window as unknown as { setOuter(v: boolean): void }).setOuter(false)
+    setTimeout(() => history.back(), 0)
+  })
+  await expect(other(page)).toBeVisible()
+  await expect.poll(async () => (await engine(page)).silent, { timeout: 5000 }).toBe(0)
+  await page.goForward()
+  await expect(home(page)).toBeVisible()
+  await open(page)
+  await page.goBack()
+  await expect(dialog(page, "Outer")).toBeHidden()
+  await expect(home(page)).toBeVisible()
+})
+
+for (const name of ["lightbox", "palette"]) {
+  test(`Back closes the ${name} without leaving the page`, async ({ page }) => {
+    await page.goto(URL)
+    await page.getByRole("button", { name: `Open ${name}`, exact: true }).click()
+    await expect(page.getByRole("dialog")).toBeVisible()
+    await page.goBack()
+    await expect(page.getByRole("dialog")).toHaveCount(0)
+    await expect(page.getByText("Home page")).toBeVisible()
+    expect(await page.evaluate(() => location.search)).toBe("?scenario=overlay-history")
+  })
+}
