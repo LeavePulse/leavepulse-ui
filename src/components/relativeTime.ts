@@ -1,3 +1,4 @@
+import { clamp } from "../composables/clamp"
 import { toEpoch } from "./timeSpan"
 
 /*
@@ -114,5 +115,5 @@ export function formatRelativeTime(
 }
 
 function clampRefresh(ms: number): number {
-  return Math.min(MAX_REFRESH, Math.max(MIN_REFRESH, Math.ceil(ms)))
+  return clamp(Math.ceil(ms), MIN_REFRESH, MAX_REFRESH)
 }

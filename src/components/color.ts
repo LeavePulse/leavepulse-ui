@@ -1,3 +1,5 @@
+import { clamp } from "../composables/clamp"
+
 /*
  * Colour conversion for LpColorPicker — kept out of the component so the maths
  * is testable on its own and reusable by anything that has to meet a colour
@@ -33,7 +35,6 @@ export interface Rgb {
 /** The string shapes a caller can hand the picker, and ask back out of it. */
 export type ColorFormat = "hex" | "rgb" | "hsl"
 
-const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
 
 /** Wraps rather than clamps: hue is a circle, and 370° is 10°, not 360°. */
 export function normalizeHue(h: number): number {

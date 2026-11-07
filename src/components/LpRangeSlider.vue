@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import SliderRail from "./SliderRail.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Two thumbs on one track: a range rather than a value. A price "from – to",
@@ -14,8 +15,8 @@ import { usePaletteControl, type PaletteControlOptions } from "../composables/us
  * Each thumb can carry a label above it (`format`), shown while it is hovered,
  * focused or dragged, so the numbers are readable without a second readout.
  */
-import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
-import { useFieldControl } from "../composables/useField"
+import { SliderRoot, SliderThumb } from "reka-ui"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
@@ -87,16 +88,14 @@ usePaletteControl({ disabled: () => field.value.disabled })
     @update:model-value="onUpdate"
     @value-commit="onCommit"
   >
-    <SliderTrack class="relative h-1.5 grow overflow-hidden rounded-pill bg-surface-soft">
-      <SliderRange class="absolute h-full rounded-pill bg-brand" />
-    </SliderTrack>
+    <SliderRail />
     <SliderThumb
       v-for="index in [0, 1] as const"
       :key="index"
       :id="index === 0 ? field.id : undefined"
       :aria-label="ariaLabels?.[index]"
       :aria-labelledby="ariaLabels ? undefined : field.labelId"
-      :aria-describedby="field.describedBy"
+      :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
       :class="thumbClass"
     >
       <span v-if="format" :class="labelClass">{{ format(props.modelValue[index]) }}</span>

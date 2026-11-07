@@ -1,5 +1,6 @@
-import { computed, inject, onScopeDispose, provide, useId, type ComputedRef, type InjectionKey } from "vue"
+import { computed, inject, onScopeDispose, provide, useAttrs, useId, type ComputedRef, type InjectionKey } from "vue"
 import type { FieldNoticeOptions } from "./useFieldNotice"
+import { isElement } from "./useView"
 
 /*
  * What a form field tells the control inside it: the id its label points at,
@@ -37,6 +38,22 @@ export function useField(): ComputedRef<FieldContext> | null {
 
 export function fieldMessageId(id: string): string {
   return `${id}-message`
+}
+
+/**
+ * The `aria-describedby` of a control: the consumer's own ids, the field's and
+ * whatever the control adds, each once. A template's explicit binding replaces
+ * what `v-bind` passed, undefined included, so every control merges here
+ * instead of dropping the consumer's description.
+ */
+export function mergeDescribedBy(...ids: unknown[]): string | undefined {
+  const all = ids.flatMap((id) => (typeof id === "string" ? id.split(/\s+/) : [])).filter(Boolean)
+  return [...new Set(all)].join(" ") || undefined
+}
+
+/** Is a boolean attribute that arrived through `$attrs` on? The same test Vue renders it by. */
+export function isAttrOn(value: unknown): boolean {
+  return !!value || value === ""
 }
 
 export interface FieldControlState {
@@ -98,7 +115,7 @@ export function useFieldControl(
  */
 export function focusLeft(event: FocusEvent): boolean {
   const next = event.relatedTarget
-  return !(next instanceof Node && (event.currentTarget as Node | null)?.contains(next))
+  return !(isElement(next) && (event.currentTarget as Node | null)?.contains(next))
 }
 
 /** Trigger and portalled content share a boundary for the control's public blur. */
@@ -124,4 +141,26 @@ export function useFieldBlur(blur: (event: FocusEvent) => void) {
 
   onScopeDispose(() => cancelPending?.())
   return { partId, onFocusOut }
+}
+
+/** What a control hands the FieldWrapper around it: its id, its texts, and the classes it takes from the app. */
+export function fieldWrapperBinds(
+  wrapped: boolean,
+  field: { id?: string },
+  props: { label?: string; hint?: string; error?: string; required?: boolean },
+  attrs: Record<string, unknown>,
+) {
+  const { label, hint, error, required } = props
+  return { wrapped, id: field.id, label, hint, error, required, class: attrs.class, style: attrs.style }
+}
+
+/** The state of a control that takes its id from the app and draws no wrapper of its own. */
+export function useAttrsField(state: () => { invalid?: boolean; disabled?: boolean }) {
+  const attrs = useAttrs()
+  const field = useFieldControl(() => ({
+    wrapped: false,
+    id: typeof attrs.id === "string" ? attrs.id : undefined,
+    ...state(),
+  }))
+  return { attrs, field }
 }

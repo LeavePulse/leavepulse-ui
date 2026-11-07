@@ -6,6 +6,7 @@
  * pair drifting apart again (one had translatable month buttons, the other
  * English ones).
  */
+import { CONTROL_SIZE } from "./controlSize"
 
 export interface CalendarLabels extends Record<string, string> {
   previous: string
@@ -24,11 +25,7 @@ export const CALENDAR_NAV =
 export const PICKER_TRIGGER =
   "group flex w-full items-center gap-2 rounded-control border bg-surface-soft px-3 text-left text-ink outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-brand disabled:cursor-not-allowed disabled:opacity-55"
 
-export const PICKER_SIZE = {
-  sm: "h-(--size-control-sm) text-xs",
-  md: "h-(--size-control-md) text-sm",
-  lg: "h-(--size-control-lg) text-sm",
-} as const
+export const PICKER_SIZE = CONTROL_SIZE
 
 export function pickerTone(invalid: boolean): string {
   return invalid ? "border-danger focus-visible:ring-danger-soft" : "border-line focus-visible:border-brand"
@@ -49,3 +46,13 @@ export const PICKER_PRESETS =
 
 export const PICKER_PRESET =
   "shrink-0 rounded-control px-2.5 py-1.5 text-left text-sm whitespace-nowrap text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:bg-surface-soft hover:text-ink focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-brand-soft aria-pressed:text-ink"
+
+/** The props the two pickers share. */
+export interface PickerFieldProps {
+  clearable?: boolean
+  disabled?: boolean
+  invalid?: boolean
+  size?: "sm" | "md" | "lg"
+  /** Locale of the shown date and the calendar; defaults to reka's ConfigProvider, then the browser. */
+  locale?: string
+}

@@ -19,7 +19,7 @@ import { CLOSE_ICON } from "./dropdown"
 import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import { toneLook } from "./tone"
-import { usePortalTarget } from "../composables/useView"
+import { nodeWindow, usePortalTarget, useView, viewDocument, viewWindow } from "../composables/useView"
 
 const props = defineProps<{ labels?: Partial<{ dismiss: string; copy: string; copied: string }> }>()
 const text = useLabels("toast", { dismiss: "Dismiss", copy: "Copy message", copied: "Copied" }, () => props.labels)
@@ -44,7 +44,7 @@ function toastsIn(root: Element): HTMLElement[] {
 }
 
 function slide(root: Element) {
-  const reduce = prefersReducedMotion()
+  const reduce = prefersReducedMotion(nodeWindow(root))
   const height = (root as HTMLElement).offsetHeight
   for (const el of toastsIn(root)) {
     const before = tops.get(el)
@@ -61,12 +61,13 @@ function slide(root: Element) {
 // The viewport's component root is a wrapper fragment, not the list, so the
 // list is found by a mark of its own once it is teleported into place.
 const viewportId = useId()
+const view = useView()
 onMounted(() =>
   nextTick(() => {
-    const root = document.querySelector(`[data-lp-toasts="${viewportId}"]`)
-    if (!root || typeof MutationObserver === "undefined") return
+    const root = viewDocument(view.value).querySelector(`[data-lp-toasts="${viewportId}"]`)
+    if (!root) return
     for (const el of toastsIn(root)) tops.set(el, el.offsetTop - (root as HTMLElement).offsetHeight)
-    observer = new MutationObserver(() => slide(root))
+    observer = new (nodeWindow(root).MutationObserver)(() => slide(root))
     observer.observe(root, { childList: true, subtree: true })
   }),
 )
@@ -207,7 +208,7 @@ const copyable = (t: ToastItem) => t.variant === "error" || t.variant === "warni
 const toastText = (t: ToastItem) => () => [t.title, t.message, t.details, t.context].filter(Boolean).join("\n")
 
 function selecting(): boolean {
-  return Boolean(window.getSelection()?.toString())
+  return Boolean(viewWindow(view.value).getSelection()?.toString())
 }
 
 function runClick(t: ToastItem) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isHTMLElement } from "../composables/useView"
 import { usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
 import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
@@ -179,7 +180,7 @@ function pillUnder(value: string, active?: string): boolean {
  */
 function releaseFocusAfterPointer(event: PointerEvent) {
   const target = event.currentTarget
-  if (target instanceof HTMLElement) target.blur()
+  if (isHTMLElement(target)) target.blur()
 }
 
 const paletteScope = usePaletteScope()

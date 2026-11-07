@@ -6,11 +6,12 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import SliderRail from "./SliderRail.vue"
 import { usePaletteControl, type PaletteControlOptions } from "../composables/usePaletteCommands"
 // Single-value slider (reka Slider). reka models value as an array; we expose
 // a plain number for the common single-thumb case. Themed via tokens.
-import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from "reka-ui"
-import { useFieldControl } from "../composables/useField"
+import { SliderRoot, SliderThumb } from "reka-ui"
+import { useFieldControl, mergeDescribedBy } from "../composables/useField"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { SLIDER_GLIDE, useSliderDrag } from "./slider"
 
@@ -68,14 +69,12 @@ usePaletteControl({ disabled: () => field.value.disabled })
     @update:model-value="onUpdate"
     @value-commit="onCommit"
   >
-    <SliderTrack class="relative h-1.5 grow overflow-hidden rounded-pill bg-surface-soft">
-      <SliderRange class="absolute h-full rounded-pill bg-brand" />
-    </SliderTrack>
+    <SliderRail />
     <SliderThumb
       :id="field.id"
       :aria-label="ariaLabel"
       :aria-labelledby="ariaLabel ? undefined : field.labelId"
-      :aria-describedby="field.describedBy"
+      :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy)"
       class="block size-4 rounded-pill border-2 border-brand bg-surface shadow outline-none transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
     />
   </SliderRoot>

@@ -1,3 +1,4 @@
+import { isElement, nodeWindow } from "./useView"
 import { nextTick, onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { prefersReducedMotion } from "./easing"
 
@@ -118,7 +119,7 @@ export function useShift(
   const scrolled = new Set<Element>()
   const rememberScroll = (event: Event) => {
     const target = event.target
-    if (target instanceof Element) scrolled.add(target)
+    if (isElement(target)) scrolled.add(target)
   }
   function readScroll(): Map<Element, number> {
     const tops = new Map<Element, number>()
@@ -221,7 +222,7 @@ export function useShift(
     tweenStart = performance.now()
     resizing.value = true
     clearTimeout(settleTimer)
-    const wait = prefersReducedMotion() ? 0 : (toValue(options.duration) ?? TWEEN_MS)
+    const wait = prefersReducedMotion(nodeWindow(node)) ? 0 : (toValue(options.duration) ?? TWEEN_MS)
     settleTimer = setTimeout(() => {
       inFlight = false
       resizing.value = false
@@ -303,12 +304,13 @@ export function useShift(
         ro.disconnect()
         for (const child of Array.from(node.children)) ro.observe(child)
       }
-      if (typeof ResizeObserver !== "undefined") {
-        ro = new ResizeObserver(() => retune())
+      const win = nodeWindow(node)
+      if (typeof win.ResizeObserver !== "undefined") {
+        ro = new win.ResizeObserver(() => retune())
         watchChildren()
       }
-      if (typeof MutationObserver !== "undefined") {
-        mo = new MutationObserver(() => {
+      if (typeof win.MutationObserver !== "undefined") {
+        mo = new win.MutationObserver(() => {
           watchChildren()
           retune()
         })

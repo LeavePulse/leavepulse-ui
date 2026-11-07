@@ -2,6 +2,7 @@ import { computed, inject, onBeforeUnmount, provide, reactive, shallowRef, watch
 import type { HintNote } from "../components/LpHintLayer.vue"
 import type { TourContext, TourStep } from "../components/LpTour.vue"
 import { anyModalOpen } from "../components/modalDepth"
+import { isTextEntry } from "./textEntry"
 import { hints } from "./useHints"
 
 /*
@@ -355,8 +356,7 @@ export function hintSummary(
 }
 
 function typing(): boolean {
-  const el = document.activeElement
-  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el instanceof HTMLElement && el.isContentEditable)
+  return isTextEntry(document.activeElement, { inputType: () => true })
 }
 
 export function createHintSystem(options: HintSystemOptions) {

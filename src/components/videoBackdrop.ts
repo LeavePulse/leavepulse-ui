@@ -3,6 +3,7 @@
  * so they can be tested without a media element.
  */
 
+import { clamp } from "../composables/clamp"
 import { splitTime } from "./timeSpan"
 
 /** The stretch of a clip that loops, and how long two passes overlap at the seam. */
@@ -29,16 +30,16 @@ export function planLoop(
   options: { start?: number; end?: number; crossfade?: number; minLength?: number } = {},
 ): LoopPlan {
   if (!Number.isFinite(duration) || duration <= 0) return { from: 0, to: 0, fade: 0 }
-  const clamp = (value: number) => Math.min(duration, Math.max(0, value))
-  let from = clamp(options.start ?? 0)
-  let to = clamp(options.end ?? duration)
+  const within = (value: number) => clamp(value, 0, duration)
+  let from = within(options.start ?? 0)
+  let to = within(options.end ?? duration)
   if (to < from) [from, to] = [to, from]
-  const minLength = Math.min(duration, Math.max(0, options.minLength ?? 0.5))
+  const minLength = clamp(options.minLength ?? 0.5, 0, duration)
   if (to - from < minLength) {
     to = Math.min(duration, from + minLength)
     from = Math.max(0, to - minLength)
   }
-  const fade = Math.min(Math.max(0, options.crossfade ?? 0), (to - from) / 2)
+  const fade = clamp(options.crossfade ?? 0, 0, (to - from) / 2)
   return { from, to, fade }
 }
 
@@ -55,7 +56,7 @@ export function seamReached(plan: LoopPlan, time: number): boolean {
  */
 export function seamProgress(plan: LoopPlan, incomingTime: number): number {
   if (plan.fade <= 0) return 1
-  return Math.min(1, Math.max(0, (incomingTime - plan.from) / plan.fade))
+  return clamp((incomingTime - plan.from) / plan.fade, 0, 1)
 }
 
 /** Whether the whole clip loops with nothing cut and no overlap, which the media element does natively. */

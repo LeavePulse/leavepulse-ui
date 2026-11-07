@@ -17,7 +17,12 @@ type ToggleEmit = {
  * Shared by LpSwitch and LpCheckbox so a setting saved from either behaves
  * the same.
  */
-export function useOptimisticToggle(action: () => ((value: boolean) => unknown) | undefined, emit: ToggleEmit) {
+export function useOptimisticToggle(
+  action: () => ((value: boolean) => unknown) | undefined,
+  emit: ToggleEmit,
+  /** Puts back what a boolean cannot say: a checkbox's mixed state. */
+  rolledBack?: () => void,
+) {
   const toast = useToast()
   const instance = getCurrentInstance()
   const pending = ref(false)
@@ -33,6 +38,7 @@ export function useOptimisticToggle(action: () => ((value: boolean) => unknown) 
       emit("done", value)
     } catch (error) {
       emit("update:modelValue", !value)
+      rolledBack?.()
       if (instance?.vnode.props?.onError) emit("error", error)
       else toast.error(error instanceof Error ? error : String(error))
     } finally {

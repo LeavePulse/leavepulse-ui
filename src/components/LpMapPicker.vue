@@ -20,6 +20,7 @@ export default { inheritAttrs: false }
  * layer first and swaps the tile pyramid only once the animation lands, which
  * is how the zoom reads as continuous instead of as a hard cut between levels.
  */
+import { clamp } from "../composables/clamp"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
@@ -107,7 +108,7 @@ let zoomTimer: ReturnType<typeof setTimeout> | undefined
 let pruneTimer: ReturnType<typeof setTimeout> | undefined
 
 function clampZoom(value: number) {
-  return Math.round(Math.min(maxZoom.value, Math.max(minZoom.value, value)))
+  return Math.round(clamp(value, minZoom.value, maxZoom.value))
 }
 
 /** World-pixel coordinate of the viewport's top-left corner, at `level`. */

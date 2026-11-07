@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 /*
  * Moving focus by direction rather than by document order: what a D-pad, a
  * stick or a TV remote needs, where "next" means "the thing to the right", not
@@ -113,7 +114,7 @@ export function focusableIn(root: ParentNode): HTMLElement[] {
     if (element.getAttribute("tabindex") === "-1" && !element.matches(ROVING_ITEMS)) return false
     const rect = element.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return false
-    const style = getComputedStyle(element)
+    const style = nodeWindow(element).getComputedStyle(element)
     return style.visibility !== "hidden" && style.display !== "none"
   })
 }

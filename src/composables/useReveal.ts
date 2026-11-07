@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 import { onBeforeUnmount, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { prefersReducedMotion } from "./easing"
 
@@ -102,7 +103,7 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
         return
       }
 
-      observer = new IntersectionObserver(
+      observer = new (nodeWindow(node).IntersectionObserver)(
         (entries) => {
           if (entries.some((entry) => entry.isIntersecting)) reveal()
         },

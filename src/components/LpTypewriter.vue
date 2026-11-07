@@ -29,6 +29,7 @@ export default { inheritAttrs: false }
  * is on screen and pauses while it is off screen or the tab is hidden. Under
  * reduced motion whole strings appear and swap without typing.
  */
+import { isElement } from "../composables/useView"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { useInView } from "../composables/useInView"
@@ -95,7 +96,7 @@ const idle = computed(() => state.value.phase === "holding" || state.value.phase
 const { el: revealEl, revealed } = useReveal({ immediate: () => props.play !== undefined })
 const { el: viewEl, inView } = useInView()
 const setRoot = (node: unknown) => {
-  const element = node instanceof Element ? node : null
+  const element = isElement(node) ? node : null
   revealEl.value = element
   viewEl.value = element
 }

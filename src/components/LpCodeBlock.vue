@@ -22,7 +22,7 @@ export default { inheritAttrs: false }
  * import/package block automatically without markers. Regions collapse by default;
  * set `region:open` (e.g. `// #region label open`) to start expanded.
  */
-import { computed, reactive, ref, watch } from "vue"
+import { computed, h, reactive, ref, watch, type FunctionalComponent } from "vue"
 import { type CodeLang, tokenizeLines } from "./codeHighlight"
 import { useLabels } from "../composables/useLpConfig"
 import LpCopyButton from "./LpCopyButton.vue"
@@ -218,6 +218,16 @@ function onInput(e: Event) {
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "overflow-hidden rounded-card border border-line bg-surface font-mono text-xs",
 )
+
+// One line of code, plain or inside a fold. Built without a template so no
+// whitespace can reach the <pre> it renders into.
+const CodeLine: FunctionalComponent<{ n: number }> = ({ n }) =>
+  h("span", { class: "block min-h-[1.4em]" }, [
+    props.lineNumbers
+      ? h("span", { class: "mr-3 inline-block w-7 select-none text-right text-muted/60", "aria-hidden": "true" }, n)
+      : null,
+    ...tokens(n).map((tok, j) => h("span", { key: j, class: tok.cls }, tok.text)),
+  ])
 </script>
 
 <template>
@@ -290,19 +300,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       ><code class="block"><template
           v-for="(seg, s) in segments"
           :key="s"
-        ><!-- Plain lines --><template v-if="seg.kind === 'lines'"><span
+        ><!-- Plain lines --><template v-if="seg.kind === 'lines'"><CodeLine
               v-for="ln in seg.lines"
               :key="'l' + ln.n"
-              class="block min-h-[1.4em]"
-            ><span
-                v-if="lineNumbers"
-                class="mr-3 inline-block w-7 select-none text-right text-muted/60"
-                aria-hidden="true"
-              >{{ ln.n }}</span><span
-                v-for="(tok, j) in tokens(ln.n)"
-                :key="j"
-                :class="tok.cls"
-              >{{ tok.text }}</span></span></template><!-- Fold region --><template
+              :n="ln.n"
+            /></template><!-- Fold region --><template
             v-else
           ><button
               type="button"
@@ -318,19 +320,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
                 class="select-none text-muted/50"
               >{{ text.lines.replace("{n}", String(seg.lines.length)) }}</span></button><template
               v-if="openState[seg.id]"
-            ><span
+            ><CodeLine
                 v-for="ln in seg.lines"
                 :key="'f' + ln.n"
-                class="block min-h-[1.4em]"
-              ><span
-                  v-if="lineNumbers"
-                  class="mr-3 inline-block w-7 select-none text-right text-muted/60"
-                  aria-hidden="true"
-                >{{ ln.n }}</span><span
-                  v-for="(tok, j) in tokens(ln.n)"
-                  :key="j"
-                  :class="tok.cls"
-                >{{ tok.text }}</span></span></template></template></template></code></pre>
+                :n="ln.n"
+              /></template></template></template></code></pre>
     </div>
   </div>
 </template>

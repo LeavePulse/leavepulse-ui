@@ -14,6 +14,7 @@ import {
   ScrollAreaViewport,
 } from "reka-ui"
 import { prefersReducedMotion } from "../composables/easing"
+import { nodeWindow } from "../composables/useView"
 
 // `fade` softens whichever of the top/bottom edges currently has content beyond
 // it, so a clipped list reads as continuing rather than as cut off. On by
@@ -122,7 +123,9 @@ function measureEdges(el: HTMLElement) {
  * it has to come off the element.
  *
  * Kept in sync with content size rather than set once: a list that fills in
- * later becomes scrollable without anything else changing.
+ * later becomes scrollable without anything else changing. The viewport's
+ * tabindex is therefore this component's alone; `tabindex` on LpScrollArea
+ * lands on its root and does not reach it.
  */
 function syncViewportFocusable(el: HTMLElement) {
   const scrollable = el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth
@@ -161,8 +164,10 @@ watch(
     }
     remeasure()
 
-    if (typeof ResizeObserver !== "undefined") {
-      edgeResize = new ResizeObserver(remeasure)
+    // The element's own window: the observers belong to the realm they watch.
+    const win = nodeWindow(el)
+    if (win.ResizeObserver) {
+      edgeResize = new win.ResizeObserver(remeasure)
       edgeResize.observe(el)
       // Watching the children too, since a grid that reflows into more rows
       // grows the content box without the viewport's own size moving.
@@ -171,8 +176,8 @@ watch(
     // Rows arriving after the first paint are the common case — a list waiting
     // on a query renders empty, and observing only the boxes that existed then
     // left the fade off until something else happened to trigger a measure.
-    if (typeof MutationObserver !== "undefined") {
-      edgeMutation = new MutationObserver(() => {
+    if (win.MutationObserver) {
+      edgeMutation = new win.MutationObserver(() => {
         if (edgeResize) {
           edgeResize.disconnect()
           edgeResize.observe(el)
@@ -186,7 +191,10 @@ watch(
   { immediate: true, flush: "post" },
 )
 
-onBeforeUnmount(stopEdgeWatch)
+onBeforeUnmount(() => {
+  stopEdgeWatch()
+  stopThumbDrag?.()
+})
 
 /*
  * A press on the bar beside the thumb. reka treats any press on the track as
@@ -211,17 +219,26 @@ function onTrackPointerDown(event: PointerEvent, axis: "x" | "y") {
   el.scrollBy(axis === "y" ? { top: step, behavior } : { left: step, behavior })
 }
 
-function onThumbPointerDown() {
+let stopThumbDrag: (() => void) | null = null
+
+function onThumbPointerDown(event: PointerEvent) {
   dragging.value = true
+  stopThumbDrag?.()
+  // The thumb's own window: inside an LpFrame the page's never hears the release.
+  const win = nodeWindow(event.currentTarget as Node)
   const stop = () => {
     dragging.value = false
-    window.removeEventListener("pointerup", stop)
-    window.removeEventListener("pointercancel", stop)
+    win.removeEventListener("pointerup", stop)
+    win.removeEventListener("pointercancel", stop)
+    win.removeEventListener("lostpointercapture", stop)
+    stopThumbDrag = null
   }
+  stopThumbDrag = stop
   // Bound on the window: the pointer is captured by the thumb, and the release
   // routinely happens far outside the scroll area.
-  window.addEventListener("pointerup", stop)
-  window.addEventListener("pointercancel", stop)
+  win.addEventListener("pointerup", stop)
+  win.addEventListener("pointercancel", stop)
+  win.addEventListener("lostpointercapture", stop)
 }
 </script>
 

@@ -2,6 +2,7 @@
  * Data export shared by the table and the chart: CSV text, a file download,
  * and an SVG rasterised with its theme resolved.
  */
+import { isElement, nodeWindow } from "../composables/useView"
 
 export interface CsvColumn<Row> {
   key: string
@@ -64,19 +65,30 @@ export function toCsv<Row>(rows: readonly Row[], columns: readonly CsvColumn<Row
  * Hand the viewer a file to save. Does nothing outside a browser, so a call
  * that runs during SSR is harmless.
  */
-export function downloadFile(name: string, data: Blob | string, type = "text/plain;charset=utf-8"): void {
-  if (typeof document === "undefined" || typeof URL === "undefined") return
+export function downloadFile(
+  name: string,
+  data: Blob | string,
+  type = "text/plain;charset=utf-8",
+  doc: Document | undefined = typeof document === "undefined" ? undefined : document,
+): void {
+  if (!doc || typeof URL === "undefined") return
   const blob = typeof data === "string" ? new Blob([data], { type }) : data
   const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = name
-  a.rel = "noopener"
+  clickLink(doc, { href: url, download: name, rel: "noopener" })
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/**
+ * Follow a link the way a click on it would, from the document it should open
+ * in: an LpFrame's, inside one.
+ */
+export function clickLink(doc: Document, attributes: Partial<Pick<HTMLAnchorElement, "href" | "download" | "target" | "rel">>): void {
+  const a = doc.createElement("a")
+  Object.assign(a, attributes)
   a.style.display = "none"
-  document.body.append(a)
+  doc.body.append(a)
   a.click()
   a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 const PAINT_PROPS = [
@@ -111,13 +123,14 @@ const PAINT_PROPS = [
  * are frozen at their end state.
  */
 export function inlineSvg(svg: SVGSVGElement): SVGSVGElement {
+  const view = nodeWindow(svg)
   const clone = svg.cloneNode(true) as SVGSVGElement
   const source = [svg, ...svg.querySelectorAll("*")]
   const target = [clone, ...clone.querySelectorAll("*")]
   source.forEach((el, i) => {
     const copy = target[i]
-    if (!(copy instanceof Element)) return
-    const computed = getComputedStyle(el)
+    if (!isElement(copy)) return
+    const computed = view.getComputedStyle(el)
     const style = PAINT_PROPS.map((p) => `${p}:${computed.getPropertyValue(p)}`)
       .filter((d) => !d.endsWith(":"))
       .join(";")
@@ -126,7 +139,7 @@ export function inlineSvg(svg: SVGSVGElement): SVGSVGElement {
   })
   // Comment nodes (Vue leaves them in development builds) may hold "--", which
   // is invalid inside an XML comment and makes the whole image fail to load.
-  const comments = document.createTreeWalker(clone, NodeFilter.SHOW_COMMENT)
+  const comments = view.document.createTreeWalker(clone, view.NodeFilter.SHOW_COMMENT)
   const dead: Node[] = []
   while (comments.nextNode()) dead.push(comments.currentNode)
   for (const node of dead) node.parentNode?.removeChild(node)
@@ -157,13 +170,14 @@ export interface RasterOptions {
 
 /** Rasterise an SVG element to a PNG blob with its theme resolved. */
 export async function svgToPng(svg: SVGSVGElement, options: RasterOptions = {}): Promise<Blob> {
+  const view = nodeWindow(svg)
   const copy = inlineSvg(svg)
   const width = Number(copy.getAttribute("width"))
   const height = Number(copy.getAttribute("height"))
   const markup = new XMLSerializer().serializeToString(copy)
   const url = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml;charset=utf-8" }))
   try {
-    const img = new Image()
+    const img = new view.Image()
     img.decoding = "async"
     const loaded = new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
@@ -172,11 +186,11 @@ export async function svgToPng(svg: SVGSVGElement, options: RasterOptions = {}):
     img.src = url
     await loaded
 
-    const scale = options.scale ?? Math.max(2, globalThis.devicePixelRatio || 1)
+    const scale = options.scale ?? Math.max(2, view.devicePixelRatio || 1)
     const pad = options.padding ?? 0
-    const measure = document.createElement("canvas").getContext("2d")
+    const measure = view.document.createElement("canvas").getContext("2d")
     const headerHeight = measure && options.header ? options.header(measure, width) : 0
-    const canvas = document.createElement("canvas")
+    const canvas = view.document.createElement("canvas")
     canvas.width = Math.ceil((width + pad * 2) * scale)
     canvas.height = Math.ceil((height + headerHeight + pad * 2) * scale)
     const ctx = canvas.getContext("2d")
@@ -200,7 +214,7 @@ export async function svgToPng(svg: SVGSVGElement, options: RasterOptions = {}):
 /** The first non-transparent background at or above an element. */
 export function backgroundOf(el: Element | null): string | undefined {
   for (let node = el; node; node = node.parentElement) {
-    const bg = getComputedStyle(node).backgroundColor
+    const bg = nodeWindow(node).getComputedStyle(node).backgroundColor
     if (bg && bg !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(bg)) return bg
   }
   return undefined
@@ -212,11 +226,12 @@ export function backgroundOf(el: Element | null): string | undefined {
  */
 export function resolveCssColor(value: string, within: Element): string {
   if (!value.includes("var(") && !value.toLowerCase().includes("currentcolor")) return value
-  const probe = document.createElement("span")
+  const view = nodeWindow(within)
+  const probe = view.document.createElement("span")
   probe.style.color = value
   probe.style.display = "none"
   within.append(probe)
-  const resolved = getComputedStyle(probe).color
+  const resolved = view.getComputedStyle(probe).color
   probe.remove()
   return resolved || value
 }

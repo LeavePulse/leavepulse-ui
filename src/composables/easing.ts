@@ -28,10 +28,33 @@
  * A plain function, not a reactive composable: it is read at the moment an
  * animation starts, and a component that also needs to RE-RENDER when the
  * setting changes mid-session should use `usePrefersReducedMotion`.
+ *
+ * Which one to use: a one-off animation reads this as it starts; anything that
+ * keeps running (a loop, a spring, a video) follows the reactive one or the
+ * media query's own change event, so it stops without a new action; a CSS
+ * transition uses `prefers-reduced-motion` in CSS.
+ *
+ * `win` is the window to ask, for a caller inside an LpFrame.
  */
-export const prefersReducedMotion = (): boolean =>
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false)
+export const prefersReducedMotion = (win?: Window): boolean => {
+  const target = win ?? (typeof window === "undefined" ? undefined : window)
+  return target?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false
+}
+
+/*
+ * Where a motion token is read from. A scoped theme (LpThemeProvider) or an
+ * LpFrame declares its tokens on its own element or document, so a caller with
+ * an element at hand passes it; without one it is the page's root.
+ */
+type TokenScope = Element | Document
+
+function readToken(name: string, scope?: TokenScope): string | null {
+  if (typeof window === "undefined") return null
+  const el = scope ? ("documentElement" in scope ? scope.documentElement : scope) : document.documentElement
+  const view = el.ownerDocument?.defaultView ?? window
+  if (!view.getComputedStyle) return null
+  return view.getComputedStyle(el).getPropertyValue(`--${name}`).trim()
+}
 
 /**
  * A motion token's value, for an API that cannot take a `var()`.
@@ -47,20 +70,21 @@ export const prefersReducedMotion = (): boolean =>
 export const easingToken = (
   name: "ease-emphasized" | "ease-travel" | "ease-settle",
   fallback = "cubic-bezier(0.2, 0, 0, 1)",
-): string => {
-  if (typeof window === "undefined" || !window.getComputedStyle) return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim()
-  return value || fallback
-}
+  scope?: TokenScope,
+): string => readToken(name, scope) || fallback
 
 /**
  * A duration token in milliseconds, for an animation or a timer driven in
  * script. Same reasoning as `easingToken`: a typed-out 220 would not follow a
  * theme that retunes the token.
  */
-export const durationToken = (name: "duration-fast" | "duration-medium", fallback = 220): number => {
-  if (typeof window === "undefined" || !window.getComputedStyle) return fallback
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim()
+export const durationToken = (
+  name: "duration-fast" | "duration-medium",
+  fallback = 220,
+  scope?: TokenScope,
+): number => {
+  const raw = readToken(name, scope)
+  if (raw === null) return fallback
   const ms = Number.parseFloat(raw)
   return Number.isFinite(ms) ? (raw.endsWith("ms") || !raw.endsWith("s") ? ms : ms * 1000) : fallback
 }
@@ -156,8 +180,9 @@ export const cubicBezier = (x1: number, y1: number, x2: number, y2: number) => {
  */
 export const tokenEase = (
   name: "ease-emphasized" | "ease-travel" | "ease-settle",
+  scope?: TokenScope,
 ): ((t: number) => number) => {
-  const match = /cubic-bezier\(([^)]+)\)/.exec(easingToken(name))
+  const match = /cubic-bezier\(([^)]+)\)/.exec(easingToken(name, undefined, scope))
   const n = match?.[1].split(",").map((p) => Number.parseFloat(p))
   return n && n.length === 4 && n.every(Number.isFinite)
     ? cubicBezier(n[0], n[1], n[2], n[3])

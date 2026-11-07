@@ -17,6 +17,7 @@ export default { inheritAttrs: false }
  * `identicon()` in identicon.ts, which a canvas, a favicon or a notification
  * icon can call directly.
  */
+import { clamp } from "../composables/clamp"
 import { computed } from "vue"
 import { identicon, identiconRects } from "./identicon"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -43,7 +44,7 @@ const props = withDefaults(
 
 const icon = computed(() => identicon(props.seed, { grid: props.grid }))
 const rects = computed(() => identiconRects(icon.value.cells))
-const pad = computed(() => props.grid * Math.max(0, Math.min(0.4, props.padding)))
+const pad = computed(() => props.grid * clamp(props.padding, 0, 0.4))
 const view = computed(() => props.grid + pad.value * 2)
 const wash = computed(() => `color-mix(in oklab, ${icon.value.color} 16%, var(--color-surface-soft))`)
 

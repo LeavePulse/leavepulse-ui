@@ -1,3 +1,4 @@
+import { clamp } from "./clamp"
 import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
 
 /*
@@ -82,10 +83,6 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
 
   function setViewport(el: HTMLElement | null) {
     viewport = el
-  }
-
-  function clamp(value: number, lo: number, hi: number) {
-    return Math.min(hi, Math.max(lo, value))
   }
 
   /**
@@ -215,7 +212,7 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
 
   function setView(view: { x: number; y: number; scale?: number }) {
     if (view.scale !== undefined) {
-      scale.value = Math.min(maxOf(), Math.max(min, view.scale))
+      scale.value = clamp(view.scale, min, maxOf())
     }
     x.value = view.x
     y.value = view.y

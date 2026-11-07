@@ -1,3 +1,5 @@
+import { nodeWindow } from "./useView"
+
 /*
  * The element that actually scrolls, and scrolling it to show a child. Inside an
  * app shell that is a scroll region, not the window, and `scrollIntoView` moves
@@ -18,7 +20,7 @@ export interface ScrollParentOptions {
 export function scrollParent(el: Element | null | undefined, { axis = "y", self = false }: ScrollParentOptions = {}): HTMLElement | null {
   for (let node = self ? (el as HTMLElement | null | undefined) : el?.parentElement; node; node = node.parentElement) {
     if (node === node.ownerDocument.body || node === node.ownerDocument.documentElement) return null
-    const style = getComputedStyle(node)
+    const style = nodeWindow(node).getComputedStyle(node)
     const y = axis !== "x" && SCROLLS.test(style.overflowY) && node.scrollHeight > node.clientHeight
     const x = axis !== "y" && SCROLLS.test(style.overflowX) && node.scrollWidth > node.clientWidth
     if (y || x) return node
@@ -48,7 +50,7 @@ export interface ScrollToElementOptions {
 /** Scroll the nearest scroller, and only it, so that `el` is in view. */
 /** The element's own `scroll-margin-top`, the gap it asks to keep above it when scrolled to. */
 export function scrollMarginTop(el: Element): number {
-  return Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0
+  return Number.parseFloat(nodeWindow(el).getComputedStyle(el).scrollMarginTop) || 0
 }
 
 export function scrollToElement(

@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 import { onScopeDispose, toValue, watch, type MaybeRefOrGetter } from "vue"
 
 /*
@@ -41,7 +42,7 @@ export function useResizeObserver(
       if (!el) return
       if (immediate) callback(undefined, el)
       if (typeof ResizeObserver === "undefined") return
-      observer = new ResizeObserver((entries) => {
+      observer = new (nodeWindow(el).ResizeObserver)((entries) => {
         const entry = entries[entries.length - 1]
         if (entry) callback(entry, el)
       })

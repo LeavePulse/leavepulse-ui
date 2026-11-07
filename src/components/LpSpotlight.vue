@@ -14,6 +14,7 @@ export default { inheritAttrs: false }
  * that is not a card. Mouse only; reduced motion draws nothing. The glow is
  * painted by `.lp-spotlight` in tokens/effects.css.
  */
+import { clamp } from "../composables/clamp"
 import { computed } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useSpotlight } from "../composables/useSpotlight"
@@ -39,7 +40,7 @@ const { class: classes, attrs: rest } = useMergedAttrs(() => "lp-spotlight round
 
 const style = computed(() => ({
   "--lp-spot-size": `${props.size}px`,
-  "--lp-spot-strength": `${Math.min(100, Math.max(0, props.strength))}%`,
+  "--lp-spot-strength": `${clamp(props.strength, 0, 100)}%`,
   ...(props.color ? { "--lp-spot-color": props.color } : {}),
 }))
 </script>

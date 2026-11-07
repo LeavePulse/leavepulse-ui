@@ -1,6 +1,7 @@
 import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
 import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
 import { scrollParent } from "./scroll"
+import { nodeWindow } from "./useView"
 
 /*
  * Paint selection: press on one item's tick and sweep across the others, and
@@ -76,8 +77,11 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     return out
   }
 
+  // Inside an LpFrame the pointer's events stay in the frame's window.
+  const hostWindow = (): Window => (options.root.value ? nodeWindow(options.root.value) : window)
+
   function keyAt(x: number, y: number): K | undefined {
-    const item = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-paint-key]")
+    const item = options.root.value?.ownerDocument.elementFromPoint(x, y)?.closest<HTMLElement>("[data-paint-key]")
     if (!item || !options.root.value?.contains(item)) return undefined
     return resolve(item.dataset.paintKey ?? "")
   }
@@ -100,11 +104,11 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
   function tick() {
     frame = 0
     if (!stroke) return
-    const box = stroke.scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight }
+    const box = stroke.scroller?.getBoundingClientRect() ?? { top: 0, bottom: hostWindow().innerHeight }
     const delta = stroke.y > box.bottom - EDGE_PX ? SCROLL_STEP : stroke.y < box.top + EDGE_PX ? -SCROLL_STEP : 0
     if (delta) {
       if (stroke.scroller) stroke.scroller.scrollTop += delta
-      else window.scrollBy(0, delta)
+      else hostWindow().scrollBy(0, delta)
       extend()
     }
     frame = requestAnimationFrame(tick)
@@ -119,7 +123,7 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     painting.value = true
     // A sweep over text would otherwise select it, and a hold that started
     // before the stroke may already have.
-    window.getSelection()?.removeAllRanges()
+    hostWindow().getSelection()?.removeAllRanges()
     if (options.root.value) options.root.value.style.userSelect = "none"
     extend()
     if (!frame) frame = requestAnimationFrame(tick)
@@ -213,22 +217,24 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     { scope: options.root },
   )
 
+  let listening: Window | null = null
   onMounted(() => {
-    window.addEventListener("pointermove", onMove)
-    window.addEventListener("pointerup", onUp)
-    window.addEventListener("pointercancel", onUp)
-    window.addEventListener("click", onClickCapture, true)
-    window.addEventListener("contextmenu", onContextMenu, true)
+    listening = hostWindow()
+    listening.addEventListener("pointermove", onMove)
+    listening.addEventListener("pointerup", onUp)
+    listening.addEventListener("pointercancel", onUp)
+    listening.addEventListener("click", onClickCapture, true)
+    listening.addEventListener("contextmenu", onContextMenu, true)
     options.root.value?.addEventListener("touchmove", onTouchMove, { passive: false })
   })
   onBeforeUnmount(() => {
     onUp()
     swallowClick = false
-    window.removeEventListener("pointermove", onMove)
-    window.removeEventListener("pointerup", onUp)
-    window.removeEventListener("pointercancel", onUp)
-    window.removeEventListener("click", onClickCapture, true)
-    window.removeEventListener("contextmenu", onContextMenu, true)
+    listening?.removeEventListener("pointermove", onMove)
+    listening?.removeEventListener("pointerup", onUp)
+    listening?.removeEventListener("pointercancel", onUp)
+    listening?.removeEventListener("click", onClickCapture, true)
+    listening?.removeEventListener("contextmenu", onContextMenu, true)
     options.root.value?.removeEventListener("touchmove", onTouchMove)
   })
 

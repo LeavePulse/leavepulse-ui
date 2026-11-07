@@ -1,3 +1,4 @@
+import { isHTMLElement } from "./useView"
 import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
 import { usePointerFrame } from "./usePointerFrame"
 import { usePrefersReducedMotion } from "./useReducedMotion"
@@ -67,7 +68,7 @@ export function useTilt(source: MaybeRefOrGetter<UseTiltOptions> = {}): UseTilt 
   })
 
   function onPointerMove(e: PointerEvent): void {
-    if (e.currentTarget instanceof HTMLElement) target = e.currentTarget
+    if (isHTMLElement(e.currentTarget)) target = e.currentTarget
     pointer.move(e)
   }
 

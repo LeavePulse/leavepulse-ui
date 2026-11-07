@@ -36,6 +36,7 @@ import { computed, nextTick, ref, watch } from "vue"
 import { useFieldNotice } from "../composables/useFieldNotice"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { useView, viewDocument } from "../composables/useView"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
@@ -74,6 +75,8 @@ const props = withDefaults(
   }>(),
   { modelValue: "", trim: true, size: "md" },
 )
+
+const view = useView()
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void
@@ -157,8 +160,9 @@ async function commit(refocus: boolean) {
     editing.value = true
     await nextTick()
     // Back into the field only if focus is not already somewhere else.
-    const active = document.activeElement
-    if (!active || active === document.body || active === idle.value) field.value?.focus({ preventScroll: true })
+    const page = viewDocument(view.value)
+    const active = page.activeElement
+    if (!active || active === page.body || active === idle.value) field.value?.focus({ preventScroll: true })
     notice.show(error instanceof Error && error.message ? error.message : text.value.failed, { tone: "danger" })
   } finally {
     pending.value = null

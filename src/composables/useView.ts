@@ -1,4 +1,8 @@
 import { computed, inject, provide, type ComputedRef, type InjectionKey } from "vue"
+import { isNode } from "./realm"
+import { isTextEntry } from "./textEntry"
+
+export { isElement, isHTMLElement, isInputElement, isNode, nodeWindow } from "./realm"
 
 /*
  * Which window a component lives in. Almost always the page's own, but inside
@@ -58,11 +62,22 @@ type Marked = Event & { [ORIGIN]?: Document }
 
 const FORWARDED = ["pointerdown", "pointerup", "click", "focusin", "keydown"] as const
 
+/*
+ * A letter typed into a field is the field's, and the page has no business
+ * hearing it. Everything else goes up: useHotkeys listens on the page, and with
+ * only Escape and chords forwarded, a plain key or a sequence did nothing while
+ * the focus sat in a frame.
+ */
+function typedHere(event: KeyboardEvent): boolean {
+  const printable = event.key.length === 1 && !event.ctrlKey && !event.metaKey
+  return printable && isTextEntry(event.target, { select: true })
+}
+
 export function forwardViewEvents(from: Document, to: Document): () => void {
   const forward = (event: Event) => {
     if (event.type === "keydown") {
       const key = event as KeyboardEvent
-      if (key.defaultPrevented || (key.key !== "Escape" && !key.ctrlKey && !key.metaKey)) return
+      if (key.defaultPrevented || typedHere(key)) return
     }
     const Copy = event.constructor as new (type: string, init: Event) => Event
     const copy = new Copy(event.type, event) as Marked
@@ -85,8 +100,7 @@ function originOf(event: Event): Document | null {
   const marked = (inner as Marked)[ORIGIN]
   if (marked) return marked
   const target = inner.target as Node | null
-  // Not `instanceof`: a node of the frame is another realm's Node.
-  if (!target || typeof target.nodeType !== "number") return null
+  if (!isNode(target)) return null
   return target.nodeType === 9 ? (target as Document) : target.ownerDocument
 }
 

@@ -1,6 +1,9 @@
 import { computed, ref, watch, type MaybeRefOrGetter, toValue } from "vue"
+import { isTextEntry } from "./textEntry"
+import { isHTMLElement } from "./useView"
 
 const NON_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"])
+const ROW_FIELD = { select: true, inputType: (type: string) => !NON_TEXT_INPUTS.has(type) }
 
 /*
  * Arrow-key navigation over a list, with a roving tabindex.
@@ -40,9 +43,9 @@ export interface UseRovingFocusOptions {
   /**
    * Which axis the arrows follow. `vertical` (default) uses ↑↓, `horizontal`
    * uses ←→, `both` accepts either — for a grid whose wrapping the caller
-   * cannot describe here.
+   * cannot describe here. A ref or getter follows a list that changes axis.
    */
-  orientation?: "vertical" | "horizontal" | "both"
+  orientation?: MaybeRefOrGetter<"vertical" | "horizontal" | "both">
   /** Wrap around at the ends instead of stopping. Default true. */
   loop?: boolean
   /** Jump to an item by typing its first letters. Default true. */
@@ -154,18 +157,13 @@ export function useRovingFocus(
     }
   }
 
-  function isTextEntry(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false
-    if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true
-    return target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type)
-  }
-
   function onKeydown(event: KeyboardEvent) {
     // A field inside a row (an inline rename, a filter) owns its keys: the list
     // taking letters for typeahead or Space for activation made it untypeable.
-    if (event.isComposing || isTextEntry(event.target)) return
-    const vertical = orientation === "vertical" || orientation === "both"
-    const horizontal = orientation === "horizontal" || orientation === "both"
+    if (event.isComposing || isTextEntry(event.target, ROW_FIELD)) return
+    const axis = toValue(orientation)
+    const vertical = axis === "vertical" || axis === "both"
+    const horizontal = axis === "horizontal" || axis === "both"
 
     switch (event.key) {
       case "ArrowDown":
@@ -234,9 +232,8 @@ export function useRovingFocus(
    * narrowed the rows would yank the user out of the field they are typing in.
    */
   watch(activeId, (id) => {
-    if (!id || typeof document === "undefined") return
     const container = containerEl.value
-    if (!container || !container.contains(document.activeElement)) return
+    if (!id || !container || !container.contains(container.ownerDocument.activeElement)) return
     const target = container.querySelector<HTMLElement>(
       `[data-roving-id="${CSS.escape(id)}"]`,
     )
@@ -254,7 +251,7 @@ export function useRovingFocus(
 
   /** Bind on the element wrapping the rows. */
   const containerProps = computed(() => ({
-    ref: (el: unknown) => setContainer(el instanceof HTMLElement ? el : null),
+    ref: (el: unknown) => setContainer(isHTMLElement(el) ? el : null),
     onKeydown,
   }))
 

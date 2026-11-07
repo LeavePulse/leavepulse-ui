@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { isHTMLElement } from "../composables/useView"
 import { computed, ref, watch, type Component } from "vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
@@ -75,7 +76,7 @@ watch(
   crumbs,
   () => {
     for (const crumb of Array.from(list.value?.$el.children ?? [])) {
-      if (crumb instanceof HTMLElement) spots.set(crumb, [crumb.offsetLeft, crumb.offsetTop])
+      if (isHTMLElement(crumb)) spots.set(crumb, [crumb.offsetLeft, crumb.offsetTop])
     }
   },
   { flush: "pre" },

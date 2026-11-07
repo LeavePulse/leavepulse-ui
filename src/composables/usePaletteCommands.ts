@@ -1,5 +1,7 @@
 import { computed, getCurrentInstance, h, inject, onMounted, onUpdated, onScopeDispose, provide, ref, shallowReactive, shallowRef, toValue, useId, type Component, type Directive, type InjectionKey, type MaybeRefOrGetter } from "vue"
+import { menuPaletteCommands } from "../components/commandPalette"
 import type { Command } from "../components/LpCommandPalette.vue"
+import type { ContextMenuItemDef } from "../components/LpContextMenu.vue"
 import { provideField, useField } from "./useField"
 import { useLabels } from "./useLpConfig"
 
@@ -104,6 +106,17 @@ export function usePaletteCommands(commands: MaybeRefOrGetter<readonly Command[]
 }
 
 /** Manual definitions override a discovered command without changing its place. */
+/** A titled menu as one command of the palette, with its items inside. */
+export function useMenuPalette(menu: { palette?: PaletteControlOptions; title?: string; items: ContextMenuItemDef[] }) {
+  const scope = usePaletteScope()
+  const generated = useId()
+  usePaletteCommands(() => {
+    if (menu.palette === false || !menu.title || !menu.items.length) return []
+    const id = `${scope?.id}/${menu.palette?.id ?? generated}`
+    return [{ id, label: menu.palette?.label ?? menu.title, children: menuPaletteCommands(menu.items, id) }]
+  }, { automatic: true })
+}
+
 export function mergePaletteCommands(discovered: readonly Command[], manual: readonly Command[]): Command[] {
   const overrides = new Map(manual.map(command => [command.id, command]))
   return uniqueCommands([...discovered.map(command => overrides.get(command.id) ?? command), ...manual])

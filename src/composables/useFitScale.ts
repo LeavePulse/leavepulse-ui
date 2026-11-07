@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from "vue"
 
 /*
@@ -29,7 +30,9 @@ export function useFitScale(
   function observe() {
     observer?.disconnect()
     if (typeof ResizeObserver === "undefined") return
-    observer = new ResizeObserver(measure)
+    const el = box.value ?? content.value
+    if (!el) return measure()
+    observer = new (nodeWindow(el).ResizeObserver)(measure)
     if (box.value) observer.observe(box.value)
     if (content.value) observer.observe(content.value)
     measure()

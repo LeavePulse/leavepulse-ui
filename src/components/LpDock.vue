@@ -43,6 +43,7 @@ import { prefersReducedMotion } from "../composables/easing"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { springSettled, springStep, type SpringState } from "../composables/usePillTransition"
 import { useRovingFocus } from "../composables/useRovingFocus"
+import { isHTMLElement } from "../composables/useView"
 import { dockSize } from "./dock"
 import LpIcon from "./LpIcon.vue"
 import LpTooltip from "./LpTooltip.vue"
@@ -96,7 +97,7 @@ function select(id: string) {
 
 const roving = useRovingFocus(
   () => props.items.map((item) => ({ id: item.id, label: item.label, disabled: item.disabled })),
-  { orientation: props.orientation, onActivate: select },
+  { orientation: () => props.orientation, onActivate: select },
 )
 
 // ── magnification ─────────────────────────────────────────
@@ -111,7 +112,7 @@ let frame = 0
 let lastTime = 0
 
 function setButton(id: string, el: unknown) {
-  if (el instanceof HTMLElement) buttons.set(id, el)
+  if (isHTMLElement(el)) buttons.set(id, el)
   else buttons.delete(id)
 }
 
@@ -120,9 +121,21 @@ function centreOf(el: HTMLElement): number {
   return vertical.value ? rect.top + rect.height / 2 : rect.left + rect.width / 2
 }
 
-function targetFor(el: HTMLElement): number {
-  if (pointer === null) return props.size
-  return dockSize(props.size, Math.max(props.size, props.magnify), pointer - centreOf(el), props.reach)
+/*
+ * `focusAt` stays relative to the bar and is read here: stored as client px it
+ * went stale as soon as the bar scrolled, while the icons it is measured
+ * against moved on.
+ */
+function swellCentre(): number | null {
+  if (props.focusAt === null) return pointer
+  if (!bar.value || !magnifying()) return null
+  const rect = bar.value.getBoundingClientRect()
+  return (vertical.value ? rect.top : rect.left) + props.focusAt
+}
+
+function targetFor(el: HTMLElement, centre: number | null): number {
+  if (centre === null) return props.size
+  return dockSize(props.size, Math.max(props.size, props.magnify), centre - centreOf(el), props.reach)
 }
 
 function step(time: number) {
@@ -133,7 +146,8 @@ function step(time: number) {
   // Read every target before writing any size: interleaving reads and writes
   // would force a layout per icon per frame.
   const targets = new Map<string, number>()
-  for (const [id, el] of buttons) targets.set(id, targetFor(el))
+  const centre = swellCentre()
+  for (const [id, el] of buttons) targets.set(id, targetFor(el, centre))
   for (const [id, el] of buttons) {
     const target = targets.get(id)!
     const next = springStep(springs.get(id) ?? { value: props.size, velocity: 0 }, target, "pill", dt)
@@ -180,17 +194,12 @@ function onFocusOut(event: FocusEvent) {
   kick()
 }
 
-// The outside-driven swell: converted from bar-relative to client px on every
-// frame it is set, so a bar that moves (scrolls) keeps the swell in place.
+// A coordinate along the old axis means nothing along the new one, so the
+// swell rests until the pointer moves again.
 watch(
-  () => props.focusAt,
-  (at) => {
-    if (at === null) {
-      pointer = null
-    } else if (bar.value && magnifying()) {
-      const rect = bar.value.getBoundingClientRect()
-      pointer = (vertical.value ? rect.top : rect.left) + at
-    }
+  [() => props.focusAt, vertical],
+  () => {
+    pointer = null
     kick()
   },
   { flush: "post" },

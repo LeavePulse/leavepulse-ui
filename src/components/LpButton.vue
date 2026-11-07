@@ -5,6 +5,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { isElement, isHTMLElement } from "../composables/useView"
 import { usePaletteAction, type PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, getCurrentInstance, onMounted, onUpdated, ref, useAttrs, type Component, type ComponentPublicInstance } from "vue"
@@ -96,7 +97,11 @@ const props = withDefaults(
     /**
      * Root element/component. Defaults to a native <button>, or a link when
      * `to`/`href` is set (the link component from provideLpConfig for internal
-     * targets). Pass a component or "a" to override.
+     * targets). Pass a component or "a" to override. A component must render
+     * one interactive root element and pass attributes to it: `disabled` here
+     * is `aria-disabled` plus a blocked click on that root, the hotkey clicks
+     * it, and a fragment root has neither. A component that handles keys
+     * itself has to honour `aria-disabled` on its own.
      */
     as?: string | Component
     /** Router destination: renders the configured link component. */
@@ -115,6 +120,8 @@ const props = withDefaults(
      * ignores further clicks; a failure is reported as an error toast with
      * the error's details, unless the app listens to `error` itself. The
      * state the work was for (a form, a switch) is the app's to roll back.
+     * `@click` still fires at once and says nothing of the result: `done` and
+     * `error` report how the work ended.
      */
     action?: () => unknown
     /**
@@ -167,8 +174,8 @@ async function runAction() {
 const root = ref<HTMLElement | ComponentPublicInstance | null>(null)
 const rootEl = (): HTMLElement | null => {
   const node = root.value
-  if (node instanceof HTMLElement) return node
-  return node?.$el instanceof HTMLElement ? node.$el : null
+  if (isHTMLElement(node)) return node
+  return isHTMLElement(node?.$el) ? node.$el : null
 }
 let viaKey = false
 
@@ -185,7 +192,7 @@ function readSpoken() {
 // app put in the slot): a loader carries a screen-reader "Loading…" that would
 // otherwise end up in the key reference as part of the button's name.
 function labelText(node: Node): string {
-  if (node instanceof Element && node.getAttribute("role") === "status") return ""
+  if (isElement(node) && node.getAttribute("role") === "status") return ""
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
   return Array.from(node.childNodes, labelText).join("")
 }

@@ -25,6 +25,7 @@
  * The mechanism — measure the natural size, pin it in pixels, tween — lives in
  * `useShift`, and LpModal drives its panel with the same composable.
  */
+import { isElement, isHTMLElement, nodeWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { useShift, type ShiftAxis } from "../composables/useShift"
@@ -99,6 +100,7 @@ const transitionClass = computed(() => TRANSITION_CLASS[props.axis])
 const PRESENCE_MS = 200
 const MOVE_MS = 160
 const EASE = "cubic-bezier(0.2, 0, 0, 1)"
+const SVG_NS = "http://www.w3.org/2000/svg"
 const GHOST = "data-lp-shift-ghost"
 
 interface Seen {
@@ -120,7 +122,7 @@ function rememberSoon(box: HTMLElement, wait = PRESENCE_MS + 80) {
 }
 
 function elementsOf(box: HTMLElement): Element[] {
-  return [...box.querySelectorAll("*")].filter((node) => !node.closest(`[${GHOST}]`) && !(node instanceof SVGElement && !(node instanceof SVGSVGElement)))
+  return [...box.querySelectorAll("*")].filter((node) => !node.closest(`[${GHOST}]`) && !(node.namespaceURI === SVG_NS && node.localName !== "svg"))
 }
 
 function remember(box: HTMLElement) {
@@ -142,7 +144,7 @@ function remember(box: HTMLElement) {
 // override that animation's transform, and the marker would pop instead of
 // sliding.
 function inFlow(node: Element): boolean {
-  const position = getComputedStyle(node).position
+  const position = nodeWindow(node).getComputedStyle(node).position
   return position !== "absolute" && position !== "fixed"
 }
 
@@ -150,7 +152,7 @@ function inFlow(node: Element): boolean {
 // actions, a list re-keyed after a reload) is not a change anyone sees, so the
 // pair is left alone rather than flashing out and in.
 function signature(node: Node): string | undefined {
-  return node instanceof Element ? node.outerHTML : undefined
+  return isElement(node) ? node.outerHTML : undefined
 }
 
 function unchanged(records: MutationRecord[]): Set<Node> {
@@ -172,7 +174,7 @@ const offset = () => (props.anchor === "end" ? -6 : 6)
 
 function ghost(box: HTMLElement, node: Element) {
   const at = seen.get(node)
-  if (!at || !at.flow || !(node instanceof HTMLElement) || node.hasAttribute(GHOST) || at.width === 0) return
+  if (!at || !at.flow || !isHTMLElement(node) || node.hasAttribute(GHOST) || at.width === 0) return
   const copy = node.cloneNode(true) as HTMLElement
   copy.setAttribute(GHOST, "")
   copy.setAttribute("aria-hidden", "true")
@@ -207,7 +209,7 @@ function ghost(box: HTMLElement, node: Element) {
 }
 
 function arrive(node: Element) {
-  if (!(node instanceof HTMLElement) || node.hasAttribute(GHOST) || !inFlow(node)) return
+  if (!isHTMLElement(node) || node.hasAttribute(GHOST) || !inFlow(node)) return
   node.animate(
     [
       { opacity: 0, transform: `translateX(${offset()}px) scale(0.96)`, filter: "blur(2px)" },
@@ -219,7 +221,7 @@ function arrive(node: Element) {
 
 function glide(node: Element) {
   const was = seen.get(node)
-  if (!was || !(node instanceof HTMLElement)) return
+  if (!was || !isHTMLElement(node)) return
   const now = node.getBoundingClientRect()
   const dx = was.x - now.left
   const dy = was.y - now.top
@@ -236,25 +238,26 @@ watch(
     presenceSize = undefined
     if (!box || !on) return
     remember(box)
-    presenceObserver = new MutationObserver((records) => {
+    const win = nodeWindow(box)
+    presenceObserver = new win.MutationObserver((records) => {
       const real = records.filter(
         (r) =>
-          ![...r.addedNodes, ...r.removedNodes].every((n) => n instanceof Element && n.hasAttribute(GHOST)),
+          ![...r.addedNodes, ...r.removedNodes].every((n) => isElement(n) && n.hasAttribute(GHOST)),
       )
-      if (real.length && !prefersReducedMotion()) {
+      if (real.length && !prefersReducedMotion(win)) {
         const added = new Set<Node>()
         const same = unchanged(real)
         for (const record of real) {
-          record.removedNodes.forEach((node) => node instanceof Element && !same.has(node) && ghost(box, node))
+          record.removedNodes.forEach((node) => isElement(node) && !same.has(node) && ghost(box, node))
           record.addedNodes.forEach((node) => {
             added.add(node)
-            if (node instanceof Element && !same.has(node)) arrive(node)
+            if (isElement(node) && !same.has(node)) arrive(node)
           })
         }
         // Measured in the next frame, which still comes before the paint: by
         // then the box has taken the classes the change gave it (held to its
         // edge), and the place an element lands is the one it will keep.
-        const parents = real.map((r) => r.target).filter((t): t is Element => t instanceof Element && !t.hasAttribute(GHOST))
+        const parents = real.map((r) => r.target).filter((t): t is Element => isElement(t) && !t.hasAttribute(GHOST))
         requestAnimationFrame(() => {
           for (const parent of parents) for (const child of parent.children) if (!added.has(child)) glide(child)
         })
@@ -262,9 +265,9 @@ watch(
       rememberSoon(box)
     })
     presenceObserver.observe(box, { childList: true, subtree: true })
-    presenceSize = new ResizeObserver(() => rememberSoon(box, 60))
+    presenceSize = new win.ResizeObserver(() => rememberSoon(box, 60))
     presenceSize.observe(box)
-    void document.fonts?.ready.then(() => rememberSoon(box, 0))
+    void box.ownerDocument.fonts?.ready.then(() => rememberSoon(box, 0))
   },
   { flush: "post" },
 )
@@ -274,7 +277,7 @@ watch(
 // resize, every child glides from where it was last seen.
 watch(resizing, (now) => {
   const box = el.value
-  if (!now || !box || !presenceObserver || prefersReducedMotion()) return
+  if (!now || !box || !presenceObserver || prefersReducedMotion(nodeWindow(box))) return
   requestAnimationFrame(() => {
     for (const child of box.children) if (!child.hasAttribute(GHOST)) glide(child)
   })

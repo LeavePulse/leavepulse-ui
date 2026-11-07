@@ -22,15 +22,18 @@ import { usePrefersReducedMotion } from "./useReducedMotion"
  */
 export type PillTransition =
   | { duration: number }
-  | { type: "spring"; stiffness: number; damping: number; mass?: number }
+  | Readonly<{ type: "spring"; stiffness: number; damping: number; mass?: number }>
 
 export type PillFeel = "pill" | "float" | "layout"
 
-const SPRING: Record<PillFeel, { type: "spring"; stiffness: number; damping: number; mass?: number }> = {
-  pill: { type: "spring", stiffness: 520, damping: 40 },
-  float: { type: "spring", stiffness: 210, damping: 26 },
-  layout: { type: "spring", stiffness: 520, damping: 42, mass: 0.9 },
-}
+type Spring = Readonly<{ type: "spring"; stiffness: number; damping: number; mass?: number }>
+
+// Frozen: every consumer holds the same object, so one write would retune them all.
+const SPRING: Readonly<Record<PillFeel, Spring>> = Object.freeze({
+  pill: Object.freeze({ type: "spring", stiffness: 520, damping: 40 }),
+  float: Object.freeze({ type: "spring", stiffness: 210, damping: 26 }),
+  layout: Object.freeze({ type: "spring", stiffness: 520, damping: 42, mass: 0.9 }),
+})
 
 export function usePillTransition(feel: PillFeel = "pill"): ComputedRef<PillTransition> {
   const reduceMotion = usePrefersReducedMotion()

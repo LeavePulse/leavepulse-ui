@@ -28,6 +28,7 @@ export default { inheritAttrs: false }
  *     round marks (10 minutes, 1 minute, 10 seconds…) and at the end — a
  *     screen reader hears the countdown matter, not every second of it.
  */
+import { clamp } from "../composables/clamp"
 import { computed, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -231,7 +232,7 @@ const urgent = computed(() =>
 
 const fraction = computed(() => {
   if (!(total.value > 0)) return null
-  return Math.max(0, Math.min(1, remaining.value / total.value))
+  return clamp(remaining.value / total.value, 0, 1)
 })
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>

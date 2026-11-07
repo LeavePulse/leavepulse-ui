@@ -5,6 +5,7 @@
  * disk agree on when it turns amber, instead of each picking its own breakpoints.
  * The colours themselves are tone.ts's: a meter tone is one of its aliases.
  */
+import { clamp } from "../composables/clamp"
 import { TONE_ALIASES, TONES, type ToneLook } from "./tone"
 
 /**
@@ -38,7 +39,7 @@ export const TONE_SOFT: Record<MeterTone, string> = byMeterTone((look) => look.s
 export function meterFraction(value: number, min: number, max: number): number {
   const span = max - min
   if (!(span > 0) || !Number.isFinite(value)) return 0
-  return Math.max(0, Math.min(1, (value - min) / span))
+  return clamp((value - min) / span, 0, 1)
 }
 
 /**

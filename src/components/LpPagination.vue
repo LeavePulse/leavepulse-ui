@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { nodeWindow } from "../composables/realm"
 /*
  * Page navigator. Pairs with LpTable but stands alone.
  *
@@ -17,6 +18,7 @@ export default { inheritAttrs: false }
  * and just swaps its number — which lets the brand pill glide between slots via
  * motion-v's shared layoutId with zero list-animation conflicts.
  */
+import { clamp } from "../composables/clamp"
 import { Motion } from "motion-v"
 import { computed, ref, useId } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
@@ -66,7 +68,7 @@ const count = computed(() => {
 })
 
 const current = computed(() =>
-  Number.isFinite(props.page) ? Math.min(Math.max(1, Math.floor(props.page)), count.value) : 1,
+  Number.isFinite(props.page) ? clamp(Math.floor(props.page), 1, count.value) : 1,
 )
 
 // A fixed run of page slots. Each slot is either a real page or a gap ("…").
@@ -85,7 +87,7 @@ const gap = ref(6)
 function measure() {
   const nav = root.value
   if (!nav || !nav.children.length) return
-  gap.value = parseFloat(getComputedStyle(nav).columnGap) || 0
+  gap.value = parseFloat(nodeWindow(nav).getComputedStyle(nav).columnGap) || 0
   const items = nav.children.length
   const used = [...nav.children].reduce((sum, el) => sum + (el as HTMLElement).offsetWidth, 0)
   slotWidth.value = used / items
@@ -144,7 +146,7 @@ const slots = computed<Slot[]>(() => {
 
 function go(p: number) {
   if (props.disabled) return
-  const next = Math.min(Math.max(1, p), count.value)
+  const next = clamp(p, 1, count.value)
   if (next === current.value) return
   emit("update:page", next)
   emit("change", next)

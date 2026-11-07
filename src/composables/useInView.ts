@@ -1,3 +1,4 @@
+import { nodeWindow } from "./realm"
 import { onBeforeUnmount, ref, watch, type Ref } from "vue"
 
 /*
@@ -40,7 +41,7 @@ export function useInView(options: { rootMargin?: string; threshold?: number } =
       observer?.disconnect()
       observer = null
       if (!node || typeof IntersectionObserver === "undefined") return sync()
-      observer = new IntersectionObserver(
+      observer = new (nodeWindow(node).IntersectionObserver)(
         (entries) => {
           intersecting.value = entries.some((entry) => entry.isIntersecting)
           sync()

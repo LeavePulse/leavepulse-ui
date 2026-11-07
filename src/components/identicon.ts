@@ -1,3 +1,5 @@
+import { clamp } from "../composables/clamp"
+
 /*
  * Identicons: a picture derived from a string, so something with no avatar
  * of its own (a new account, a server, an API key, a commit) still gets a
@@ -67,7 +69,7 @@ function generator(seed: number): () => number {
 
 /** The grid and colour for a seed. */
 export function identicon(seed: string, options: IdenticonOptions = {}): Identicon {
-  const size = Math.max(3, Math.min(12, Math.round(options.grid ?? 5)))
+  const size = clamp(Math.round(options.grid ?? 5), 3, 12)
   const [sMin, sMax] = options.saturation ?? [55, 72]
   const [lMin, lMax] = options.lightness ?? [48, 60]
   const next = generator(hashString(seed))
@@ -146,7 +148,7 @@ export interface IdenticonSvgOptions extends IdenticonOptions {
 export function identiconSvg(seed: string, options: IdenticonSvgOptions = {}): string {
   const { cells, color } = identicon(seed, options)
   const n = cells.length
-  const pad = n * Math.max(0, Math.min(0.4, options.padding ?? 0.12))
+  const pad = n * clamp(options.padding ?? 0.12, 0, 0.4)
   const view = n + pad * 2
   const px = options.size ?? 64
   const bg = options.background ? `<rect width="${view}" height="${view}" fill="${options.background}"/>` : ""

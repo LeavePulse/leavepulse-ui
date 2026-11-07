@@ -1,3 +1,5 @@
+import { clamp } from "../composables/clamp"
+
 /*
  * Keyframes and timing for LpRevealOnScroll, kept apart from the component so
  * they can be tested without a DOM.
@@ -52,5 +54,5 @@ export function revealTo(from: Keyframe): Keyframe {
  * last rows would still be invisible when the user starts reading them.
  */
 export function staggerDelay(index: number, delay: number, stagger: number, cap = 10): number {
-  return delay + Math.min(Math.max(0, index), cap) * Math.max(0, stagger)
+  return delay + clamp(index, 0, cap) * Math.max(0, stagger)
 }

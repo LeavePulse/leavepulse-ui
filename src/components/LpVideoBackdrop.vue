@@ -32,8 +32,11 @@ export default { inheritAttrs: false }
  * loop decodes one stream. Both play the same `src`: a URL the media element
  * fetches by range, or an object URL of a file already in memory.
  */
+import { clamp } from "../composables/clamp"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
+import { usePrefersReducedMotion } from "../composables/useReducedMotion"
+import { useView } from "../composables/useView"
 import { useInView } from "../composables/useInView"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { isNativeLoop, planLoop, seamProgress, seamReached } from "./videoBackdrop"
@@ -101,7 +104,12 @@ const throttle = ref(1)
  */
 const SLOWEST_RATE = 1 / 16
 
-const reducedMotion = ref(prefersReducedMotion())
+// Read now as well: the live query reports only after mount, and a first paint
+// must not start a video the viewer asked not to see.
+const view = useView()
+const reducedMotion = ref(prefersReducedMotion(view.value?.window))
+const liveMotion = usePrefersReducedMotion()
+watch(liveMotion, (reduced) => (reducedMotion.value = reduced))
 /*
  * Unseen: the tab is hidden or the backdrop is off screen. A video decoding
  * frames under the fold spends as much as one in view, and a page of them
@@ -305,21 +313,11 @@ watch(
   },
 )
 
-function onMotionChange(event: MediaQueryListEvent) {
-  reducedMotion.value = event.matches
-}
-let motionQuery: MediaQueryList | null = null
-
-onMounted(() => {
-  applyRate()
-  motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
-  motionQuery.addEventListener("change", onMotionChange)
-})
+onMounted(applyRate)
 
 onBeforeUnmount(() => {
   if (frame) cancelAnimationFrame(frame)
   if (ramp) cancelAnimationFrame(ramp)
-  motionQuery?.removeEventListener("change", onMotionChange)
 })
 
 function layerStyle(index: 0 | 1) {
@@ -380,7 +378,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </div>
     <div
       class="absolute inset-0 bg-black transition-opacity duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none"
-      :style="{ opacity: Math.min(1, Math.max(0, dim)) }"
+      :style="{ opacity: clamp(dim, 0, 1) }"
     />
   </div>
 </template>

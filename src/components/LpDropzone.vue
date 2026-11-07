@@ -6,6 +6,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { isElement, nodeWindow } from "../composables/realm"
 /*
  * A place to put files: drop them, click to browse, or paste from the
  * clipboard.
@@ -43,7 +44,9 @@ import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-
 import DropzoneLinkField from "./DropzoneLinkField.vue"
 import { POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { inTextField } from "../composables/textEntry"
+import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
+
 
 const props = withDefaults(
   defineProps<{
@@ -378,7 +381,7 @@ function onPicked(event: Event) {
   if (el.files?.length) {
     hints.use(HINT_SIGNALS.dropzoneBrowse)
     const zone = revealAnchor.value
-    if (zone instanceof Element) noteDropzone(zone)
+    if (isElement(zone)) noteDropzone(zone)
   }
   take(el.files)
   // Cleared so picking the same file twice in a row fires again — otherwise
@@ -389,18 +392,20 @@ function onPicked(event: Event) {
 function windowPaste(event: ClipboardEvent) {
   // Already taken by the zone itself, which the paste bubbled up from.
   if (props.disabled || event.defaultPrevented) return
-  const target = event.target as HTMLElement | null
   // A paste aimed at somewhere you can type belongs to that thing.
-  if (target?.closest("input, textarea, [contenteditable]")) return
+  if (inTextField(event.target)) return
   onPaste(event)
 }
 
+const view = useView()
 let listening = false
 function listen(on: boolean) {
   if (on === listening || typeof window === "undefined") return
   listening = on
-  if (on) window.addEventListener("paste", windowPaste)
-  else window.removeEventListener("paste", windowPaste)
+  // A paste stays in the document it happened in: inside an LpFrame, that one.
+  const win = viewWindow(view.value)
+  if (on) win.addEventListener("paste", windowPaste)
+  else win.removeEventListener("paste", windowPaste)
 }
 let mounted = false
 onMounted(() => {
@@ -443,7 +448,7 @@ const frameRadius = computed(() =>
 )
 function measureRadius() {
   const zone = revealAnchor.value as HTMLElement | null
-  if (zone) measuredRadius.value = getComputedStyle(zone).borderTopLeftRadius
+  if (zone) measuredRadius.value = nodeWindow(zone).getComputedStyle(zone).borderTopLeftRadius
 }
 watch(rootClass, () => nextTick(measureRadius))
 

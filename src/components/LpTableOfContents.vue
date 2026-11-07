@@ -12,6 +12,7 @@
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
+import { useView, viewDocument, viewWindow } from "../composables/useView"
 import { atScrollEnd, scrollMarginTop, scrollParent, scrollToElement } from "../composables/scroll"
 import { usePillTransition } from "../composables/usePillTransition"
 
@@ -92,12 +93,17 @@ let safetyTimer: ReturnType<typeof setTimeout> | null = null
  * final section could otherwise never reach. Works for the window and for a
  * scroll area the headings live in.
  */
+// Headings sit in the document this list renders in, a frame's inside one.
+const host = useView()
+
 function setup() {
   stopSpy?.()
   stopSpy = null
   const ids = flatIds(props.links)
   if (!ids.length) return
-  const first = document.getElementById(ids[0]!)
+  const page = viewDocument(host.value)
+  const win = viewWindow(host.value)
+  const first = page.getElementById(ids[0]!)
   const scroller = first ? scrollParent(first) : null
   let frame = 0
 
@@ -105,13 +111,13 @@ function setup() {
     frame = 0
     if (spySuppressed) return
     const top = scroller ? scroller.getBoundingClientRect().top : 0
-    const headings = ids.map((id) => document.getElementById(id)).filter((el): el is HTMLElement => !!el)
+    const headings = ids.map((id) => page.getElementById(id)).filter((el): el is HTMLElement => !!el)
     if (!headings.length) return
     let current = headings[0]!.id
-    const view = scroller ? scroller.clientHeight : window.innerHeight
+    const view = scroller ? scroller.clientHeight : win.innerHeight
     const line = Math.max(props.offset, view / 4)
     for (const el of headings) if (el.getBoundingClientRect().top - top <= line + 1) current = el.id
-    const scrolled = scroller ? scroller.scrollTop : window.scrollY
+    const scrolled = scroller ? scroller.scrollTop : win.scrollY
     const end = atScrollEnd(headings[0])
     if (scrolled > 0 && end) current = headings[headings.length - 1]!.id
     activeId.value = current
@@ -119,13 +125,13 @@ function setup() {
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(measure)
   }
-  const target: HTMLElement | Window = scroller ?? window
+  const target: HTMLElement | Window = scroller ?? win
   target.addEventListener("scroll", onScroll, { passive: true })
-  window.addEventListener("resize", onScroll)
+  win.addEventListener("resize", onScroll)
   measure()
   stopSpy = () => {
     target.removeEventListener("scroll", onScroll)
-    window.removeEventListener("resize", onScroll)
+    win.removeEventListener("resize", onScroll)
     if (frame) cancelAnimationFrame(frame)
   }
 }
@@ -147,7 +153,8 @@ function suppressSpyUntilScrollEnds(target: HTMLElement) {
   if (rafId != null) cancelAnimationFrame(rafId)
   if (safetyTimer != null) clearTimeout(safetyTimer)
   const scroller = scrollParent(target)
-  const position = () => (scroller ? scroller.scrollTop : window.scrollY)
+  const win = viewWindow(host.value)
+  const position = () => (scroller ? scroller.scrollTop : win.scrollY)
   let last = position()
   const tick = () => {
     const y = position()
@@ -165,7 +172,7 @@ function suppressSpyUntilScrollEnds(target: HTMLElement) {
 }
 
 function onClick(id: string, ev: MouseEvent) {
-  const el = document.getElementById(id)
+  const el = viewDocument(host.value).getElementById(id)
   if (!el) return
   ev.preventDefault()
   activeId.value = id // mark immediately so the bar jumps to the clicked item

@@ -25,6 +25,7 @@ export default { inheritAttrs: false }
  *
  * A truncated value becomes focusable, so the tip is reachable by keyboard too.
  */
+import { nodeWindow } from "../composables/useView"
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useResizeObserver } from "../composables/useResizeObserver"
@@ -57,8 +58,8 @@ const drawn = ref(props.text)
 
 let canvas: CanvasRenderingContext2D | null = null
 function measurer(el: HTMLElement): (s: string) => number {
-  canvas ??= document.createElement("canvas").getContext("2d")
-  const style = getComputedStyle(el)
+  canvas ??= el.ownerDocument.createElement("canvas").getContext("2d")
+  const style = nodeWindow(el).getComputedStyle(el)
   // Built from the longhands: Firefox leaves the `font` shorthand empty in
   // computed styles.
   if (canvas) canvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
@@ -86,7 +87,7 @@ useResizeObserver(box, () => measure())
 onMounted(() => {
   measure()
   // Web fonts land after mount and change every width.
-  void document.fonts?.ready.then(() => measure())
+  void box.value?.ownerDocument.fonts?.ready.then(() => measure())
 })
 watch(
   () => [props.text, props.lines, props.middle, props.tail],
