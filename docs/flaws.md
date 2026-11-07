@@ -12,12 +12,6 @@ entry is deleted, not ticked: the commit says what changed.
   menu and a card needs a wrapping element (LpSidebarRow, LpColorPicker carry
   one). Let one of them forward `as-child` to its own trigger, or offer an
   element root.
-- **Kit props are loose in consumers.** A misspelt prop (`text` for
-  `content` on LpTooltip, `categories` for `labels` on LpChart) falls through
-  as an attribute with no error, and vue-tsc in the app does not catch it.
-  Ship prop types consumers check, or warn in dev on an unknown prop of a kit
-  component.
-
 - **Forward onto an overlay entry is a router visit.** With overlay history
   on, Back from a kit entry mutes the router, but Forward starts from the
   router's own entry, so vue-router runs its guards and `afterEach` for the

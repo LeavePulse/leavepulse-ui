@@ -23,6 +23,8 @@
  *                app's source, "all" registers the whole set, "kit" only the
  *                kit's own, or a list of names. Anything else still renders,
  *                from a lazily loaded chunk of the bundled collection.
+ *   propCheck    false to skip the dev warning for an unknown prop on a kit
+ *                component (default: on in `nuxt dev`, never in a build)
  */
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -43,6 +45,8 @@ export interface LeavepulseUiOptions {
   exclude?: string[]
   /** Lucide icons registered up front (default "scan"). */
   icons?: "scan" | "all" | "kit" | string[]
+  /** Warn in `nuxt dev` about an unknown prop on a kit component (default true). */
+  propCheck?: boolean
 }
 
 function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string): string {
@@ -55,7 +59,7 @@ function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string): string
 
 export default defineNuxtModule<LeavepulseUiOptions>({
   meta: { name: "@leavepulse/ui", configKey: "leavepulseUi" },
-  defaults: { theme: true, link: true, icons: "scan" },
+  defaults: { theme: true, link: true, icons: "scan", propCheck: true },
   setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
     const skip = new Set(options.exclude ?? [])
@@ -77,6 +81,10 @@ export default defineNuxtModule<LeavepulseUiOptions>({
         mode: "all",
         getContents: () => `${icons}import { defineNuxtPlugin } from "#app"\nexport default defineNuxtPlugin(() => {})\n`,
       })
+    }
+
+    if (nuxt.options.dev && options.propCheck !== false) {
+      addPlugin({ src: resolver.resolve("./runtime/propCheck.plugin"), mode: "client" })
     }
 
     if (options.link !== false) {

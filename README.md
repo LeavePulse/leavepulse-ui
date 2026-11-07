@@ -137,6 +137,23 @@ from the package root; `@leavepulse/ui/dist/*.js` also resolves, for a tool
 that needs one file (the Nuxt module does), and covers `components`,
 `composables`, `layout` and `theme`.
 
+### Catching a misspelt prop
+
+A prop a component does not declare falls through as an attribute with no
+error, so `<LpTooltip text="...">` renders with no tip. `lpPropCheck` warns in
+development, and knows `data-*`, `aria-*` and anything the rendered element
+takes. The Nuxt module installs it in `nuxt dev` (`propCheck: false` turns it off).
+
+```ts
+import { lpPropCheck } from "@leavepulse/ui"
+if (import.meta.env.DEV) app.use(lpPropCheck, { ignore: [/^x-/] })
+```
+
+vue-tsc also skips unknown props by default. `vueCompilerOptions.checkUnknownProps`
+in the app's tsconfig turns that on, but it also reports attributes passed
+through on purpose (`id`, `title`, `aria-*`), so it suits a one-off sweep better
+than a standing gate.
+
 ### Nuxt
 
 ```ts
