@@ -170,10 +170,15 @@ export { default as LpMediaGallery } from "./components/LpMediaGallery.vue"
 export { default as LpModal } from "./components/LpModal.vue"
 export { default as LpModalNav } from "./components/LpModalNav.vue"
 export { default as LpNotificationBell } from "./components/LpNotificationBell.vue"
+export { default as LpNotificationFeed } from "./components/LpNotificationFeed.vue"
 export type {
+  NotificationAction,
+  NotificationActor,
+  NotificationCategory,
   NotificationItem,
   NotificationLabels,
-} from "./components/LpNotificationBell.vue"
+  NotificationMenu,
+} from "./components/notifications"
 export { default as LpNumberField } from "./components/LpNumberField.vue"
 export type { NumberFieldLabels } from "./components/LpNumberField.vue"
 export { default as LpTimeField } from "./components/LpTimeField.vue"

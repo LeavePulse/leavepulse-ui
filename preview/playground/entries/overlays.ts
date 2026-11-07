@@ -12,6 +12,7 @@ import {
   LpModal,
   LpModalNav,
   LpNotificationBell,
+  type NotificationItem,
   LpSwitch,
   LpSegmented,
   LpSidebar,
@@ -26,19 +27,27 @@ export const overlays: ComponentEntry[] = [
     id: "notificationbell",
     name: "NotificationBell",
     description:
-      "Icon button with an unread badge that opens a popover feed on left-click; right-click for quick actions (Mark all read; override via `menuItems`). Each feed row has its own right-click menu (mark read/unread, open, dismiss). Data-driven: bind items / unread-count and handle mark-read / mark-unread / mark-all-read / dismiss / select — no fetching inside. Rows are rounded tiles showing icon, title, body, relative time and an unread dot. `tone` per item tints the icon by category (billing, security, …) while it is unread; a read row always goes muted.",
+      "Icon button with an unread badge that opens the notification feed (LpNotificationFeed) in a popover; right-click the bell for quick actions. The feed has All / Unread tabs (plus your own `categories`), rows grouped by day, and per-row quick actions on hover or focus (read / unread, dismiss; ↑ ↓ move between rows, Delete dismisses). A row can lead with its sender (`actor`), carry its own buttons (`actions`: Approve / Decline done in place, an async `onSelect` shows the button busy) and, once handled, say what became of it (`outcome`). `itemMenu` adds right-click entries per row; `hasMore` + `@load-more` page the feed; `allLink` and `@settings` add a footer link and a gear. Data in, events out — no fetching inside; tabs filter `items` locally, or bind `v-model:filter` to fetch per tab.",
     components: { LpNotificationBell, LpIcon, LpBadge },
     state: () => {
+      const toast = useToast()
+      const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
       const s = reactive({
         items: [
           {
             id: "1",
-            title: "Payment received",
-            body: "Your payment of €12.99 was received.",
-            icon: "lucide:check-circle",
-            tone: "action",
-            createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+            title: "Anna requested access to ger-01-p",
+            body: "Read-only access to the production host, for the incident review.",
+            actor: { name: "Anna Petrova" },
+            icon: "lucide:key-round",
+            tone: "warning",
+            category: "requests",
+            createdAt: ago(2 * 60_000),
             read: false,
+            actions: [
+              { label: "Approve", variant: "primary", onSelect: (n: NotificationItem) => s.resolve(n.id, "Approved") },
+              { label: "Decline", onSelect: (n: NotificationItem) => s.resolve(n.id, "Declined") },
+            ],
           },
           {
             id: "2",
@@ -46,18 +55,41 @@ export const overlays: ComponentEntry[] = [
             body: "leavepulse.dev renews in 3 days.",
             icon: "lucide:shield-alert",
             tone: "danger",
-            createdAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+            createdAt: ago(3 * 3_600_000),
             read: false,
+            actions: [{ label: "Renew now", variant: "primary", icon: "lucide:refresh-cw", onSelect: () => toast.success("Renewal started") }],
           },
           {
             id: "3",
+            title: "Mark commented on Deploy #482",
+            body: "“Looks good, merging after the canary.”",
+            actor: { name: "Mark Ivanov" },
+            icon: "lucide:message-square",
+            category: "mentions",
+            createdAt: ago(26 * 3_600_000),
+            read: true,
+          },
+          {
+            id: "4",
             title: "Invoice available",
             body: "Your June invoice is ready to view.",
             icon: "lucide:receipt-text",
-            createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+            createdAt: ago(3 * 86_400_000),
             read: true,
           },
-        ],
+        ] as NotificationItem[],
+        page: 0,
+        loadingMore: false,
+        resolve(id: string, outcome: string) {
+          // An answer takes a round-trip: the button shows it busy meanwhile.
+          return new Promise<void>((done) =>
+            setTimeout(() => {
+              const n = s.items.find((x) => x.id === id)
+              if (n) n.outcome = outcome
+              done()
+            }, 700),
+          )
+        },
         markRead(id: string) {
           const n = s.items.find((x) => x.id === id)
           if (n) n.read = true
@@ -75,12 +107,49 @@ export const overlays: ComponentEntry[] = [
         clear() {
           s.items = []
         },
+        settings() {
+          toast.info("Open notification settings")
+        },
+        loadMore() {
+          s.loadingMore = true
+          setTimeout(() => {
+            s.page++
+            s.items.push({
+              id: `old-${s.page}`,
+              title: `Weekly report #${40 - s.page}`,
+              body: "Uptime 99.98%, 2 incidents.",
+              icon: "lucide:bar-chart-3",
+              createdAt: ago((7 + s.page * 7) * 86_400_000),
+              read: true,
+            })
+            s.loadingMore = false
+          }, 600)
+        },
+        itemMenu: (n: NotificationItem) => [{ label: "Copy link", icon: "lucide:link", onSelect: () => toast.success(`Copied ${n.id}`) }],
+        categories: [
+          { value: "requests", label: "Requests" },
+          { value: "mentions", label: "Mentions" },
+        ],
       })
       return s
     },
     template: `<div class="flex items-center gap-4">
-  <LpNotificationBell :items="items" @mark-read="markRead" @mark-unread="markUnread" @mark-all-read="markAllRead" @dismiss="dismiss" @clear="clear" />
-  <span class="text-sm text-muted">← click to open · right-click on a row</span>
+  <LpNotificationBell
+    :items="items"
+    :categories="categories"
+    :item-menu="itemMenu"
+    :has-more="page < 3"
+    :loading-more="loadingMore"
+    all-link="#notifications"
+    @mark-read="markRead"
+    @mark-unread="markUnread"
+    @mark-all-read="markAllRead"
+    @dismiss="dismiss"
+    @clear="clear"
+    @settings="settings"
+    @load-more="loadMore"
+  />
+  <span class="text-sm text-muted">← click to open · hover a row · right-click for more</span>
 </div>`,
     thumb: `<div class="flex items-start gap-2">
   <div class="relative grid size-8 place-items-center rounded-control text-ink">

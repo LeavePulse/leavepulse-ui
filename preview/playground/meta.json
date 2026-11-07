@@ -6386,25 +6386,67 @@
     "name": "menuItems",
     "type": "ContextMenuItemDef[] | undefined",
     "required": false,
-    "description": "Right-click menu items; overrides the built-in quick actions."
+    "description": "Right-click menu on the bell; overrides the built-in quick actions."
+   },
+   {
+    "name": "itemMenu",
+    "type": "NotificationMenu | undefined",
+    "required": false,
+    "description": "Extra right-click entries for a feed row."
+   },
+   {
+    "name": "categories",
+    "type": "NotificationCategory[] | undefined",
+    "required": false,
+    "description": "Tabs after All and Unread, matched against `item.category`."
+   },
+   {
+    "name": "groupByDay",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Head runs of rows with Today / Yesterday / Earlier. Default true."
+   },
+   {
+    "name": "hasMore",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "More is waiting: the feed offers Load more (`@load-more`)."
+   },
+   {
+    "name": "loadingMore",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "allLink",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The feed's footer link to the whole list (\"View all notifications\")."
    },
    {
     "name": "labels",
     "type": "NotificationLabels | undefined",
     "required": false,
-    "description": "Translations for the strings the bell renders itself."
+    "description": "Translations for the strings the bell and its feed render themselves."
    },
    {
     "name": "formatTime",
     "type": "((iso: string) => string) | undefined",
     "required": false,
-    "description": "Formats `item.createdAt` for display. Defaults to a narrow relative time\nin the app's locale (\"now\", \"5m ago\", \"3h ago\"); pass your own to word\nit differently."
+    "description": "Formats `item.createdAt`; defaults to a narrow relative time in the app's locale."
    },
    {
     "name": "open",
     "type": "boolean | undefined",
     "required": false,
     "default": "false"
+   },
+   {
+    "name": "filter",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"all\""
    }
   ],
   "events": [
@@ -6425,6 +6467,14 @@
     "type": "[item: NotificationItem]"
    },
    {
+    "name": "action",
+    "type": "[item: NotificationItem, action: NotificationAction]"
+   },
+   {
+    "name": "update:filter",
+    "type": "[value: string]"
+   },
+   {
     "name": "markRead",
     "type": "[id: string]"
    },
@@ -6435,9 +6485,163 @@
    {
     "name": "markAllRead",
     "type": "[]"
+   },
+   {
+    "name": "settings",
+    "type": "[]"
+   },
+   {
+    "name": "loadMore",
+    "type": "[]"
    }
   ],
   "slots": []
+ },
+ "LpNotificationFeed": {
+  "props": [
+   {
+    "name": "items",
+    "type": "NotificationItem[] | undefined",
+    "required": false,
+    "default": "[]"
+   },
+   {
+    "name": "unreadCount",
+    "type": "number | undefined",
+    "required": false,
+    "description": "Unread count for the Unread tab; falls back to counting unread items."
+   },
+   {
+    "name": "loading",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "hasMore",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "More is waiting past the last row: a Load more button asks for it (`@load-more`)."
+   },
+   {
+    "name": "loadingMore",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "A `@load-more` is in flight."
+   },
+   {
+    "name": "title",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "emptyLabel",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "categories",
+    "type": "NotificationCategory[] | undefined",
+    "required": false,
+    "description": "Tabs after All and Unread, matched against `item.category`."
+   },
+   {
+    "name": "groupByDay",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Head runs of rows with Today / Yesterday / Earlier. Default true."
+   },
+   {
+    "name": "hideTitle",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Drop the title row (tabs and buttons stay)."
+   },
+   {
+    "name": "allLink",
+    "type": "string | undefined",
+    "required": false,
+    "description": "The footer's link to the whole feed."
+   },
+   {
+    "name": "maxHeight",
+    "type": "string | false | undefined",
+    "required": false,
+    "default": "\"min(28rem, 70dvh)\"",
+    "description": "Scroll inside the feed, capped at this height (any CSS length). `false`\nlets it grow with the page, for a full page of notifications."
+   },
+   {
+    "name": "itemMenu",
+    "type": "NotificationMenu | undefined",
+    "required": false,
+    "description": "Extra right-click entries for a row, after mark read / open / dismiss."
+   },
+   {
+    "name": "labels",
+    "type": "NotificationLabels | undefined",
+    "required": false
+   },
+   {
+    "name": "formatTime",
+    "type": "((iso: string) => string) | undefined",
+    "required": false,
+    "description": "Formats `item.createdAt` for display. Defaults to a narrow relative time\nin the app's locale (\"now\", \"5m ago\", \"3h ago\")."
+   },
+   {
+    "name": "filter",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"all\""
+   }
+  ],
+  "events": [
+   {
+    "name": "dismiss",
+    "type": "[id: string]"
+   },
+   {
+    "name": "clear",
+    "type": "[]"
+   },
+   {
+    "name": "select",
+    "type": "[item: NotificationItem]"
+   },
+   {
+    "name": "action",
+    "type": "[item: NotificationItem, action: NotificationAction]"
+   },
+   {
+    "name": "update:filter",
+    "type": "[value: string]"
+   },
+   {
+    "name": "markRead",
+    "type": "[id: string]"
+   },
+   {
+    "name": "markUnread",
+    "type": "[id: string]"
+   },
+   {
+    "name": "markAllRead",
+    "type": "[]"
+   },
+   {
+    "name": "settings",
+    "type": "[]"
+   },
+   {
+    "name": "loadMore",
+    "type": "[]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "footer",
+    "type": "{}"
+   }
+  ]
  },
  "LpNumberField": {
   "props": [

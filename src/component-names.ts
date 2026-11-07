@@ -70,6 +70,7 @@ export const COMPONENT_NAMES = [
   "LpModal",
   "LpModalNav",
   "LpNotificationBell",
+  "LpNotificationFeed",
   "LpNumberField",
   "LpNumberFlow",
   "LpOtpInput",

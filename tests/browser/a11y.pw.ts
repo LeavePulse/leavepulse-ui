@@ -9,7 +9,7 @@ import { expect, test } from "./fixtures"
  * landmarks, title or heading outline to speak of. Colour contrast is left out
  * too: it depends on the app's theme, not on the component.
  */
-const SCENARIOS = ["contracts", "fields", "table", "shell-features", "file-tree", "log-tools", "chart-toolkit", "data"]
+const SCENARIOS = ["contracts", "fields", "table", "shell-features", "file-tree", "log-tools", "chart-toolkit", "data", "notifications"]
 const PAGE_RULES = ["region", "landmark-one-main", "page-has-heading-one", "document-title", "html-has-lang", "color-contrast"]
 /*
  * axe joins the text of side-by-side chips with no space between them
