@@ -27,6 +27,8 @@ export default { inheritAttrs: false }
  */
 import { computed, nextTick, ref, useId, useSlots, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
+import { isElement } from "../composables/useView"
+import { devWarn } from "../composables/devWarn"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useNow } from "../composables/useNow"
@@ -42,6 +44,7 @@ import {
   connectorFilled,
   currentStepIndex,
   stepElapsed,
+  duplicateStepKeys,
   stepKey,
   type PipelineStep,
   type StepStatus,
@@ -73,6 +76,8 @@ const props = withDefaults(
     /**
      * Keep the current step (see `currentStepIndex`) scrolled into view as the
      * run advances: a long job list, or a horizontal strip wider than its box.
+     * It moves only when the current step changes, so a status update inside a
+     * step leaves the reader's scroll alone.
      */
     follow?: boolean
     /**
@@ -164,11 +169,17 @@ const announcement = ref("")
 let seen = new Map<string, StepStatus>()
 /* Steps the pipeline opened itself — the only ones it may close again. */
 const autoOpened = new Set<string>()
+const warnedKeys = new Set<string>()
 
 watch(
   () => props.steps.map((s, i) => [stepKey(s, i), s.status] as const),
   (pairs, old) => {
     const next = new Map(pairs)
+    const repeated = duplicateStepKeys(props.steps).filter((key) => !warnedKeys.has(key))
+    if (repeated.length) {
+      repeated.forEach((key) => warnedKeys.add(key))
+      devWarn(`LpPipeline: step keys must be unique, repeated: ${repeated.join(", ")}`)
+    }
     if (old) {
       const opened: string[] = []
       const closed: string[] = []
@@ -191,6 +202,8 @@ watch(
       }
     }
     seen = next
+    // A step that left the run will never pass to be folded again.
+    for (const key of autoOpened) if (!next.has(key)) autoOpened.delete(key)
   },
   { immediate: true },
 )
@@ -198,7 +211,7 @@ watch(
 /* ── Following the current step. */
 const uid = useId()
 const items: Array<Element | null> = []
-const bindItem = (i: number) => (el: unknown) => { items[i] = el instanceof Element ? el : null }
+const bindItem = (i: number) => (el: unknown) => { items[i] = isElement(el) ? el : null }
 const current = computed(() => currentStepIndex(props.steps))
 
 watch(current, async (i) => {

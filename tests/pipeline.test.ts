@@ -4,6 +4,7 @@ import {
   childProgress,
   connectorFilled,
   currentStepIndex,
+  duplicateStepKeys,
   overallStatus,
   stepElapsed,
   type StepStatus,
@@ -101,5 +102,20 @@ describe("useLoadingGate", () => {
     await wait(90)
     expect(shown.value).toBe(false)
     scope.stop()
+  })
+})
+
+describe("duplicateStepKeys", () => {
+  test("reports each repeated key once", () => {
+    expect(duplicateStepKeys([{ key: "a" }, { key: "b" }, { key: "a" }, { key: "a" }])).toEqual(["a"])
+  })
+
+  test("is empty for no steps and for steps keyed by position", () => {
+    expect(duplicateStepKeys([])).toEqual([])
+    expect(duplicateStepKeys([{}, {}, {}])).toEqual([])
+  })
+
+  test("sees a key that collides with a position", () => {
+    expect(duplicateStepKeys([{ key: "1" }, {}])).toEqual(["1"])
   })
 })

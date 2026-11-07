@@ -278,9 +278,23 @@ export type {
   EdgeCategory,
   EdgeObserved,
   TopologyEdge,
+  TopologyGroupBy,
+  TopologyLabels,
   TopologyLane,
+  TopologyLayoutOptions,
   TopologyNode,
+  TopologySelectionAction,
+  TopologySnapshot,
 } from "./components/LpTopologyCanvas.vue"
+export {
+  clusterGraph,
+  diffTopology,
+  findPath,
+  layeredLayout,
+  neighborhood,
+  topologyToSvg,
+} from "./components/topologyGraph"
+export type { DetailLevel, GraphPath, TopologyDiff } from "./components/topologyGraph"
 export { default as LpUptimeBar } from "./components/LpUptimeBar.vue"
 export type { UptimeSegment, UptimeStatus } from "./components/LpUptimeBar.vue"
 

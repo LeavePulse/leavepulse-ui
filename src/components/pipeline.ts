@@ -99,3 +99,9 @@ export function childProgress(step: PipelineStep): { done: number; total: number
 export function stepKey(step: Pick<PipelineStep, "key">, index: number): string {
   return step.key ?? String(index)
 }
+
+/** Keys used by more than one step, which would then share their open state. */
+export function duplicateStepKeys(steps: readonly Pick<PipelineStep, "key">[]): string[] {
+  const keys = steps.map(stepKey)
+  return [...new Set(keys.filter((key, i) => keys.indexOf(key) !== i))]
+}
