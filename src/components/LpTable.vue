@@ -11,6 +11,7 @@ import { menuPaletteCommands } from "./commandPalette"
 import LpDataList from "./LpDataList.vue"
 import LpCheckbox from "./LpCheckbox.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
+import LpEditable from "./LpEditable.vue"
 import LpEmptyState from "./LpEmptyState.vue"
 import LpBadge from "./LpBadge.vue"
 import LpIcon from "./LpIcon.vue"
@@ -29,7 +30,21 @@ import { usePaintSelect } from "../composables/usePaintSelect"
 import { useRovingFocus } from "../composables/useRovingFocus"
 import { useLabels } from "../composables/useLpConfig"
 import { useResizeObserver } from "../composables/useResizeObserver"
-import { compareValues } from "./tableSort"
+import {
+  clampColumnWidth,
+  groupRows,
+  nextSorts,
+  orderPinned,
+  pinOffsets,
+  presetHidden,
+  rowWindow,
+  sortByKeys,
+  type ColumnPin,
+  type ColumnPreset,
+} from "./tableFeatures"
+import { devWarn } from "../composables/devWarn"
+import { startPointerDrag } from "../composables/pointerDrag"
+import { isHTMLElement, nodeWindow } from "../composables/useView"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
 import {
@@ -100,6 +115,41 @@ export interface TableColumn<Row> {
    * user's own show/hide applies as usual.
    */
   hideBelow?: number
+  /** Stick to this edge while the table scrolls sideways. Pinned columns move to that edge. */
+  pin?: ColumnPin
+  /** Bounds in px for `resizableColumns`. */
+  minWidth?: number
+  maxWidth?: number
+  /** Set false to keep this column out of `resizableColumns`. */
+  resizable?: boolean
+  /**
+   * The cell edits in place (LpEditable), and a save emits `cellEdit`. A cell
+   * slot for the column wins: it draws the cell itself. Values are edited as
+   * text; `parseEdit` turns the text back into the value the row holds.
+   */
+  editable?: boolean | ((row: Row) => boolean)
+  /** A message rejects the text and keeps the cell open. */
+  validateEdit?: (value: string, row: Row) => string | true | void
+  parseEdit?: (value: string, row: Row) => unknown
+}
+
+/** A saved inline edit. The table holds no rows of its own to change: apply it to yours. */
+export interface TableCellEdit<Row> {
+  row: Row
+  key: string
+  value: unknown
+  previous: unknown
+}
+
+/**
+ * "Everything this query matches, except these": what a bulk action sends to
+ * the server, in place of ids the client never loaded. See `selectionToken`.
+ */
+export interface TableSelectionToken {
+  sorts: SortState[]
+  hidden: Record<string, unknown[]>
+  excluded: (string | number)[]
+  total: number
 }
 
 export interface TableLabels {
@@ -137,6 +187,13 @@ export interface TableLabels {
   pageSelected: string
   selectAllMatching: string
   allMatchingSelected: string
+  columnPresets: string
+  resizeColumn: string
+  expandRow: string
+  collapseRow: string
+  groupCount: string
+  expandGroup: string
+  collapseGroup: string
 }
 
 export interface TableExportOptions extends CsvOptions {
@@ -165,6 +222,8 @@ export interface TableQuery {
   page: number
   pageSize: number
   sort: SortState | null
+  /** Every sort key in order, with `multiSort`. `sort` is the first of them. */
+  sorts?: SortState[]
   hidden: Record<string, unknown[]>
 }
 
@@ -288,8 +347,70 @@ const props = withDefaults(
      * With `load`: the user chose "select all N" beyond the loaded page
      * (v-model:allMatching). The keys in `selected` are then only the loaded
      * ones; acting on everything that matches is the consumer's to do.
+     *
+     * It holds only while every loaded row is ticked: a new page, sort or
+     * filter brings unticked rows and clears it, so a bulk action never runs
+     * on a set the user can no longer see.
      */
     allMatching?: boolean
+    /**
+     * Keep "select all N" across pages and sorts, and let the user untick rows
+     * out of it: the selection is then the query and its exceptions, emitted
+     * as `update:selectionToken` for a bulk action to send, with no need for
+     * ids the client never loaded. `selected` stays the loaded keys. A change
+     * of filter means a different set of rows, so it clears the selection.
+     */
+    selectionToken?: boolean
+    /** Sort by several columns: Shift-click adds a column (v-model:sorts). */
+    multiSort?: boolean
+    /** Sort keys in order (v-model:sorts), with `multiSort`. Left unset the table keeps them. */
+    sorts?: SortState[]
+    /**
+     * Drag a column's edge, or focus it and use the arrows, to set its width;
+     * double-click clears it. Sets a fixed table layout once a width is set.
+     */
+    resizableColumns?: boolean
+    /** Widths in px by column key (v-model:columnWidths). */
+    columnWidths?: Record<string, number>
+    /** Named sets of columns, offered in the table's menu. */
+    columnPresets?: readonly ColumnPreset[]
+    /** The chosen preset's id (v-model:columnPreset). */
+    columnPreset?: string | null
+    /**
+     * Group rows under a heading: a column key or a function. Client side, so
+     * with `load` it groups the loaded page. Groups follow the row order, so
+     * sort by the same column to keep them put.
+     */
+    groupBy?: string | ((row: T) => unknown)
+    groupLabel?: (value: unknown, rows: T[]) => string
+    /** Collapsed group ids, `String(value)` (v-model:collapsedGroups). */
+    collapsedGroups?: string[]
+    /**
+     * Rows open a panel beneath them, drawn by the `expanded` slot. A function
+     * says which rows can. Ignored with `virtualRowHeight`.
+     */
+    expandable?: boolean | ((row: T) => boolean)
+    /** Open row keys (v-model:expanded). */
+    expanded?: RowKey[]
+    /**
+     * Draw only the rows in view, for thousands of them, at this height in px.
+     * Give the table a `max-height`, or a limited parent: with room for every
+     * row, every row is in view and all of them are drawn.
+     *
+     * The price of drawing a window:
+     * - Every row, group heading included, must be exactly this tall: keep cells
+     *   on one line (`nowrap`). A taller row drifts the scroll position.
+     * - Row enter, leave and move animations are off.
+     * - `expandable` is ignored: a panel has no fixed height.
+     * - Arrow keys and typeahead reach the rows drawn, not the whole list.
+     * - Sweeping ticks reaches the rows drawn; Ctrl+A and the header tick do
+     *   cover all of them.
+     * - Find in page sees the rows drawn.
+     * `stickyHeader`, pins and the row menu work as usual.
+     */
+    virtualRowHeight?: number
+    /** Rows drawn beyond each edge of the view. */
+    virtualOverscan?: number
   }>(),
   { palette: undefined,
     rows: () => [],
@@ -307,6 +428,14 @@ const props = withDefaults(
     sort: undefined,
     filters: undefined,
     filtered: false,
+    sorts: undefined,
+    columnWidths: undefined,
+    columnPreset: undefined,
+    groupBy: undefined,
+    collapsedGroups: undefined,
+    expanded: undefined,
+    virtualRowHeight: undefined,
+    virtualOverscan: 6,
   },
 )
 
@@ -346,6 +475,13 @@ const labelSet = useLabels<TableLabels>(
     pageSelected: "All {count} on this page are selected.",
     selectAllMatching: "Select all {total}",
     allMatchingSelected: "All {total} are selected.",
+    columnPresets: "Column presets",
+    resizeColumn: "Resize {column}",
+    expandRow: "Expand row",
+    collapseRow: "Collapse row",
+    groupCount: "{label} ({count})",
+    expandGroup: "Expand {label}",
+    collapseGroup: "Collapse {label}",
   },
   () => props.labels,
 )
@@ -384,6 +520,13 @@ const emit = defineEmits<{
   /** The empty table's reset was pressed: clear the filters kept outside it. */
   (e: "resetFilters"): void
   (e: "update:allMatching", value: boolean): void
+  (e: "update:selectionToken", value: TableSelectionToken | null): void
+  (e: "update:sorts", value: SortState[]): void
+  (e: "update:columnWidths", value: Record<string, number>): void
+  (e: "update:columnPreset", value: string | null): void
+  (e: "update:collapsedGroups", value: string[]): void
+  (e: "update:expanded", value: RowKey[]): void
+  (e: "cellEdit", edit: TableCellEdit<T>): void
   (e: "rowClick", row: T): void
 }>()
 
@@ -435,10 +578,11 @@ function onRowContextMenu(row: T) {
  */
 function openRowMenu(event: Event) {
   const button = event.currentTarget
-  if (!(button instanceof HTMLElement)) return
+  if (!isHTMLElement(button)) return
   const rect = button.getBoundingClientRect()
+  const win = nodeWindow(button)
   button.dispatchEvent(
-    new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }),
+    new win.MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }),
   )
 }
 
@@ -478,7 +622,16 @@ const contextMenu = computed<ContextMenuItemDef[]>(() => {
 // emitted an event nobody was listening for, and left the rows exactly as they
 // were: a control that answers a click by doing nothing.
 const ownSort = ref<SortState | null>(null)
-const activeSort = computed(() => (props.sort !== undefined ? props.sort : ownSort.value))
+const ownSorts = ref<SortState[]>([])
+const activeSort = computed(() => {
+  if (props.multiSort) return (props.sorts ?? ownSorts.value)[0] ?? null
+  return props.sort !== undefined ? props.sort : ownSort.value
+})
+const sortList = computed<SortState[]>(() => {
+  if (props.multiSort) return props.sorts ?? ownSorts.value
+  return activeSort.value ? [activeSort.value] : []
+})
+const sortOf = (col: TableColumn<T>) => sortList.value.find((sort) => sort.key === col.key)
 
 // ── server-backed rows ───────────────────────────────────────
 const loaded = shallowRef<T[]>([])
@@ -491,6 +644,14 @@ const busy = computed(() => props.loading || task.pending.value)
 
 const sourceRows = computed<T[]>(() => (props.load ? loaded.value : props.rows))
 const sourceIndex = computed(() => new Map(sourceRows.value.map((row, i) => [row, i])))
+
+// New objects drop what position-keyed selection pointed at, without a word.
+let warnedRowKey = false
+watch(sourceRows, () => {
+  if (warnedRowKey || props.rowKey || !props.selected.length) return
+  warnedRowKey = true
+  devWarn("LpTable: rows were replaced while some are selected, and without `rowKey` the selection now points at positions, not rows. Set `rowKey`.")
+})
 
 // The tallest page shown so far, held as a floor: the last page is usually
 // short, and without it the pager below jumps up the moment you reach it.
@@ -547,12 +708,14 @@ function writeHidden(next: Record<string, Set<unknown>>) {
  * out beside the new one, and the table would show both lists for a moment.
  */
 const animating = ref(false)
+/* Longer than any row transition: a fallback off switch, not a measure of one. */
+const MOTION_WINDOW_MS = 600
 let motionTimer: ReturnType<typeof setTimeout> | undefined
 function withMotion(change: () => void) {
   if (!props.load) {
     animating.value = true
     if (motionTimer) clearTimeout(motionTimer)
-    motionTimer = setTimeout(() => (animating.value = false), 600)
+    motionTimer = setTimeout(() => (animating.value = false), MOTION_WINDOW_MS)
   }
   change()
 }
@@ -575,6 +738,113 @@ const visibleColumns = computed(() =>
     (c) => !hiddenColumns.value.has(c.key) && !(c.hideBelow && tableWidth.value < c.hideBelow),
   ),
 )
+
+// Pinned columns at their edges; with no pins, the columns as given.
+const shownColumns = computed(() => orderPinned(visibleColumns.value))
+
+// ── column widths and pins ───────────────────────────────────
+const RESIZE_STEP_PX = 16
+/* Room counted for a column with no width of its own, once the layout is fixed. */
+const UNSET_COLUMN_PX = 120
+const TICK_COLUMN_WIDTH = "3.25rem"
+const EXPAND_COLUMN_WIDTH = "2.5rem"
+
+const ownWidths = ref<Record<string, number>>({})
+const widths = computed(() => props.columnWidths ?? ownWidths.value)
+const fixedLayout = computed(() => !!props.resizableColumns && Object.keys(widths.value).length > 0)
+const tableStyle = computed(() => {
+  if (!fixedLayout.value) return undefined
+  const sum = shownColumns.value.reduce((room, col) => room + (widths.value[col.key] ?? UNSET_COLUMN_PX), 0)
+  return { minWidth: `${sum}px` }
+})
+
+function writeWidths(next: Record<string, number>) {
+  ownWidths.value = next
+  emit("update:columnWidths", next)
+}
+
+const canResize = (col: TableColumn<T>) => !!props.resizableColumns && col.resizable !== false && !!col.label
+/* Marks the header cells something measures, and only those. */
+const measuredCol = (col: TableColumn<T>) => (props.resizableColumns || col.pin ? col.key : undefined)
+
+function headerWidths(): Record<string, number> {
+  const measured: Record<string, number> = {}
+  for (const cell of frameEl.value?.querySelectorAll<HTMLElement>("th[data-lp-col]") ?? []) {
+    measured[cell.dataset.lpCol!] = cell.offsetWidth
+  }
+  return measured
+}
+
+function setWidth(col: TableColumn<T>, width: number) {
+  writeWidths({ ...widths.value, [col.key]: clampColumnWidth(width, col.minWidth, col.maxWidth) })
+}
+
+function clearWidth(col: TableColumn<T>) {
+  const { [col.key]: _gone, ...rest } = widths.value
+  writeWidths(rest)
+}
+
+/*
+ * The first drag fixes the layout, which would hand the free room out anew, so
+ * every column starts from the width it has on screen.
+ */
+function startResize(event: PointerEvent, col: TableColumn<T>) {
+  const handle = event.currentTarget
+  if (!isHTMLElement(handle) || event.button !== 0) return
+  event.stopPropagation()
+  const measured = headerWidths()
+  if (!fixedLayout.value) writeWidths(measured)
+  const from = measured[col.key] ?? handle.parentElement?.offsetWidth ?? 0
+  const startX = event.clientX
+  startPointerDrag(event, { move: (e) => setWidth(col, from + e.clientX - startX), end: () => {} })
+}
+
+function onResizeKey(event: KeyboardEvent, col: TableColumn<T>) {
+  const step = event.key === "ArrowRight" ? RESIZE_STEP_PX : event.key === "ArrowLeft" ? -RESIZE_STEP_PX : 0
+  if (!step) return
+  event.preventDefault()
+  event.stopPropagation()
+  const measured = headerWidths()
+  if (!fixedLayout.value) writeWidths(measured)
+  setWidth(col, (widths.value[col.key] ?? measured[col.key] ?? UNSET_COLUMN_PX) + step)
+}
+
+const pinWidths = ref<Record<string, number>>({})
+const pinOffset = computed(() => pinOffsets(shownColumns.value, pinWidths.value))
+function measurePins() {
+  if (shownColumns.value.some((col) => col.pin)) pinWidths.value = headerWidths()
+}
+watch([shownColumns, widths, tableWidth], measurePins, { flush: "post" })
+onMounted(measurePins)
+
+const PIN_HEAD = "sticky z-[11] bg-surface-soft"
+const PIN_CELL = "sticky z-[1] bg-surface"
+const pinStyle = (col: TableColumn<T>) => (col.pin ? { [col.pin]: `${pinOffset.value[col.key] ?? 0}px` } : undefined)
+
+function headStyle(col: TableColumn<T>) {
+  const width = (props.resizableColumns ? widths.value[col.key] : undefined)
+  const size = width != null ? `${width}px` : col.width
+  if (!size && !col.pin) return undefined
+  return { ...(size ? { width: size } : {}), ...pinStyle(col) }
+}
+
+// ── column presets ───────────────────────────────────────────
+const ownPreset = ref<string | null>(null)
+const activePreset = computed(() => (props.columnPreset !== undefined ? props.columnPreset : ownPreset.value))
+
+function showPreset(id: string | null | undefined) {
+  const preset = props.columnPresets?.find((p) => p.id === id)
+  if (!preset) return
+  hiddenColumns.value = presetHidden(preset, props.columns)
+  if (preset.widths && props.resizableColumns) writeWidths({ ...widths.value, ...preset.widths })
+}
+
+function choosePreset(id: string | null) {
+  ownPreset.value = id
+  emit("update:columnPreset", id)
+  showPreset(id)
+}
+watch(() => props.columnPreset, showPreset, { immediate: true })
 
 const facetColumns = computed(() => props.columns.filter((col) => col.filterable).map((col) => col.key))
 const localFacets = useTableFacets({
@@ -665,6 +935,11 @@ function toggleColumn(key: string) {
   if (next.has(key)) next.delete(key)
   else next.add(key)
   hiddenColumns.value = next
+  // The set on screen is no longer the preset's.
+  if (activePreset.value != null) {
+    ownPreset.value = null
+    emit("update:columnPreset", null)
+  }
 }
 
 /** Rows left once the per-column value filters have been applied. */
@@ -677,40 +952,41 @@ const filteredRows = computed<T[]>(() => {
   )
 })
 
-// We compare by raw cell value with a stable-ish coerce.
 function sortRows(rows: T[]): T[] {
-  const s = activeSort.value
-  if (!s || props.load) return rows
-  const col = props.columns.find((c) => c.key === s.key)
-  if (!col?.sortable) return rows
-  const factor = s.dir === "asc" ? 1 : -1
-  const own = col.compare
-  const value = col.sortValue ?? ((row: T) => row[s.key])
-  return [...rows].sort((a, b) => (own ? own(a, b) : compareValues(value(a), value(b))) * factor)
+  if (!sortList.value.length || props.load) return rows
+  return sortByKeys(rows, sortList.value, props.columns)
 }
 
 const displayRows = computed<T[]>(() => sortRows(filteredRows.value))
 
-function toggleSort(col: TableColumn<T>) {
-  if (!col.sortable) return
-  const s = activeSort.value
-  // Cycle: none → asc → desc → none, scoped to the clicked column.
-  let next: SortState | null
-  if (!s || s.key !== col.key) next = { key: col.key, dir: "asc" }
-  else if (s.dir === "asc") next = { key: col.key, dir: "desc" }
-  else next = null
-  // Kept locally as well as emitted: a parent that binds v-model overwrites
-  // this on the way back, and one that does not still gets a table that sorts.
+function writeSorts(next: SortState[]) {
   withMotion(() => {
-    ownSort.value = next
-    emit("update:sort", next)
+    ownSorts.value = next
+    ownSort.value = next[0] ?? null
+    if (props.multiSort) emit("update:sorts", next)
+    emit("update:sort", next[0] ?? null)
   })
 }
 
+function toggleSort(col: TableColumn<T>, event?: MouseEvent) {
+  if (!col.sortable) return
+  // Cycle: none → asc → desc → none, scoped to the clicked column.
+  // Kept locally as well as emitted: a parent that binds v-model overwrites
+  // this on the way back, and one that does not still gets a table that sorts.
+  writeSorts(nextSorts(sortList.value, col.key, !!(props.multiSort && event?.shiftKey)))
+}
+
 function sortIcon(col: TableColumn<T>): string {
-  const s = activeSort.value
-  if (s?.key !== col.key) return "lucide:chevrons-up-down"
+  const s = sortOf(col)
+  if (!s) return "lucide:chevrons-up-down"
   return s.dir === "asc" ? "lucide:arrow-up" : "lucide:arrow-down"
+}
+
+/* The key's place in a sort by several columns; nothing to say with just one. */
+function sortPosition(col: TableColumn<T>): number | undefined {
+  if (sortList.value.length < 2) return undefined
+  const at = sortList.value.findIndex((sort) => sort.key === col.key)
+  return at < 0 ? undefined : at + 1
 }
 
 /**
@@ -727,11 +1003,16 @@ function sortIcon(col: TableColumn<T>): string {
 // back before the popover can take it, or the popover reads that focus move as
 // an outside interaction and dismisses itself. So the trigger is clicked once
 // the menu is gone.
+const MENU_CLOSE_LIMIT_MS = 600
+const FOCUS_RETURN_MS = 30
 function openFilter(key: string) {
   const open = () => frameEl.value?.querySelector<HTMLElement>(`[data-lp-filter="${CSS.escape(key)}"]`)?.click()
   const started = performance.now()
+  // The menu this was picked from, in the table's own document; a menu that
+  // opens elsewhere in the meantime is no reason to wait.
+  const closing = [...(frameEl.value?.ownerDocument ?? document).querySelectorAll("[data-reka-menu-content]")]
   const wait = () => {
-    if (!document.querySelector("[data-reka-menu-content]") || performance.now() - started > 600) setTimeout(open, 30)
+    if (!closing.some((menu) => menu.isConnected) || performance.now() - started > MENU_CLOSE_LIMIT_MS) setTimeout(open, FOCUS_RETURN_MS)
     else requestAnimationFrame(wait)
   }
   requestAnimationFrame(wait)
@@ -739,11 +1020,7 @@ function openFilter(key: string) {
 
 function headerMenu(col: TableColumn<T>): ContextMenuItemDef[] {
   const s = activeSort.value
-  const set = (next: SortState | null) => () =>
-    withMotion(() => {
-      ownSort.value = next
-      emit("update:sort", next)
-    })
+  const set = (next: SortState | null) => () => writeSorts(next ? [next] : [])
 
   const items: ContextMenuItemDef[] = []
 
@@ -806,8 +1083,20 @@ function tableMenu(): ContextMenuItemDef[] {
     ? [{ label: text.value.exportCsv, icon: "lucide:download", onSelect: () => exportCsv() }]
     : []
   if (!offered.length) return exportItem
+  const presets: ContextMenuItemDef[] = props.columnPresets?.length
+    ? [{
+        label: text.value.columnPresets,
+        icon: "lucide:layout-template",
+        children: props.columnPresets.map((preset) => ({
+          label: preset.label,
+          checked: activePreset.value === preset.id,
+          onSelect: () => choosePreset(preset.id),
+        })),
+      }]
+    : []
   return [
     ...exportItem,
+    ...presets,
     {
       label: text.value.columns,
       icon: "lucide:columns-3",
@@ -833,6 +1122,7 @@ function fetchPage(delay = 0) {
       .map(([key, set]) => [key, [...set]]),
   )
   const query: TableQuery = { page: page.value, pageSize: props.pageSize, sort: activeSort.value, hidden }
+  if (props.multiSort) query.sorts = sortList.value
   task.run((signal) => load(query, signal), {
     delay,
     apply: (result) => {
@@ -858,7 +1148,7 @@ function fetchPage(delay = 0) {
 // A new sort, filter or page size starts from the first page: page 4 of a
 // different question, or of a different cut of the rows, is a page of nothing
 // in particular.
-watch([activeSort, hiddenValues, () => props.pageSize], () => {
+watch([sortList, hiddenValues, () => props.pageSize], () => {
   if (!props.load) return
   if (page.value !== 1) page.value = 1
   else fetchPage(props.debounce)
@@ -878,6 +1168,7 @@ onMounted(() => {
     if (state) {
       if (state.sort !== undefined) {
         ownSort.value = state.sort
+        ownSorts.value = state.sort ? [state.sort] : []
         emit("update:sort", state.sort)
       }
       if (state.hidden) writeHidden(mergeRestored(hiddenValues.value, state.hidden))
@@ -916,7 +1207,7 @@ function exportCsv(options: TableExportOptions = {}): string {
     }))
   const csv = toCsv(rows, columns, options)
   if (options.download !== false) {
-    downloadFile(`${fileStem(options.filename ?? props.exportFilename, "table")}.csv`, csv, "text/csv;charset=utf-8")
+    downloadFile(`${fileStem(options.filename ?? props.exportFilename, "table")}.csv`, csv, "text/csv;charset=utf-8", tableEl.value?.ownerDocument)
   }
   return csv
 }
@@ -925,16 +1216,28 @@ defineExpose({ reload: () => fetchPage(), exportCsv })
 
 // ── selection ────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selected))
+/*
+ * With `selectionToken`, "all N" is the query and its exceptions rather than
+ * keys: the rows the client never loaded have no key to hold.
+ */
+const excluded = ref<Set<RowKey>>(new Set())
+const tokenActive = computed(() => !!props.selectionToken && !!props.load && props.allMatching)
+const isSelected = (key: RowKey) => (tokenActive.value ? !excluded.value.has(key) : selectedSet.value.has(key))
 // "All" is what the user can see: rows a header filter hides are left alone.
 const allKeys = computed(() => filteredRows.value.map((r, i) => keyFor(r, i)))
 const allChecked = computed(
-  () => allKeys.value.length > 0 && allKeys.value.every((k) => selectedSet.value.has(k)),
+  () => allKeys.value.length > 0 && allKeys.value.every(isSelected),
 )
 const someChecked = computed(
-  () => !allChecked.value && allKeys.value.some((k) => selectedSet.value.has(k)),
+  () => !allChecked.value && allKeys.value.some(isSelected),
 )
 
 function toggleAll(checked: boolean) {
+  if (tokenActive.value) {
+    if (checked) excluded.value = new Set()
+    else clearSelection()
+    return
+  }
   const next = new Set(selectedSet.value)
   for (const key of allKeys.value) {
     if (checked) next.add(key)
@@ -944,6 +1247,14 @@ function toggleAll(checked: boolean) {
 }
 
 function toggleRow(key: RowKey, checked: boolean) {
+  if (tokenActive.value) {
+    const out = new Set(excluded.value)
+    if (checked) out.delete(key)
+    else out.add(key)
+    if (out.size >= total.value) clearSelection()
+    else excluded.value = out
+    return
+  }
   const next = new Set(selectedSet.value)
   if (checked) next.add(key)
   else next.delete(key)
@@ -957,7 +1268,7 @@ const keyByText = computed(
 )
 const paint = usePaintSelect<RowKey>({
   root: frameEl,
-  enabled: () => !!props.selectable,
+  enabled: () => !!props.selectable && !tokenActive.value,
   selection: () => props.selected,
   set: (keys) => emit("update:selected", keys),
   resolve: (raw) => keyByText.value.get(raw),
@@ -978,7 +1289,28 @@ const ticksShown = computed(
 function clearSelection() {
   emit("update:selected", [])
   if (props.allMatching) emit("update:allMatching", false)
+  excluded.value = new Set()
 }
+
+watch([tokenActive, sortList, excluded, total], () => {
+  if (!tokenActive.value) {
+    if (excluded.value.size) excluded.value = new Set()
+    emit("update:selectionToken", null)
+    return
+  }
+  emit("update:selectionToken", {
+    sorts: sortList.value,
+    hidden: Object.fromEntries(
+      Object.entries(hiddenValues.value).filter(([, set]) => set.size).map(([key, set]) => [key, [...set]]),
+    ),
+    excluded: [...excluded.value],
+    total: total.value,
+  })
+})
+// Another filter is another set of rows: what was selected no longer describes it.
+watch(hiddenValues, () => {
+  if (tokenActive.value) clearSelection()
+})
 
 /*
  * A long press on a row starts selection in hold mode. Presses that begin on
@@ -995,7 +1327,7 @@ function onRowPointerDown(event: PointerEvent, key: RowKey) {
 // Once something is selected, a click on a row adds or removes it, as in a
 // phone's selection mode; with nothing selected it is the row's click again.
 function onRowClick(row: T, key: RowKey) {
-  if (holdMode.value && props.selected.length) toggleRow(key, !selectedSet.value.has(key))
+  if (holdMode.value && props.selected.length) toggleRow(key, !isSelected(key))
   else emit("rowClick", row)
 }
 
@@ -1021,7 +1353,7 @@ const pageAllSelected = computed(
 // "Select all" beyond the page is a separate, explicit step: the header tick
 // only ever means the rows the user can see.
 watch(pageAllSelected, (all) => {
-  if (!all && props.allMatching) emit("update:allMatching", false)
+  if (!all && props.allMatching && !props.selectionToken) emit("update:allMatching", false)
 })
 /*
  * One status line that rolls between its states ("60 rows", "3 selected",
@@ -1030,6 +1362,9 @@ watch(pageAllSelected, (all) => {
  */
 const statusText = computed(() => {
   if (!(props.selectable && props.selected.length)) return countText.value
+  if (tokenActive.value && excluded.value.size) {
+    return text.value.selectedCount.replace("{count}", String(total.value - excluded.value.size))
+  }
   return props.allMatching
     ? text.value.allMatchingSelected.replace("{total}", String(total.value))
     : text.value.selectedCount.replace("{count}", String(props.selected.length))
@@ -1070,7 +1405,102 @@ function skeletonWidth(row: number, col: number): string {
   return `${SKELETON_WIDTHS[(row * 3 + col * 2) % SKELETON_WIDTHS.length]}%`
 }
 
-const colSpan = computed(() => visibleColumns.value.length + (props.selectable ? 1 : 0))
+// ── expansion, groups and the rows drawn ─────────────────────
+const VIEWPORT = "[data-reka-scroll-area-viewport]"
+const expansionOn = computed(() => !!props.expandable && !props.virtualRowHeight)
+const ownExpanded = ref<RowKey[]>([])
+const expandedKeys = computed(() => new Set(props.expanded ?? ownExpanded.value))
+const canExpand = (row: T) => (typeof props.expandable === "function" ? props.expandable(row) : !!props.expandable)
+
+function toggleExpanded(key: RowKey) {
+  const next = new Set(expandedKeys.value)
+  if (!next.delete(key)) next.add(key)
+  ownExpanded.value = [...next]
+  emit("update:expanded", ownExpanded.value)
+}
+
+const ownCollapsed = ref<string[]>([])
+const collapsedSet = computed(() => new Set(props.collapsedGroups ?? ownCollapsed.value))
+
+function toggleGroup(id: string) {
+  const next = new Set(collapsedSet.value)
+  if (!next.delete(id)) next.add(id)
+  ownCollapsed.value = [...next]
+  emit("update:collapsedGroups", ownCollapsed.value)
+}
+
+type ViewEntry =
+  | { kind: "row"; id: string; row: T; index: number }
+  | { kind: "detail"; id: string; row: T; index: number }
+  | { kind: "group"; id: string; group: string; value: unknown; rows: T[]; label: string; collapsed: boolean }
+
+function groupValue(row: T): unknown {
+  return typeof props.groupBy === "function" ? props.groupBy(row) : row[props.groupBy as keyof T]
+}
+
+const allEntries = computed<ViewEntry[]>(() => {
+  const rows = displayRows.value
+  const indexes = props.groupBy !== undefined ? new Map(rows.map((row, i) => [row, i])) : null
+  const entries: ViewEntry[] = []
+  const pushRow = (row: T, index: number) => {
+    const key = keyFor(row, index)
+    entries.push({ kind: "row", id: String(key), row, index })
+    if (expansionOn.value && expandedKeys.value.has(key) && canExpand(row)) {
+      entries.push({ kind: "detail", id: `lp-detail:${key}`, row, index })
+    }
+  }
+  if (!indexes) {
+    rows.forEach((row, index) => pushRow(row, index))
+    return entries
+  }
+  for (const group of groupRows(rows, groupValue)) {
+    const collapsed = collapsedSet.value.has(group.id)
+    const name = props.groupLabel?.(group.value, group.rows) ?? group.id
+    const label = text.value.groupCount.replace("{label}", name).replace("{count}", String(group.rows.length))
+    entries.push({ kind: "group", id: `lp-group:${group.id}`, group: group.id, value: group.value, rows: group.rows, label, collapsed })
+    if (!collapsed) for (const row of group.rows) pushRow(row, indexes.get(row) ?? 0)
+  }
+  return entries
+})
+
+const viewportEl = shallowRef<HTMLElement | null>(null)
+const scrollTop = ref(0)
+const viewportHeight = ref(0)
+const onViewportScroll = () => (scrollTop.value = viewportEl.value?.scrollTop ?? 0)
+onMounted(() => {
+  if (props.virtualRowHeight) viewportEl.value = frameEl.value?.querySelector<HTMLElement>(VIEWPORT) ?? null
+})
+watch(viewportEl, (el, _, onCleanup) => {
+  if (!el) return
+  el.addEventListener("scroll", onViewportScroll, { passive: true })
+  onCleanup(() => el.removeEventListener("scroll", onViewportScroll))
+})
+useResizeObserver(viewportEl, (_, el) => (viewportHeight.value = el.clientHeight), { immediate: true })
+
+const rowWindowed = computed(() =>
+  props.virtualRowHeight
+    ? rowWindow(scrollTop.value, viewportHeight.value, props.virtualRowHeight, allEntries.value.length, props.virtualOverscan)
+    : null,
+)
+const viewEntries = computed(() =>
+  rowWindowed.value ? allEntries.value.slice(rowWindowed.value.start, rowWindowed.value.end) : allEntries.value,
+)
+/* The row's place among all of them, for assistive tech: the header is row 1. */
+const rowOffset = (entry: ViewEntry) => (rowWindowed.value?.start ?? 0) + viewEntries.value.indexOf(entry) + 2
+const rowStyle = computed(() => (props.virtualRowHeight ? { height: `${props.virtualRowHeight}px` } : undefined))
+
+function isEditable(col: TableColumn<T>, row: T): boolean {
+  return typeof col.editable === "function" ? col.editable(row) : !!col.editable
+}
+
+function saveCell(col: TableColumn<T>, row: T, value: string) {
+  const parsed = col.parseEdit ? col.parseEdit(value, row) : value
+  emit("cellEdit", { row, key: col.key, value: parsed, previous: row[col.key] })
+}
+
+const colSpan = computed(
+  () => visibleColumns.value.length + (props.selectable ? 1 : 0) + (expansionOn.value ? 1 : 0),
+)
 
 /*
  * Keyboard navigation over the rows. A table is one Tab stop, not one per row:
@@ -1082,10 +1512,9 @@ const colSpan = computed(() => visibleColumns.value.length + (props.selectable ?
  * cursor survives a re-sort.
  */
 const rovingItems = computed(() =>
-  displayRows.value.map((row, index) => ({
-    id: String(keyFor(row, index)),
-    label: String(row[props.columns[0]?.key ?? ""] ?? ""),
-  })),
+  viewEntries.value.flatMap((entry) =>
+    entry.kind === "row" ? [{ id: entry.id, label: String(entry.row[props.columns[0]?.key ?? ""] ?? "") }] : [],
+  ),
 )
 
 const rowByKey = computed(() => {
@@ -1113,7 +1542,7 @@ function onRowKeydown(event: KeyboardEvent) {
     const row = rowByKey.value.get(key)
     if (row) {
       const rowKey = keyFor(row, displayRows.value.indexOf(row))
-      toggleRow(rowKey, !selectedSet.value.has(rowKey))
+      toggleRow(rowKey, !isSelected(rowKey))
     }
     return
   }
@@ -1283,7 +1712,13 @@ usePaletteCommands(() => {
       :title-icon="menuHead?.icon"
       :title-image="menuHead?.image"
     >
-    <table ref="tableEl" class="w-full border-collapse text-sm">
+    <table
+      ref="tableEl"
+      class="w-full border-collapse text-sm"
+      :class="fixedLayout ? 'table-fixed' : ''"
+      :style="tableStyle"
+      :aria-rowcount="virtualRowHeight ? allEntries.length + 1 : undefined"
+    >
       <!-- The background belongs on `thead` itself, not only on its row:
            `border-collapse` collapses the borders, and with a sticky header the
            rows show through that seam — a band of body text rides across the
@@ -1293,7 +1728,13 @@ usePaletteCommands(() => {
         :class="stickyHeader ? 'sticky top-0 z-10 bg-surface-soft' : ''"
       >
         <tr class="border-b border-line bg-surface-soft">
-          <th v-if="selectable" class="w-px p-0" :class="cellY">
+          <th v-if="expansionOn" class="w-px p-0" :style="fixedLayout ? { width: EXPAND_COLUMN_WIDTH } : undefined" :class="cellY" />
+          <th
+            v-if="selectable"
+            class="w-px p-0"
+            :class="cellY"
+            :style="fixedLayout ? { width: ticksShown ? TICK_COLUMN_WIDTH : '0' } : undefined"
+          >
             <div class="lp-tick lp-tick-open" :class="ticksShown ? '' : 'lp-tick-hidden'" :inert="!ticksShown">
               <LpCheckbox
                 :model-value="allChecked"
@@ -1303,14 +1744,15 @@ usePaletteCommands(() => {
             </div>
           </th>
           <th
-            v-for="col in visibleColumns"
+            v-for="col in shownColumns"
             :key="col.key"
-            :style="col.width ? { width: col.width } : undefined"
+            :style="headStyle(col)"
             class="px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
-            :class="[alignClass(col.align), cellY]"
+            :class="[alignClass(col.align), cellY, col.pin ? PIN_HEAD : '', canResize(col) && !col.pin ? 'relative' : '']"
+            :data-lp-col="measuredCol(col)"
             :aria-sort="
-              activeSort?.key === col.key
-                ? activeSort.dir === 'asc'
+              sortOf(col)
+                ? sortOf(col)!.dir === 'asc'
                   ? 'ascending'
                   : 'descending'
                 : undefined
@@ -1329,9 +1771,9 @@ usePaletteCommands(() => {
               class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
-                activeSort?.key === col.key ? 'text-ink' : '',
+                sortOf(col) ? 'text-ink' : '',
               ]"
-              @click="toggleSort(col)"
+              @click="toggleSort(col, $event)"
             >
               {{ col.label }}
               <LpIcon
@@ -1340,11 +1782,12 @@ usePaletteCommands(() => {
                 :size="13"
                 class="shrink-0 transition-[transform,opacity] duration-[var(--duration-fast)] ease-[var(--ease-emphasized)]"
                 :class="
-                  activeSort?.key === col.key
+                  sortOf(col)
                     ? 'opacity-100'
                     : 'opacity-40 group-hover/sort:opacity-70'
                 "
               />
+              <span v-if="sortPosition(col)" class="tabular-nums text-brand">{{ sortPosition(col) }}</span>
             </button>
             </LpContextMenu>
             <template v-else>{{ col.label }}</template>
@@ -1372,6 +1815,20 @@ usePaletteCommands(() => {
                 @update:hidden="(next) => setHidden(col.key, next)"
               />
             </LpPopover>
+            <span
+              v-if="canResize(col)"
+              role="separator"
+              aria-orientation="vertical"
+              tabindex="0"
+              :aria-label="text.resizeColumn.replace('{column}', col.label)"
+              :aria-valuenow="widths[col.key]"
+              class="absolute inset-y-0 right-0 w-1.5 cursor-col-resize touch-none outline-none transition-colors duration-fast hover:bg-brand focus-visible:bg-brand"
+              :data-lp-resize="col.key"
+              @pointerdown="startResize($event, col)"
+              @click.stop
+              @dblclick.stop="clearWidth(col)"
+              @keydown="onResizeKey($event, col)"
+            />
           </th>
         </tr>
       </thead>
@@ -1389,7 +1846,7 @@ usePaletteCommands(() => {
       <TransitionGroup
         tag="tbody"
         name="lp-row"
-        :css="animating"
+        :css="animating && !virtualRowHeight"
         :class="busy && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
         :aria-busy="busy || undefined"
         :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
@@ -1405,9 +1862,10 @@ usePaletteCommands(() => {
             :key="`lp-table-skeleton-${n}`"
             class="lp-row-empty border-b border-line/60 last:border-0"
           >
+            <td v-if="expansionOn" class="w-px p-0" :class="cellY" />
             <td v-if="selectable" class="w-px p-0" :class="cellY" />
             <td
-              v-for="(col, ci) in visibleColumns"
+              v-for="(col, ci) in shownColumns"
               :key="col.key"
               class="px-4"
               :class="[alignClass(col.align), cellY]"
@@ -1436,43 +1894,101 @@ usePaletteCommands(() => {
         <!-- A plain <tr>, because TransitionGroup animates element children and
              nothing else. The right-click menu is the table's one menu, told
              which row the event came from — see `contextMenu`. -->
-        <tr
-          v-for="(row, index) in displayRows"
-          :key="keyFor(row, index)"
-          @contextmenu="onRowContextMenu(row)"
-          class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
-          :class="selectedSet.has(keyFor(row, index)) ? 'bg-brand-soft/40' : ''"
-          v-bind="roving.itemProps(String(keyFor(row, index)))"
-          :data-paint-key="selectable ? String(keyFor(row, index)) : undefined"
-          :data-lp-context-row="rowMenu ? '' : undefined"
-          @click="onRowClick(row, keyFor(row, index))"
-          @pointerdown="onRowPointerDown($event, keyFor(row, index))"
-          @keydown="onRowKeydown"
-        >
-          <td
-            v-if="selectable"
-            class="w-px cursor-pointer p-0 select-none"
-            :class="cellY"
-            @click.stop
-            @pointerdown.stop="paint.onPointerDown($event, keyFor(row, index))"
+        <tr v-if="rowWindowed?.before" key="lp-virtual-before" aria-hidden="true">
+          <td :colspan="colSpan" class="p-0" :style="{ height: `${rowWindowed.before}px` }" />
+        </tr>
+        <!-- One keyed fragment per entry: TransitionGroup reads through it to
+             the row, so the rows animate as they always did. -->
+        <template v-for="entry in viewEntries" :key="entry.id">
+          <tr v-if="entry.kind === 'group'" class="border-b border-line/60 bg-surface-soft/60" :style="rowStyle">
+            <td :colspan="colSpan" class="px-4 text-xs font-medium text-muted" :class="cellY">
+              <slot name="group" :value="entry.value" :rows="entry.rows" :label="entry.label" :collapsed="entry.collapsed" :toggle="() => toggleGroup(entry.group)">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-small outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                  :aria-expanded="!entry.collapsed"
+                  :aria-label="(entry.collapsed ? text.expandGroup : text.collapseGroup).replace('{label}', entry.label)"
+                  @click="toggleGroup(entry.group)"
+                >
+                  <LpIcon name="lucide:chevron-right" :size="14" class="transition-transform duration-fast motion-reduce:transition-none" :class="entry.collapsed ? '' : 'rotate-90'" />
+                  {{ entry.label }}
+                </button>
+              </slot>
+            </td>
+          </tr>
+          <tr v-else-if="entry.kind === 'detail'" class="border-b border-line/60 last:border-0" data-lp-row-detail>
+            <td :colspan="colSpan" class="px-4 py-3">
+              <slot name="expanded" :row="entry.row" :close="() => toggleExpanded(keyFor(entry.row, entry.index))" />
+            </td>
+          </tr>
+          <!-- A plain <tr>, because TransitionGroup animates element children and
+               nothing else. The right-click menu is the table's one menu, told
+               which row the event came from — see `contextMenu`. -->
+          <tr
+            v-else
+            @contextmenu="onRowContextMenu(entry.row)"
+            class="group border-b border-line/60 outline-none transition-colors last:border-0 hover:bg-surface-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[active]:bg-surface-soft/40"
+            :class="isSelected(keyFor(entry.row, entry.index)) ? 'bg-brand-soft/40' : ''"
+            :style="rowStyle"
+            :aria-rowindex="virtualRowHeight ? rowOffset(entry) : undefined"
+            v-bind="roving.itemProps(String(keyFor(entry.row, entry.index)))"
+            :data-paint-key="selectable ? String(keyFor(entry.row, entry.index)) : undefined"
+            :data-lp-context-row="rowMenu ? '' : undefined"
+            @click="onRowClick(entry.row, keyFor(entry.row, entry.index))"
+            @pointerdown="onRowPointerDown($event, keyFor(entry.row, entry.index))"
+            @keydown="onRowKeydown"
           >
-            <div class="lp-tick lp-tick-open" :class="ticksShown ? '' : 'lp-tick-cue'">
-              <LpCheckbox
-                :model-value="selectedSet.has(keyFor(row, index))"
-                @update:model-value="(v) => toggleRow(keyFor(row, index), v)"
-              />
-            </div>
-          </td>
-          <td
-            v-for="(col, ci) in visibleColumns"
-            :key="col.key"
-            class="px-4 text-ink"
-            :class="[alignClass(col.align), cellY, col.nowrap ? 'whitespace-nowrap' : '']"
-          >
-            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :open-menu="openRowMenu">
-              {{ row[col.key] }}
-            </slot>
-          </td>
+            <td v-if="expansionOn" class="w-px p-0 text-center" :class="cellY" @click.stop @keydown.stop>
+              <button
+                v-if="canExpand(entry.row)"
+                type="button"
+                class="inline-grid size-6 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                :aria-expanded="expandedKeys.has(keyFor(entry.row, entry.index))"
+                :aria-label="expandedKeys.has(keyFor(entry.row, entry.index)) ? text.collapseRow : text.expandRow"
+                @click="toggleExpanded(keyFor(entry.row, entry.index))"
+              >
+                <LpIcon name="lucide:chevron-right" :size="14" class="transition-transform duration-fast motion-reduce:transition-none" :class="expandedKeys.has(keyFor(entry.row, entry.index)) ? 'rotate-90' : ''" />
+              </button>
+            </td>
+            <td
+              v-if="selectable"
+              class="w-px cursor-pointer p-0 select-none"
+              :class="cellY"
+              @click.stop
+              @pointerdown.stop="paint.onPointerDown($event, keyFor(entry.row, entry.index))"
+            >
+              <div class="lp-tick lp-tick-open" :class="ticksShown ? '' : 'lp-tick-cue'">
+                <LpCheckbox
+                  :model-value="isSelected(keyFor(entry.row, entry.index))"
+                  @update:model-value="(v) => toggleRow(keyFor(entry.row, entry.index), v)"
+                />
+              </div>
+            </td>
+            <td
+              v-for="col in shownColumns"
+              :key="col.key"
+              class="px-4 text-ink"
+              :class="[alignClass(col.align), cellY, col.nowrap ? 'whitespace-nowrap' : '', col.pin ? PIN_CELL : '']"
+              :style="pinStyle(col)"
+            >
+              <slot :name="`cell-${col.key}`" :row="entry.row" :value="entry.row[col.key]" :open-menu="openRowMenu">
+                <!-- The field is its own world: its clicks and keys are not the row's. -->
+                <span v-if="isEditable(col, entry.row)" class="inline-block" @click.stop @pointerdown.stop @keydown.stop>
+                  <LpEditable
+                    :model-value="String(entry.row[col.key] ?? '')"
+                    :label="col.label"
+                    size="sm"
+                    :validate="(value) => col.validateEdit?.(value, entry.row)"
+                    :save="(value) => saveCell(col, entry.row, value)"
+                  />
+                </span>
+                <template v-else>{{ entry.row[col.key] }}</template>
+              </slot>
+            </td>
+          </tr>
+        </template>
+        <tr v-if="rowWindowed?.after" key="lp-virtual-after" aria-hidden="true">
+          <td :colspan="colSpan" class="p-0" :style="{ height: `${rowWindowed.after}px` }" />
         </tr>
       </TransitionGroup>
     </table>

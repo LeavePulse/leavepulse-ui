@@ -70,6 +70,18 @@ const text = useLabels<DataListLabels>("dataList", { empty: "—" }, () => props
 const slots = useSlots()
 
 const keyOf = (item: DataListItem) => item.key ?? item.label
+
+// Row identity: the key, numbered from its second use, so two rows with one
+// label stay two rows. A slot name still addresses them by `keyOf`.
+const rowKeys = computed(() => {
+  const uses = new Map<string, number>()
+  return props.items.map((item) => {
+    const key = keyOf(item)
+    const use = uses.get(key) ?? 0
+    uses.set(key, use + 1)
+    return use ? `${key}#${use}` : key
+  })
+})
 const isEmpty = (value: DataListItem["value"]) => value === null || value === undefined || value === ""
 // Long text wraps; rolling a paragraph would clip it to one line.
 const rolls = (value: DataListItem["value"]) => !isEmpty(value) && String(value).length <= 48
@@ -109,7 +121,7 @@ const pad = computed(() => (props.size === "sm" ? "py-1.5 text-xs" : "py-2.5 tex
     >
       <div
         v-for="(item, i) in items"
-        :key="keyOf(item)"
+        :key="rowKeys[i]"
         class="group/row grid items-baseline"
         :class="[ROW[layout], pad, divided && i > 0 ? 'border-t border-line' : '']"
       >
