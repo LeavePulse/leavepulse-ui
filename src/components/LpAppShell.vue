@@ -30,10 +30,28 @@ export default { inheritAttrs: false }
  * #header-title (override the computed title), and the default slot (page body).
  * Overlays that aren't part of the frame (command palette, toaster) live in the
  * host next to <LpAppShell>.
+ *
+ * Every option below is off until asked for, and the shell's markup without
+ * them is what it always was: `headerCollapse`, `backToTop`, `density`,
+ * `pageTransition`, `safeArea`, the #aside region and `adaptiveNav`.
  */
-import { computed, onMounted, ref, useId, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, useId, useSlots, watch } from "vue"
+import { easingToken, durationToken, prefersReducedMotion } from "../composables/easing"
 import { useLabels } from "../composables/useLpConfig"
 import { useScrollMemory } from "../composables/scrollMemory"
+import { nodeWindow, useView, viewWindow } from "../composables/useView"
+import AppShellContextNav from "./AppShellContextNav.vue"
+import {
+  contextNavItems,
+  DENSITY_CLASS,
+  headerCollapsedAfter,
+  NAV_BREAKPOINT_PX,
+  resolveNavMode,
+  type AdaptiveNav,
+  type NavBreakpoint,
+  type NavMode,
+  type ShellDensity,
+} from "./appShell"
 import LpBottomNav from "./LpBottomNav.vue"
 import LpContextSwitcher from "./LpContextSwitcher.vue"
 import LpButton from "./LpButton.vue"
@@ -45,6 +63,9 @@ import type { AppContext, SidebarItem, SidebarSection } from "./sidebar"
 import { mergeClass, useMergedAttrs } from "../composables/useMergedClass"
 
 export type { SidebarItem, SidebarSection } from "./sidebar"
+
+/* Past this much scrolled the way back up is worth a button. */
+const BACK_TO_TOP_AFTER_PX = 600
 
 const props = withDefaults(
   defineProps<{
@@ -94,7 +115,7 @@ const props = withDefaults(
     /** Loading skeleton for the nav. */
     loading?: boolean
     /** Text overrides: the burger's name and the skip link. */
-    labels?: Partial<{ openMenu: string; skipToContent: string }>
+    labels?: Partial<{ openMenu: string; skipToContent: string; backToTop: string; aside: string; contextNav: string }>
     /** Icon-only rail (v-model:compact). Forwarded to LpSidebar. */
     compact?: boolean
     /** The person sizes the rail and folds it to icons. Forwarded to LpSidebar. */
@@ -123,9 +144,44 @@ const props = withDefaults(
     /**
      * On phones, the main pages along the bottom instead of the burger, with
      * "More" for the rest (it opens the drawer). `true` takes the first four
-     * pages, a number that many, a list of ids those pages.
+     * pages, a number that many, a list of ids those pages. Top-level pages
+     * only: an id from `children` is ignored, and such a page stays behind "More".
      */
     bottomNav?: boolean | number | string[]
+    /**
+     * The header leaves as the page scrolls down and returns on the way up,
+     * giving a small screen its height back. A keyboard user tabbing into it
+     * brings it back too. A full-bleed page owns its scrolling, so the header
+     * stays there.
+     */
+    headerCollapse?: boolean
+    /** A button back to the top of a long page; a number sets how far down it appears, in px. */
+    backToTop?: boolean | number
+    /** How tight the page sits in main. Unset keeps the shell's own padding. */
+    density?: ShellDensity
+    /**
+     * A new `path` fades the page and the header's title and actions in as one,
+     * on the same clock, so actions arriving by teleport do not land apart from
+     * their page. Nothing is remounted. Skipped under reduced motion.
+     */
+    pageTransition?: boolean
+    /**
+     * Keep the header and the page's end clear of a notch and a home bar
+     * (`viewport-fit=cover`). The bottom bar always does.
+     */
+    safeArea?: boolean
+    /** Tailwind breakpoint below which the #aside region is hidden. Defaults to `mobileBreakpoint`. */
+    asideBreakpoint?: NavBreakpoint
+    /** Classes for the #aside region, its width above all. */
+    asideClass?: string
+    /**
+     * One model for the navigation across widths; see `NavMode`. Below
+     * `mobileBreakpoint` it is `bottomNav` or the drawer, as ever; this adds the
+     * fold to icons in between and the row of sub-pages where the rail is gone.
+     * A `compact` the app controls wins, and a person folding the rail by hand
+     * holds until the width crosses into another mode.
+     */
+    adaptiveNav?: AdaptiveNav
   }>(),
   {
     mobileBreakpoint: "lg",
@@ -144,6 +200,8 @@ const emit = defineEmits<{
   (e: "update:compact", value: boolean): void
   (e: "update:pinned", ids: string[]): void
   (e: "update:context", id: string): void
+  /** The navigation the width settled on, with `adaptiveNav` or without. */
+  (e: "nav-mode", mode: NavMode): void
 }>()
 
 const switching = computed(() => (props.contexts?.length ?? 0) > 1)
@@ -153,11 +211,16 @@ const flatItems = computed<SidebarItem[]>(() =>
   (props.sections ? props.sections.flatMap((s) => s.items) : (props.items ?? [])).flatMap((i) => [i, ...(i.children ?? [])]),
 )
 
+// Compared in one spelling, so "/billing/" and "//billing" are "/billing".
+const SLASH_RUN = /\/{2,}/g
+const TRAILING_SLASH = /(?<=.)\/$/
+const cleanPath = computed(() => props.path?.replace(SLASH_RUN, "/").replace(TRAILING_SLASH, ""))
+
 // Default active test: exact match for "/", prefix match (on a segment
 // boundary) otherwise — so "/billing" doesn't light up on "/billing-x".
 function matchesPath(item: SidebarItem): boolean {
-  if (item.id === "/") return props.path === "/"
-  return props.path === item.id || props.path!.startsWith(`${item.id}/`)
+  if (item.id === "/") return cleanPath.value === "/"
+  return cleanPath.value === item.id || cleanPath.value!.startsWith(`${item.id}/`)
 }
 
 // Only the LONGEST match lights up. A parent whose id prefixes its children —
@@ -193,7 +256,7 @@ const pageTitle = computed(() => {
 const drawerOpen = defineModel<boolean>("open", { default: false })
 const text = useLabels(
   "appShell",
-  { openMenu: "Open menu", skipToContent: "Skip to content" },
+  { openMenu: "Open menu", skipToContent: "Skip to content", backToTop: "Back to top", aside: "Details", contextNav: "In this section" },
   () => props.labels,
 )
 
@@ -204,6 +267,7 @@ const text = useLabels(
  * A full-bleed page owns its scrolling, so the shell leaves it alone.
  */
 const scrollArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
+const asideArea = ref<{ viewportEl: HTMLElement | null } | null>(null)
 const bleedId = `lp-shell-bleed-${useId()}`
 const mounted = ref(false)
 onMounted(() => (mounted.value = true))
@@ -211,20 +275,151 @@ const bleeding = computed(() => props.fullBleed && mounted.value)
 const mainId = `lp-main-${useId()}`
 
 // Focus instead of following the hash, which a router would treat as a navigation.
+const mainEl = ref<HTMLElement | null>(null)
 function skipToMain() {
-  document.getElementById(mainId)?.focus()
+  mainEl.value?.focus()
 }
 
 watch(
   () => props.path,
   () => {
     if (drawerOpen.value) drawerOpen.value = false
+    headerCollapsed.value = false
   },
 )
 useScrollMemory(
   () => (bleeding.value ? null : scrollArea.value?.viewportEl),
   () => props.path,
   () => props.hash,
+)
+// The side region keeps its own place on the same address.
+useScrollMemory(
+  () => asideArea.value?.viewportEl,
+  () => props.path,
+  () => undefined,
+  "aside:",
+)
+
+const headerCollapsed = ref(false)
+const scrolledFar = ref(false)
+const backToTopAfter = computed(() => (typeof props.backToTop === "number" ? props.backToTop : BACK_TO_TOP_AFTER_PX))
+let lastTop = 0
+
+function onMainScroll(event: Event) {
+  if (!props.headerCollapse && !props.backToTop) return
+  const view = event.target as HTMLElement
+  const top = view.scrollTop
+  if (props.headerCollapse) {
+    headerCollapsed.value = headerCollapsedAfter(headerCollapsed.value, lastTop, top, view.scrollHeight - view.clientHeight)
+  }
+  scrolledFar.value = top > backToTopAfter.value
+  lastTop = top
+}
+
+const headerHidden = computed(() => headerCollapsed.value && !bleeding.value)
+const HEADER_HEIGHT = "4rem"
+const headerHeight = computed(() => (props.safeArea ? `calc(${HEADER_HEIGHT} + env(safe-area-inset-top))` : HEADER_HEIGHT))
+
+function scrollToTop() {
+  const view = scrollArea.value?.viewportEl
+  if (!view) return
+  view.scrollTo({ top: 0, behavior: prefersReducedMotion(nodeWindow(view)) ? "instant" : "smooth" })
+  // The button is about to leave, and focus must not leave with it.
+  mainEl.value?.focus()
+}
+
+const headerClass = computed(() =>
+  mergeClass(
+    "relative flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:px-6",
+    props.headerCollapse && "transition-[margin-top] duration-[var(--duration-medium)] ease-[var(--ease-settle)]",
+    props.safeArea &&
+      "h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-[max(1.5rem,env(safe-area-inset-left))] md:pr-[max(1.5rem,env(safe-area-inset-right))]",
+  ),
+)
+const pageClass = computed(() =>
+  mergeClass(
+    DENSITY_CLASS[props.density ?? "comfortable"],
+    props.contentClass,
+    props.safeArea && !props.bottomNav && "pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+  ),
+)
+
+// Fades on one clock, read from the page's own tokens. Post flush: a teleported
+// action arrives with the render that brought the page.
+const headerEl = ref<HTMLElement | null>(null)
+const bleedEl = ref<HTMLElement | null>(null)
+watch(
+  () => props.path,
+  () => {
+    const content = bleeding.value ? bleedEl.value : scrollArea.value?.viewportEl
+    if (!props.pageTransition || !content || prefersReducedMotion(nodeWindow(content))) return
+    const timing = { duration: durationToken("duration-medium", undefined, content), easing: easingToken("ease-settle", undefined, content) }
+    // Title and actions; the burger is the frame, not the page.
+    const header = headerEl.value?.querySelectorAll(":scope > :not(button)") ?? []
+    for (const el of [content, ...header]) el.animate({ opacity: [0, 1] }, timing)
+  },
+  { flush: "post" },
+)
+
+const slots = useSlots()
+const hasAside = computed(() => !!slots.aside)
+const ASIDE_VISIBLE: Record<NavBreakpoint, string> = {
+  sm: "hidden sm:flex",
+  md: "hidden md:flex",
+  lg: "hidden lg:flex",
+  xl: "hidden xl:flex",
+  "2xl": "hidden 2xl:flex",
+}
+const asideClasses = computed(() =>
+  mergeClass("min-h-0 w-80 flex-col border-l border-line bg-surface", ASIDE_VISIBLE[props.asideBreakpoint ?? props.mobileBreakpoint], props.asideClass),
+)
+
+/*
+ * The aside takes a grid column rather than a wrapper around main: a wrapper
+ * that comes and goes with the slot would remount the page. Header, the
+ * sub-page row and the bottom bar span both columns.
+ */
+const columnClass = computed(() => (hasAside.value ? "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto]" : "flex min-w-0 flex-1 flex-col"))
+const columnStyle = computed(() =>
+  hasAside.value ? { gridTemplateRows: `auto ${contextVisible.value ? "auto " : ""}minmax(0,1fr) auto` } : undefined,
+)
+const spanClass = computed(() => (hasAside.value ? "col-span-2" : undefined))
+
+// One width rather than a media query per breakpoint: those report one by one,
+// so a jump across two passed through a mode the window was never in.
+const view = useView()
+const width = ref(0)
+const measureWidth = () => (width.value = viewWindow(view.value).innerWidth)
+onMounted(() => {
+  measureWidth()
+  viewWindow(view.value).addEventListener("resize", measureWidth)
+})
+onBeforeUnmount(() => viewWindow(view.value).removeEventListener("resize", measureWidth))
+
+// Before mount there is no width: a server render is the plain rail.
+const navMode = computed<NavMode>(() =>
+  mounted.value
+    ? resolveNavMode((breakpoint) => width.value >= NAV_BREAKPOINT_PX[breakpoint], {
+        mobileBreakpoint: props.mobileBreakpoint,
+        bottomNav: !!props.bottomNav,
+        compactBelow: props.adaptiveNav?.compactBelow,
+      })
+    : "rail",
+)
+watch(navMode, (mode) => emit("nav-mode", mode))
+
+// What a person chose by hand, for as long as the width stays in this mode.
+const handCompact = ref<boolean | undefined>()
+watch(navMode, () => (handCompact.value = undefined))
+const railCompact = computed(() => props.compact ?? handCompact.value ?? (navMode.value === "compact" ? true : undefined))
+function onCompact(value: boolean) {
+  if (props.adaptiveNav) handCompact.value = value
+  emit("update:compact", value)
+}
+
+const contextItems = computed(() => (props.adaptiveNav?.contextNav ? contextNavItems(topItems.value, activeTest.value) : []))
+const contextVisible = computed(
+  () => (navMode.value === "bottom" || navMode.value === "drawer") && (contextItems.value.length > 0 || (!!slots["context-nav"] && !!props.adaptiveNav?.contextNav)),
 )
 
 function onSelect(item: SidebarItem) {
@@ -260,7 +455,7 @@ function onBottom(item: SidebarItem) {
 
 // Expose the burger trigger so a host can omit its own header entirely.
 const _openDrawer = () => (drawerOpen.value = true)
-defineExpose({ openDrawer: _openDrawer })
+defineExpose({ openDrawer: _openDrawer, navMode })
 
 // The shell claims the full viewport height, which is wrong when it is embedded in a page that already has a header of its own.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
@@ -292,7 +487,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :loading="loading"
       :collapsed="collapsed"
       :auto-collapse-after="autoCollapseAfter"
-      :compact="compact"
+      :compact="railCompact"
       :resizable="resizable"
       :pinnable="pinnable"
       :pinned="pinned"
@@ -303,7 +498,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       :hints="hints"
       class="shrink-0"
       @update:model-value="onModel"
-      @update:compact="(v) => emit('update:compact', v)"
+      @update:compact="onCompact"
       @update:pinned="(v) => emit('update:pinned', v)"
       @update:open="(v) => (drawerOpen = v)"
       @update:collapsed="(v) => emit('update:collapsed', v)"
@@ -336,7 +531,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     </LpSidebar>
 
     <!-- Main column: header + the single scroll region. -->
-    <div class="flex min-w-0 flex-1 flex-col">
+    <div :class="columnClass" :style="columnStyle">
       <!-- `relative` so a consumer can centre something — section tabs, a
            search box — against the WHOLE bar. Centring it inside the title
            block instead makes its position depend on how wide the actions are,
@@ -344,7 +539,10 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
            59 px off centre with two actions and 77 px with three, which reads
            as the navigation drifting rather than the page changing. -->
       <header
-        class="relative flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 md:px-6"
+        ref="headerEl"
+        :class="[headerClass, spanClass]"
+        :style="headerHidden ? { marginTop: `calc(-1 * ${headerHeight})` } : undefined"
+        @focusin="headerCollapsed = false"
       >
         <LpButton
           :class="burgerClass"
@@ -398,26 +596,55 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
            tab going from a full-bleed page to a padded one cut instead of
            playing its transition, and lost the page's state. Until mount the
            page stays in the scroll region, which is what a server render has. -->
-      <main :id="mainId" tabindex="-1" class="flex min-h-0 flex-1 flex-col outline-none">
-        <div v-show="bleeding" :id="bleedId" class="min-h-0 flex-1 overflow-hidden" />
+      <template v-if="contextVisible">
+        <slot name="context-nav" :items="contextItems" :mode="navMode">
+          <AppShellContextNav
+            :class="spanClass"
+            :items="contextItems"
+            :is-active="activeTest"
+            :label="text.contextNav"
+            @select="onBottom"
+          />
+        </slot>
+      </template>
+      <main ref="mainEl" :id="mainId" tabindex="-1" :data-lp-density="density" :class="['flex min-h-0 flex-1 flex-col outline-none', backToTop && 'relative']">
+        <div ref="bleedEl" v-show="bleeding" :id="bleedId" class="min-h-0 flex-1 overflow-hidden" />
         <LpScrollArea
           v-show="!bleeding"
           ref="scrollArea"
           class="min-h-0 flex-1"
-          :content-class="mergeClass('px-4 py-6 md:px-6', contentClass)"
+          :content-class="pageClass"
+          @scroll="onMainScroll"
         >
           <Teleport :to="`#${bleedId}`" :disabled="!bleeding" defer>
             <slot />
           </Teleport>
         </LpScrollArea>
+        <LpButton
+          v-if="backToTop && scrolledFar && !bleeding"
+          class="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] right-6"
+          variant="outline"
+          size="sm"
+          square
+          :aria-label="text.backToTop"
+          @click="scrollToTop"
+        >
+          <LpIcon name="lucide:arrow-up" :size="16" />
+        </LpButton>
       </main>
+      <aside v-if="hasAside" :aria-label="text.aside" :class="asideClasses">
+        <LpScrollArea ref="asideArea" class="min-h-0 flex-1" content-class="p-4">
+          <slot name="aside" />
+        </LpScrollArea>
+      </aside>
       <LpBottomNav
         v-if="bottomNav"
-        :class="burgerHidden[mobileBreakpoint]"
+        :class="[burgerHidden[mobileBreakpoint], spanClass]"
         :items="bottomItems"
         :is-active="activeTest"
         more
         :more-active="moreActive"
+        :more-expanded="drawerOpen"
         @select="onBottom"
         @more="drawerOpen = true"
       />

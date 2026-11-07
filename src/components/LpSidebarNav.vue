@@ -149,7 +149,8 @@ let typedAt = 0
 function onKey(event: KeyboardEvent) {
   const box = event.currentTarget as HTMLElement
   const list = [...box.querySelectorAll<HTMLElement>("[data-lp-nav-row]")].filter((r) => r.offsetParent !== null)
-  const at = list.indexOf(document.activeElement as HTMLElement)
+  // The rows' own document: inside an LpFrame the page's only knows the iframe.
+  const at = list.indexOf(box.ownerDocument.activeElement as HTMLElement)
   if (at < 0) return
   const row = list[at]!
   const go = (i: number) => {
@@ -270,7 +271,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         @activate="activate"
       />
     </div>
-    <template v-for="(section, si) in groups" :key="si">
+    <template v-for="(section, si) in groups" :key="sectionKey(section) || si">
     <!-- Compact, a group that folds is one icon: its pages open in the card
          beside it, as a page's own pages do. A hundred initials in a column
          would be no nav at all. -->

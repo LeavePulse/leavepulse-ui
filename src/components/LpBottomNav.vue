@@ -29,10 +29,14 @@ const props = withDefaults(
     more?: boolean
     /** Marks "More" current: the page shown is one of those behind it. */
     moreActive?: boolean
+    /** Whether what "More" opens is open now, told to assistive tech. */
+    moreExpanded?: boolean
+    /** The id of what "More" opens, while it is in the page. */
+    moreControls?: string
     label?: string
     labels?: Partial<{ nav: string; more: string }>
   }>(),
-  { more: false, moreActive: false },
+  { more: false, moreActive: false, moreExpanded: false },
 )
 
 const emit = defineEmits<{
@@ -74,6 +78,10 @@ const ROW = "relative flex items-center justify-center outline-none transition-[
     <button
       v-if="more"
       type="button"
+      aria-haspopup="dialog"
+      :aria-expanded="moreExpanded"
+      :aria-controls="moreControls"
+      :aria-current="moreActive ? 'true' : undefined"
       :class="[ROW, BOTTOM_ITEM, moreActive ? 'text-brand' : 'text-muted']"
       @click="emit('more')"
     >

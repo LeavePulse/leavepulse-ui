@@ -9,6 +9,7 @@
  * sidebar it is the row's name (and the pages under it), since the row shows
  * only an icon; with a `preview` it is a glance at the page before going there.
  */
+import { clamp } from "../composables/clamp"
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useLocale } from "../composables/useLocale"
@@ -164,7 +165,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
             <span
               v-if="typeof item.busy === 'number'"
               class="block h-full rounded-pill bg-brand transition-[width] duration-(--duration-medium) ease-[var(--ease-emphasized)]"
-              :style="{ width: `${Math.round(Math.min(1, Math.max(0, item.busy)) * 100)}%` }"
+              :style="{ width: `${Math.round(clamp(item.busy, 0, 1) * 100)}%` }"
             />
             <span v-else class="lp-sweep absolute inset-y-0 left-0 w-2/5 rounded-pill bg-brand" />
           </span>

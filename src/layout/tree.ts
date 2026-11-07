@@ -1,3 +1,4 @@
+import { clamp } from "../composables/clamp"
 import { reactive } from "vue"
 
 /*
@@ -221,11 +222,11 @@ export function moveLeaf(
 ): void {
   if (movingId === targetId) return
   const moving = findLeaf(root, movingId)
-  if (!moving) return
+  // Checked before the cell is detached: with nowhere to land it would be lost.
+  const target = findLeaf(root, targetId)
+  if (!moving || !target) return
 
   if (side === "center") {
-    const target = findLeaf(root, targetId)
-    if (!target) return
     const merged = moving.blocks
     detach(root, movingId)
     target.active = target.blocks.length
@@ -275,23 +276,37 @@ export function serializeLayout(root: Split): SerializedNode {
   return strip(root) as SerializedSplit
 }
 
+const validSize = (size: unknown): number =>
+  typeof size === "number" && Number.isFinite(size) && size > 0 ? size : 1
+
+/*
+ * The data may come from a file or an older version, so nothing about its
+ * shape is taken on trust: a bad size or direction falls back to the default
+ * and a node that cannot be drawn (no tabs, no children, an unknown kind) is
+ * left out, so one damaged cell does not cost the person the whole layout.
+ * Only a root that is no layout at all throws. Block ids are the app's, so an
+ * id that repeats across cells is kept.
+ */
 export function deserializeLayout(data: SerializedNode): Split {
-  const hydrate = (n: SerializedNode): LayoutNode => {
-    if (n.kind === "leaf") {
+  const hydrate = (n: SerializedNode | null | undefined): LayoutNode | null => {
+    if (n?.kind === "leaf") {
       // Accept both the tabbed form and the legacy single-`block` form.
-      const blocks = n.blocks ?? (n.block != null ? [n.block] : [])
-      const active = Math.min(Math.max(n.active ?? 0, 0), Math.max(blocks.length - 1, 0))
-      return { kind: "leaf", id: nid(), blocks, active, size: n.size ?? 1 }
+      const listed = Array.isArray(n.blocks) ? n.blocks : n.block != null ? [n.block] : []
+      const blocks = listed.filter((block) => typeof block === "string")
+      if (!blocks.length) return null
+      const wanted = Number.isInteger(n.active) ? n.active : 0
+      const active = clamp(wanted, 0, blocks.length - 1)
+      return { kind: "leaf", id: nid(), blocks, active, size: validSize(n.size) }
     }
-    return {
-      kind: "split",
-      id: nid(),
-      dir: n.dir,
-      size: n.size ?? 1,
-      children: n.children.map(hydrate),
-    }
+    if (n?.kind !== "split" || !Array.isArray(n.children)) return null
+    const children = n.children.map(hydrate).filter((child) => child !== null)
+    if (!children.length) return null
+    return { kind: "split", id: nid(), dir: n.dir === "col" ? "col" : "row", size: validSize(n.size), children }
   }
-  return reactive(hydrate(data) as Split)
+  if (data?.kind !== "leaf" && data?.kind !== "split") throw new Error("Invalid layout")
+  const root = hydrate(data)
+  if (root?.kind === "split") return reactive(root)
+  return reactive<Split>({ kind: "split", id: nid(), dir: "row", size: 1, children: root ? [root] : [] })
 }
 
 // ── history snapshots ────────────────────────────────────────

@@ -2,6 +2,7 @@
 import { Motion } from "motion-v"
 import { computed, onBeforeUnmount, ref } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
+import { startPointerDrag } from "../composables/pointerDrag"
 import type { LayoutNode, Leaf, Side, Split } from "../layout/tree"
 import type { BlockRegistry } from "../layout/registry"
 import { blockTitle } from "../layout/registry"
@@ -108,35 +109,26 @@ let stopSplitter: (() => void) | null = null
 onBeforeUnmount(() => stopSplitter?.())
 
 function startSplitter(ev: PointerEvent, parent: Split, index: number) {
-  ev.preventDefault()
   const handle = ev.currentTarget as HTMLElement
   const host = handle.parentElement
   if (!host) return
-  // Capture keeps the moves coming when the pointer crosses an iframe or leaves
-  // the window; pointercancel (a touch the browser took over) ends it too.
-  handle.setPointerCapture?.(ev.pointerId)
   emit("resize-start")
-  const rect = host.getBoundingClientRect()
   const horizontal = parent.dir === "row"
-  const span = horizontal ? rect.width : rect.height
   let last = horizontal ? ev.clientX : ev.clientY
-
-  const move = (e: PointerEvent) => {
-    const cur = horizontal ? e.clientX : e.clientY
-    emit("resize", parent, index, (cur - last) / span)
-    last = cur
-  }
-  const up = () => {
-    window.removeEventListener("pointermove", move)
-    window.removeEventListener("pointerup", up)
-    window.removeEventListener("pointercancel", up)
-    stopSplitter = null
-    emit("resize-end")
-  }
-  stopSplitter = up
-  window.addEventListener("pointermove", move)
-  window.addEventListener("pointerup", up)
-  window.addEventListener("pointercancel", up)
+  stopSplitter = startPointerDrag(ev, {
+    move(e) {
+      const cur = horizontal ? e.clientX : e.clientY
+      // Measured per move: the container can resize during the drag.
+      const rect = host.getBoundingClientRect()
+      const span = horizontal ? rect.width : rect.height
+      if (span > 0) emit("resize", parent, index, (cur - last) / span)
+      last = cur
+    },
+    end() {
+      stopSplitter = null
+      emit("resize-end")
+    },
+  })
 }
 </script>
 
@@ -203,12 +195,12 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
       @dragstart="emit('dragstart', node.id)"
       @dragend="(hoverSide = null), emit('dragend')"
     >
-      <button
+      <!-- Tab and close are neighbours: a button inside a button is invalid and
+           never reached by the keyboard. -->
+      <div
         v-for="(block, i) in leaf.blocks"
         :key="block + i"
-        type="button"
-        draggable="true"
-        class="inline-flex max-w-40 cursor-grab items-center gap-1.5 rounded-control px-2 py-1 text-xs transition-colors active:cursor-grabbing"
+        class="inline-flex max-w-40 items-center rounded-control text-xs transition-colors"
         :class="[
           i === leaf.active
             ? 'bg-surface-soft text-ink'
@@ -216,24 +208,31 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
           tabDrag === i ? 'opacity-40' : '',
           tabOver === i && tabDrag !== null && tabDrag !== i ? 'ring-1 ring-brand' : '',
         ]"
-        @click="emit('set-active', node.id, i)"
-        @dragstart.stop="onTabDragStart(i, $event)"
         @dragover="onTabDragOver(i, $event)"
         @drop.stop="onTabDrop(i)"
-        @dragend="onTabDragEnd"
       >
-        <LpIcon v-if="tabIcon(block)" :name="tabIcon(block)!" :size="13" />
-        <span class="truncate">{{ tabTitle(block) }}</span>
-        <span
+        <button
+          type="button"
+          draggable="true"
+          :aria-current="i === leaf.active ? 'true' : undefined"
+          class="inline-flex min-w-0 cursor-grab items-center gap-1.5 rounded-control px-2 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+          @click="emit('set-active', node.id, i)"
+          @dragstart.stop="onTabDragStart(i, $event)"
+          @dragend="onTabDragEnd"
+        >
+          <LpIcon v-if="tabIcon(block)" :name="tabIcon(block)!" :size="13" />
+          <span class="truncate">{{ tabTitle(block) }}</span>
+        </button>
+        <button
           v-if="edit && tabClosable(block)"
-          class="grid size-3.5 place-items-center rounded-pill text-muted hover:bg-line hover:text-ink"
-          role="button"
+          type="button"
+          class="mr-1 grid size-3.5 shrink-0 place-items-center rounded-pill text-muted outline-none hover:bg-line hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="`Close ${tabTitle(block)}`"
-          @click.stop="emit('remove-block', node.id, i)"
+          @click="emit('remove-block', node.id, i)"
         >
           <LpIcon name="lucide:x" :size="11" />
-        </span>
-      </button>
+        </button>
+      </div>
     </div>
 
     <!-- Active block content. -->

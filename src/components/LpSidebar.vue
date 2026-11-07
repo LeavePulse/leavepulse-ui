@@ -13,8 +13,10 @@
  * auto-closes the drawer. With `responsive` off the component renders exactly
  * the static <nav> it always has — existing call sites are unaffected.
  */
-import { computed, nextTick, ref, useId } from "vue"
+import { clamp } from "../composables/clamp"
+import { computed, nextTick, onBeforeUnmount, ref, useId } from "vue"
 import { parseCombo, useHotkeys } from "../composables/useHotkeys"
+import { startPointerDrag } from "../composables/pointerDrag"
 import { usePersisted } from "../composables/usePersisted"
 import { useLabels } from "../composables/useLpConfig"
 import LpDrawer from "./LpDrawer.vue"
@@ -123,7 +125,7 @@ const props = withDefaults(
     persist?: string
     /**
      * Fold collapsible groups automatically once the nav has more than this
-     * many rows, counting headings and items alike.
+     * many rows, counting headings, items and the pages under them alike.
      *
      * The reason is the reader, not the pixels: a short nav is taken in at a
      * glance, a long one has to be searched, and searching a list you did not
@@ -310,9 +312,12 @@ const ownCollapsed = usePersisted<string[] | null>(
   { validate: (value): value is string[] | null => value === null || (Array.isArray(value) && value.every((k) => typeof k === "string")) },
 )
 
-/** Headings + items: what the eye actually has to walk past. */
-const navLength = computed(
-  () => groups.value.reduce((n, g) => n + g.items.length + (g.title ? 1 : 0), 0),
+/** Headings, items and their pages: what the eye actually has to walk past. */
+const navLength = computed(() =>
+  groups.value.reduce(
+    (n, g) => n + (g.title ? 1 : 0) + g.items.reduce((rows, i) => rows + 1 + (i.children?.length ?? 0), 0),
+    0,
+  ),
 )
 
 /*
@@ -340,7 +345,9 @@ function toggleSection(key: string, collapsed: boolean) {
   const next = collapsed
     ? [...new Set([...collapsedKeys.value, key])]
     : collapsedKeys.value.filter((k) => k !== key)
-  ownCollapsed.value = next
+  // A bound value is the app's: storing it too would surface a stale choice
+  // the day the binding goes. The same goes for compact and pins below.
+  if (props.collapsed === undefined) ownCollapsed.value = next
   emit("update:collapsed", next)
 }
 
@@ -351,7 +358,7 @@ function toggleSection(key: string, collapsed: boolean) {
 const ownCompact = usePersisted<boolean>(() => props.persist && `lp-sidebar:${props.persist}:compact`, false)
 const isCompact = computed(() => props.compact ?? ownCompact.value)
 function setCompact(value: boolean) {
-  ownCompact.value = value
+  if (props.compact === undefined) ownCompact.value = value
   emit("update:compact", value)
 }
 
@@ -370,12 +377,20 @@ const env = computed(() => {
 
 const DEFAULT_WIDTH = 240
 const COMPACT_WIDTH = 64
-const ownWidth = usePersisted<number>(() => props.resizable && props.persist && `lp-sidebar:${props.persist}:width`, DEFAULT_WIDTH)
+const ownWidth = usePersisted<number>(() => props.resizable && props.persist && `lp-sidebar:${props.persist}:width`, DEFAULT_WIDTH, {
+  validate: (value): value is number => typeof value === "number" && Number.isFinite(value),
+})
 const dragging = ref(false)
+
+/*
+ * The bounds apply to what is drawn, not to what is kept: a width remembered
+ * under other bounds fits today's, and comes back if they widen again.
+ */
+const boundedWidth = (width: number) => clamp(width, props.minWidth, props.maxWidth)
 
 const railWidth = computed(() => {
   if (isCompact.value) return `${COMPACT_WIDTH}px`
-  if (props.resizable) return `${ownWidth.value}px`
+  if (props.resizable) return `${boundedWidth(ownWidth.value)}px`
   return props.width
 })
 
@@ -385,34 +400,32 @@ const railWidth = computed(() => {
  * useful, and the icon rail is the honest form of "narrow".
  */
 const FOLD_AT = 132
+let stopResize: (() => void) | null = null
+onBeforeUnmount(() => stopResize?.())
+
 function startResize(event: PointerEvent) {
   if (event.button !== 0) return
-  const handle = event.currentTarget as HTMLElement
-  handle.setPointerCapture(event.pointerId)
   const from = event.clientX
-  const start = isCompact.value ? COMPACT_WIDTH : ownWidth.value
+  const start = isCompact.value ? COMPACT_WIDTH : boundedWidth(ownWidth.value)
   dragging.value = true
-  const move = (e: PointerEvent) => {
-    const wanted = start + (e.clientX - from)
-    if (wanted < FOLD_AT) {
-      // Folded by dragging: the width it unfolds to is the one it had, not
-      // the narrowest the drag passed through on its way down.
-      if (!isCompact.value) setCompact(true)
-      if (start !== COMPACT_WIDTH) ownWidth.value = start
-      return
-    }
-    if (isCompact.value) setCompact(false)
-    ownWidth.value = Math.round(Math.min(props.maxWidth, Math.max(props.minWidth, wanted)))
-  }
-  const stop = () => {
-    dragging.value = false
-    handle.removeEventListener("pointermove", move)
-    handle.removeEventListener("pointerup", stop)
-    handle.removeEventListener("pointercancel", stop)
-  }
-  handle.addEventListener("pointermove", move)
-  handle.addEventListener("pointerup", stop)
-  handle.addEventListener("pointercancel", stop)
+  stopResize = startPointerDrag(event, {
+    move(e) {
+      const wanted = start + (e.clientX - from)
+      if (wanted < FOLD_AT) {
+        // Folded by dragging: the width it unfolds to is the one it had, not
+        // the narrowest the drag passed through on its way down.
+        if (!isCompact.value) setCompact(true)
+        if (start !== COMPACT_WIDTH) ownWidth.value = start
+        return
+      }
+      if (isCompact.value) setCompact(false)
+      ownWidth.value = Math.round(boundedWidth(wanted))
+    },
+    end() {
+      dragging.value = false
+      stopResize = null
+    },
+  })
 }
 const railEl = ref<HTMLElement | null>(null)
 async function searchFromCompact() {
@@ -451,7 +464,7 @@ const pinnedItems = computed<SidebarItem[]>(() =>
 )
 function togglePin(id: string) {
   const next = pinnedIds.value.includes(id) ? pinnedIds.value.filter((k) => k !== id) : [...pinnedIds.value, id]
-  ownPinned.value = next
+  if (props.pinned === undefined) ownPinned.value = next
   emit("update:pinned", next)
 }
 
@@ -495,6 +508,32 @@ const chromeClass = computed(() =>
 // Vue can't auto-inherit a consumer-passed `class`. Take attrs over manually and
 // land them on the desktop rail (where a layout class like `shrink-0` belongs).
 defineOptions({ inheritAttrs: false })
+
+// The rail and the drawer draw the same list and the same search over it.
+const navBinds = computed(() => ({
+  groups: groups.value,
+  pinnable: props.pinnable,
+  pinned: pinnedItems.value,
+  previewDelay: props.previewDelay,
+  labels: text.value,
+  itemActive,
+  loading: props.loading,
+  skeletonRows: props.skeletonRows,
+  skeletonHeader: props.skeletonHeader,
+  collapsedKeys: collapsedKeys.value,
+  hoverFollow: props.hoverFollow,
+  onActivate: activate,
+  onToggleSection: toggleSection,
+  onTogglePin: togglePin,
+}))
+const searchField = computed(() => ({
+  size: "sm" as const,
+  icon: "lucide:search",
+  clearable: true,
+  class: "mb-2 shrink-0",
+  placeholder: placeholder.value,
+  "aria-label": placeholder.value,
+}))
 </script>
 
 <template>
@@ -558,30 +597,12 @@ defineOptions({ inheritAttrs: false })
     <LpInput
       v-if="searchable && !isCompact"
       v-model="query"
-      size="sm"
-      icon="lucide:search"
-      clearable
-      class="mb-2 shrink-0"
-      :placeholder="placeholder"
-      :aria-label="placeholder"
+      v-bind="searchField"
     />
     <LpSidebarNav
-      :groups="groups"
+      v-bind="navBinds"
       :pill-id="railPillId"
       :compact="isCompact"
-      :pinnable="pinnable"
-      :pinned="pinnedItems"
-      :preview-delay="previewDelay"
-      :labels="text"
-      :item-active="itemActive"
-      :loading="loading"
-      :skeleton-rows="skeletonRows"
-      :skeleton-header="skeletonHeader"
-      :collapsed-keys="collapsedKeys"
-      :hover-follow="hoverFollow"
-      @activate="activate"
-      @toggle-section="toggleSection"
-      @toggle-pin="togglePin"
     >
       <template v-if="$slots.item" #item="slotProps">
         <slot name="item" v-bind="slotProps" />
@@ -660,29 +681,11 @@ defineOptions({ inheritAttrs: false })
       <LpInput
         v-if="searchable"
         v-model="query"
-        size="sm"
-        icon="lucide:search"
-        clearable
-        class="mb-2 shrink-0"
-        :placeholder="placeholder"
-        :aria-label="placeholder"
+        v-bind="searchField"
       />
       <LpSidebarNav
-        :groups="groups"
+        v-bind="navBinds"
         :pill-id="drawerPillId"
-        :pinnable="pinnable"
-        :pinned="pinnedItems"
-        :preview-delay="previewDelay"
-        :labels="text"
-        :item-active="itemActive"
-        :loading="loading"
-        :skeleton-rows="skeletonRows"
-        :skeleton-header="skeletonHeader"
-        :collapsed-keys="collapsedKeys"
-        :hover-follow="hoverFollow"
-        @activate="activate"
-        @toggle-section="toggleSection"
-        @toggle-pin="togglePin"
       >
         <template v-if="$slots.item" #item="slotProps">
           <slot name="item" v-bind="slotProps" />

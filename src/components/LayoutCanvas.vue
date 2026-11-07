@@ -10,6 +10,9 @@
  * the consumer owns content. Pass a `registry` for tab titles/icons.
  *
  * The tree is plain serializable data (see layout/tree.ts).
+ *
+ * Rearranging cells is native drag and drop, which touch browsers do not
+ * reliably start, so on a phone or tablet a layout can be used but not rebuilt.
  */
 import LayoutNode from "./LayoutNode.vue"
 import {

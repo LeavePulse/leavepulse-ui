@@ -48,6 +48,7 @@ export interface SidebarItem {
    * away without opening the section first. In a compact sidebar they open in
    * a card beside the icon.
    */
+  /** One level: search, the active row and the rail stop at these pages, nothing under them is drawn. */
   children?: SidebarItem[]
   /** A dot instead of a count: something new here that has no number to it. */
   dot?: boolean

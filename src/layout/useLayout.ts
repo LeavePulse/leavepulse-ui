@@ -90,6 +90,8 @@ export interface UseLayout {
   serialize: () => unknown
   /** Replace the layout from previously serialized data. */
   hydrate: (data: unknown) => void
+  /** Forget undo and redo, for a layout that replaces this one rather than edits it. */
+  clearHistory: () => void
 }
 
 export function useLayout(options: UseLayoutOptions): UseLayout {
@@ -180,5 +182,9 @@ export function useLayout(options: UseLayoutOptions): UseLayout {
       record(() => {
         layout.value = deserializeLayout(data as Parameters<typeof deserializeLayout>[0])
       }),
+    clearHistory: () => {
+      past.value = []
+      future.value = []
+    },
   }
 }
