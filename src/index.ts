@@ -124,9 +124,9 @@ export type { MenuItem } from "./components/LpDropdownMenu.vue"
 export { default as LpDropzone } from "./components/LpDropzone.vue"
 export { default as LpEmptyState } from "./components/LpEmptyState.vue"
 export { default as LpFileTree } from "./components/LpFileTree.vue"
-export type { FileTreeSummary } from "./components/LpFileTree.vue"
+export type { FileTreeMove, FileTreeSummary } from "./components/LpFileTree.vue"
 export type { FileTreeLabels } from "./components/LpFileTree.vue"
-export type { CheckState, FileNode, NodeStats } from "./components/fileTree"
+export type { CheckState, FileNode, FileTreeFilter, NodeStats } from "./components/fileTree"
 export {
   ancestorIds,
   checkedCount,

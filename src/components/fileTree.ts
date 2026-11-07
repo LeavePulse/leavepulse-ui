@@ -4,6 +4,7 @@
  * component-to-component cycle. Re-exported from LpFileTree.vue.
  */
 
+import { clamp } from "../composables/clamp"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import { formatBytes } from "./format"
 
@@ -328,4 +329,218 @@ export function ancestorIds(nodes: FileNode[], id: string): string[] {
   }
   walk(nodes, [])
   return path
+}
+
+/** What narrows the tree. Every field is optional; all that are set must hold. */
+export interface FileTreeFilter {
+  /** Case-insensitive, against the entry's name and its path from the root. */
+  query?: string
+  kind?: FileNode["kind"]
+  /** File extensions without the dot. A directory never matches one. */
+  extensions?: string[]
+  /** Bytes, inclusive. An entry with no `size` does not match. */
+  minSize?: number
+  maxSize?: number
+  /** Inclusive. An entry with no readable `modified` does not match. */
+  modifiedFrom?: Date | number
+  modifiedTo?: Date | number
+}
+
+const PATH_SEPARATOR = "/"
+
+/** A file's extension, lowercase. A leading dot starts a name, not an extension. */
+export function fileExtension(name: string): string {
+  const dot = name.lastIndexOf(".")
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : ""
+}
+
+function modifiedTime(value: FileNode["modified"]): number {
+  if (value === undefined) return Number.NaN
+  return value instanceof Date ? value.getTime() : typeof value === "number" ? value : Date.parse(value)
+}
+
+const timeOf = (value: Date | number) => (typeof value === "number" ? value : value.getTime())
+
+/** True when no field of the filter would narrow anything. */
+export function isFilterEmpty(filter: FileTreeFilter | undefined): boolean {
+  if (!filter) return true
+  return (
+    !filter.query?.trim() &&
+    filter.kind === undefined &&
+    !filter.extensions?.length &&
+    filter.minSize === undefined &&
+    filter.maxSize === undefined &&
+    filter.modifiedFrom === undefined &&
+    filter.modifiedTo === undefined
+  )
+}
+
+/** Whether one entry, at this path, passes the filter on its own. */
+export function matchesFilter(node: FileNode, path: string, filter: FileTreeFilter): boolean {
+  const needle = filter.query?.trim().toLowerCase()
+  if (needle && !node.name.toLowerCase().includes(needle) && !path.toLowerCase().includes(needle)) return false
+  if (filter.kind && node.kind !== filter.kind) return false
+  if (filter.extensions?.length) {
+    if (node.kind !== "file") return false
+    const wanted = filter.extensions.map((ext) => ext.replace(/^\./, "").toLowerCase())
+    if (!wanted.includes(fileExtension(node.name))) return false
+  }
+  if (filter.minSize !== undefined || filter.maxSize !== undefined) {
+    if (node.size === undefined) return false
+    if (filter.minSize !== undefined && node.size < filter.minSize) return false
+    if (filter.maxSize !== undefined && node.size > filter.maxSize) return false
+  }
+  if (filter.modifiedFrom !== undefined || filter.modifiedTo !== undefined) {
+    const time = modifiedTime(node.modified)
+    if (Number.isNaN(time)) return false
+    if (filter.modifiedFrom !== undefined && time < timeOf(filter.modifiedFrom)) return false
+    if (filter.modifiedTo !== undefined && time > timeOf(filter.modifiedTo)) return false
+  }
+  return true
+}
+
+export interface FilteredTree {
+  nodes: FileNode[]
+  /** Directories that hold a match: shown open while the filter is on. */
+  openIds: Set<string>
+}
+
+/**
+ * The tree with only the matches and the folders leading to them. A kept folder
+ * is a copy whose `children` are its kept entries, so what is ticked through it
+ * is what is shown. A folder that is not loaded keeps `children` undefined: only
+ * loaded entries can be searched.
+ */
+export function filterTree(nodes: FileNode[], filter: FileTreeFilter | undefined): FilteredTree {
+  const openIds = new Set<string>()
+  if (!filter || isFilterEmpty(filter)) return { nodes, openIds }
+  const active = filter
+
+  function walk(list: FileNode[], parentPath: string): FileNode[] {
+    const kept: FileNode[] = []
+    for (const node of list) {
+      const path = parentPath ? `${parentPath}${PATH_SEPARATOR}${node.name}` : node.name
+      const children = node.children && walk(node.children, path)
+      if (children?.length) {
+        openIds.add(node.id)
+        kept.push({ ...node, children })
+      } else if (matchesFilter(node, path, active)) {
+        kept.push(children ? { ...node, children } : node)
+      }
+    }
+    return kept
+  }
+
+  return { nodes: walk(nodes, ""), openIds }
+}
+
+/** The tree with children fetched by `load` put in place. The app's own `children` win. */
+export function withLoadedChildren(nodes: FileNode[], loaded: ReadonlyMap<string, FileNode[]>): FileNode[] {
+  if (!loaded.size) return nodes
+  return nodes.map((node) => {
+    if (node.kind !== "dir") return node
+    const children = node.children ?? loaded.get(node.id)
+    if (!children) return node
+    return { ...node, children: withLoadedChildren(children, loaded) }
+  })
+}
+
+/** One row of the flattened tree, with what a flat DOM cannot imply to assistive tech. */
+export interface FlatRow {
+  node: FileNode
+  depth: number
+  /** Siblings at this level, and this row's 1-based place among them. */
+  setSize: number
+  posInSet: number
+}
+
+/** The visible rows in render order: open directories followed by their children. */
+export function flattenVisible(nodes: FileNode[], open: ReadonlySet<string>, sort: boolean): FlatRow[] {
+  const rows: FlatRow[] = []
+  function walk(list: FileNode[], depth: number) {
+    const ordered = sort ? sortNodes(list) : list
+    ordered.forEach((node, index) => {
+      rows.push({ node, depth, setSize: ordered.length, posInSet: index + 1 })
+      if (node.kind === "dir" && open.has(node.id) && node.children?.length) walk(node.children, depth + 1)
+    })
+  }
+  walk(nodes, 0)
+  return rows
+}
+
+export interface RowWindow {
+  /** First row to render, and one past the last. */
+  start: number
+  end: number
+}
+
+/** Which rows a scroll position shows, with `overscan` extra on each side. */
+export function rowWindow(scrollTop: number, viewport: number, rowHeight: number, total: number, overscan: number): RowWindow {
+  const first = Math.floor(Math.max(0, scrollTop) / rowHeight)
+  const count = Math.ceil(Math.max(0, viewport) / rowHeight)
+  return {
+    start: clamp(first - overscan, 0, total),
+    end: Math.min(total, first + count + overscan),
+  }
+}
+
+/** Ids between two rows, inclusive, in row order; locked rows are left out. */
+export function rangeIds(rows: readonly FileNode[], anchor: string | undefined, target: string): string[] {
+  const to = rows.findIndex((node) => node.id === target)
+  if (to < 0) return []
+  const found = anchor === undefined ? -1 : rows.findIndex((node) => node.id === anchor)
+  const from = found < 0 ? to : found
+  return rows
+    .slice(Math.min(from, to), Math.max(from, to) + 1)
+    .filter((node) => !node.disabled)
+    .map((node) => node.id)
+}
+
+/** The chain from the root down to `id`, itself included. */
+export function nodeTrail(id: string, byId: ReadonlyMap<string, FileNode>, parentOf: ReadonlyMap<string, string>): FileNode[] {
+  const trail: FileNode[] = []
+  for (let at: string | undefined = id; at !== undefined; at = parentOf.get(at)) {
+    const node = byId.get(at)
+    if (node) trail.unshift(node)
+  }
+  return trail
+}
+
+/**
+ * Whether `sources` may land in `target`: a directory that is not one of them,
+ * not inside one of them, and not where all of them already are.
+ */
+export function canDrop(sources: readonly string[], target: FileNode, parentOf: ReadonlyMap<string, string>): boolean {
+  if (target.kind !== "dir" || target.disabled || !sources.length) return false
+  for (let at: string | undefined = target.id; at !== undefined; at = parentOf.get(at)) {
+    if (sources.includes(at)) return false
+  }
+  return sources.some((id) => parentOf.get(id) !== target.id)
+}
+
+/** Those of `ids` no other of them contains: a moved folder carries what is inside it. */
+export function topmostIds(ids: readonly string[], parentOf: ReadonlyMap<string, string>): string[] {
+  const all = new Set(ids)
+  return ids.filter((id) => {
+    for (let at = parentOf.get(id); at !== undefined; at = parentOf.get(at)) {
+      if (all.has(at)) return false
+    }
+    return true
+  })
+}
+
+export type RenameProblem = "empty" | "separator" | "duplicate"
+
+/** Why a new name cannot stand, or null. An unchanged name is the caller's no-op. */
+export function renameProblem(name: string, node: FileNode, siblings: readonly FileNode[]): RenameProblem | null {
+  const next = name.trim()
+  if (!next) return "empty"
+  if (/[/\\\0]/.test(next)) return "separator"
+  return siblings.some((other) => other.id !== node.id && other.name === next) ? "duplicate" : null
+}
+
+/** How much of a name to select for renaming: the stem, so the extension survives typing. */
+export function renameSelectionEnd(node: FileNode): number {
+  const dot = node.name.lastIndexOf(".")
+  return node.kind === "file" && dot > 0 ? dot : node.name.length
 }

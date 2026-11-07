@@ -16,11 +16,12 @@ export default { inheritAttrs: false }
  * (the one matching `focusedId`), which is what a11y expects of role="tree" —
  * Tab enters the tree once, arrows move within it. The parent owns that state.
  */
-import { computed } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import {
   fileIcon,
   formatModified,
   formatSize,
+  renameSelectionEnd,
   sortNodes,
   type FileNode,
   type NodeStats,
@@ -53,6 +54,21 @@ const props = defineProps<{
   stats: Map<string, NodeStats>
   showSize: boolean
   showModified: boolean
+  /** Rows picked with Ctrl and Shift, in `multiple` mode. */
+  selectedIds?: ReadonlySet<string>
+  multiple?: boolean
+  /** The root flattens the tree to window it: this row renders alone, with its place stated. */
+  flat?: boolean
+  setSize?: number
+  posInSet?: number
+  /** Rows can be dragged; the root decides where they land. */
+  movable?: boolean
+  dropTargetId?: string
+  /** The row being renamed, the text in its field and whether that text can stand. */
+  renamingId?: string
+  renameValue?: string
+  renameInvalid?: boolean
+  renameLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -60,6 +76,15 @@ const emit = defineEmits<{
   (e: "toggle", node: FileNode): void
   (e: "focus", node: FileNode): void
   (e: "check", node: FileNode, value: boolean): void
+  (e: "pick", node: FileNode, mode: "toggle" | "range"): void
+  (e: "move-start", node: FileNode, event: DragEvent): void
+  (e: "move-over", node: FileNode, event: DragEvent): void
+  (e: "move-leave", node: FileNode): void
+  (e: "move-drop", node: FileNode): void
+  (e: "move-end"): void
+  (e: "rename-input", value: string): void
+  (e: "rename-commit", blurred?: boolean): void
+  (e: "rename-cancel"): void
 }>()
 
 // Declared explicitly: the component renders itself, so an inferred slot type
@@ -71,7 +96,8 @@ defineSlots<{
 const isDir = computed(() => props.node.kind === "dir")
 const isOpen = computed(() => isDir.value && props.expanded.has(props.node.id))
 const isLoading = computed(() => props.loading.has(props.node.id))
-const isSelected = computed(() => props.selectedId === props.node.id)
+const isSelected = computed(() => props.selectedId === props.node.id || !!props.selectedIds?.has(props.node.id))
+const isRenaming = computed(() => props.renamingId === props.node.id)
 const isFocused = computed(() => props.focusedId === props.node.id)
 
 // A directory with no `children` array hasn't been loaded yet — we can't know if
@@ -127,13 +153,48 @@ function rowDelay(index: number): string {
   return `${staggerDelay(index, 0, 18, 10)}ms`
 }
 
-function onActivate() {
+function onActivate(event: MouseEvent) {
   if (props.node.disabled) return
   emit("focus", props.node)
+  if (props.multiple && (event.shiftKey || event.ctrlKey || event.metaKey)) {
+    emit("pick", props.node, event.shiftKey ? "range" : "toggle")
+    return
+  }
   // A directory row toggles; a file row selects. Directories still emit select
   // so callers can drive a details panel off the highlighted entry.
   emit("select", props.node)
   if (isDir.value) emit("toggle", props.node)
+}
+
+const renameField = ref<HTMLInputElement | null>(null)
+
+// Opens on the name without its extension, so typing replaces only that.
+watch(
+  isRenaming,
+  async (renaming) => {
+    if (!renaming) return
+    await nextTick()
+    renameField.value?.focus()
+    renameField.value?.setSelectionRange(0, renameSelectionEnd(props.node))
+  },
+  { immediate: true },
+)
+
+// The field keeps every key to itself: the tree would take the arrows and Home,
+// and a dialog around it would close on the Escape that cancels the rename.
+function onRenameKey(event: KeyboardEvent) {
+  event.stopPropagation()
+  if (event.key === "Enter") emit("rename-commit", false)
+  else if (event.key === "Escape") emit("rename-cancel")
+}
+
+function onMoveStart(event: DragEvent) {
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move"
+    // Firefox starts no drag without data.
+    event.dataTransfer.setData("text/plain", props.node.name)
+  }
+  emit("move-start", props.node, event)
 }
 
 // A node is a list row whose min-width the consumer may need to release when the tree scrolls horizontally.
@@ -151,6 +212,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
     :aria-selected="isSelected"
     :aria-expanded="canExpand ? isOpen : undefined"
     :aria-disabled="node.disabled || undefined"
+    :aria-setsize="flat ? setSize : undefined"
+    :aria-posinset="flat ? posInSet : undefined"
   >
     <!-- Passthrough when the node has no menu, so the row keeps the native one.
          Headed by the entry's own name and icon: in a column of look-alike
@@ -166,6 +229,8 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <div
         :data-node-id="node.id"
         :tabindex="isFocused ? 0 : -1"
+        :draggable="movable && !node.disabled && !isRenaming ? 'true' : undefined"
+        :data-drop-target="dropTargetId === node.id ? '' : undefined"
         class="group/row relative flex min-w-0 cursor-pointer select-none items-center gap-1.5 rounded-control py-1 pr-2 text-sm outline-none transition-colors duration-[var(--duration-fast)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         :class="[
           node.disabled
@@ -173,9 +238,15 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             : isSelected
               ? 'bg-brand-soft text-ink'
               : 'text-muted hover:bg-surface-soft hover:text-ink',
+          dropTargetId === node.id ? 'ring-2 ring-inset ring-brand' : '',
         ]"
         :style="{ paddingLeft: `${depth * 14 + 6}px` }"
         @click.stop="onActivate"
+        @dragstart="onMoveStart"
+        @dragover="emit('move-over', node, $event)"
+        @dragleave="emit('move-leave', node)"
+        @drop.prevent="emit('move-drop', node)"
+        @dragend="emit('move-end')"
       >
         <!-- Chevron sits in a fixed-width slot so names line up whether or not
              the row can expand. Leaves get the same gutter, left empty.
@@ -228,7 +299,20 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         />
 
         <span class="min-w-0 flex-1 shrink-[2] truncate">
-          <slot name="row" :node="node" :depth="depth" :expanded="isOpen" :selected="isSelected">
+          <input
+            v-if="isRenaming"
+            ref="renameField"
+            class="w-full min-w-0 rounded-sm border bg-surface-soft px-1 text-sm text-ink outline-none"
+            :class="renameInvalid ? 'border-danger' : 'border-line-strong'"
+            :value="renameValue"
+            :aria-label="renameLabel"
+            :aria-invalid="renameInvalid || undefined"
+            @click.stop
+            @keydown="onRenameKey"
+            @input="emit('rename-input', ($event.target as HTMLInputElement).value)"
+            @blur="emit('rename-commit', true)"
+          >
+          <slot v-else name="row" :node="node" :depth="depth" :expanded="isOpen" :selected="isSelected">
             {{ node.name }}
           </slot>
         </span>
@@ -260,7 +344,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
 
     <!-- The branch folds open and shut (LpCollapse); a toggle mid-way reverses
          from where it is. Rows inside stagger themselves in. -->
-    <LpCollapse :open="isOpen && hasChildren">
+    <LpCollapse v-if="!flat" :open="isOpen && hasChildren">
       <ul role="group" class="flex min-w-0 flex-col overflow-hidden">
         <LpFileTreeNode
           v-for="(child, i) in children"
@@ -280,10 +364,27 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :stats="stats"
           :show-size="showSize"
           :show-modified="showModified"
+          :selected-ids="selectedIds"
+          :multiple="multiple"
+          :movable="movable"
+          :drop-target-id="dropTargetId"
+          :renaming-id="renamingId"
+          :rename-value="renameValue"
+          :rename-invalid="renameInvalid"
+          :rename-label="renameLabel"
           @select="emit('select', $event)"
           @toggle="emit('toggle', $event)"
           @focus="emit('focus', $event)"
           @check="(n, v) => emit('check', n, v)"
+          @pick="(n, mode) => emit('pick', n, mode)"
+          @move-start="(n, e) => emit('move-start', n, e)"
+          @move-over="(n, e) => emit('move-over', n, e)"
+          @move-leave="emit('move-leave', $event)"
+          @move-drop="emit('move-drop', $event)"
+          @move-end="emit('move-end')"
+          @rename-input="emit('rename-input', $event)"
+          @rename-commit="emit('rename-commit', $event)"
+          @rename-cancel="emit('rename-cancel')"
         >
           <template #row="slotProps">
             <slot name="row" v-bind="slotProps" />
