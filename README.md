@@ -315,6 +315,10 @@ objects are edited, reordered or removed. The slot also provides `index`,
 disabled/read-only state, and can be combined with the `trailing` slot. Its
 button text comes from `labels.clear` or the app-wide `input` label scope.
 
+### Staying in the right window
+
+`tests/realmGuard.test.ts` fails on `instanceof Element`, a bare `new ResizeObserver`, `getComputedStyle` or `document.activeElement`: inside an LpFrame those are another realm's. Use `composables/realm.ts`.
+
 ### Browser regression tests
 
 ```sh
