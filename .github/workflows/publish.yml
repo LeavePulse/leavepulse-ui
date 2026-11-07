@@ -63,6 +63,7 @@ jobs:
         run: npm run check:pack
 
       - name: Publish to npm
-        run: npm publish
+        # Built and checked above; prepublishOnly stays for a publish by hand.
+        run: npm publish --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

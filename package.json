@@ -64,6 +64,10 @@
     "release:minor": "npm version minor -m \"chore: release v%s\" && git push --follow-tags",
     "release:major": "npm version major -m \"chore: release v%s\" && git push --follow-tags",
     "check:pack": "node scripts/check-pack.mjs",
+    "check:consumer": "node scripts/check-consumer.mjs",
+    "check:ssr": "node scripts/check-ssr.mjs",
+    "check:size": "node scripts/check-size.mjs",
+    "test:coverage": "bun test --coverage",
     "gen:icons": "node scripts/gen-kit-icons.mjs",
     "gen:meta": "node scripts/gen-preview-meta.mjs"
   },
@@ -84,8 +88,11 @@
     }
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@iconify-json/lucide": "^1.2.112",
     "@iconify/vue": "^5.0.1",
+    "@nuxt/kit": "^4.0.0",
+    "@nuxt/schema": "^4.0.0",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^26.2.0",

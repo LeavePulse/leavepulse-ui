@@ -1,0 +1,12 @@
+{
+  // The Nuxt module and its runtime plugins, left out of the other two configs.
+  // Types of @nuxt/kit are real; the virtual modules a Nuxt app generates are
+  // stubbed in tests/consumer/nuxt-virtual.d.ts.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": { "@leavepulse/ui": ["./src/index.ts"] }
+  },
+  "include": ["src/nuxt.ts", "src/runtime/**/*.ts", "tests/consumer/nuxt-virtual.d.ts"],
+  "exclude": []
+}

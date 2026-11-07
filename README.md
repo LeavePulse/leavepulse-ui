@@ -130,6 +130,13 @@ again, nothing remounts). A Forward onto a kit entry still reaches it that
 way, because the entry it starts from belongs to the router. Plain
 `pushState` and `popstate` only, so WebKit (Safari, WebKitGTK) works too.
 
+### Module format
+
+The package is ESM only: `require("@leavepulse/ui")` is not supported. Import
+from the package root; `@leavepulse/ui/dist/*.js` also resolves, for a tool
+that needs one file (the Nuxt module does), and covers `components`,
+`composables`, `layout` and `theme`.
+
 ### Nuxt
 
 ```ts

@@ -12,7 +12,8 @@ export default defineConfig({
   workers: 2,
   use: {
     baseURL: external ?? "http://127.0.0.1:4501",
-    browserName: "chromium",
+    // CI's cross-browser workflow sets this for Firefox and WebKit.
+    browserName: (process.env.LP_TEST_BROWSER ?? "chromium") as "chromium" | "firefox" | "webkit",
     trace: "retain-on-failure",
     launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH },
   },

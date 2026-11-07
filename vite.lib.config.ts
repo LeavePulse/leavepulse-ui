@@ -27,7 +27,7 @@ function collectEntries() {
     index: resolve("./src/index.ts"),
     "icons-all": resolve("./src/icons-all.ts"),
   }
-  for (const dir of ["components", "composables", "layout"]) {
+  for (const dir of ["components", "composables", "layout", "theme"]) {
     for (const file of readdirSync(resolve(`./src/${dir}`))) {
       if (!/\.(vue|ts)$/.test(file) || file.endsWith(".d.ts")) continue
       entries[`${dir}/${file.replace(/\.ts$/, "")}`] = resolve(`./src/${dir}/${file}`)

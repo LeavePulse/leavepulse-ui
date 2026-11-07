@@ -8,6 +8,9 @@ dist/
 # Preview demo build output (vite.config.ts), separate from the library dist.
 dist-preview/
 
+# npm pack output and bundles the package checks work on.
+.pack/
+
 # Local env / editor noise
 .env
 .env.*

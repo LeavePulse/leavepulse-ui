@@ -20,6 +20,21 @@ const walk = (value) => {
 }
 walk(pkg.exports)
 
+// The Nuxt module registers each component by this path. A wildcard export
+// promises it and nothing above would notice it gone.
+const names = readFileSync(new URL("../src/component-names.ts", import.meta.url), "utf8").match(/"(Lp|Layout)\w+"/g) ?? []
+if (names.length === 0) missing.push("src/component-names.ts (no names read)")
+for (const quoted of names) {
+  const name = quoted.slice(1, -1)
+  want(`dist/components/${name}.vue.js`)
+  want(`dist/components/${name}.vue.d.ts`)
+}
+
+// Everything ./dist/*.js exposes has its code beside its types.
+for (const path of files) {
+  if (/^dist\/(theme|layout)\/.*\.d\.ts$/.test(path)) want(path.replace(/\.d\.ts$/, ".js"))
+}
+
 const declarations = [...files].filter((f) => f.startsWith("dist/") && f.endsWith(".d.ts")).length
 if (declarations === 0) missing.push("dist/**/*.d.ts (no declarations at all)")
 

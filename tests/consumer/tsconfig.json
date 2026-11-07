@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler", "strict": true,
+    "jsx": "preserve", "lib": ["ES2022", "DOM", "DOM.Iterable"], "noEmit": true, "skipLibCheck": true,
+    "types": [], "baseUrl": ".", "paths": { "@leavepulse/ui": ["../../.pack/package/dist/index.d.ts"] }
+  },
+  "vueCompilerOptions": { "checkUnknownProps": true },
+  "include": ["Misuse.vue", "Correct.vue"]
+}
