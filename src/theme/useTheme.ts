@@ -36,7 +36,9 @@ type Cached = { theme: TokenSet; system?: undefined } | { system: SystemThemes; 
 // ── self-managed theme state (singleton) ─────────────────────────────────
 // The kit owns the active theme, like an i18n locale, so every consumer shares
 // one source of truth. Lazily hydrated from the cache on the client; on the
-// server `current` stays null.
+// server `current` stays null and `init` writes nothing, because this module
+// outlives a request and one visitor's theme must not reach the next. A server
+// renders from `themeFromCookie` + `themeToCssRule`; the setters are client-only.
 const _current = shallowRef<TokenSet | null>(null)
 const _system = shallowRef<SystemThemes | null>(null)
 let _hydrated = false
@@ -182,22 +184,31 @@ export function revealTransition(
   update: () => void | Promise<void>,
   origin?: RevealOrigin,
   durationMs = 480,
+  page: Document = document,
 ): void {
-  const doc = document as ViewTransitionDocument
-  if (typeof doc.startViewTransition !== "function" || prefersReducedMotion()) {
+  const doc = page as ViewTransitionDocument
+  const win = page.defaultView ?? window
+  if (typeof doc.startViewTransition !== "function" || prefersReducedMotion(win)) {
     void update()
     return
   }
 
-  const x = origin?.x ?? window.innerWidth / 2
-  const y = origin?.y ?? window.innerHeight / 2
+  const x = origin?.x ?? win.innerWidth / 2
+  const y = origin?.y ?? win.innerHeight / 2
   // Radius that reaches the farthest viewport corner from the origin.
   const endRadius = Math.hypot(
-    Math.max(x, window.innerWidth - x),
-    Math.max(y, window.innerHeight - y),
+    Math.max(x, win.innerWidth - x),
+    Math.max(y, win.innerHeight - y),
   )
 
   const transition = doc.startViewTransition(update)
+  /*
+   * `ready` rejects when there will be nothing to animate: a newer transition
+   * replaced this one (the browser skips it by itself, and its `update` still
+   * runs, so quick switches land in order) or the page went hidden. An `update`
+   * that throws still reports, through `finished`.
+   */
+  const skipped = () => {}
   transition.ready.then(() => {
     // Animate the OLD snapshot shrinking to a point, revealing the (already
     // repainted) live page underneath through the growing hole. Clipping the
@@ -205,13 +216,13 @@ export function revealTransition(
     // theme before the circle starts, which read as the theme "changing twice".
     // The pseudo-elements belong to the document element whatever was updated,
     // so the animation always targets it.
-    document.documentElement.animate(
+    page.documentElement.animate(
       {
         clipPath: [`circle(${endRadius}px at ${x}px ${y}px)`, `circle(0px at ${x}px ${y}px)`],
       },
       {
         duration: durationMs,
-        easing: easingToken("ease-emphasized"),
+        easing: easingToken("ease-emphasized", undefined, page),
         // Hold the fully-shrunk circle after the keyframes end. Without it the
         // old snapshot snaps back to its default (un-clipped) state for the one
         // frame between animation-end and the browser tearing down the
@@ -221,7 +232,7 @@ export function revealTransition(
         pseudoElement: "::view-transition-old(root)",
       },
     )
-  })
+  }, skipped)
 }
 
 /*
@@ -235,7 +246,7 @@ export function applyThemeWithTransition(
   root: HTMLElement = document.documentElement,
   durationMs = 480,
 ): void {
-  revealTransition(() => applyTheme(theme, root), origin, durationMs)
+  revealTransition(() => applyTheme(theme, root), origin, durationMs, root.ownerDocument)
 }
 
 export function serializeTheme(theme: TokenSet): string {
@@ -279,12 +290,72 @@ export function normalizeTheme(raw: Partial<TokenSet> & { name?: string }): Toke
   }
 }
 
-/** Parse + validate a theme JSON; throws on a malformed shape. */
+const THEME_NAME_MAX = 64
+/* Past the 9999 a pill radius is spelt with: beyond that a size is a typo, not a design. */
+const THEME_SIZE_MAX = 99_999
+/* A value goes into a stylesheet as text (themeToCssRule), so it must not be able to leave its declaration. */
+const CSS_BREAKOUT = /[{}<>]/
+const CSS_URL = /url\([^()]*\)/g
+
+function cssValueProblem(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return "must be a non-empty string"
+  // A `;` belongs inside a data: url, and nowhere else in a value.
+  if (CSS_BREAKOUT.test(value) || value.replace(CSS_URL, "").includes(";")) return "is not a single CSS value"
+  return null
+}
+
+function sizeProblem(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "must be a finite number"
+  if (value < 0 || value > THEME_SIZE_MAX) return `must be between 0 and ${THEME_SIZE_MAX}`
+  return null
+}
+
+function axisProblem(
+  axis: string,
+  values: unknown,
+  keys: object,
+  check: (value: unknown) => string | null,
+): string | null {
+  if (values === undefined) return null
+  if (!values || typeof values !== "object") return `${axis} must be an object`
+  for (const key of Object.keys(keys)) {
+    const value = (values as Record<string, unknown>)[key]
+    if (value === undefined) continue
+    const problem = check(value)
+    if (problem) return `${axis}.${key} ${problem}`
+  }
+  return null
+}
+
+/*
+ * What is wrong with a theme read from storage or a file, or null. Types stop
+ * at the JSON boundary: `radiusCard: "huge"` would reach the page as `hugepx`.
+ * A token that is simply missing is fine: normalizeTheme fills it, which is how
+ * a theme saved before that token existed keeps working.
+ */
+export function themeProblem(raw: Partial<TokenSet>): string | null {
+  const { name, mode } = raw as { name?: unknown; mode?: unknown }
+  if (name !== undefined && (typeof name !== "string" || !name.trim() || name.length > THEME_NAME_MAX)) {
+    return `name must be 1 to ${THEME_NAME_MAX} characters`
+  }
+  if (mode !== undefined && mode !== "light" && mode !== "dark") return 'mode must be "light" or "dark"'
+  return (
+    axisProblem("colors", raw.colors, COLOR_VARS, cssValueProblem) ??
+    axisProblem("shape", raw.shape, SHAPE_VARS, sizeProblem) ??
+    axisProblem("density", raw.density, DENSITY_VARS, sizeProblem) ??
+    axisProblem("font", raw.font, FONT_VARS, cssValueProblem) ??
+    axisProblem("surface", raw.surface, SURFACE_VARS, cssValueProblem)
+  )
+}
+
+/** Parse + validate a theme JSON; throws on a malformed shape or a bad token value. */
 export function parseTheme(json: string): TokenSet {
   const raw = JSON.parse(json) as Partial<TokenSet>
   if (!raw || typeof raw !== "object" || !raw.colors || !raw.shape || !raw.density) {
     throw new Error("Invalid theme: missing colors/shape/density")
   }
+  const problem = themeProblem(raw)
+  if (problem) throw new Error(`Invalid theme: ${problem}`)
   return normalizeTheme(raw)
 }
 
@@ -321,7 +392,8 @@ export function cacheSystemThemes(system: SystemThemes): void {
 /*
  * SSR handoff. localStorage is invisible to the server, so the theme NAME rides
  * along in a cookie and the server resolves it against the themes it knows
- * (see themeFromCookie). "Follow the OS" is stored as `system:<light>|<dark>`.
+ * (see themeFromCookie). "Follow the OS" is stored as `system:<light>|<dark>`,
+ * each name encoded on its own so a `|` in a name stays part of that name.
  */
 export const THEME_COOKIE = "lp-theme"
 const SYSTEM_PREFIX = "system:"
@@ -329,7 +401,7 @@ const SYSTEM_PREFIX = "system:"
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 function systemCookieValue(system: SystemThemes): string {
-  return `${SYSTEM_PREFIX}${system.light.name}|${system.dark.name}`
+  return `${SYSTEM_PREFIX}${encodeURIComponent(system.light.name)}|${encodeURIComponent(system.dark.name)}`
 }
 
 function writeThemeCookie(value: string): void {
@@ -368,7 +440,8 @@ export function themeFromCookie(
     if (value.startsWith(SYSTEM_PREFIX)) {
       const [lightName = "", darkName = ""] = value.slice(SYSTEM_PREFIX.length).split("|")
       const wanted = options.prefersDark === false ? lightName : darkName
-      const found = find(wanted)
+      // Raw too: a cookie from before the names were encoded.
+      const found = find(safeDecode(wanted)) ?? find(wanted)
       if (found) return found
       continue
     }
@@ -427,6 +500,7 @@ export function useTheme(): UseTheme {
       _current.value = theme
     },
     init: (fallback: TokenSet) => {
+      if (typeof window === "undefined") return fallback
       _fallback = fallback
       hydrateOnce()
       if (!_current.value) _current.value = bootstrapTheme(fallback)

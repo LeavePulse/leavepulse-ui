@@ -14,12 +14,14 @@
  */
 import { computed, watchEffect } from "vue"
 import { Icon, getIcon } from "@iconify/vue"
-import { iconsVersion, requestIcon } from "../icons"
+import { failedIcons, iconsVersion, requestIcon } from "../icons"
 
 const props = defineProps<{
   /** iconify name, e.g. "lucide:check". Bare names assume the lucide set. */
   name: string
   size?: number | string
+  /** An icon to show if `name` is unknown or its chunk fails to load; it must already be registered. */
+  fallback?: string
 }>()
 
 function resolve(name: string): string {
@@ -29,7 +31,9 @@ function resolve(name: string): string {
 const fullName = computed(() => resolve(props.name))
 const data = computed(() => {
   void iconsVersion.value
-  return getIcon(fullName.value)
+  const icon = getIcon(fullName.value)
+  if (icon || !props.fallback || !failedIcons.has(fullName.value)) return icon
+  return getIcon(resolve(props.fallback))
 })
 const lucide = computed(() => fullName.value.startsWith("lucide:"))
 

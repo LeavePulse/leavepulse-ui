@@ -85,7 +85,7 @@ function play(node: HTMLElement) {
   if (props.immediate || prefersReducedMotion() || typeof node.animate !== "function") return
   const from = revealFrom(props.preset, props.direction, props.distance)
   const frames = [from, revealTo(from)]
-  const easing = easingToken("ease-emphasized")
+  const easing = easingToken("ease-emphasized", undefined, node)
   // `backwards` holds each target in its hidden state through its delay, so a
   // staggered child does not flash in before its turn.
   const targets = props.stagger > 0 ? Array.from(node.children) : [node]

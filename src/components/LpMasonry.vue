@@ -26,6 +26,7 @@ export default { inheritAttrs: false }
  * DOM order is the items' order, which is also the reading order for
  * keyboard and screen readers.
  */
+import { isHTMLElement, nodeWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue"
 import { easingToken, prefersReducedMotion } from "../composables/easing"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -91,7 +92,7 @@ function heightOf(entry: ResizeObserverEntry): number {
 
 function setItem(key: string | number, el: unknown) {
   const previous = elements.get(key)
-  if (el instanceof HTMLElement) {
+  if (isHTMLElement(el)) {
     if (previous === el) return
     if (previous) observer?.unobserve(previous)
     elements.set(key, el)
@@ -108,11 +109,12 @@ function setItem(key: string | number, el: unknown) {
 }
 
 onMounted(() => {
-  if (typeof ResizeObserver === "undefined") {
+  const Observer = root.value ? nodeWindow(root.value).ResizeObserver : undefined
+  if (!Observer) {
     width.value = root.value?.clientWidth ?? 0
     return
   }
-  observer = new ResizeObserver((entries) => {
+  observer = new Observer((entries) => {
     for (const entry of entries) {
       if (entry.target === root.value) {
         width.value = entry.contentRect.width
@@ -195,8 +197,9 @@ const hidden = computed(() => !ready.value || !revealed.value)
 watch(
   () => ready.value && revealed.value,
   (go) => {
-    if (!go || !props.entrance || prefersReducedMotion()) return
-    const easing = easingToken("ease-emphasized")
+    const box = root.value
+    if (!go || !box || !props.entrance || prefersReducedMotion(nodeWindow(box))) return
+    const easing = easingToken("ease-emphasized", undefined, box)
     // Stagger by the order items are placed in, which reads top to bottom.
     keys.value.forEach((key, index) => {
       const el = elements.get(key)

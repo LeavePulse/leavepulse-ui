@@ -4,6 +4,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts">
+import { nodeWindow } from "../composables/realm"
 /*
  * Shows and hides content by folding it open and shut: the box grows from
  * nothing to the content's own height (or width), and back. Anything under it
@@ -79,7 +80,7 @@ type Size = { height: number; width: number; opacity: number }
 
 function current(el: HTMLElement): Size {
   const rect = el.getBoundingClientRect()
-  return { height: rect.height, width: rect.width, opacity: Number(getComputedStyle(el).opacity) }
+  return { height: rect.height, width: rect.width, opacity: Number(nodeWindow(el).getComputedStyle(el).opacity) }
 }
 
 function natural(el: HTMLElement): Size {
@@ -99,7 +100,7 @@ function frame(size: Size): Keyframe {
 function fold(el: Element, opening: boolean, done: () => void) {
   const box = el as HTMLElement
   const previous = running.get(box)
-  if (prefersReducedMotion() || typeof box.animate !== "function") {
+  if (prefersReducedMotion(box.ownerDocument.defaultView ?? undefined) || typeof box.animate !== "function") {
     previous?.cancel()
     done()
     return
@@ -110,8 +111,8 @@ function fold(el: Element, opening: boolean, done: () => void) {
   const to = opening ? natural(box) : ZERO
   box.style.overflow = "hidden"
   const animation = box.animate([frame(from), frame(to)], {
-    duration: props.duration ?? durationToken("duration-medium"),
-    easing: easingToken("ease-emphasized"),
+    duration: props.duration ?? durationToken("duration-medium", undefined, box),
+    easing: easingToken("ease-emphasized", undefined, box),
     // Closing holds the folded frame until Vue hides the element, so it never flashes back open.
     fill: opening ? "none" : "forwards",
   })

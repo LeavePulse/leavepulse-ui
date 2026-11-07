@@ -823,7 +823,12 @@
    CSS transitions/animate-pulse used across the kit collapse to a near-instant
    state change — content still mounts/unmounts, it just doesn't travel. This is
    the CSS half; motion-v springs (Tabs/Layout) opt out in JS via
-   usePrefersReducedMotion() (usePillTransition). */
+   usePrefersReducedMotion() (usePillTransition).
+
+   Global on purpose, and part of this stylesheet's contract: it also covers the
+   host app's own elements, so an app that imports the kit's CSS gets reduced
+   motion for free. An animation that must keep running (a status spinner) sets
+   its own `animation-duration` with `!important` in a later layer. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

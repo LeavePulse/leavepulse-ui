@@ -17,6 +17,7 @@ export default { inheritAttrs: false }
  * finishes its run before fading, so "done" is seen rather than the line just
  * vanishing mid-way.
  */
+import { useView } from "../composables/useView"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { durationToken, prefersReducedMotion } from "../composables/easing"
 import { useLoadingGate } from "../composables/useLoadingGate"
@@ -61,8 +62,9 @@ const text = useLabels("activityLine", { busy: "Loading" }, () => props.labels)
  * idle → running → (gate closes) → finishing → idle. `finishing` is the run to
  * the end and the fade after it; then the element is gone.
  */
+const view = useView()
 const gated = useLoadingGate(() => props.active, {
-  delay: () => (prefersReducedMotion() ? 0 : props.delay),
+  delay: () => (prefersReducedMotion(view.value?.window) ? 0 : props.delay),
   minVisible: 300,
 })
 const phase = ref<"idle" | "running" | "finishing">("idle")
@@ -79,7 +81,7 @@ watch(
     if (phase.value === "idle") return
     phase.value = "finishing"
     // The run to the end (slow), then the fade (medium), then gone.
-    const hold = prefersReducedMotion() ? 0 : durationToken("duration-medium") * 3
+    const hold = prefersReducedMotion(view.value?.window) ? 0 : durationToken("duration-medium", undefined, view.value?.document) * 3
     doneTimer = setTimeout(() => (phase.value = "idle"), hold)
   },
   { immediate: true },

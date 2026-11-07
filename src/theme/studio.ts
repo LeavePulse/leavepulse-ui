@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, watch, watchEffect, type ComputedRef, type Ref } from "vue"
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef, watch, watchEffect, type ComputedRef, type Ref } from "vue"
 import { usePersisted } from "../composables/usePersisted"
 import { defineTheme, withBrand } from "./define"
 import { presets } from "./presets"
@@ -110,10 +110,12 @@ function create(key: string, config: Ref<Omit<ThemeStudioOptions, "storageKey">>
     const dark = pair && themes.value.find((t) => t.name === pair.dark)
     return light && dark ? { light, dark } : null
   })
-  const prefersDark = ref(typeof window !== "undefined" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches)
-  if (typeof window !== "undefined") {
-    window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", (e) => (prefersDark.value = e.matches))
-  }
+  const scheme = typeof window === "undefined" ? undefined : window.matchMedia?.("(prefers-color-scheme: dark)")
+  const prefersDark = ref(!!scheme?.matches)
+  const onScheme = (e: MediaQueryListEvent) => (prefersDark.value = e.matches)
+  scheme?.addEventListener("change", onScheme)
+  // A studio opened and closed again left its listener on the page.
+  if (getCurrentScope()) onScopeDispose(() => scheme?.removeEventListener("change", onScheme))
   const engine = useTheme()
   const defaults = (): StudioState => ({
     theme: engine.currentName.value || themes.value[0]?.name || "",

@@ -1,12 +1,16 @@
 <script lang="ts">
-// The last press anywhere on the page: a theme change triggered by a toggle
-// reveals from the toggle the user just pressed.
+// The last press in each window: a theme change triggered by a toggle reveals
+// from the toggle the user just pressed. Per window because an LpFrame has its
+// own, whose presses and viewport coordinates the page never sees.
 const PRESS_FRESH_MS = 1500
-let lastPress: { x: number; y: number; at: number } | null = null
-if (typeof window !== "undefined") {
-  window.addEventListener(
+const presses = new WeakMap<Window, { x: number; y: number; at: number } | null>()
+
+function trackPresses(win: Window) {
+  if (presses.has(win)) return
+  presses.set(win, null)
+  win.addEventListener(
     "pointerdown",
-    (event) => (lastPress = { x: event.clientX, y: event.clientY, at: performance.now() }),
+    (event) => presses.set(win, { x: event.clientX, y: event.clientY, at: performance.now() }),
     { capture: true, passive: true },
   )
 }
@@ -26,13 +30,15 @@ export default { inheritAttrs: false }
  * circular reveal the global theme switch uses, growing from where the user
  * last pressed, or from the subtree's centre.
  */
-import { computed, nextTick, ref, shallowRef, watch, type Component, type ComponentPublicInstance } from "vue"
+import { computed, nextTick, onMounted, ref, shallowRef, watch, type Component, type ComponentPublicInstance } from "vue"
 import type { TokenSet } from "../theme/tokens"
 import { revealTransition, themeEntries, type RevealOrigin } from "../theme/useTheme"
 import { useMergedAttrs } from "../composables/useMergedClass"
+import { isElement, nodeWindow, useView, viewWindow } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
+    /** Replace the object to change the theme: a mutation inside it is not seen. */
     theme: TokenSet
     /** Root element. A wrapper that should not affect layout can use `class="contents"`. */
     as?: string | Component
@@ -54,11 +60,19 @@ const style = computed(() => ({
   colorScheme: shown.value.mode,
 }))
 
-function originOf(): RevealOrigin | undefined {
-  if (lastPress && performance.now() - lastPress.at < PRESS_FRESH_MS) return lastPress
+const view = useView()
+onMounted(() => trackPresses(viewWindow(view.value)))
+
+function rootElement(): Element | undefined {
   const value = root.value
-  const el = value instanceof HTMLElement ? value : (value?.$el as Element | undefined)
-  const box = el?.getBoundingClientRect?.()
+  const el = isElement(value) ? value : value?.$el
+  return isElement(el) ? el : undefined
+}
+
+function originOf(el: Element | undefined): RevealOrigin | undefined {
+  const press = presses.get(el ? nodeWindow(el) : viewWindow(view.value))
+  if (press && performance.now() - press.at < PRESS_FRESH_MS) return press
+  const box = el?.getBoundingClientRect()
   return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : undefined
 }
 
@@ -69,10 +83,12 @@ watch(
       shown.value = next
       return
     }
-    revealTransition(async () => {
+    const el = rootElement()
+    const update = async () => {
       shown.value = next
       await nextTick()
-    }, originOf())
+    }
+    revealTransition(update, originOf(el), undefined, el?.ownerDocument)
   },
 )
 </script>

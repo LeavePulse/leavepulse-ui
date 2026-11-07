@@ -1,5 +1,5 @@
 import { addCollection, addIcon, iconLoaded, type IconifyIcon, type IconifyJSON } from "@iconify/vue"
-import { ref } from "vue"
+import { reactive, ref } from "vue"
 import { KIT_ICONS } from "./kit-icons"
 
 /*
@@ -16,12 +16,24 @@ addCollection(KIT_ICONS)
 /** Bumped whenever icons are registered, so rendered icons re-resolve. */
 export const iconsVersion = ref(0)
 
-let lucide: Promise<IconifyJSON> | undefined
+/** Names that could not be loaded, so an LpIcon can show its `fallback`. */
+export const failedIcons = reactive(new Set<string>())
 
-function loadLucide(): Promise<IconifyJSON> {
-  lucide ??= import("@iconify-json/lucide/icons.json").then((m) => (m.default ?? m) as IconifyJSON)
-  return lucide
+/** Load once, but forget a failure: a lost chunk must not fail every later icon too. */
+export function loadOnce<T>(load: () => Promise<T>): () => Promise<T> {
+  let loaded: Promise<T> | undefined
+  return () => {
+    loaded ??= load().catch((error) => {
+      loaded = undefined
+      throw error
+    })
+    return loaded
+  }
 }
+
+const loadLucide = loadOnce(() =>
+  import("@iconify-json/lucide/icons.json").then((m) => (m.default ?? m) as IconifyJSON),
+)
 
 /** Register a whole iconify collection (any prefix) for offline use. */
 export function registerIconCollection(collection: IconifyJSON): void {
@@ -58,5 +70,14 @@ const pending = new Set<string>()
 export function requestIcon(name: string): void {
   if (pending.has(name) || typeof window === "undefined") return
   pending.add(name)
-  void registerIcons([name]).finally(() => pending.delete(name))
+  void registerIcons([name])
+    .then(() => {
+      if (iconLoaded(name)) failedIcons.delete(name)
+      else failedIcons.add(name)
+    })
+    .catch((error: unknown) => {
+      failedIcons.add(name)
+      console.warn(`[@leavepulse/ui] icon "${name}" failed to load`, error)
+    })
+    .finally(() => pending.delete(name))
 }

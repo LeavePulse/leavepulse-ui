@@ -35,6 +35,8 @@ export default { inheritAttrs: false }
  * - Unmounting releases the GL context, so a page that mounts and unmounts
  *   backdrops does not run into the browser's limit on live contexts.
  */
+import { clamp } from "../composables/clamp"
+import { nodeWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { parseColor } from "./color"
 import { approach, frameDue, FRAGMENT_HEADER, PRESETS, tooSlow, VERTEX_SHADER, type ShaderPreset, type Vec3 } from "./shaderBackdrop"
@@ -95,7 +97,7 @@ const weakEngine = typeof navigator !== "undefined" && isBrokenBackdropEngine()
 const fallbackStyle = computed(() => ({ background: PRESETS[props.preset].fallback, opacity: Math.min(1, clamp01(props.intensity) * 1.15) }))
 
 function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n))
+  return clamp(n, 0, 1)
 }
 
 // ── Theme colours ───────────────────────────────────────────────────────────
@@ -115,10 +117,10 @@ let paint: CanvasRenderingContext2D | null = null
 function tokenColor(name: string): Vec3 {
   if (!probe || !root.value) return [0, 0, 0]
   probe.style.color = `var(--color-${name})`
-  const css = getComputedStyle(probe).color
+  const css = nodeWindow(probe).getComputedStyle(probe).color
   const rgb = parseColor(css)
   if (rgb) return [rgb.r / 255, rgb.g / 255, rgb.b / 255]
-  paint ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true })
+  paint ??= probe.ownerDocument.createElement("canvas").getContext("2d", { willReadFrequently: true })
   if (!paint) return [0, 0, 0]
   paint.clearRect(0, 0, 1, 1)
   paint.fillStyle = "#000"
@@ -204,7 +206,7 @@ let pixelRatio = 1
 function sizeCanvas() {
   const el = canvas.value
   if (!el) return
-  const dpr = Math.min(weakEngine ? 1 : 2, window.devicePixelRatio || 1)
+  const dpr = Math.min(weakEngine ? 1 : 2, nodeWindow(el).devicePixelRatio || 1)
   pixelRatio = dpr * PRESETS[props.preset].scale
   const w = Math.max(1, Math.round(el.clientWidth * pixelRatio))
   const h = Math.max(1, Math.round(el.clientHeight * pixelRatio))
@@ -351,16 +353,17 @@ useResizeObserver(root, () => {
 })
 
 onMounted(() => {
-  probe = document.createElement("span")
+  const page = root.value?.ownerDocument ?? document
+  probe = page.createElement("span")
   probe.style.display = "none"
   root.value?.appendChild(probe)
 
   // Themes are applied as variables and attributes on <html>; a scheme switch can also come from the OS.
-  themeObserver = new MutationObserver(() => {
+  themeObserver = new (nodeWindow(page).MutationObserver)(() => {
     if (gl) refreshPalette()
   })
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class", "data-theme", "data-theme-mode"] })
-  schemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)")
+  themeObserver.observe(page.documentElement, { attributes: true, attributeFilter: ["style", "class", "data-theme", "data-theme-mode"] })
+  schemeQuery = nodeWindow(page).matchMedia?.("(prefers-color-scheme: dark)")
   schemeQuery?.addEventListener("change", refreshPalette)
 
   if (wantGl.value) start()
@@ -391,7 +394,7 @@ watch(
       }
       drawFrame()
       shown.value = true
-    }, durationToken("duration-medium"))
+    }, durationToken("duration-medium", undefined, root.value ?? undefined))
   },
 )
 watch(

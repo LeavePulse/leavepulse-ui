@@ -1,4 +1,6 @@
-import { onScopeDispose, shallowRef, toValue, watch, type MaybeRefOrGetter, type ShallowRef } from "vue"
+import { clamp } from "./clamp"
+import { useView } from "./useView"
+import { hasInjectionContext, type MaybeRefOrGetter, onScopeDispose, shallowRef, type ShallowRef, toValue, watch } from "vue"
 import { durationToken, prefersReducedMotion, tokenEase } from "./easing"
 
 /*
@@ -47,6 +49,8 @@ export function useTween<T>(
   mix: (from: T, to: T, t: number) => T,
   options: TweenOptions<T> = {},
 ): Readonly<ShallowRef<T>> {
+  // Reads tokens where it animates; a store outside setup has only the page.
+  const view = hasInjectionContext() ? useView() : null
   const shown = shallowRef(source())
   let target = shown.value
   let frame = 0
@@ -59,11 +63,12 @@ export function useTween<T>(
   watch(source, (to) => {
     if (options.equal?.(target, to)) return
     target = to
-    const ms = toValue(options.duration) ?? durationToken("duration-medium")
+    const scope = view?.value?.document
+    const ms = toValue(options.duration) ?? durationToken("duration-medium", undefined, scope)
     if (
       toValue(options.enabled) === false ||
       ms <= 0 ||
-      prefersReducedMotion() ||
+      prefersReducedMotion(view?.value?.window) ||
       typeof requestAnimationFrame === "undefined"
     ) {
       stop()
@@ -72,12 +77,12 @@ export function useTween<T>(
     }
 
     const from = shown.value
-    const ease = options.ease ?? tokenEase("ease-emphasized")
+    const ease = options.ease ?? tokenEase("ease-emphasized", scope)
     const started = performance.now()
     stop()
     const step = (now: number) => {
       // rAF stamps the frame's start, which can precede the watcher by a few ms.
-      const t = Math.min(1, Math.max(0, (now - started) / ms))
+      const t = clamp((now - started) / ms, 0, 1)
       // The last frame is the target itself, not a mix that rounds near it, so
       // whatever the mix carried for the journey (ghosts, resampled points)
       // is gone once it lands.
