@@ -56,10 +56,12 @@ export const COMPONENT_NAMES = [
   "LpImageEditor",
   "LpInfraNode",
   "LpInput",
+  "LpInspector",
   "LpKeys",
   "LpLightbox",
   "LpLink",
   "LpLoader",
+  "LpLogInspector",
   "LpLogViewer",
   "LpMagnetic",
   "LpMapPicker",
@@ -135,5 +137,7 @@ export const COMPONENT_NAMES = [
   "LpTruncate",
   "LpTypewriter",
   "LpUptimeBar",
-  "LpVideoBackdrop"
+  "LpVideoBackdrop",
+  "LpWindow",
+  "LpWorkspaceSwitcher"
 ] as const

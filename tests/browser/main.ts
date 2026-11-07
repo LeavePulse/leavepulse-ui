@@ -1,12 +1,26 @@
 import { createApp } from "vue"
+import TableFeatures from "./TableFeatures.vue"
 import "../../preview/preview-tailwind.css"
 import AutocompleteBlur from "./AutocompleteBlur.vue"
 import Contracts from "./Contracts.vue"
+import ChartToolkit from "./ChartToolkit.vue"
+import DataContracts from "./DataContracts.vue"
+import FileTreeFeatures from "./FileTreeFeatures.vue"
+import Fields from "./Fields.vue"
+import HotkeyFrame from "./HotkeyFrame.vue"
+import LinkedView from "./LinkedView.vue"
+import LogTools from "./LogTools.vue"
 import OverlayHistory from "./OverlayHistory.vue"
+import Overlays from "./Overlays.vue"
+import RealmSweep from "./RealmSweep.vue"
+import ShellFeatures from "./ShellFeatures.vue"
+import ShellFrame from "./ShellFrame.vue"
 import ShellScroll from "./ShellScroll.vue"
 import ShiftTick from "./ShiftTick.vue"
 import StatFit from "./StatFit.vue"
+import TopologyContracts from "./TopologyContracts.vue"
+import Workspace from "./Workspace.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
-const SCENARIOS = { "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
+const SCENARIOS = { "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
 createApp(SCENARIOS[scenario as keyof typeof SCENARIOS] ?? Contracts).mount("#app")
