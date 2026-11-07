@@ -138,6 +138,7 @@ const railPanel = computed(() => [
   "rounded-card border border-line p-2 shadow-panel",
   frosted.value ? "lp-glass-overlay" : "bg-surface-raised",
 ])
+const railSlot = computed(() => (props.navSide === "end" ? "asideEnd" : "aside"))
 </script>
 
 <template>
@@ -154,27 +155,7 @@ const railPanel = computed(() => [
     <!-- The gap sits on a wrapper rather than on LpSidebar itself: LpSidebar
          splits its `class` between its root and the inner `nav`, so a margin
          given to it lands on both. -->
-    <template v-if="hasNav && navSide === 'start'" #aside>
-      <div :class="railClass">
-        <LpSidebar
-          v-model="active"
-          v-model:open="navOpen"
-          variant="panel"
-          :items="items"
-          :sections="sections"
-          :width="navWidth"
-          :searchable="searchable"
-          :search-placeholder="searchPlaceholder"
-          :loading="loading"
-          responsive
-          :mobile-breakpoint="mobileBreakpoint"
-          :style="railStyle"
-          :class="railPanel"
-        />
-      </div>
-    </template>
-
-    <template v-if="hasNav && navSide === 'end'" #asideEnd>
+    <template v-if="hasNav" #[railSlot]>
       <div :class="railClass">
         <LpSidebar
           v-model="active"

@@ -59,24 +59,41 @@ const { class: frameClass, attrs: rest } = useMergedAttrs(
 )
 
 const cleanups: (() => void)[] = []
+const LAYERS = "[data-dismissable-layer], [role=dialog], [role=menu], [role=listbox]"
+
+/* What can change on a stylesheet that is already in the page: a theme swapped by `href`, one turned off. */
+const SHEET_ATTRIBUTES = ["href", "rel", "media", "disabled", "crossorigin", "integrity", "title", "type"]
 
 function mirrorHead(doc: Document) {
-  const copies = new Map<Node, Node>()
+  const copies = new Map<Node, Element>()
+  const isSheet = (node: Node) => node instanceof HTMLStyleElement || (node instanceof HTMLLinkElement && node.rel === "stylesheet")
   const copy = (node: Node) => {
-    if (!(node instanceof HTMLStyleElement || (node instanceof HTMLLinkElement && node.rel === "stylesheet"))) return
-    const clone = doc.importNode(node, true)
+    if (!isSheet(node) || copies.has(node)) return
+    const clone = doc.importNode(node as Element, true)
     copies.set(node, clone)
     doc.head.appendChild(clone)
+  }
+  const drop = (node: Node) => {
+    copies.get(node)?.remove()
+    copies.delete(node)
+  }
+  const syncAttribute = (node: Element, name: string) => {
+    if (!isSheet(node)) return drop(node)
+    if (!copies.has(node)) return copy(node)
+    const value = node.getAttribute(name)
+    if (value === null) copies.get(node)!.removeAttribute(name)
+    else copies.get(node)!.setAttribute(name, value)
   }
   for (const node of document.head.childNodes) copy(node)
   const observer = new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === "childList") {
         for (const node of record.addedNodes) copy(node)
-        for (const node of record.removedNodes) {
-          copies.get(node)?.parentNode?.removeChild(copies.get(node)!)
-          copies.delete(node)
-        }
+        for (const node of record.removedNodes) drop(node)
+        continue
+      }
+      if (record.type === "attributes") {
+        syncAttribute(record.target as Element, record.attributeName!)
         continue
       }
       // A style rewritten in place (a hot reload) is copied again.
@@ -84,7 +101,7 @@ function mirrorHead(doc: Document) {
       if (style instanceof HTMLStyleElement && copies.has(style)) copies.get(style)!.textContent = style.textContent
     }
   })
-  observer.observe(document.head, { childList: true, subtree: true, characterData: true })
+  observer.observe(document.head, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: SHEET_ATTRIBUTES })
   cleanups.push(() => observer.disconnect())
 }
 
@@ -118,7 +135,9 @@ function liftForeignLocks(doc: Document) {
     }
   }
   const observer = new MutationObserver(lift)
-  observer.observe(document.body, { attributes: true, attributeFilter: ["style"] })
+  // The child list too: when the page's own layer goes while the frame's stays,
+  // reka keeps the lock and the style never changes to say so.
+  observer.observe(document.body, { attributes: true, attributeFilter: ["style"], childList: true, subtree: true })
   cleanups.push(() => observer.disconnect())
 }
 
@@ -143,12 +162,13 @@ function setup() {
   let pending = 0
   const measure = () => {
     pending = 0
-    let bottom = content.offsetHeight
+    // scrollHeight as well: what is positioned inside overflows the box without growing it.
+    let bottom = Math.max(content.offsetHeight, content.scrollHeight)
     for (const child of doc.body.children) {
       if (child === content) continue
-      for (const layer of child.querySelectorAll("[data-dismissable-layer], [role=dialog], [role=menu], [role=listbox]")) {
-        bottom = Math.max(bottom, Math.ceil(layer.getBoundingClientRect().bottom + 8))
-      }
+      // The portal's root can be the layer itself, which querySelectorAll skips.
+      const layers = [...(child.matches(LAYERS) ? [child] : []), ...child.querySelectorAll(LAYERS)]
+      for (const layer of layers) bottom = Math.max(bottom, Math.ceil(layer.getBoundingClientRect().bottom + 8))
     }
     contentHeight.value = bottom
   }

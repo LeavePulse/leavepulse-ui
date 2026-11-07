@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { useId } from "vue"
-import { menuPaletteCommands } from "./commandPalette"
-import { usePaletteCommands, usePaletteScope, type PaletteControlOptions } from "../composables/usePaletteCommands"
+import { useMenuPalette, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * Right-click context menu (reka ContextMenu). Same items as LpDropdownMenu,
  * drawn by the same renderer: nested submenus (`children`), tick-box items and
@@ -84,16 +82,22 @@ const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
 // next keystroke goes nowhere. Hand focus back to the field instead, with its
 // selection if the menu action left the text as it was.
 type TextField = HTMLInputElement | HTMLTextAreaElement
+type SelectionDirection = TextField["selectionDirection"]
 const SELECTABLE = new Set(["text", "search", "url", "tel", "password"])
 const view = useView()
-let field: { el: TextField; value: string; start: number; end: number } | null = null
+let field: { el: TextField; value: string; start: number; end: number; direction: SelectionDirection } | null = null
 
 function rememberField() {
+  // No menu will open, so nothing would ever hand this reference back.
+  if (!enabled.value) {
+    field = null
+    return
+  }
   const el = viewDocument(view.value).activeElement
   const text =
     el?.tagName === "TEXTAREA" || (el?.tagName === "INPUT" && SELECTABLE.has((el as HTMLInputElement).type))
   field = text
-    ? { el: el as TextField, value: (el as TextField).value, start: (el as TextField).selectionStart ?? 0, end: (el as TextField).selectionEnd ?? 0 }
+    ? { el: el as TextField, value: (el as TextField).value, start: (el as TextField).selectionStart ?? 0, end: (el as TextField).selectionEnd ?? 0, direction: (el as TextField).selectionDirection }
     : null
 }
 
@@ -140,9 +144,12 @@ function returnFocus(event: Event) {
   const saved = field
   field = null
   if (!saved || !saved.el.isConnected) return
-  event.preventDefault()
+  // A field the action hid or disabled refuses focus: reka then keeps its own
+  // fallback to the trigger, so focus does not fall to the body.
   saved.el.focus()
-  if (saved.el.value === saved.value) saved.el.setSelectionRange(saved.start, saved.end)
+  if (saved.el.ownerDocument.activeElement !== saved.el) return
+  event.preventDefault()
+  if (saved.el.value === saved.value) saved.el.setSelectionRange(saved.start, saved.end, saved.direction ?? undefined)
 }
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
@@ -151,12 +158,7 @@ const portalTo = usePortalTarget()
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
 
-const paletteScope = usePaletteScope()
-const paletteId = useId()
-usePaletteCommands(() => props.palette === false || !props.title || !props.items.length ? [] : [{
-  id: `${paletteScope?.id}/${props.palette?.id ?? paletteId}`, label: props.palette?.label ?? props.title,
-  children: menuPaletteCommands(props.items, `${paletteScope?.id}/${props.palette?.id ?? paletteId}`),
-}], { automatic: true })
+useMenuPalette(props)
 </script>
 
 <template>

@@ -27,6 +27,7 @@
  * those bind their handlers to the slot's direct child, so a wrapper swallows
  * them and the control stops opening. Put `aria-label` on the trigger instead.
  */
+import { clamp } from "../composables/clamp"
 import {
   injectTooltipProviderContext,
   TooltipContent,
@@ -43,7 +44,7 @@ import {
 } from "../composables/usePillTransition"
 import { PANEL_SURFACE, TOOLTIP_ANIM } from "./dropdown"
 import { prefersReducedMotion } from "../composables/easing"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
 const props = withDefaults(
   defineProps<{
@@ -131,15 +132,21 @@ const EDGE = 8
  * uptime slice with its breakdown) slid half off screen. The offset is held to
  * the room the window has on each side of where reka put the tip.
  */
-function inView(x: number): number {
+function inView(x: number, y: number): { x: number; y: number } {
   const panel = tipBody.value?.parentElement
-  if (!panel) return x
+  if (!panel) return { x, y }
   const rect = panel.getBoundingClientRect()
-  const placed = rect.left - offset.value.x
-  const width = panel.ownerDocument.defaultView?.innerWidth ?? window.innerWidth
+  const win = panel.ownerDocument.defaultView ?? window
+  return {
+    x: withinRoom(x, rect.left - offset.value.x, rect.width, win.innerWidth),
+    y: withinRoom(y, rect.top - offset.value.y, rect.height, win.innerHeight),
+  }
+}
+
+function withinRoom(value: number, placed: number, size: number, room: number): number {
   const min = EDGE - placed
-  const max = width - EDGE - rect.width - placed
-  return max < min ? x : Math.min(max, Math.max(min, x))
+  const max = room - EDGE - size - placed
+  return max < min ? value : clamp(value, min, max)
 }
 
 /*
@@ -152,6 +159,22 @@ let sx: SpringState = { value: 0, velocity: 0 }
 let sy: SpringState = { value: 0, velocity: 0 }
 let frame = 0
 let lastFrame = 0
+/* The last reading, so the tip can be placed again when the window changes under it. */
+let pointer: { el: HTMLElement; x: number; y: number } | null = null
+
+function stopSpring() {
+  if (frame) cancelAnimationFrame(frame)
+  frame = 0
+  lastFrame = 0
+}
+
+/* Straight to the target, with no spring left over to pull it back. */
+function jumpToTarget() {
+  stopSpring()
+  offset.value = { x: target.x, y: target.y }
+  sx = { value: target.x, velocity: 0 }
+  sy = { value: target.y, velocity: 0 }
+}
 
 const settle = (now: number) => {
   const dt = lastFrame ? (now - lastFrame) / 1000 : 1 / 60
@@ -179,10 +202,17 @@ const onPointerMove = (e: PointerEvent) => {
   if (!props.followCursor) return
   const el = e.currentTarget as HTMLElement | null
   if (!el) return
+  pointer = { el, x: e.clientX, y: e.clientY }
+  follow()
+}
+
+function follow() {
+  if (!pointer) return
+  const { el, x: clientX, y: clientY } = pointer
   const rect = el.getBoundingClientRect()
   const halfX = props.side === "left" || props.side === "right" ? rect.width / 2 : 0
   const dirX = props.side === "right" ? -1 : 1
-  target.x = e.clientX - (rect.left + rect.width / 2) + halfX * dirX
+  target.x = clientX - (rect.left + rect.width / 2) + halfX * dirX
   /*
    * reka clears the tip past the whole box's EDGE, not past the pointer, so on
    * a tall trigger it ends up half the box above the cursor — measured at 96px
@@ -192,11 +222,11 @@ const onPointerMove = (e: PointerEvent) => {
    */
   const half = props.side === "top" || props.side === "bottom" ? rect.height / 2 : 0
   const dir = props.side === "bottom" ? -1 : 1
-  target.y = e.clientY - (rect.top + rect.height / 2) + half * dir
-  target.x = inView(target.x)
+  target.y = clientY - (rect.top + rect.height / 2) + half * dir
+  Object.assign(target, inView(target.x, target.y))
   // Without motion the tip goes straight to the reading instead of trailing.
   if (prefersReducedMotion()) {
-    offset.value = { x: target.x, y: target.y }
+    jumpToTarget()
     return
   }
   if (!frame) frame = requestAnimationFrame(settle)
@@ -218,10 +248,7 @@ const onOpenChange = (next: boolean) => {
   if (!open.value || !props.followCursor) return
   // A fresh open starts at the cursor instead of flying in from wherever the
   // last one came to rest.
-  offset.value = { x: target.x, y: target.y }
-  sx = { value: target.x, velocity: 0 }
-  sy = { value: target.y, velocity: 0 }
-  lastFrame = 0
+  jumpToTarget()
 }
 
 /*
@@ -243,9 +270,26 @@ watch(
   },
 )
 
-onBeforeUnmount(() => {
-  if (frame) cancelAnimationFrame(frame)
-})
+/*
+ * A followed tip moves only with the pointer, so a window that changes under a
+ * still pointer (a resize, a phone's address bar, a rotation) would leave it
+ * off screen. And a tip that is gone has nothing left to animate.
+ */
+const view = useView()
+watch(
+  () => open.value && props.followCursor,
+  (following, _, onCleanup) => {
+    if (!following) {
+      stopSpring()
+      return
+    }
+    const win = viewWindow(view.value)
+    win.addEventListener("resize", follow)
+    onCleanup(() => win.removeEventListener("resize", follow))
+  },
+)
+
+onBeforeUnmount(stopSpring)
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
 const portalTo = usePortalTarget()

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { useId } from "vue"
-import { menuPaletteCommands } from "./commandPalette"
-import { usePaletteCommands, usePaletteScope, type PaletteControlOptions } from "../composables/usePaletteCommands"
+import { useMenuPalette, type PaletteControlOptions } from "../composables/usePaletteCommands"
 /*
  * A menu opened from a button (usually a row's "…"). Its items are the same
  * shape as LpContextMenu's and are drawn by the same renderer, so one array
@@ -36,6 +34,9 @@ const props = withDefaults(defineProps<{
 }>(), { palette: undefined })
 
 const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
+// reka names the menu after its trigger, and aria-labelledby beats aria-label:
+// a `title` only names the menu with that link taken off. MenuTitle itself is
+// hidden from assistive tech, so nothing is announced twice.
 
 function opened(open: boolean) {
   if (open && props.rightClickToo) hints.use(HINT_SIGNALS.menuButton)
@@ -47,12 +48,7 @@ const portalTo = usePortalTarget()
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
 
-const paletteScope = usePaletteScope()
-const paletteId = useId()
-usePaletteCommands(() => props.palette === false || !props.title || !props.items.length ? [] : [{
-  id: `${paletteScope?.id}/${props.palette?.id ?? paletteId}`, label: props.palette?.label ?? props.title,
-  children: menuPaletteCommands(props.items, `${paletteScope?.id}/${props.palette?.id ?? paletteId}`),
-}], { automatic: true })
+useMenuPalette(props)
 </script>
 
 <template>
@@ -68,7 +64,7 @@ usePaletteCommands(() => props.palette === false || !props.title || !props.items
         :side-offset="6"
         align="end"
         :class="PANEL"
-        :aria-label="title"
+        v-bind="title ? { 'aria-label': title, 'aria-labelledby': undefined } : {}"
       >
         <MenuTitle v-if="title" :title="title" :subtitle="subtitle" :icon="titleIcon" :image="titleImage" />
         <ContextMenuItems :items="items" :panel="PANEL" kind="dropdown" />

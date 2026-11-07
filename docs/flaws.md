@@ -35,10 +35,6 @@ entry is deleted, not ticked: the commit says what changed.
 
 ## Ideas
 
-- **Overlay history for LpLightbox and LpCommandPalette.** They share the
-  modal stack but not `useOverlayHistory`; Back on a phone with the lightbox
-  open still leaves the page.
-
 - **Context switcher in the rail header**: server, workspace or machine, which
   every app now draws in the header slot itself.
 - **Reorder pins** by dragging within the pinned block, and pin by dragging a

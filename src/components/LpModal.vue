@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isElement } from "../composables/realm"
 import {
   DialogClose,
   DialogContent,
@@ -11,7 +12,7 @@ import {
 import { computed, onBeforeUnmount, ref, useSlots, watch } from "vue"
 import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
-import { useOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
+import { useModelOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 import { useLabels } from "../composables/useLpConfig"
 import { useShift } from "../composables/useShift"
 import { useModalLayer } from "./modalDepth"
@@ -65,7 +66,9 @@ const props = withDefaults(
      * happens if the DOM order is left to decide.
      *
      * `"none"` leaves reka's own behaviour alone; pass a CSS selector to name
-     * the element yourself.
+     * the element yourself. A custom control the list cannot recognise (a
+     * canvas editor, a composite widget) marks its entry point with
+     * `data-lp-autofocus` and a tabindex.
      */
     autoFocus?: "auto" | "none" | string
     /**
@@ -129,16 +132,11 @@ function close() {
   void onOpenChange(false)
 }
 
-useOverlayHistory({
+useModelOverlayHistory({
   mode: () => props.history,
   open: () => !!props.open,
-  close: async () => {
-    if (!(await allowClose())) return false
-    emit("update:open", false)
-    return true
-  },
-  reopen: () => emit("update:open", true),
-  navigated: () => emit("update:open", false),
+  setOpen: (open) => emit("update:open", open),
+  allowClose,
 })
 defineExpose({ close })
 
@@ -161,7 +159,7 @@ const onInteractOutside = (event: Event) => {
   guardOutside(event)
   if (!props.dismissible) return event.preventDefault()
   const target = event.target
-  if (target instanceof Element && target.closest("[data-lp-modal-aside]")) {
+  if (isElement(target) && target.closest("[data-lp-modal-aside]")) {
     event.preventDefault()
   }
 }
@@ -233,6 +231,8 @@ const AUTO_FOCUS_ORDER = [
   "input:not([type=hidden]):not([disabled]):not([readonly]):not([tabindex='-1'])",
   "textarea:not([disabled]):not([readonly])",
   "select:not([disabled])",
+  "[contenteditable]:not([contenteditable='false'])",
+  "[role='textbox']",
   "[data-lp-autofocus]",
   "button:not([disabled]):not([data-lp-dialog-close])",
   "[href]",
@@ -273,7 +273,7 @@ function onOpenAutoFocus(event: Event) {
       target.focus()
       // Only once focus really landed: a prevented auto-focus that failed would
       // leave the keyboard on the page behind the dialog.
-      if (document.activeElement !== target) continue
+      if (target.ownerDocument.activeElement !== target) continue
       event.preventDefault()
       // `focus-visible` is the browser's own heuristic and cannot be forced, so
       // the ring is driven off an attribute the kit owns. Skipped for a control

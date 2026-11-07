@@ -5,7 +5,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "reka-ui"
-import { computed } from "vue"
+import { computed, useAttrs } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
 import { POPOVER_PANEL } from "./dropdown"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
@@ -20,7 +20,11 @@ const props = withDefaults(
     sideOffset?: number
     /** Extra classes for the floating panel (width, padding, overflow). */
     panelClass?: string
-    /** Accessible name of the panel, which reka exposes as a dialog. */
+    /**
+     * Accessible name of the panel, which reka exposes as a dialog. Without
+     * one the trigger names it. A heading inside the panel names it better:
+     * pass `aria-labelledby` with its id.
+     */
     ariaLabel?: string
   }>(),
   { side: "bottom", align: "center", sideOffset: 6 },
@@ -35,6 +39,22 @@ const open = defineModel<boolean>("open")
 const panel = computed(() =>
   mergeClass(POPOVER_PANEL, "z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none", props.panelClass),
 )
+
+/*
+ * reka writes the trigger's id into `aria-labelledby` after the attributes it
+ * was given, and that outranks `aria-label`: a name passed here never reached
+ * a reader. It renders that value once per open, so the panel can be put right
+ * as it opens without being overwritten.
+ */
+const attrs = useAttrs()
+function namePanel(event: Event) {
+  // The event comes from the positioning wrapper around the panel.
+  const panel = (event.currentTarget as HTMLElement).querySelector('[role="dialog"]')
+  if (!panel) return
+  const labelledBy = attrs["aria-labelledby"]
+  if (typeof labelledBy === "string") panel.setAttribute("aria-labelledby", labelledBy)
+  else if (props.ariaLabel) panel.removeAttribute("aria-labelledby")
+}
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
 const portalTo = usePortalTarget()
@@ -51,6 +71,7 @@ const guardOutside = useOutsideGuard()
     <PopoverPortal :to="portalTo">
       <PopoverContent
         v-bind="$attrs"
+        @open-auto-focus="namePanel"
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         :collision-padding="8"

@@ -94,7 +94,11 @@ const guardOutside = useOutsideGuard()
  * the link under it.
  */
 const SLOP = 8
+/* A long press may produce no click at all; past this the next click is the user's own. */
+const CLICK_AFTER_RELEASE_MS = 350
 let holdTimer = 0
+/* The finger the hold belongs to: a second one must not move or end it. */
+let holdPointer: number | null = null
 let start = { x: 0, y: 0 }
 let held = false
 
@@ -103,9 +107,28 @@ function cancelHold() {
   holdTimer = 0
 }
 
-function onPointerDown(event: PointerEvent) {
-  if (event.pointerType !== "touch" || props.touch !== "hold" || props.disabled) return
+function onPointerUp(event: PointerEvent) {
+  if (holdPointer !== null && event.pointerId !== holdPointer) return
+  holdPointer = null
+  cancelHold()
+  if (held) window.setTimeout(() => (held = false), CLICK_AFTER_RELEASE_MS)
+}
+
+// A cancelled press produces no click, so there is nothing left to swallow.
+function onPointerCancel(event?: PointerEvent) {
+  if (event && holdPointer !== null && event.pointerId !== holdPointer) return
+  holdPointer = null
+  cancelHold()
   held = false
+}
+
+function onPointerDown(event: PointerEvent) {
+  // Any new press starts over: on a hybrid laptop the mouse click after a hold
+  // must not be taken for that hold's own click.
+  if (holdTimer && event.pointerId !== holdPointer) return
+  held = false
+  if (event.pointerType !== "touch" || props.touch !== "hold" || props.disabled) return
+  holdPointer = event.pointerId
   start = { x: event.clientX, y: event.clientY }
   cancelHold()
   holdTimer = window.setTimeout(() => {
@@ -116,7 +139,7 @@ function onPointerDown(event: PointerEvent) {
 }
 
 function onPointerMove(event: PointerEvent) {
-  if (!holdTimer) return
+  if (!holdTimer || event.pointerId !== holdPointer) return
   if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > SLOP) cancelHold()
 }
 
@@ -135,7 +158,9 @@ function onContextMenu(event: Event) {
 watch(
   () => props.disabled,
   (off) => {
-    if (off) open.value = false
+    if (!off) return
+    onPointerCancel()
+    open.value = false
   },
 )
 
@@ -150,8 +175,8 @@ onBeforeUnmount(cancelHold)
       :class="touch === 'hold' ? '[-webkit-touch-callout:none]' : undefined"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
-      @pointerup="cancelHold"
-      @pointercancel="cancelHold"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerCancel"
       @click.capture="onClickCapture"
       @contextmenu="onContextMenu"
     >

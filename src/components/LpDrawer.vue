@@ -1,4 +1,5 @@
 <script lang="ts">
+import { clamp } from "../composables/clamp"
 import { ref as sharedRef, type Ref } from "vue"
 
 // One pull at a time across every edge-open drawer on the page, pinned to a
@@ -37,13 +38,14 @@ import { CLOSE_ICON } from "./dropdown"
 import { prefersReducedMotion } from "../composables/easing"
 import { useCloseGuard, type CloseGuard } from "../composables/useCloseGuard"
 import { useGlass } from "../composables/useGlass"
-import { useOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
+import { useModelOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 import { useLabels } from "../composables/useLpConfig"
 import { usePersisted } from "../composables/usePersisted"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { startPointerDrag } from "../composables/pointerDrag"
+import { isElement, nodeWindow, useOutsideGuard, usePortalTarget, useView, viewDocument, viewWindow } from "../composables/useView"
 
 type Direction = "top" | "bottom" | "left" | "right"
 
@@ -223,16 +225,11 @@ async function requestClose() {
 // ways out do. Handed to the body and footer slots, and exposed.
 defineExpose({ close: requestClose })
 
-useOverlayHistory({
+useModelOverlayHistory({
   mode: () => props.history,
   open: () => !!props.open,
-  close: async () => {
-    if (!(await allowClose())) return false
-    emit("update:open", false)
-    return true
-  },
-  reopen: () => emit("update:open", true),
-  navigated: () => emit("update:open", false),
+  setOpen: (open) => emit("update:open", open),
+  allowClose,
 })
 
 // The header's close button is vaul's own and would slide the panel away at
@@ -255,22 +252,26 @@ const sizeStyle = computed(() => {
   if (props.snapPoints?.length && isSheet.value) return undefined
   // A live resize wins over the preset/width.
   if (props.resizable && isHorizontal.value && resizedPx.value != null) {
-    return { width: `${resizedPx.value}px` }
+    // Capped live: a width dragged or remembered on a wide window must still
+    // fit once the window shrinks or the device turns.
+    return { width: `min(${resizedPx.value}px, ${props.maxSize})` }
   }
   const len = props.width ?? `min(${isHorizontal.value ? "94vw" : "94vh"}, ${SIZES[props.size]}rem)`
   return isHorizontal.value ? { width: len } : { height: len }
 })
 
-// Resolve a CSS length to px against the viewport. Anything it cannot read
-// (calc(), min()) comes back NaN for the caller to fall back on.
-function toPx(css: string): number {
+// Resolve a CSS length to px against the viewport. Only px, rem, vw and vh are
+// read; anything else (calc(), min()) comes back NaN and the caller falls back
+// to the viewport, while the CSS itself still applies the length as written.
+function toPx(css: string, win?: Window): number {
   const n = Number.parseFloat(css)
   if (css.endsWith("rem")) {
-    const root = typeof document === "undefined" ? 16 : Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    const view = win ?? (typeof window === "undefined" ? null : window)
+    const root = view ? Number.parseFloat(view.getComputedStyle(view.document.documentElement).fontSize) || 16 : 16
     return n * root
   }
-  if (css.endsWith("vw")) return (n / 100) * window.innerWidth
-  if (css.endsWith("vh")) return (n / 100) * window.innerHeight
+  if (css.endsWith("vw")) return (n / 100) * (win ?? window).innerWidth
+  if (css.endsWith("vh")) return (n / 100) * (win ?? window).innerHeight
   if (css.endsWith("px") || /^[\d.]+$/.test(css.trim())) return n
   return Number.NaN
 }
@@ -283,34 +284,22 @@ let endResize: (() => void) | null = null
 
 function startResize(e: PointerEvent) {
   if (!props.resizable || !isHorizontal.value) return
-  e.preventDefault()
   endResize?.()
-  const grip = e.currentTarget instanceof HTMLElement ? e.currentTarget : null
-  grip?.setPointerCapture(e.pointerId)
+  // The window the panel lives in: an LpFrame's, inside one.
+  const win = nodeWindow(e.currentTarget as Node)
   const fromRight = dir.value === "right"
-  const min = toPx(props.minSize)
-  const max = toPx(props.maxSize)
-  const onMove = (ev: PointerEvent) => {
-    if (ev.pointerId !== e.pointerId) return
-    const raw = fromRight ? window.innerWidth - ev.clientX : ev.clientX
-    resizedPx.value = Math.max(Number.isNaN(min) ? 0 : min, Math.min(Number.isNaN(max) ? Infinity : max, raw))
-  }
-  const end = () => {
-    window.removeEventListener("pointermove", onMove)
-    window.removeEventListener("pointerup", end)
-    window.removeEventListener("pointercancel", end)
-    grip?.removeEventListener("lostpointercapture", end)
-    document.body.style.userSelect = ""
-    document.body.style.cursor = ""
-    endResize = null
-  }
-  endResize = end
-  document.body.style.userSelect = "none"
-  document.body.style.cursor = "ew-resize"
-  window.addEventListener("pointermove", onMove)
-  window.addEventListener("pointerup", end)
-  window.addEventListener("pointercancel", end)
-  grip?.addEventListener("lostpointercapture", end)
+  const min = toPx(props.minSize, win)
+  const max = toPx(props.maxSize, win)
+  endResize = startPointerDrag(e, {
+    cursor: "ew-resize",
+    move(ev) {
+      const raw = fromRight ? win.innerWidth - ev.clientX : ev.clientX
+      resizedPx.value = Math.max(Number.isNaN(min) ? 0 : min, Math.min(Number.isNaN(max) ? win.innerWidth : Math.min(max, win.innerWidth), raw))
+    },
+    end() {
+      endResize = null
+    },
+  })
 }
 
 onBeforeUnmount(() => endResize?.())
@@ -380,22 +369,30 @@ const skipOpenSlide = ref(false)
 watch(
   () => props.open,
   (open) => {
-    if (!open) skipOpenSlide.value = false
+    if (open) return
+    skipOpenSlide.value = false
+    // Closing mid-resize removes the grip, which takes its capture events along.
+    endResize?.()
   },
 )
 
 // Resolve the panel's main-axis size in px to map drag distance → progress.
 function panelPx(): number {
-  const vw = typeof window === "undefined" ? 0 : window.innerWidth
+  const vw = typeof window === "undefined" ? 0 : edgeWindow().innerWidth
   const preset = toPx(`${SIZES[props.size]}rem`)
-  const cap = props.width ? toPx(props.width) : preset
+  const resized = props.resizable ? resizedPx.value : null
+  const cap = resized ?? (props.width ? toPx(props.width) : preset)
   return Math.min(vw * 0.94, Number.isFinite(cap) ? cap : preset)
 }
+
+// The window the drawer renders in (an LpFrame's, inside one).
+const view = useView()
+const edgeWindow = () => viewWindow(view.value)
 
 function edgeEnabled(): boolean {
   if (!props.edgeOpen || !isHorizontal.value || props.open || handingOff.value) return false
   const bp = props.edgeBreakpoint ? BREAKPOINT_PX[props.edgeBreakpoint] : null
-  return bp === null || window.innerWidth < bp
+  return bp === null || edgeWindow().innerWidth < bp
 }
 
 let track: { id: number; x: number; y: number; t: number; lastX: number; lastT: number; speed: number } | null = null
@@ -405,12 +402,13 @@ const owner = Symbol("edge-pull")
 // pulls (a carousel, a wide table) keeps the gesture: the pull only claims
 // what nothing under the finger wants.
 function scrollsWithPull(target: EventTarget | null): boolean {
-  let el = target instanceof Element ? target : null
+  let el = isElement(target) ? target : null
   const pullsRight = dir.value === "left"
-  while (el && el !== document.body) {
+  const body = el?.ownerDocument.body
+  while (el && el !== body) {
     if (el.closest(EDGE_IGNORE) === el) return true
     if (el.scrollWidth > el.clientWidth) {
-      const overflow = getComputedStyle(el).overflowX
+      const overflow = nodeWindow(el).getComputedStyle(el).overflowX
       if (overflow === "auto" || overflow === "scroll") {
         if (pullsRight ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth) return true
       }
@@ -421,7 +419,7 @@ function scrollsWithPull(target: EventTarget | null): boolean {
 }
 
 function inward(x: number): number {
-  return dir.value === "right" ? window.innerWidth - x : x
+  return dir.value === "right" ? edgeWindow().innerWidth - x : x
 }
 
 function onTouchStart(e: TouchEvent) {
@@ -457,12 +455,21 @@ function onTouchMove(e: TouchEvent) {
   if (dt > 0) track.speed = (((t.clientX - track.lastX) * sign) / dt) * 0.6 + track.speed * 0.4
   track.lastX = t.clientX
   track.lastT = e.timeStamp
-  peek.value = Math.max(0, Math.min(1, inward(t.clientX) / panelPx()))
+  peek.value = clamp(inward(t.clientX) / panelPx(), 0, 1)
 }
 
 function dropTrack() {
   track = null
   if (edgeOwner.value === owner) edgeOwner.value = null
+}
+
+// The system took the touch (a gesture, a dialog): the pull did not finish, so
+// it never opens the drawer, however far it had come.
+function cancelPull() {
+  if (!track) return
+  dropTrack()
+  peeking.value = false
+  peek.value = 0
 }
 
 function settle() {
@@ -503,19 +510,21 @@ function onTouchEnd(e: TouchEvent) {
 
 if (typeof document !== "undefined") {
   watch(
-    () => props.edgeOpen && isHorizontal.value,
+    () => (props.edgeOpen && isHorizontal.value ? viewDocument(view.value) : null),
     (on, _, onCleanup) => {
       if (!on) return
+      const doc = viewDocument(view.value)
       const passive = { passive: true }
-      document.addEventListener("touchstart", onTouchStart, passive)
-      document.addEventListener("touchmove", onTouchMove, { passive: false })
-      document.addEventListener("touchend", onTouchEnd, passive)
-      document.addEventListener("touchcancel", onTouchEnd, passive)
+      doc.addEventListener("touchstart", onTouchStart, passive)
+      doc.addEventListener("touchmove", onTouchMove, { passive: false })
+      doc.addEventListener("touchend", onTouchEnd, passive)
+      doc.addEventListener("touchcancel", cancelPull, passive)
       onCleanup(() => {
-        document.removeEventListener("touchstart", onTouchStart)
-        document.removeEventListener("touchmove", onTouchMove)
-        document.removeEventListener("touchend", onTouchEnd)
-        document.removeEventListener("touchcancel", onTouchEnd)
+        doc.removeEventListener("touchstart", onTouchStart)
+        doc.removeEventListener("touchmove", onTouchMove)
+        doc.removeEventListener("touchend", onTouchEnd)
+        doc.removeEventListener("touchcancel", cancelPull)
+        cancelPull()
       })
     },
     { immediate: true },

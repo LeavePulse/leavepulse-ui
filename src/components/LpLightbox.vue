@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useModelOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 /*
  * Full-screen image viewer — the Discord-style lightbox: click a thumbnail, the
  * image fills the screen, arrows step through the set, the wheel zooms toward
@@ -13,6 +14,7 @@
  * Controlled via v-model:open and v-model:index, so the caller owns which image
  * is showing and can drive it from a grid, a route or a keyboard shortcut.
  */
+import { clamp } from "../composables/clamp"
 import {
   DialogContent,
   DialogDescription,
@@ -24,12 +26,14 @@ import {
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useZoomPan } from "../composables/useZoomPan"
+import { clickLink } from "./exportData"
 import { fileNameOf, type LightboxItem } from "./lightbox"
 import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import { useModalLayer } from "./modalDepth"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { inTextField } from "../composables/textEntry"
+import { nodeWindow, useOutsideGuard, usePortalTarget, useView, viewDocument } from "../composables/useView"
 
 export type LightboxLabels = {
   viewer: string
@@ -50,6 +54,12 @@ export type LightboxLabels = {
 
 const props = withDefaults(
   defineProps<{
+    /**
+     * Browser Back closes it, and opening it adds a history entry. Unset
+     * follows `provideOverlayHistory` (off without one); `"reopen"` also opens
+     * it again on Forward; `false` keeps it out of history.
+     */
+    history?: OverlayHistoryMode
     open?: boolean
     /** Images to page through. */
     items: LightboxItem[]
@@ -70,6 +80,7 @@ const props = withDefaults(
     labels?: Partial<LightboxLabels>
   }>(),
   {
+    history: undefined,
     open: false,
     index: 0,
     rotatable: true,
@@ -89,6 +100,13 @@ const emit = defineEmits<{
   /** Copy finished — `false` when the browser refused (tainted/cross-origin). */
   (e: "copy", item: LightboxItem, ok: boolean): void
 }>()
+
+useModelOverlayHistory({
+  mode: () => props.history,
+  open: () => !!props.open,
+  setOpen: (open) => emit("update:open", open),
+  allowClose: async () => true,
+})
 
 const text = useLabels<LightboxLabels>(
   "lightbox",
@@ -137,7 +155,7 @@ const isPanning = computed(() => zoom.panning.value)
 // moves it locally and reports the move.
 const shown = ref(props.index)
 watch(() => props.index, (i) => (shown.value = i))
-const current = computed(() => Math.min(Math.max(shown.value, 0), Math.max(props.items.length - 1, 0)))
+const current = computed(() => clamp(shown.value, 0, Math.max(props.items.length - 1, 0)))
 const item = computed<LightboxItem | undefined>(() => props.items[current.value])
 const total = computed(() => props.items.length)
 const showStrip = computed(() => props.filmstrip ?? total.value > 1)
@@ -146,6 +164,7 @@ const rotation = ref(0)
 const loading = ref(false)
 const failed = ref(false)
 const viewport = ref<HTMLElement | null>(null)
+const stageImage = ref<HTMLImageElement | null>(null)
 const stripEl = ref<HTMLElement | null>(null)
 
 watch(viewport, (el) => zoom.setViewport(el))
@@ -158,7 +177,7 @@ function go(next: number) {
   if (!total.value) return
   const wrapped = props.loop
     ? (next + total.value) % total.value
-    : Math.min(Math.max(next, 0), total.value - 1)
+    : clamp(next, 0, total.value - 1)
   if (wrapped === current.value) return
   // Compare against the raw target, not the wrapped one: stepping past the last
   // image is still "forward" even though the index jumps back to 0.
@@ -225,7 +244,7 @@ function onStageWheel(e: WheelEvent) {
 // Reset the view whenever the image changes — carrying a 4x zoom onto the next
 // picture means landing on a random crop of it.
 watch(
-  () => [current.value, props.open] as const,
+  () => [current.value, props.open, item.value?.src] as const,
   () => {
     zoom.reset()
     rotation.value = 0
@@ -234,6 +253,16 @@ watch(
     if (props.open) nextTick(scrollThumbIntoView)
   },
 )
+
+/*
+ * An image paged past stays in flight after it leaves the DOM and still reports
+ * here: only the one on stage may settle the spinner or the failed state.
+ */
+function imageSettled(event: Event, ok: boolean) {
+  if (event.currentTarget !== stageImage.value) return
+  loading.value = false
+  if (!ok) failed.value = true
+}
 
 function scrollThumbIntoView() {
   const el = stripEl.value?.querySelector<HTMLElement>(`[data-index="${current.value}"]`)
@@ -261,7 +290,13 @@ watch(
   },
 )
 
+/* Controls in the `actions` slot keep their own keys: a caret, a typed "r". */
+const OWNS_KEYS =
+  "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox'], [role='searchbox'], [role='combobox']"
+
 function onKeydown(e: KeyboardEvent) {
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+  if (inTextField(e.target, OWNS_KEYS)) return
   switch (e.key) {
     case "ArrowRight":
       e.preventDefault()
@@ -338,27 +373,27 @@ function onViewportClick(e: MouseEvent) {
   close()
 }
 
+/*
+ * The window the viewer opened in. Inside an LpFrame its location is
+ * about:blank, which resolves nothing, so a relative source is read against the
+ * document's base URL rather than the location.
+ */
+const view = useView()
+const viewerDocument = () => viewDocument(view.value)
+const viewerWindow = () => nodeWindow(viewerDocument())
+const resolved = (src: string) => new URL(src, viewerDocument().baseURI)
+
 function sameOrigin(src: string): boolean {
   try {
-    const url = new URL(src, window.location.href)
-    return url.protocol === "blob:" || url.protocol === "data:" || url.origin === window.location.origin
+    const url = resolved(src)
+    return url.protocol === "blob:" || url.protocol === "data:" || url.origin === new URL(viewerDocument().baseURI).origin
   } catch {
     return false
   }
 }
 
 function save(href: string, name: string, newTab = false) {
-  const a = document.createElement("a")
-  a.href = href
-  if (newTab) {
-    a.target = "_blank"
-    a.rel = "noopener"
-  } else {
-    a.download = name
-  }
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
+  clickLink(viewerDocument(), newTab ? { href, target: "_blank", rel: "noopener" } : { href, download: name })
 }
 
 /*
@@ -373,11 +408,12 @@ async function download() {
   const name = fileNameOf(target)
   if (sameOrigin(target.src)) return save(target.src, name)
   try {
-    const response = await fetch(target.src, { mode: "cors" })
+    const win = viewerWindow()
+    const response = await win.fetch(resolved(target.src).href, { mode: "cors" })
     if (!response.ok) throw new Error(String(response.status))
-    const url = URL.createObjectURL(await response.blob())
+    const url = win.URL.createObjectURL(await response.blob())
     save(url, name)
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    win.setTimeout(() => win.URL.revokeObjectURL(url), 0)
   } catch {
     save(target.src, name, true)
   }
@@ -392,20 +428,28 @@ let copyTarget: LightboxItem | undefined
 async function imageToCopy(): Promise<Blob> {
   const target = (copyTarget = item.value)
   if (!target) throw new Error("No image")
-  const response = await fetch(target.src)
+  const win = viewerWindow()
+  const response = await win.fetch(resolved(target.src).href)
   const blob = await response.blob()
   // Clipboard only takes PNG; re-encode anything else through a canvas.
-  return blob.type === "image/png" ? blob : reencodeToPng(await createImageBitmap(blob))
+  return blob.type === "image/png" ? blob : reencodeToPng(await win.createImageBitmap(blob))
 }
 function copyDone(ok: boolean) {
-  if (copyTarget) emit("copy", copyTarget, ok)
+  const target = copyTarget
+  copyTarget = undefined
+  if (target) emit("copy", target, ok)
 }
 
 async function reencodeToPng(bitmap: ImageBitmap): Promise<Blob> {
-  const canvas = document.createElement("canvas")
-  canvas.width = bitmap.width
-  canvas.height = bitmap.height
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0)
+  const canvas = viewerDocument().createElement("canvas")
+  try {
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0)
+  } finally {
+    // Decoded pixels live outside the JS heap; a large image should not wait for GC.
+    bitmap.close()
+  }
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/png"),
   )
@@ -570,14 +614,15 @@ const guardOutside = useOutsideGuard()
           <img
             v-else-if="item"
             :key="`${current}:${item.src}`"
+            ref="stageImage"
             data-lightbox-image
             :src="item.src"
             :alt="item.title ?? ''"
             class="max-h-full max-w-full select-none object-contain transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] animate-[lightbox-frame-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none motion-reduce:transition-none"
             :style="imageStyle"
             draggable="false"
-            @load="loading = false"
-            @error="((failed = true), (loading = false))"
+            @load="imageSettled($event, true)"
+            @error="imageSettled($event, false)"
           />
 
           <!-- Mounted throughout and driven by `active`, so a cached image that
