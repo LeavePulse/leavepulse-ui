@@ -30,6 +30,9 @@ Object.assign(window, { shellFeatures: { path } })
   >
     <template #header-actions><button>Save</button><button @click="dialog = true">Open dialog</button></template>
     <div data-test-page style="height: 3000px">
+      <!-- What a page's own sticky parts do with the shell's variables. -->
+      <div data-test-sticky class="sticky h-6" style="top: var(--lp-shell-top)">Sticky</div>
+      <div data-test-foot class="fixed left-0 h-0 w-0" style="bottom: var(--lp-shell-bottom)" />
       Page {{ path }}
       <output aria-label="Modes">{{ modes.join(",") }}</output>
     </div>

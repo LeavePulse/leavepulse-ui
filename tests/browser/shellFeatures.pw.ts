@@ -186,3 +186,46 @@ test("where the browser's bars float over the page, the shell draws none and kee
   await expect(page.locator("html")).not.toHaveClass(/\blp-scrollbar-none\b/)
   await expect(page.locator("[data-lp-page-scrollbar]")).toBeHidden()
 })
+
+test.describe("the shell's variables for a page's own sticky parts", () => {
+  const top = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => Math.round(el.getBoundingClientRect().top))
+  const bottom = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => Math.round(el.getBoundingClientRect().bottom))
+  const scrollDoc = (page: Page, y: number) => page.locator("html").evaluate((el, value) => el.scrollTo({ top: value, behavior: "instant" }), y)
+
+  test("a sticky block stays under the header", async ({ page }) => {
+    await page.setViewportSize({ width: 1300, height: 700 })
+    await open(page, "")
+    await scrollDoc(page, 1200)
+    await expect.poll(() => top(page, "[data-test-sticky]")).toBe(await bottom(page, "header"))
+  })
+
+  test("it follows the header out when the header collapses", async ({ page }) => {
+    await page.setViewportSize({ width: 1300, height: 700 })
+    await open(page, "collapse")
+    await scrollDoc(page, 1200)
+    await expect.poll(() => top(page, "[data-test-sticky]")).toBe(0)
+  })
+
+  test("it stays under the row of sub-pages too", async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 700 })
+    await open(page, "adaptive")
+    const row = page.getByRole("navigation", { name: "In this section" })
+    await expect(row).toBeVisible()
+    await scrollDoc(page, 1200)
+    await expect.poll(() => top(page, "[data-test-sticky]")).toBe(await row.evaluate((el) => Math.round(el.getBoundingClientRect().bottom)))
+  })
+
+  test("the foot of the window is kept clear of the bottom bar", async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 700 })
+    await open(page, "bottom")
+    const bar = page.locator("nav").filter({ has: page.getByRole("button", { name: "More" }) })
+    await expect.poll(() => top(page, "[data-test-foot]")).toBe(await bar.evaluate((el) => Math.round(el.getBoundingClientRect().top)))
+  })
+
+  test("in its own scroll region nothing of the shell lies over the page", async ({ page }) => {
+    await open(page, "region")
+    const value = await page.locator("[data-test-sticky]").evaluate((el) => getComputedStyle(el).top)
+    expect(value).toBe("0px")
+    expect(await page.locator("[data-test-foot]").evaluate((el) => getComputedStyle(el).bottom)).toBe("0px")
+  })
+})

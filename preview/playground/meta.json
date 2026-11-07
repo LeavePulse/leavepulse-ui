@@ -413,7 +413,7 @@
     "type": "\"document\" | \"region\" | undefined",
     "required": false,
     "default": "\"document\"",
-    "description": "What scrolls. `\"document\"` (the default): the window, with the rail,\nheader and bottom bar sticky; a page that filled main with `h-full`\ngrows with its content now, so a page meant to fill the screen asks for\n`min-h-[calc(100dvh-4rem)]` or `fullBleed`. `\"region\"`: the shell is\nthe viewport and the page scrolls inside main. Read once: changing it\nremounts the page.",
+    "description": "What scrolls. `\"document\"` (the default): the window, with the rail,\nheader and bottom bar sticky; a page that filled main with `h-full`\ngrows with its content now, so a page meant to fill the screen asks for\n`min-h-[calc(100dvh-4rem)]` or `fullBleed`. `\"region\"`: the shell is\nthe viewport and the page scrolls inside main. Read once: changing it\nremounts the page.\n\nA page's own sticky parts keep clear of the shell's with two variables\nset inside it: `--lp-shell-top`, how much of the window's top the shell\ncovers (the header, 0 while `headerCollapse` has it away, plus the\nsub-page row), and `--lp-shell-bottom`, how much of its foot (the bottom\nbar). Both change as those do, and are 0px in `\"region\"` and on a\n`fullBleed` page, where nothing of the shell's lies over the page:\n`position: sticky; top: var(--lp-shell-top)`. Keep the page's sticky\nlayers under `--z-sticky`, the shell's.",
     "choices": [
      "document",
      "region"

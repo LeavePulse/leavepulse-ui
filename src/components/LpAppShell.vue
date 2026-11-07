@@ -47,8 +47,9 @@ export default { inheritAttrs: false }
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, useSlots, watch } from "vue"
 import { easingToken, durationToken, prefersReducedMotion } from "../composables/easing"
 import { useLabels } from "../composables/useLpConfig"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import { useScrollMemory } from "../composables/scrollMemory"
-import { nodeWindow, useView, viewWindow } from "../composables/useView"
+import { isHTMLElement, nodeWindow, useView, viewWindow } from "../composables/useView"
 import AppShellContextNav from "./AppShellContextNav.vue"
 import {
   contextNavItems,
@@ -129,6 +130,15 @@ const props = withDefaults(
      * `min-h-[calc(100dvh-4rem)]` or `fullBleed`. `"region"`: the shell is
      * the viewport and the page scrolls inside main. Read once: changing it
      * remounts the page.
+     *
+     * A page's own sticky parts keep clear of the shell's with two variables
+     * set inside it: `--lp-shell-top`, how much of the window's top the shell
+     * covers (the header, 0 while `headerCollapse` has it away, plus the
+     * sub-page row), and `--lp-shell-bottom`, how much of its foot (the bottom
+     * bar). Both change as those do, and are 0px in `"region"` and on a
+     * `fullBleed` page, where nothing of the shell's lies over the page:
+     * `position: sticky; top: var(--lp-shell-top)`. Keep the page's sticky
+     * layers under `--z-sticky`, the shell's.
      */
     scroll?: "document" | "region"
     /**
@@ -329,8 +339,8 @@ useScrollMemory(
   () => props.path,
   () => props.hash,
   "",
-  // The sticky header covers the top of the window; a region starts below it.
-  () => (documentScroll && !bleeding.value ? (headerEl.value?.offsetHeight ?? 0) : 0),
+  // The sticky header and sub-page row cover the top of the window; a region starts below them.
+  () => (documentScroll && !bleeding.value ? (headerEl.value?.offsetHeight ?? 0) + contextRowHeight.value : 0),
 )
 // The side region keeps its own place on the same address.
 useScrollMemory(
@@ -389,17 +399,19 @@ watch(bleeding, (bleed) => {
     void nextTick(() => view.scrollTo({ top, behavior: "instant" }))
   }
 })
-// The bottom bar's height, for the page's scrollbar to stop above it (0 where it is hidden).
+/*
+ * What the shell's sticky bars cover of the window, for the page: the sub-page
+ * row's height (it sits under the header) and the bottom bar's (0 where hidden).
+ */
 const bottomBarEl = ref<{ $el: HTMLElement } | null>(null)
 const bottomBarHeight = ref(0)
-let bottomBarSize: ResizeObserver | undefined
-onMounted(() => {
-  const el = bottomBarEl.value?.$el
-  if (!el || el.nodeType !== 1) return
-  bottomBarSize = new (nodeWindow(el).ResizeObserver)(() => (bottomBarHeight.value = el.offsetHeight))
-  bottomBarSize.observe(el)
-})
-onBeforeUnmount(() => bottomBarSize?.disconnect())
+useResizeObserver(
+  () => (bottomBarEl.value?.$el?.nodeType === 1 ? bottomBarEl.value.$el : null),
+  (_, el) => (bottomBarHeight.value = (el as HTMLElement).offsetHeight),
+  { immediate: true },
+)
+const contextRowEl = ref<HTMLElement | null>(null)
+const contextRowHeight = ref(0)
 
 let releaseDocument: (() => void) | undefined
 onMounted(() => {
@@ -480,7 +492,7 @@ const asideClasses = computed(() =>
 const columnClass = computed(() => (hasAside.value ? "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto]" : "flex min-w-0 flex-1 flex-col"))
 const columnStyle = computed(() => ({
   ...(hasAside.value ? { gridTemplateRows: `auto ${contextVisible.value ? "auto " : ""}minmax(0,1fr) auto` } : {}),
-  ...(windowScrolls.value ? { "--lp-shell-top": shellTop.value } : {}),
+  ...shellVars.value,
 }))
 const spanClass = computed(() => (hasAside.value ? "col-span-2" : undefined))
 
@@ -520,6 +532,17 @@ const contextItems = computed(() => (props.adaptiveNav?.contextNav ? contextNavI
 const contextVisible = computed(
   () => (navMode.value === "bottom" || navMode.value === "drawer") && (contextItems.value.length > 0 || (!!slots["context-nav"] && !!props.adaptiveNav?.contextNav)),
 )
+// The row is the app's own slot or the shell's, so it is found where it renders: right after the header.
+watch(
+  [contextVisible, mounted],
+  () => {
+    const next = headerEl.value?.nextElementSibling
+    contextRowEl.value = contextVisible.value && isHTMLElement(next) && next !== mainEl.value ? next : null
+    if (!contextRowEl.value) contextRowHeight.value = 0
+  },
+  { flush: "post" },
+)
+useResizeObserver(contextRowEl, (_, el) => (contextRowHeight.value = (el as HTMLElement).offsetHeight), { immediate: true })
 
 function onSelect(item: SidebarItem) {
   emit("select", item)
@@ -564,12 +587,27 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 
 /*
  * What stays in view while the window scrolls the page. The header sits on
- * top; the row of sub-pages and the aside sit under it, following it out
- * when it collapses (--lp-shell-top is how much of the header is showing).
+ * top; the row of sub-pages sits under it and follows it out when it
+ * collapses (--lp-shell-header is how much of the header is showing).
+ *
+ * Two variables are the page's to use (documented on `scroll`), and set in
+ * every mode, so `var(--lp-shell-top)` never needs a fallback:
+ * --lp-shell-top is how much of the window's top the shell covers (header
+ * plus sub-page row), --lp-shell-bottom how much of its foot (the bottom
+ * bar). Both are 0px where the page scrolls in its own region or is full bleed.
  */
 const STICKY = "sticky z-(--z-sticky)"
 const railClass = computed(() => (windowScrolls.value ? "sticky top-0 flex h-dvh shrink-0 self-start" : "contents"))
-const shellTop = computed(() => (headerHidden.value ? "0px" : headerHeight.value))
+const shellHeader = computed(() => (headerHidden.value ? "0px" : headerHeight.value))
+const shellVars = computed(() =>
+  windowScrolls.value
+    ? {
+        "--lp-shell-header": shellHeader.value,
+        "--lp-shell-top": `calc(${shellHeader.value} + ${contextRowHeight.value}px)`,
+        "--lp-shell-bottom": `${bottomBarHeight.value}px`,
+      }
+    : { "--lp-shell-header": "0px", "--lp-shell-top": "0px", "--lp-shell-bottom": "0px" },
+)
 const BACK_TO_TOP_ABOVE_BAR: Record<NavBreakpoint, string> = {
   sm: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
   md: "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-[calc(1rem+env(safe-area-inset-bottom))]",
@@ -725,7 +763,7 @@ const backToTopClass = computed(() =>
       <template v-if="contextVisible">
         <slot name="context-nav" :items="contextItems" :mode="navMode">
           <AppShellContextNav
-            :class="[spanClass, windowScrolls && `${STICKY} top-(--lp-shell-top) transition-[top] duration-[var(--duration-medium)] ease-[var(--ease-settle)]`]"
+            :class="[spanClass, windowScrolls && `${STICKY} top-(--lp-shell-header) transition-[top] duration-[var(--duration-medium)] ease-[var(--ease-settle)]`]"
             :items="contextItems"
             :is-active="activeTest"
             :label="text.contextNav"
@@ -769,7 +807,7 @@ const backToTopClass = computed(() =>
           <slot name="aside" />
         </LpScrollArea>
       </aside>
-      <LpPageScrollbar v-if="windowScrolls && pageScrollbar" top="var(--lp-shell-top)" :bottom="`${bottomBarHeight}px`" />
+      <LpPageScrollbar v-if="windowScrolls && pageScrollbar" top="var(--lp-shell-top)" bottom="var(--lp-shell-bottom)" />
       <LpBottomNav
         v-if="bottomNav"
         ref="bottomBarEl"
