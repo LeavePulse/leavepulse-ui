@@ -165,6 +165,12 @@ watch(
 )
 
 onBeforeUnmount(cancelHold)
+
+// Several roots (trigger and portal), so Vue cannot hand attributes on by
+// itself and dropped them: a trigger wrapped around this one from outside (an
+// LpPopover's, as-child) lost its id, ARIA state and click, and its popover
+// never opened. They go to the trigger, which merges them onto the slot's element.
+defineOptions({ inheritAttrs: false })
 </script>
 
 <template>
@@ -172,6 +178,7 @@ onBeforeUnmount(cancelHold)
   <HoverCardRoot v-else v-model:open="open" :open-delay="openDelay" :close-delay="closeDelay">
     <HoverCardTrigger
       as-child
+      v-bind="$attrs"
       :class="touch === 'hold' ? '[-webkit-touch-callout:none]' : undefined"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"

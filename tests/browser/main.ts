@@ -19,8 +19,9 @@ import ShellScroll from "./ShellScroll.vue"
 import ShiftTick from "./ShiftTick.vue"
 import StatFit from "./StatFit.vue"
 import TopologyContracts from "./TopologyContracts.vue"
+import TriggerNesting from "./TriggerNesting.vue"
 import Workspace from "./Workspace.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
-const SCENARIOS = { "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
+const SCENARIOS = { "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur }
 createApp(SCENARIOS[scenario as keyof typeof SCENARIOS] ?? Contracts).mount("#app")

@@ -7,11 +7,6 @@ entry is deleted, not ticked: the commit says what changed.
 
 ## Flaws
 
-- **LpContextMenu and LpHoverCard cannot wrap each other.** Both render a
-  fragment, and an `as-child` trigger cannot take a fragment, so a row with a
-  menu and a card needs a wrapping element (LpSidebarRow, LpColorPicker carry
-  one). Let one of them forward `as-child` to its own trigger, or offer an
-  element root.
 - **Forward onto an overlay entry is a router visit.** With overlay history
   on, Back from a kit entry mutes the router, but Forward starts from the
   router's own entry, so vue-router runs its guards and `afterEach` for the

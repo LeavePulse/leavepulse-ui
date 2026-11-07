@@ -296,6 +296,12 @@ const portalTo = usePortalTarget()
 // What happens in another document (the page around a frame, or a frame in
 // the page) is not "outside" for this layer.
 const guardOutside = useOutsideGuard()
+
+// Several roots (trigger and portal), so Vue cannot hand attributes on by
+// itself and dropped them: a trigger wrapped around this one from outside (an
+// LpPopover's, as-child) lost its id, ARIA state and click, and its popover
+// never opened. They go to the trigger, which merges them onto the slot's element.
+defineOptions({ inheritAttrs: false })
 </script>
 
 <template>
@@ -318,6 +324,7 @@ const guardOutside = useOutsideGuard()
            lands on the real button rather than on a wrapper. -->
       <TooltipTrigger
         as-child
+        v-bind="$attrs"
         :aria-label="label ? content : undefined"
         @pointermove="onPointerMove"
       >

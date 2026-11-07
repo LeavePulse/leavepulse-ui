@@ -159,6 +159,12 @@ const portalTo = usePortalTarget()
 const guardOutside = useOutsideGuard()
 
 useMenuPalette(props)
+
+// Several roots (trigger and portal), so Vue cannot hand attributes on by
+// itself and dropped them: a trigger wrapped around this one from outside (an
+// LpPopover's, as-child) lost its id, ARIA state and click, and its popover
+// never opened. They go to the trigger, which merges them onto the slot's element.
+defineOptions({ inheritAttrs: false })
 </script>
 
 <template>
@@ -169,6 +175,7 @@ useMenuPalette(props)
   <ContextMenuRoot @update:open="opened">
     <ContextMenuTrigger
       as-child
+      v-bind="$attrs"
       :disabled="!enabled"
       :data-lp-context-menu="hinted ? '' : undefined"
       @click.capture="leftClick"
