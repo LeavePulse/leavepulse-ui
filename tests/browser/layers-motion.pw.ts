@@ -60,7 +60,7 @@ for (const control of ["Frame actions", "Frame popover", "Frame select"]) {
   test(`${control} closes on the second pointer press inside a frame`, async ({ page }) => {
     await page.goto("/tests/browser/?scenario=frame")
     const frame = page.frameLocator("iframe")
-    const trigger = frame.locator(`button[aria-label="${control}"]`).first()
+    const trigger = frame.locator(`button[aria-label^="${control}"]`).first()
     await trigger.click()
     await expect(trigger).toHaveAttribute("aria-expanded", "true")
     await trigger.click()
