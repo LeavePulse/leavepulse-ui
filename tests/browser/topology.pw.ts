@@ -70,7 +70,9 @@ test("a filtered edge is gone", async ({ page }) => {
 test("a group of selected nodes gets its actions", async ({ page }) => {
   await open(page, "select")
   await page.evaluate(() => (window as unknown as { canvas: Canvas }).canvas.selectNodes(["a", "b"]))
-  await page.getByRole("button", { name: "Restart" }).click()
+  const restart = page.getByRole("button", { name: "Restart" })
+  await expect(restart.locator("svg")).toHaveCount(1)
+  await restart.click()
   await expect(log(page)).toContainText('{"action":"restart","ids":["a","b"]}')
 })
 

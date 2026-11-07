@@ -5,7 +5,7 @@
  * depends_on edges connect these across host frames. Tailwind utilities only
  * (no scoped CSS) so styles reach consumer apps via @source.
  */
-import { Handle, Position } from "@vue-flow/core"
+import { Handle, Position, type NodeProps } from "@vue-flow/core"
 import { computed } from "vue"
 
 export interface ServiceNodeData {
@@ -16,7 +16,9 @@ export interface ServiceNodeData {
   dimmed?: boolean
 }
 
-const props = defineProps<{ data: ServiceNodeData; selected?: boolean }>()
+// Vue Flow hands a custom node all of NodeProps. Declared, they stop falling
+// through onto the node's root as attributes (position="[object Object]").
+const props = defineProps<Omit<NodeProps<ServiceNodeData>, "selected"> & { selected?: boolean }>()
 
 const kindVar: Record<string, string> = {
   service: "var(--color-brand)",

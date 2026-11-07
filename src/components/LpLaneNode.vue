@@ -10,6 +10,8 @@
  * tab stays clickable-looking but is inert. Tailwind utilities only so styles
  * reach consumer apps via @source.
  */
+import type { NodeProps } from "@vue-flow/core"
+
 export interface LaneNodeData {
   label: string
   /** Optional accent colour token for the lane border + label. */
@@ -18,7 +20,9 @@ export interface LaneNodeData {
   height: number
 }
 
-const props = defineProps<{ data: LaneNodeData }>()
+// Vue Flow hands a custom node all of NodeProps. Declared, they stop falling
+// through onto the node's root as attributes (position="[object Object]").
+const props = defineProps<NodeProps<LaneNodeData>>()
 </script>
 
 <template>

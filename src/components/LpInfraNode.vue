@@ -8,7 +8,7 @@
  * `@source` over the kit emits these classes — scoped CSS in a published
  * component doesn't reach apps that only import the kit's token css.
  */
-import { Handle, Position } from "@vue-flow/core"
+import { Handle, Position, type NodeProps } from "@vue-flow/core"
 import { computed } from "vue"
 import LpBadge from "./LpBadge.vue"
 import LpStatus from "./LpStatus.vue"
@@ -66,8 +66,9 @@ export interface InfraNodeLabels {
   old?: string
 }
 
-const props = defineProps<{
-  data: InfraNodeData
+// Vue Flow hands a custom node all of NodeProps. Declared, they stop falling
+// through onto the node's root as attributes (position="[object Object]").
+const props = defineProps<Omit<NodeProps<InfraNodeData>, "selected"> & {
   selected?: boolean
   /** Extra/overriding role styles, merged over the defaults below. */
   roles?: Record<string, InfraRoleStyle>

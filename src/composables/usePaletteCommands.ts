@@ -218,8 +218,11 @@ export function usePaletteControl(options: {
           h(raw.label ? "h3" : "label", { id: `${editorId}-label`, for: raw.label ? undefined : editorId, class: "text-sm font-semibold text-ink" }, label()),
           h(instance.type as Component, {
             ...raw, id: undefined, name: undefined, form: undefined, autofocus: undefined, palette: false,
-            disabled: options.disabled?.() || !writable(), invalid: options.invalid?.(),
-            required: field?.value.required ?? instance.props.required,
+            disabled: options.disabled?.() || !writable(),
+            // Only to a control that declares them: elsewhere they fell through
+            // as attributes onto its root (a switch's button took `required`).
+            ...("invalid" in instance.props ? { invalid: options.invalid?.() } : {}),
+            ...("required" in instance.props ? { required: field?.value.required ?? instance.props.required } : {}),
             "aria-label": label(), class: "w-full", style: undefined,
           }, instance.slots),
           error() || hint() ? h("p", { id: `${editorId}-message`, class: error() ? "text-xs text-danger" : "text-xs text-muted", role: error() ? "alert" : undefined }, error() || hint()) : null,

@@ -56,7 +56,7 @@ onMounted(() => ((window as unknown as { canvas: unknown }).canvas = canvas.valu
       :compare-to="mode === 'diff' ? earlier : undefined"
       :timeline="mode === 'timeline' ? history : undefined"
       :selectable="mode === 'select'"
-      :selection-actions="mode === 'select' ? [{ id: 'restart', label: 'Restart' }] : undefined"
+      :selection-actions="mode === 'select' ? [{ id: 'restart', label: 'Restart', icon: 'lucide:rotate-ccw' }] : undefined"
       @path-change="note"
       @selection-action="note"
       @node-activate="(id) => note({ activated: id })"

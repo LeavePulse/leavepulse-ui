@@ -30,6 +30,7 @@ import { useResizeObserver } from "../composables/useResizeObserver"
 import { isHTMLElement, nodeWindow } from "../composables/useView"
 import { backgroundOf, resolveCssColor, svgToPng } from "./exportData"
 import LpButton from "./LpButton.vue"
+import LpIcon from "./LpIcon.vue"
 import LpInfraNode, { type InfraNodeData } from "./LpInfraNode.vue"
 import LpInput from "./LpInput.vue"
 import LpLaneNode from "./LpLaneNode.vue"
@@ -962,9 +963,10 @@ defineExpose({
         :key="action.id"
         size="sm"
         variant="outline"
-        :icon="action.icon"
         @click="emit('selection-action', { action: action.id, ids: selectedIds })"
       >
+        <!-- LpButton has no icon prop: an :icon here fell through and drew nothing. -->
+        <LpIcon v-if="action.icon" :name="action.icon" :size="14" />
         {{ action.label }}
       </LpButton>
     </Panel>
