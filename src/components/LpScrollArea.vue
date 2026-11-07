@@ -13,8 +13,20 @@ import {
   ScrollAreaThumb,
   ScrollAreaViewport,
 } from "reka-ui"
-import { prefersReducedMotion } from "../composables/easing"
 import { nodeWindow } from "../composables/useView"
+import {
+  BAR_FADE,
+  BAR_X,
+  BAR_X_SIZE,
+  BAR_Y,
+  BAR_Y_SIZE,
+  pageToward,
+  SCROLL_HIDE_DELAY_MS,
+  THUMB_X,
+  THUMB_X_ROUND,
+  THUMB_Y,
+  THUMB_Y_ROUND,
+} from "./scrollbar"
 
 // `fade` softens whichever of the top/bottom edges currently has content beyond
 // it, so a clipped list reads as continuing rather than as cut off. On by
@@ -80,8 +92,7 @@ function onViewportBlur() {
 // `opacity-0` + the hidden-state fade is what keeps the bar invisible at rest:
 // with force-mount the element stays in the DOM, so a one-shot fade-out alone
 // would snap back to visible once the animation finished.
-const barFade =
-  "opacity-0 data-[state=visible]:animate-[fade-in_180ms_ease] data-[state=visible]:opacity-100 data-[state=hidden]:animate-[fade-out_240ms_ease]"
+const edge = computed(() => (props.floating ? "floating" : "wall"))
 
 // Dragging the thumb pulls the pointer off the bar and across the content, and
 // the browser reads that as a text selection — the rows highlight blue while
@@ -197,13 +208,9 @@ onBeforeUnmount(() => {
 })
 
 /*
- * A press on the bar beside the thumb. reka treats any press on the track as
- * "put the thumb's middle under the pointer" and sets the scroll in one go,
- * so a press that just missed the narrow thumb yanked the content by half a
- * thumb, and a press further away teleported it. Like a native bar, a press
- * off the thumb now pages one viewport towards the pointer, smoothly; the
- * thumb itself has a hit area as wide as the bar (see its `before:`), so a
- * press that meant to grab it does.
+ * A press on the bar beside the thumb pages towards the pointer (pageToward)
+ * instead of reka's jump; the thumb's hit area is as wide as the bar (its
+ * `before:`), so a press that meant to grab it does.
  */
 function onTrackPointerDown(event: PointerEvent, axis: "x" | "y") {
   const el = viewportEl.value
@@ -213,10 +220,7 @@ function onTrackPointerDown(event: PointerEvent, axis: "x" | "y") {
   event.preventDefault()
   event.stopImmediatePropagation()
   const rect = thumb.getBoundingClientRect()
-  const before = axis === "y" ? event.clientY < rect.top : event.clientX < rect.left
-  const step = (axis === "y" ? el.clientHeight : el.clientWidth) * 0.85 * (before ? -1 : 1)
-  const behavior = prefersReducedMotion() ? "auto" : "smooth"
-  el.scrollBy(axis === "y" ? { top: step, behavior } : { left: step, behavior })
+  pageToward(el, axis, axis === "y" ? event.clientY < rect.top : event.clientX < rect.left)
 }
 
 let stopThumbDrag: (() => void) | null = null
@@ -253,7 +257,7 @@ function onThumbPointerDown(event: PointerEvent) {
     class="relative flex flex-col overflow-hidden"
     :class="dragging ? 'select-none' : undefined"
     type="hover"
-    :scroll-hide-delay="500"
+    :scroll-hide-delay="SCROLL_HIDE_DELAY_MS"
   >
     <!-- The bar itself is a pointer target far wider than it looks: the visible
          rail is the thumb, sized below, while the track pads it out to a
@@ -273,8 +277,8 @@ function onThumbPointerDown(event: PointerEvent) {
     <ScrollAreaScrollbar
       orientation="vertical"
       force-mount
-      class="group z-1 flex touch-none select-none justify-end pl-2.5"
-      :class="[barFade, floating ? 'w-4 py-1 pr-1' : 'w-3.5 py-px pr-px']"
+      class="z-1"
+      :class="[BAR_Y, BAR_FADE, BAR_Y_SIZE[edge]]"
       :style="barInsetTop ? { marginTop: barInsetTop } : undefined"
       @pointerdown.capture="onTrackPointerDown($event, 'y')"
     >
@@ -286,22 +290,22 @@ function onThumbPointerDown(event: PointerEvent) {
            the positioning reka owns. -->
       <ScrollAreaThumb
         data-lp-thumb
-        class="relative min-w-1 bg-brand/40 before:absolute before:inset-y-0 before:right-0 before:-left-2.5 before:content-[''] transition-[min-width,background-color] duration-[var(--duration-fast)] group-hover:min-w-1.5 group-hover:bg-brand"
-        :class="floating ? 'rounded-pill' : 'rounded-l-pill'"
+        class="relative"
+        :class="[THUMB_Y, THUMB_Y_ROUND[edge]]"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>
 
     <ScrollAreaScrollbar
       orientation="horizontal"
-      class="group z-1 flex flex-col touch-none select-none justify-end pt-2.5"
-      :class="[barFade, floating ? 'h-4 px-1 pb-1' : 'h-3.5 px-px pb-px']"
+      class="z-1"
+      :class="[BAR_X, BAR_FADE, BAR_X_SIZE[edge]]"
       @pointerdown.capture="onTrackPointerDown($event, 'x')"
     >
       <ScrollAreaThumb
         data-lp-thumb
-        class="relative min-h-1 bg-brand/40 before:absolute before:inset-x-0 before:bottom-0 before:-top-2.5 before:content-[''] transition-[min-height,background-color] duration-[var(--duration-fast)] group-hover:min-h-1.5 group-hover:bg-brand"
-        :class="floating ? 'rounded-pill' : 'rounded-t-pill'"
+        class="relative"
+        :class="[THUMB_X, THUMB_X_ROUND[edge]]"
         @pointerdown="onThumbPointerDown"
       />
     </ScrollAreaScrollbar>
