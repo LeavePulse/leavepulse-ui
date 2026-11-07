@@ -165,6 +165,52 @@ export interface RecentSource {
   children?: unknown
 }
 
+/*
+ * Where a command's `href` may lead. Commands can come from a search or from
+ * stored history, so a `javascript:` link there would run in the app's origin.
+ * Mail and phone links are as harmless as a web one and common in a help menu.
+ * The base only lets a relative link parse: nothing here reads the window, so
+ * this holds on the server.
+ */
+const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:"])
+const RELATIVE_BASE = "http://relative.invalid/"
+
+export function isSafeHref(href: string): boolean {
+  try {
+    return SAFE_LINK_SCHEMES.has(new URL(href, RELATIVE_BASE).protocol)
+  } catch {
+    return false
+  }
+}
+
+/** The link as it would be pasted elsewhere: absolute, or as given if it cannot be read. */
+export function absoluteHref(href: string, base: string): string {
+  try {
+    return new URL(href, base).href
+  } catch {
+    return href
+  }
+}
+
+/** The row that unfolds a group; the NUL keeps it out of any id an app would write. */
+export function moreRowId(group: string): string {
+  return `\u0000lp-cmd-more\u0000${group}`
+}
+
+const IMAGE_SHAPES: unknown[] = ["circle", "soft", "square"]
+const isOptionalString = (value: unknown) => value === undefined || typeof value === "string"
+
+function isStoredImage(value: unknown): boolean {
+  if (value === undefined || typeof value === "string") return true
+  if (!value || typeof value !== "object") return false
+  const { src, alt, fallback, icon, shape } = value as Record<string, unknown>
+  return (src === null || isOptionalString(src))
+    && isOptionalString(alt)
+    && isOptionalString(fallback)
+    && isOptionalString(icon)
+    && (shape === undefined || IMAGE_SHAPES.includes(shape))
+}
+
 function isEntry(value: unknown): value is RecentEntry {
   if (!value || typeof value !== "object") return false
   const v = value as Record<string, unknown>
@@ -173,6 +219,10 @@ function isEntry(value: unknown): value is RecentEntry {
     && typeof v.label === "string"
     && Array.isArray(v.path)
     && v.path.every((step) => typeof step === "string")
+    && isOptionalString(v.description)
+    && isOptionalString(v.icon)
+    && isStoredImage(v.image)
+    && (v.href === undefined || (typeof v.href === "string" && isSafeHref(v.href)))
   )
 }
 
@@ -182,17 +232,28 @@ export function readRecent(stored: unknown): RecentItem[] {
   return stored.filter((v): v is RecentItem => typeof v === "string" || isEntry(v))
 }
 
-function recentKey(item: RecentItem): string {
-  return typeof item === "string" ? item : [...item.path, item.id].join("\u0000")
+/**
+ * What makes a command itself: the same id may live in two modes
+ * (`services/restart`, `deploy/restart`). A root command's key is its bare id,
+ * so a stored id and a stored entry at the root count as one.
+ */
+export function commandKey(id: string, path: readonly string[] = []): string {
+  return [...path, id].join("\u0000")
+}
+
+export function recentKey(item: RecentItem): string {
+  return typeof item === "string" ? item : commandKey(item.id, item.path)
 }
 
 /**
  * The history item for a pick. A root pick stays a bare id, the format older
  * versions wrote and still read; anything deeper becomes an entry with only
- * the fields that survive JSON.
+ * the fields that survive JSON. So does a `fetched` pick at the root: its id
+ * stands for nothing among the root commands, and only an entry reaches
+ * `resolveRecent` with what is needed to find it again.
  */
-export function toRecentItem(command: RecentSource, path: readonly string[]): RecentItem {
-  if (!path.length) return command.id
+export function toRecentItem(command: RecentSource, path: readonly string[], fetched = false): RecentItem {
+  if (!path.length && !fetched) return command.id
   const entry: RecentEntry = { id: command.id, label: command.label, path: [...path] }
   if (command.description) entry.description = command.description
   if (command.icon) entry.icon = command.icon

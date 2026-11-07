@@ -5,7 +5,12 @@ import {
   matchModePrefix,
   modeChipLabel,
   pushRecent,
+  absoluteHref,
+  commandKey,
+  isSafeHref,
+  moreRowId,
   readRecent,
+  recentKey,
   recentVisible,
   resolveRecentItems,
   toRecentItem,
@@ -161,4 +166,52 @@ test("a mode chip names the mode without the query placeholder", () => {
   expect(modeChipLabel({ label: "Find {query} on the server" })).toBe("Find on the server")
   expect(modeChipLabel({ label: "Theme" })).toBe("Theme")
   expect(modeChipLabel({ label: 'Search "{query}"', modeLabel: "Catalogue" })).toBe("Catalogue")
+})
+
+test("a fetched root pick is an entry, so resolveRecent can reach it", () => {
+  const hit = { id: "ada", label: "Ada", recentData: { kind: "person" } }
+  expect(toRecentItem(hit, [])).toBe("ada")
+  const stored = toRecentItem(hit, [], true)
+  expect(stored).toEqual({ id: "ada", label: "Ada", path: [], data: { kind: "person" } })
+  const resolve = (entry: RecentEntry) => ({ id: entry.id, label: "Live Ada" })
+  const out = resolveRecentItems([stored], [], { limit: 5, resolve, fromEntry: (entry) => entry })
+  expect(out).toEqual([{ command: { id: "ada", label: "Live Ada" }, path: [] }])
+})
+
+test("identity is path and id, and a root entry equals its bare id", () => {
+  expect(commandKey("restart", ["services"])).not.toBe(commandKey("restart", ["deploy"]))
+  expect(recentKey({ id: "a", label: "A", path: [] })).toBe(recentKey("a"))
+  expect(pushRecent(["a"], { id: "a", label: "A", path: [] }, 5)).toHaveLength(1)
+})
+
+test("stored entries with a wrong field are dropped", () => {
+  const good = { id: "a", label: "A", path: [], image: { src: null, shape: "soft" } }
+  expect(readRecent([good])).toEqual([good] as never)
+  for (const bad of [
+    { ...good, description: 1 },
+    { ...good, icon: {} },
+    { ...good, image: { shape: "hexagon" } },
+    { ...good, image: 7 },
+    { ...good, href: 7 },
+    { ...good, href: "javascript:alert(1)" },
+  ]) expect(readRecent([bad])).toEqual([])
+})
+
+test("only web, mail and phone links are followed", () => {
+  for (const href of ["/docs", "docs/a", "?q=1", "#top", "https://a.b/c", "http://a.b", "mailto:a@b.c", "tel:+1"]) {
+    expect(isSafeHref(href)).toBe(true)
+  }
+  for (const href of ["javascript:alert(1)", " JavaScript:alert(1)", "java\nscript:alert(1)", "data:text/html,x", "vbscript:x", "http://["]) {
+    expect(isSafeHref(href)).toBe(false)
+  }
+})
+
+test("a link is made absolute without a window, and survives being unreadable", () => {
+  expect(absoluteHref("/docs", "https://a.b/c")).toBe("https://a.b/docs")
+  expect(absoluteHref("http://[", "https://a.b/")).toBe("http://[")
+})
+
+test("the unfold row cannot share an id with a command", () => {
+  expect(moreRowId("Files")).toContain("\u0000")
+  expect(moreRowId("Files")).not.toBe(moreRowId("Other"))
 })

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useModelOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
+import { nodeWindow } from "../composables/realm"
 /*
  * Command palette (⌘K). A centered dialog with a filter box and a keyboard-
  * navigable, grouped command list. Built on reka Dialog (focus trap + overlay);
@@ -28,6 +30,7 @@
  *     someone runs hourly sits wherever the alphabet put it. With `recent`
  *     bound, picks float to a group of their own.
  */
+import { clamp } from "../composables/clamp"
 import {
   DialogContent,
   DialogDescription,
@@ -66,7 +69,11 @@ import {
   type PaletteQuery,
 } from "./commandSearch"
 import {
+  absoluteHref,
   commandHasPreview,
+  commandKey,
+  isSafeHref,
+  moreRowId,
   PALETTE_MODES,
   type PaletteMode,
   fallbackRows,
@@ -74,13 +81,14 @@ import {
   modeChipLabel,
   pushRecent,
   readRecent,
+  recentKey,
   recentVisible,
   resolveRecentItems,
   toRecentItem,
   type RecentEntry,
   type RecentItem,
 } from "./commandPalette"
-import { useOutsideGuard, usePortalTarget } from "../composables/useView"
+import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
 /**
  * A picture in a row's icon slot: an avatar, a project logo, a world's
@@ -323,6 +331,12 @@ export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
 const props = withDefaults(
   defineProps<{
     open?: boolean
+    /**
+     * Browser Back closes it, and opening it adds a history entry. Unset
+     * follows `provideOverlayHistory` (off without one); `"reopen"` also opens
+     * it again on Forward; `false` keeps it out of history.
+     */
+    history?: OverlayHistoryMode
     commands?: Command[]
     /** Include live commands registered by enclosing LpCommandScope components. */
     context?: boolean
@@ -428,6 +442,7 @@ const props = withDefaults(
     glass?: boolean
   }>(),
   {
+    history: undefined,
     placeholder: "Type a command or search…",
     emptyText: "No results",
     commands: () => [],
@@ -528,6 +543,13 @@ const emit = defineEmits<{
   (e: "remember", item: RecentItem, command: Command): void
 }>()
 
+useModelOverlayHistory({
+  mode: () => props.history,
+  open: () => !!props.open,
+  setOpen: (open) => emit("update:open", open),
+  allowClose: async () => true,
+})
+
 const query = ref("")
 /*
  * The input is a combobox over a listbox: focus never leaves the box, so the
@@ -538,7 +560,13 @@ const listId = `lp-cmd-${useId()}`
 function optionId(index: number): string {
   return `${listId}-${index}`
 }
-const activeId = computed(() => (flat.value.length ? optionId(selectedIndex.value) : undefined))
+/* The list is on screen and has rows: only then does the box point into it. */
+const listShown = computed(() => !editing.value && !promptCommand.value && flat.value.length > 0)
+const activeId = computed(() => (listShown.value ? optionId(selectedIndex.value) : undefined))
+/* The placeholder goes away with the first letter; the box keeps saying what it is for. */
+const inputName = computed(() =>
+  promptCommand.value?.label ?? (mode.value ? modeChipLabel(mode.value) : text.value.title),
+)
 const selectedIndex = ref(0)
 const selectedId = ref<string | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -566,26 +594,32 @@ const mode = computed<Command | null>(() => trail.value[trail.value.length - 1] 
 const modeItems = shallowRef<Command[]>([])
 
 const { copy } = useClipboard()
+const view = useView()
+
+/* The command's link, unless it is one the palette will not follow. */
+function linkOf(c: Command | undefined): string | undefined {
+  return c?.href && isSafeHref(c.href) ? c.href : undefined
+}
 
 function actionsOf(c: Command | undefined): Command[] {
   if (!c || c.disabled || moreOf.has(c)) return []
   const own = c.actions ?? []
-  const href = c.href
+  // Read when used, not here: this runs while rendering, on the server too.
+  const href = linkOf(c)
   if (!href) return own
-  const link = new URL(href, window.location.href).href
   return [
     ...own,
     {
       id: `${c.id}:open-in-new-tab`,
       label: text.value.openInNewTab,
       icon: "lucide:external-link",
-      onSelect: () => window.open(href, "_blank", "noopener"),
+      onSelect: () => viewWindow(view.value).open(href, "_blank", "noopener"),
     },
     {
       id: `${c.id}:copy-link`,
       label: text.value.copyLink,
       icon: "lucide:link",
-      onSelect: () => void copy(link, { toast: text.value.linkCopied || false }),
+      onSelect: () => void copy(absoluteHref(href, viewWindow(view.value).document.baseURI), { toast: text.value.linkCopied || false }),
     },
   ]
 }
@@ -648,9 +682,13 @@ watch(
       next.push(fresh)
       level = Array.isArray(fresh.children) ? fresh.children : []
     }
+    const fetcherBefore = mode.value?.children
     trail.value = next
-    const last = next[next.length - 1]
-    if (last && Array.isArray(last.children)) modeItems.value = last.children
+    const children = next[next.length - 1]?.children
+    if (Array.isArray(children)) modeItems.value = children
+    // A new fetcher may answer differently: ask again, with the old rows up
+    // until it does, so a refresh of the app's commands does not blank the list.
+    else if (children !== fetcherBefore) refresh(true)
   },
 )
 
@@ -679,7 +717,7 @@ function popTo(depth: number) {
   select(0)
   refresh()
   void nextTick(() => {
-    const index = state.selectedId ? flat.value.findIndex((c) => c.id === state.selectedId) : -1
+    const index = state.selectedId ? flat.value.findIndex((c) => rowId(c) === state.selectedId) : -1
     select(index >= 0 ? index : 0)
   })
   inputRef.value?.focus()
@@ -725,9 +763,9 @@ function cancel() {
  */
 const failed = ref(false)
 
-function refresh() {
+function refresh(keepRows = false) {
   cancel()
-  found.value = []
+  if (!keepRows) found.value = []
   failed.value = false
   const run = fetcher()
   if (!run) return
@@ -786,15 +824,18 @@ const ranked = computed<Command[]>(() => local.value.items)
 /*
  * Fetched results sit under their own heading unless they brought a group of
  * their own, so they never look like they were part of the static list. An id
- * already matched locally is dropped: the same command listed twice is a
- * misclick waiting to happen.
+ * already matched locally, or already answered by the provider, is dropped:
+ * the same command listed twice is a misclick waiting to happen.
  */
 const fetched = computed<Command[]>(() => {
   if (!found.value.length) return []
   const seen = new Set(ranked.value.map((c) => c.id))
-  const rows = found.value
-    .filter((c) => !seen.has(c.id))
-    .map((c) => (c.group ? c : { ...c, group: props.resultsLabel }))
+  const rows: Command[] = []
+  for (const c of found.value) {
+    if (seen.has(c.id)) continue
+    seen.add(c.id)
+    rows.push(c.group ? c : { ...c, group: props.resultsLabel })
+  }
   return applyQueryFilters(rows, parseCommandQuery(query.value))
 })
 
@@ -836,10 +877,19 @@ const ownRecent = computed<RecentItem[]>({
 const recentPath = new WeakMap<Command, string[]>()
 const syntheticModes = new WeakSet<Command>()
 
+function pathOf(c: Command): string[] {
+  return recentPath.get(c) ?? trail.value.map((step) => step.id)
+}
+
+/* A root pick that is not a root command is something a search found. */
+function historyItem(c: Command): RecentItem {
+  const path = pathOf(c)
+  return toRecentItem(c, path, !path.length && !rootCommands.value.some((root) => root.id === c.id))
+}
+
 function remember(c: Command) {
   if (c.remember === false || trail.value.some((step) => syntheticModes.has(step))) return
-  const path = recentPath.get(c) ?? trail.value.map((step) => step.id)
-  const item = toRecentItem(c, path)
+  const item = historyItem(c)
   emit("remember", item, c)
   const key = props.recentKey
   if (!key || props.recent) return
@@ -866,10 +916,10 @@ const recentItems = computed<Command[]>(() => {
   })
   const out: Command[] = []
   for (const { command, path } of found) {
+    if (out.length >= props.recentLimit) break
     if (out.includes(command) || !recentVisible(command, terms, props.recentLabel)) continue
     recentPath.set(command, path)
     out.push(command)
-    if (out.length >= props.recentLimit) break
   }
   return out
 })
@@ -882,16 +932,24 @@ const pinnedItems = computed(() => {
   return pinResolved.value.filter(({ command }) => recentVisible(command, parseCommandQuery(query.value), pinnedHeading.value)).map(({ command, path }) => { recentPath.set(command, path); return command })
 })
 function isPinned(command: Command) {
-  const path = recentPath.get(command) ?? trail.value.map(step => step.id)
-  return pinList.value.some(item => typeof item === "string" ? !path.length && item === command.id : item.id === command.id && item.path.join("\0") === path.join("\0"))
+  const key = commandKey(command.id, pathOf(command))
+  return pinList.value.some(item => recentKey(item) === key)
 }
 function togglePin(command: Command | undefined) {
   if (!command || moreOf.has(command) || command.children || trail.value.some(step => syntheticModes.has(step))) return
-  const path = recentPath.get(command) ?? trail.value.map(step => step.id)
-  const next = isPinned(command) ? pinList.value.filter(item => typeof item === "string" ? item !== command.id : item.id !== command.id || item.path.join("\0") !== path.join("\0"))
-    : pushRecent(pinList.value, toRecentItem(command, path), Infinity)
+  const key = commandKey(command.id, pathOf(command))
+  const next = isPinned(command) ? pinList.value.filter(item => recentKey(item) !== key)
+    : pushRecent(pinList.value, historyItem(command), Infinity)
   if (props.pinned === undefined) storedPinned.value = next
   emit("update:pinned", next)
+}
+
+/*
+ * A row's identity on screen. The same id can sit in one list twice, a root
+ * command beside a recent pick from a mode, and they are different rows.
+ */
+function rowId(c: Command): string {
+  return commandKey(c.id, recentPath.get(c))
 }
 
 // Group preserving first-seen order; ungrouped commands sit under "".
@@ -909,11 +967,15 @@ const grouped = computed<{ name: string; items: Command[] }[]>(() => {
   }
   const pinned = pinnedItems.value
   for (const c of pinned) push(c, pinnedHeading.value)
-  const recent = recentItems.value.filter(c => !pinned.some(p => p.id === c.id))
-  for (const c of recent) push(c, props.recentLabel)
+  const shown = new Set(pinned.map(rowId))
+  const recent = recentItems.value.filter(c => !shown.has(rowId(c)))
+  for (const c of recent) {
+    push(c, props.recentLabel)
+    shown.add(rowId(c))
+  }
   // A recent entry is shown once: leaving the copy in its own group would put
   // the same row on screen twice with nothing to tell them apart.
-  for (const c of ranked.value) if (!recent.includes(c) && !pinned.some(p => p.id === c.id)) push(c, c.group ?? "")
+  for (const c of ranked.value) if (!shown.has(rowId(c))) push(c, c.group ?? "")
   for (const c of fetched.value) push(c, c.group ?? "")
   // Last, whatever their group: they are the way out when nothing above is it.
   const tail = new Map<string, Command[]>()
@@ -948,13 +1010,13 @@ function folded(name: string, items: Command[]): Command[] {
   const limit = props.groupLimit
   if (!limit || items.length <= limit + 1 || expanded.value.has(name)) return items
   const more: Command = {
-    id: `lp-cmd-more:${name}`,
+    id: moreRowId(name),
     label: text.value.showMore.replace("{count}", String(items.length - limit)),
     icon: "lucide:chevron-down",
     keepOpen: true,
   }
   moreOf.set(more, name)
-  firstHidden.set(more, items[limit].id)
+  firstHidden.set(more, rowId(items[limit]))
   return [...items.slice(0, limit), more]
 }
 
@@ -1128,15 +1190,17 @@ function enterByPrefix(value: string): boolean {
 }
 watch([query, trail, () => props.open], () => {
   expanded.value = new Set()
+  keyboardSelection.value = true
 })
 watch(
-  () => flat.value.map((c) => c.id).join("|"),
+  () => flat.value.map(rowId).join("|"),
   () => {
-    const index = selectedId.value ? flat.value.findIndex((c) => c.id === selectedId.value) : -1
+    const index = selectedId.value ? flat.value.findIndex((c) => rowId(c) === selectedId.value) : -1
+    keyboardSelection.value = true
     select(index >= 0 ? index : 0)
   },
 )
-watch([selectedIndex, () => flat.value.map((c) => c.id).join("|")], async () => {
+watch([selectedIndex, () => flat.value.map(rowId).join("|")], async () => {
   await nextTick()
   scrollSelectedIntoView()
 })
@@ -1152,8 +1216,9 @@ const keyboardSelection = ref(false)
 
 function select(index: number, keyboard = false) {
   const len = flat.value.length
-  selectedIndex.value = len ? Math.max(0, Math.min(index, len - 1)) : 0
-  selectedId.value = flat.value[selectedIndex.value]?.id ?? null
+  selectedIndex.value = len ? clamp(index, 0, len - 1) : 0
+  const row = flat.value[selectedIndex.value]
+  selectedId.value = row ? rowId(row) : null
   if (keyboard) keyboardSelection.value = true
 }
 
@@ -1177,7 +1242,7 @@ function onPaletteKeydown(event: KeyboardEvent) {
   }
   if (!(["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"] as string[]).includes(event.key)) return
   // Home and End belong to the caret while there is text to move it through.
-  const typing = event.target instanceof HTMLInputElement && event.target.value !== ""
+  const typing = inputRef.value?.value !== ""
   if (typing && (event.key === "Home" || event.key === "End")) return
   event.preventDefault()
   event.stopPropagation()
@@ -1187,8 +1252,17 @@ function onPaletteKeydown(event: KeyboardEvent) {
   else if (event.key === "End") select(flat.value.length - 1, true)
   else movePage(event.key === "PageDown" ? 1 : -1)
 }
-function onPointerMove() {
+/*
+ * A row that appears under a still pointer gets a pointerenter of its own, and
+ * browsers can send a move of zero after a layout: neither is the user choosing
+ * it. The selection stays where the keyboard or the list put it until the
+ * pointer really moves, and that first move picks the row it is over.
+ */
+let hovered: Command | null = null
+function onPointerMove(event: PointerEvent) {
+  if (!keyboardSelection.value || (!event.movementX && !event.movementY)) return
   keyboardSelection.value = false
+  if (hovered) select(flatIndexOf(hovered))
 }
 function onCloseAutoFocus(event: Event) {
   if (!afterClose) return
@@ -1211,19 +1285,23 @@ async function focusEditor() {
     return !!field
   }
   if (focus()) return
-  const observer = new MutationObserver(() => { if (focus()) { observer.disconnect(); stopEditorFocus = undefined } })
+  const observer = new (nodeWindow(root).MutationObserver)(() => { if (focus()) { observer.disconnect(); stopEditorFocus = undefined } })
   observer.observe(root, { childList: true, subtree: true })
   stopEditorFocus = () => { observer.disconnect(); stopEditorFocus = undefined }
 }
 watch([editing, () => props.open], () => { if (!editing.value || !props.open) stopEditorFocus?.() })
 onBeforeUnmount(() => stopEditorFocus?.())
 function onPointerEnter(c: Command) {
+  hovered = c
   if (!keyboardSelection.value) select(flatIndexOf(c))
+}
+function onPointerLeave() {
+  hovered = null
 }
 function runSelected(event?: KeyboardEvent) {
   if (promptCommand.value) { void submitPrompt(); return }
   const c = flat.value[selectedIndex.value]
-  if (c?.href && !c.disabled && (event?.ctrlKey || event?.metaKey)) {
+  if (c && linkOf(c) && !c.disabled && (event?.ctrlKey || event?.metaKey)) {
     openInNewTab(c)
     return
   }
@@ -1231,8 +1309,9 @@ function runSelected(event?: KeyboardEvent) {
 }
 
 function openInNewTab(c: Command) {
-  if (!c.href) return
-  window.open(c.href, "_blank", "noopener")
+  const href = linkOf(c)
+  if (!href) return
+  viewWindow(view.value).open(href, "_blank", "noopener")
   emit("run", c.id, c)
   remember(c)
   emit("update:open", false)
@@ -1244,7 +1323,7 @@ function openInNewTab(c: Command) {
  * command nor closes. Only the plain click is taken over.
  */
 function onRowClick(event: MouseEvent, c: Command) {
-  if (c.href && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)) return
+  if (linkOf(c) && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)) return
   event.preventDefault()
   run(c)
 }
@@ -1279,7 +1358,8 @@ async function run(row: Command | undefined) {
     return
   }
   if (!await execute(c, () => c.onSelect?.())) return
-  if (!c.onSelect && c.href && !c.children) window.location.assign(c.href)
+  const href = linkOf(c)
+  if (!c.onSelect && href && !c.children) viewWindow(view.value).location.assign(href)
   // A command with children drills in instead of closing, and is navigation
   // rather than a pick — so it stays out of the recency history.
   if (c.children) {
@@ -1405,7 +1485,8 @@ watch(
     failed.value = false
     if (o) {
       await nextTick()
-      inputRef.value?.focus()
+      // Closed again meanwhile: the box belongs to a dialog on its way out.
+      if (props.open) inputRef.value?.focus()
     }
   },
   { immediate: true },
@@ -1504,8 +1585,9 @@ const guardOutside = useOutsideGuard()
             type="text"
             role="combobox"
             aria-autocomplete="list"
-            aria-expanded="true"
-            :aria-controls="listId"
+            :aria-label="inputName"
+            :aria-expanded="listShown"
+            :aria-controls="listShown ? listId : undefined"
             :aria-activedescendant="activeId"
             :placeholder="promptCommand?.prompt?.placeholder ?? mode?.childPlaceholder ?? placeholder"
             class="h-12 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
@@ -1556,18 +1638,18 @@ const guardOutside = useOutsideGuard()
                 <!-- tabindex -1: the rows are reached with the arrows from the box,
                      so Tab should not walk through every one of them. -->
                 <component
-                  :is="c.href ? 'a' : 'button'"
+                  :is="linkOf(c) ? 'a' : 'button'"
                   v-for="c in group.items"
                   :id="optionId(flatIndexOf(c))"
-                  :key="c.id"
-                  :href="c.disabled ? undefined : c.href"
-                  :type="c.href ? undefined : 'button'"
+                  :key="rowId(c)"
+                  :href="c.disabled ? undefined : linkOf(c)"
+                  :type="linkOf(c) ? undefined : 'button'"
                   role="option"
                   tabindex="-1"
                   :aria-selected="flatIndexOf(c) === selectedIndex"
                   :aria-disabled="c.disabled || undefined"
                   :data-cmd-index="flatIndexOf(c)"
-                  :disabled="c.href ? undefined : c.disabled"
+                  :disabled="linkOf(c) ? undefined : c.disabled"
                   class="lp-cmd-item flex w-full gap-3 rounded-inner px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
                   :class="[
                     c.excerpt ? 'items-start' : 'items-center',
@@ -1579,6 +1661,7 @@ const guardOutside = useOutsideGuard()
                   ]"
                   @click="onRowClick($event, c)"
                   @pointerenter="onPointerEnter(c)"
+                  @pointerleave="onPointerLeave"
                 >
                   <!-- A picture takes the icon's slot at the icon's footprint, with
                        a negative margin so a 20px avatar does not make its row
