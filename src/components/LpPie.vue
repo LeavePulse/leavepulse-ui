@@ -20,7 +20,10 @@ export default { inheritAttrs: false }
  * A donut's hole is the natural place for the headline the chart is about — the
  * total, or whatever the caller puts in the `center` slot.
  */
+import { clamp } from "../composables/clamp"
+import { isElement, useView, viewWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { useHotkeys } from "../composables/useHotkeys"
 import { easeTravel, prefersReducedMotion } from "../composables/easing"
 import { useReveal } from "../composables/useReveal"
 import { lerp, mixColor, useTween } from "../composables/useTween"
@@ -272,7 +275,7 @@ const skeletonRing = computed(() => {
   return { inset: `${inset}px`, borderWidth: `${Math.max(1, band)}px` }
 })
 const inner = computed(() =>
-  props.type === "donut" ? outer.value * Math.min(0.95, Math.max(0, props.innerRatio)) : 0,
+  props.type === "donut" ? outer.value * clamp(props.innerRatio, 0, 0.95) : 0,
 )
 
 /*
@@ -682,7 +685,7 @@ const leaveChart = (e: PointerEvent) => {
   // it, so look both up and down from wherever the pointer was reported to go.
   const to = e.relatedTarget
   if (
-    to instanceof Element &&
+    isElement(to) &&
     (to.closest("[data-lp-follow]") || to.querySelector("[data-lp-follow]"))
   )
     return
@@ -691,22 +694,28 @@ const leaveChart = (e: PointerEvent) => {
   endDrag()
 }
 
+const view = useView()
+
+// Where the pointer is held: inside an LpFrame its release stays in the frame's window.
+let dragWindow: Window | null = null
+
 const endDrag = () => {
   dragging.value = false
-  window.removeEventListener("pointerup", endDrag)
-  window.removeEventListener("pointercancel", endDrag)
+  dragWindow?.removeEventListener("pointerup", endDrag)
+  dragWindow?.removeEventListener("pointercancel", endDrag)
+  dragWindow = null
 }
 
 const beginDrag = () => {
   dragging.value = true
-  window.addEventListener("pointerup", endDrag)
-  window.addEventListener("pointercancel", endDrag)
+  dragWindow = viewWindow(view.value)
+  dragWindow.addEventListener("pointerup", endDrag)
+  dragWindow.addEventListener("pointercancel", endDrag)
 }
 
 onBeforeUnmount(() => {
   endDrag()
   clearTimeout(leaveTimer)
-  window.removeEventListener("keydown", onKeydown)
 })
 
 const clearSelection = () => {
@@ -717,23 +726,16 @@ const clearSelection = () => {
 }
 
 /*
- * Escape drops the selection, the way it dismisses any transient state. Bound
- * to the window rather than the chart because a selection made with the mouse
- * leaves focus nowhere in particular — requiring the user to focus the chart
- * first would make the key useless exactly when they reach for it. Only armed
- * while something is selected, so the chart never swallows an Escape meant for
- * a dialog or a menu above it.
+ * Escape drops the selection, the way it dismisses any transient state. Global
+ * rather than on the chart because a selection made with the mouse leaves focus
+ * nowhere in particular — requiring the user to focus the chart first would
+ * make the key useless exactly when they reach for it. Only armed while
+ * something is selected, so the chart never swallows an Escape meant for a
+ * dialog or a menu above it.
  */
-const onKeydown = (e: KeyboardEvent) => {
-  if (e.key === "Escape") clearSelection()
-}
-
-watch(
-  () => selected.value.size > 0,
-  (hasSelection) => {
-    if (hasSelection) window.addEventListener("keydown", onKeydown)
-    else window.removeEventListener("keydown", onKeydown)
-  },
+useHotkeys(
+  () => [{ key: "escape", allowInInput: true, handler: clearSelection }],
+  { enabled: () => selected.value.size > 0 },
 )
 
 const menuPoint = ref<{ index: number; label: string; value: number; isOther: boolean } | null>(

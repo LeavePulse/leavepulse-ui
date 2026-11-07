@@ -4,6 +4,7 @@
  * pixel box, return paths and tick positions.
  */
 
+import { clamp } from "../composables/clamp"
 import { compactNumber } from "./format"
 
 export interface ChartPoint {
@@ -63,6 +64,29 @@ export interface ChartMarker {
   at: number | string
   label?: string
   color?: string
+}
+
+/**
+ * A stretch of the x axis: a maintenance window, an incident, off hours. `from`
+ * and `to` are point indices or x labels. Drawn under the data.
+ */
+export interface ChartBand {
+  from: number | string
+  to: number | string
+  label?: string
+  color?: string
+}
+
+/**
+ * A note pinned to one reading. `at` is a point index or an x label; `value`
+ * places it on the y axis and defaults to the first visible series there.
+ */
+export interface ChartAnnotation {
+  at: number | string
+  value?: number
+  label: string
+  color?: string
+  axis?: ChartAxis
 }
 
 /**
@@ -307,8 +331,8 @@ const smoothSegment = (pts: { x: number; y: number }[], tension: number): string
     let c2y = p2.y - ((p3.y - p1.y) / 6) * tension
     const lo = Math.min(p1.y, p2.y)
     const hi = Math.max(p1.y, p2.y)
-    c1y = Math.min(hi, Math.max(lo, c1y))
-    c2y = Math.min(hi, Math.max(lo, c2y))
+    c1y = clamp(c1y, lo, hi)
+    c2y = clamp(c2y, lo, hi)
     d += `C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`
   }
   return d
@@ -344,7 +368,7 @@ export const areaPath = (
   s: Scale,
   smooth: number,
 ): string => {
-  const base = yAt(Math.max(s.min, Math.min(s.max, 0)), s.min, s.max, s.box)
+  const base = yAt(clamp(0, s.min, s.max), s.min, s.max, s.box)
   return runs(values, s.count)
     .map((idx) => {
       const d = segmentPath(idx, values, s, smooth)

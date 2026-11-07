@@ -16,10 +16,15 @@ export default { inheritAttrs: false }
  * every series at that index at once, so comparing series is one hover, not one
  * hover per line.
  */
+import { clamp } from "../composables/clamp"
 import { Motion } from "motion-v"
-import { computed, ref, shallowRef, watch, onMounted } from "vue"
+import { computed, nextTick, ref, shallowRef, useId, watch, onMounted } from "vue"
+import { useChartSync } from "../composables/useChartSync"
 import { useLabels } from "../composables/useLpConfig"
-import { easeTravel, prefersReducedMotion } from "../composables/easing"
+import { easeTravel } from "../composables/easing"
+import { usePrefersReducedMotion } from "../composables/useReducedMotion"
+import { startPointerDrag } from "../composables/pointerDrag"
+import { nodeWindow } from "../composables/useView"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
 import { lerp, mixValues, resample, useTween } from "../composables/useTween"
@@ -44,10 +49,23 @@ import {
   xLabelIndices,
   yAt,
   type Box,
+  type ChartAnnotation,
+  type ChartBand,
   type ChartMarker,
   type ChartSeries,
   type ChartThreshold,
 } from "./chart"
+import ChartRangeSelector from "./ChartRangeSelector.vue"
+import {
+  ZOOM_STEP,
+  chartView,
+  clampRange,
+  slotOf,
+  sourceOf,
+  zoomRange,
+  type ChartDownsample,
+  type ChartRange,
+} from "./chartWindow"
 import { PANEL_SURFACE } from "./dropdown"
 import LegendSwatch from "./LegendSwatch.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
@@ -72,6 +90,12 @@ export interface ChartText {
   point: string
   /** Header of the label column in a CSV export. */
   xColumn: string
+  /** Name of the overview's left edge, for assistive tech. */
+  rangeStart: string
+  /** Name of the overview's right edge. */
+  rangeEnd: string
+  /** The button that shows the whole series again. */
+  resetZoom: string
 }
 
 export interface ChartExportOptions {
@@ -151,6 +175,36 @@ const props = withDefaults(
     thresholds?: ChartThreshold[]
     /** Vertical markers at x positions (deploys, incidents). */
     markers?: ChartMarker[]
+    /** Stretches of the x axis, drawn under the data (maintenance, incidents). */
+    bands?: ChartBand[]
+    /** Notes pinned to single readings. */
+    annotations?: ChartAnnotation[]
+    /**
+     * The window of the data on show, by point index (`v-model:range`). Unset
+     * and null are the whole series. Exports and `dataTable` always hold all of it.
+     */
+    range?: ChartRange | null
+    /** The overview under the plot, for moving and resizing the window. */
+    rangeSelector?: boolean
+    /**
+     * Zoom on the plot: drag across it, Ctrl+wheel or pinch, the + and - keys.
+     * Double click, 0 or the reset button show the whole series.
+     */
+    zoomable?: boolean
+    /**
+     * Thin a series longer than the plot is wide, for line and area charts.
+     * `minmax` keeps each bucket's extremes, so a one-point spike survives;
+     * `lttb` keeps the shape of a smooth curve and can lose one. Off by default.
+     * Curves are drawn straight while thinned: `smooth` would overshoot.
+     */
+    downsample?: ChartDownsample | false
+    /** Points to thin to. Defaults to one a pixel of the chart's width. */
+    maxPoints?: number
+    /**
+     * Charts of one group mark the same x label on hover. Matched by label, so
+     * they may hold different windows of the same timeline.
+     */
+    syncGroup?: string
     /** Accessible name for the plot. Defaults to a generated summary. */
     ariaLabel?: string
     /** Render the data as a visually hidden table for screen readers. */
@@ -178,6 +232,9 @@ const props = withDefaults(
     animate: true,
     thresholds: () => [],
     markers: () => [],
+    bands: () => [],
+    annotations: () => [],
+    range: undefined,
     dataTable: false,
     sample: true,
   },
@@ -185,7 +242,16 @@ const props = withDefaults(
 
 const strings = useLabels<ChartText>(
   "chart",
-  { empty: "No data", loading: "Loading", rightAxis: "Measured on the right axis", point: "Point", xColumn: "Label" },
+  {
+    empty: "No data",
+    loading: "Loading",
+    rightAxis: "Measured on the right axis",
+    point: "Point",
+    xColumn: "Label",
+    rangeStart: "Start of the range",
+    rangeEnd: "End of the range",
+    resetZoom: "Show all",
+  },
   () => props.text,
 )
 
@@ -194,6 +260,8 @@ const emit = defineEmits<{
   (e: "pointClick", payload: ChartPointEvent): void
   /** Right-click on a point/bar, fired before `menuItems` is consulted. */
   (e: "pointContextMenu", payload: ChartPointEvent): void
+  /** The window moved; null is the whole series. */
+  (e: "update:range", range: ChartRange | null): void
 }>()
 
 // ── size ───────────────────────────────────────
@@ -211,7 +279,7 @@ const width = ref(0)
  */
 const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animate })
 // SMIL ignores the reduced-motion media query, so the wipe is skipped here.
-const reduced = ref(false)
+const reduced = usePrefersReducedMotion()
 const still = computed(() => !props.animate || reduced.value)
 const drawing = computed(() => !still.value && revealed.value)
 
@@ -219,7 +287,6 @@ onMounted(() => {
   // One element, two observers: hand the composable the same node rather than
   // wrapping the chart in a spare div just to carry a second ref.
   revealAnchor.value = root.value
-  reduced.value = prefersReducedMotion()
 })
 useResizeObserver(root, (entry, el) => (width.value = entry ? entry.contentRect.width : el.clientWidth), {
   immediate: true,
@@ -233,7 +300,7 @@ const toggleSeries = (id: string) => {
   if (next.has(id)) next.delete(id)
   else next.add(id)
   // Never hide the last visible series — an empty plot reads as broken.
-  if (next.size < source.value.length) hidden.value = next
+  if (allSeries.value.some((s) => !next.has(s.id))) hidden.value = next
 }
 
 const SAMPLE_POINTS = 12
@@ -251,24 +318,78 @@ const source = computed<ChartSeries[]>(() => {
 })
 
 // Identity is position plus name, so two series sharing a name stay separate.
-const allSeries = computed(() =>
+const fullSeries = computed(() =>
   normalise(source.value).map((s, i) => ({ ...s, id: `${i}:${s.name}` })),
+)
+const fullCount = computed(() => pointCount(fullSeries.value))
+const fullLabels = computed(() => resolveLabels(source.value, props.labels, fullCount.value))
+
+/*
+ * The window and the thinning sit between the data and everything drawn. Past
+ * this point a mark's index is a slot of `view`; `sourceOf` and `slotOf` cross
+ * back to the data. Slots follow the chart's own width and not the plot's: the
+ * plot's gutters come from the scale, which comes from these very values.
+ */
+const ownRange = shallowRef<ChartRange | null>(null)
+const range = computed(() => clampRange(props.range === undefined ? ownRange.value : props.range, fullCount.value))
+
+const view = computed(() =>
+  chartView(
+    fullSeries.value.map((s) => s.values),
+    fullCount.value,
+    range.value,
+    props.type === "bar" ? false : props.downsample,
+    props.maxPoints ?? Math.floor(width.value),
+  ),
+)
+const narrowed = computed(() => range.value !== null || view.value.indices !== null)
+
+/* What the chart works from: the same objects as the data when nothing narrows it. */
+const allSeries = computed(() =>
+  narrowed.value ? fullSeries.value.map((s, i) => ({ ...s, values: view.value.values[i] })) : fullSeries.value,
+)
+
+function setRange(next: ChartRange | null) {
+  ownRange.value = next
+  emit("update:range", next)
+}
+
+/*
+ * A zoom follows the hand, so it lands at once: easing would slide the curve
+ * under the pointer. The flag only has to cover the watchers of this flush.
+ */
+let rangeMoving = false
+watch(
+  () => `${range.value?.start}:${range.value?.end}`,
+  () => {
+    rangeMoving = true
+    void nextTick(() => (rangeMoving = false))
+  },
+  { flush: "sync" },
 )
 const visible = computed(() => allSeries.value.filter((s) => !hidden.value.has(s.id)))
 
 // A series asked to start hidden is hidden once, when it first appears: the
 // legend owns it from then on, and a data refresh must not switch it back off.
+// That state lives as long as the series does: one that goes away takes it
+// along, so a new series in its place starts from its own `hidden`. An empty
+// list is data still on its way, not every series removed.
 const seeded = new Set<string>()
 watch(
   () => props.series.map((s, i) => [`${i}:${s.name}`, !!s.hidden] as const),
   (entries) => {
-    let next: Set<string> | null = null
+    if (!entries.length) return
+    const ids = new Set<string>(entries.map(([id]) => id))
+    for (const id of seeded) if (!ids.has(id)) seeded.delete(id)
+    const kept = [...hidden.value].filter((id) => ids.has(id))
+    const next = new Set(kept)
     for (const [id, off] of entries) {
       if (seeded.has(id)) continue
       seeded.add(id)
-      if (off) (next ??= new Set(hidden.value)).add(id)
+      if (off) next.add(id)
     }
-    if (next && next.size < entries.length) hidden.value = next
+    const allowed = next.size < entries.length ? next : new Set(kept)
+    if (allowed.size !== hidden.value.size || [...allowed].some((id) => !hidden.value.has(id))) hidden.value = allowed
   },
   { immediate: true },
 )
@@ -302,7 +423,7 @@ const SETTLE_MS = 260
 const settle = {
   duration: SETTLE_MS,
   ease: easeTravel,
-  enabled: () => props.animate,
+  enabled: () => props.animate && !rangeMoving,
 }
 
 /*
@@ -386,7 +507,7 @@ const drawnSeries = useTween(() => targetDrawn.value, mixDrawn, {
    * itself in on its own entrance — a morph from readings nobody saw would
    * only muddy it.
    */
-  enabled: () => props.animate && revealed.value && !!svgEl.value,
+  enabled: () => props.animate && !rangeMoving && revealed.value && !!svgEl.value,
 })
 
 /** The drawn copy of each current series, by id, for marks built from `visible`. */
@@ -397,11 +518,16 @@ const drawnById = computed(() => {
 })
 
 const count = computed(() => pointCount(allSeries.value))
-const labels = computed(() => resolveLabels(source.value, props.labels, count.value))
+const labels = computed(() =>
+  narrowed.value
+    ? Array.from({ length: count.value }, (_, slot) => fullLabels.value[sourceOf(view.value, slot)] ?? "")
+    : fullLabels.value,
+)
 const banded = computed(() => props.type === "bar")
 
+// The whole data, not the window: a gap zoomed into is a gap, not an empty chart.
 const hasData = computed(() =>
-  allSeries.value.some((s) => s.values.some((v) => v != null)),
+  fullSeries.value.some((s) => s.values.some((v) => v != null)),
 )
 
 /* Data to interact with: present, and not about to be replaced by the load in
@@ -692,7 +818,7 @@ const xLabels = computed(() =>
 // ── marks ──────────────────────────────────────
 const baseY = computed(() =>
   yAt(
-    Math.max(scale.value.min, Math.min(scale.value.max, 0)),
+    clamp(0, scale.value.min, scale.value.max),
     scale.value.min,
     scale.value.max,
     box.value,
@@ -707,19 +833,21 @@ const baseY = computed(() =>
  * it falls out of the plot while the remaining series keep their place, which is
  * what "stop showing this one" should look like.
  */
+const curve = computed(() => (view.value.indices ? 0 : props.smooth))
+
 const lines = computed(() =>
   drawnSeries.value.map((s) => {
     const g = geoOf(s)
     // A series leaving the data collapses exactly as one being hidden does.
     const p = presenceOf(s.id) * s.enter
     // Values pulled toward the axis floor, so the curve flattens into it.
-    const base = Math.min(Math.max(0, g.min), g.max)
+    const base = clamp(0, g.min, g.max)
     const values = p === 1 ? s.values : s.values.map((v) => (v == null ? null : base + (v - base) * p))
     return {
       ...s,
       values,
-      d: linePath(values, g, props.smooth),
-      fill: props.type === "area" ? areaPath(values, g, props.smooth) : "",
+      d: linePath(values, g, curve.value),
+      fill: props.type === "area" ? areaPath(values, g, curve.value) : "",
       /* A dashed series is a reference level (a budget, a target), not a
          measurement — dotting it implies readings that aren't there. */
       points: props.showPoints && !s.dashed,
@@ -782,7 +910,7 @@ const bars = computed(() => {
       } else {
         const sc = scaleOf(s)
         const top = yAt(v, sc.min, sc.max, box.value)
-        const base = yAt(Math.max(sc.min, Math.min(sc.max, 0)), sc.min, sc.max, box.value)
+        const base = yAt(clamp(0, sc.min, sc.max), sc.min, sc.max, box.value)
         y = Math.min(top, base)
         h = Math.abs(top - base)
       }
@@ -837,6 +965,42 @@ const bars = computed(() => {
 const active = ref(-1)
 const pointer = ref({ x: 0, y: 0 })
 
+/* The hover of another chart in the group, as a slot of this one. */
+const { peerLabel, publish } = useChartSync(() => props.syncGroup)
+const labelIndex = computed(() => (props.syncGroup ? new Map(fullLabels.value.map((label, i) => [label, i])) : null))
+const peerSlot = computed(() => {
+  const source = peerLabel.value == null ? undefined : labelIndex.value?.get(peerLabel.value)
+  return source === undefined ? -1 : slotOf(view.value, source)
+})
+const crosshair = computed(() => (active.value >= 0 ? active.value : peerSlot.value))
+watch(active, (slot) => publish(slot >= 0 ? (labels.value[slot] ?? null) : null))
+
+/* Past this many px a press on the plot is a selection, not a click. */
+const SELECT_SLOP = 4
+let swallowClick = false
+const selection = ref<{ from: number; to: number } | null>(null)
+
+const onPointerDown = (e: PointerEvent) => {
+  if (!props.zoomable || e.button !== 0) return
+  const el = e.currentTarget as SVGElement
+  const offset = (ev: PointerEvent) => ev.clientX - el.getBoundingClientRect().left
+  const pressedAt = offset(e)
+  startPointerDrag(e, {
+    move(ev) {
+      const x = offset(ev)
+      if (Math.abs(x - pressedAt) > SELECT_SLOP) selection.value = { from: pressedAt, to: x }
+    },
+    end(completed) {
+      const picked = selection.value
+      selection.value = null
+      if (!completed || !picked) return
+      swallowClick = true
+      const ends = [picked.from, picked.to].map((x) => sourceOf(view.value, nearestIndex(x, geo.value)))
+      setRange(clampRange({ start: ends[0], end: ends[1] }, fullCount.value))
+    },
+  })
+}
+
 const onMove = (e: PointerEvent) => {
   keyboard.value = false
   const el = e.currentTarget as SVGElement
@@ -846,12 +1010,36 @@ const onMove = (e: PointerEvent) => {
   active.value = nearestIndex(x, geo.value)
 }
 
+const selectionBox = computed(() => {
+  if (!selection.value) return null
+  const right = box.value.width - box.value.right
+  const [from, to] = [selection.value.from, selection.value.to].map((x) => clamp(x, box.value.left, right))
+  return { x: Math.min(from, to), width: Math.abs(to - from) }
+})
+
+function zoomBy(factor: number, anchor: number) {
+  setRange(zoomRange(range.value, fullCount.value, anchor, factor))
+}
+
+/* Plain wheel stays the page's: a chart in a dashboard must not trap scrolling. */
+const onWheel = (e: WheelEvent) => {
+  if (!props.zoomable || !e.ctrlKey || !ready.value) return
+  e.preventDefault()
+  const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
+  const plot = plotWidth(box.value) || 1
+  zoomBy(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, (e.clientX - rect.left - box.value.left) / plot)
+}
+
+const resetZoom = () => {
+  if (range.value) setRange(null)
+}
+
 const onLeave = () => {
   active.value = -1
 }
 
 const pointEvent = (originalEvent: MouseEvent): ChartPointEvent => ({
-  index: active.value,
+  index: sourceOf(view.value, active.value),
   label: labels.value[active.value] ?? "",
   values: allSeries.value.map((s) => s.values[active.value] ?? null),
   originalEvent,
@@ -860,6 +1048,10 @@ const pointEvent = (originalEvent: MouseEvent): ChartPointEvent => ({
 /* A tap fires pointerleave before click, which has already cleared the hover,
    so the index comes from the click itself. */
 const onClick = (e: MouseEvent) => {
+  if (swallowClick) {
+    swallowClick = false
+    return
+  }
   const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
   active.value = nearestIndex(e.clientX - rect.left, geo.value)
   if (active.value < 0) return
@@ -891,19 +1083,19 @@ const onContextMenu = (e: MouseEvent) => {
 }
 
 const activeX = computed(() =>
-  active.value < 0 ? 0 : xAt(active.value, count.value, box.value, banded.value),
+  crosshair.value < 0 ? 0 : xAt(crosshair.value, count.value, box.value, banded.value),
 )
 
 /** Dots on the crosshair — one per visible series that has a value here. */
 const activePoints = computed(() => {
-  if (active.value < 0) return []
+  if (crosshair.value < 0) return []
   return visible.value
-    .map((s) => ({ s, v: s.values[active.value] }))
+    .map((s) => ({ s, v: s.values[crosshair.value] }))
     .filter((r): r is { s: (typeof visible.value)[number]; v: number } => r.v != null)
     .map(({ s, v }) => {
       const sc = scaleOf(s)
       // The dot rides the curve as drawn; the figure is the reading itself.
-      const at = drawnById.value.get(s.id)?.values[active.value] ?? v
+      const at = drawnById.value.get(s.id)?.values[crosshair.value] ?? v
       return {
         color: s.color,
         id: s.id,
@@ -971,7 +1163,7 @@ watch(
   },
 )
 
-const clipId = `lp-chart-${Math.random().toString(36).slice(2, 9)}`
+const clipId = `lp-chart-${useId()}`
 
 /*
  * The gradient id for a series, with the series NAME reduced to id-safe
@@ -1015,7 +1207,7 @@ const thresholdMarks = computed(() =>
 
 const markerMarks = computed(() =>
   props.markers.flatMap((m, i) => {
-    const index = markerIndex(m.at, labels.value, count.value)
+    const index = slotOf(view.value, markerIndex(m.at, fullLabels.value, fullCount.value))
     if (index < 0 || width.value <= 0) return []
     return [
       {
@@ -1023,6 +1215,47 @@ const markerMarks = computed(() =>
         x: xAt(index, count.value, box.value, banded.value),
         label: m.label,
         color: m.color ?? "var(--color-line-strong)",
+      },
+    ]
+  }),
+)
+
+/* A source point's x, held to the plot when the window has left it behind. */
+const xOfSource = (source: number): number => {
+  if (source < view.value.start) return box.value.left
+  if (source > view.value.end) return box.value.width - box.value.right
+  return xAt(slotOf(view.value, source), count.value, box.value, banded.value)
+}
+
+const bandMarks = computed(() =>
+  props.bands.flatMap((b, i) => {
+    const ends = [markerIndex(b.from, fullLabels.value, fullCount.value), markerIndex(b.to, fullLabels.value, fullCount.value)]
+    if (ends.some((end) => end < 0) || width.value <= 0) return []
+    const from = Math.min(...ends)
+    const to = Math.max(...ends)
+    if (to < view.value.start || from > view.value.end) return []
+    const x = xOfSource(from)
+    return [{ key: i, x, width: xOfSource(to) - x, label: b.label, color: b.color ?? "var(--color-line-strong)" }]
+  }),
+)
+
+const annotationMarks = computed(() =>
+  props.annotations.flatMap((a, i) => {
+    const source = markerIndex(a.at, fullLabels.value, fullCount.value)
+    const slot = slotOf(view.value, source)
+    const lead = fullSeries.value.find((s) => !hidden.value.has(s.id) && s.values[source] != null)
+    const value = a.value ?? lead?.values[source]
+    if (slot < 0 || value == null || width.value <= 0) return []
+    const sc = (a.value == null ? lead?.axis : a.axis) === "right" && rightScale.value ? rightScale.value : scale.value
+    const x = xAt(slot, count.value, box.value, banded.value)
+    return [
+      {
+        key: i,
+        x,
+        y: yAt(value, sc.min, sc.max, box.value),
+        label: a.label,
+        color: a.color ?? "var(--color-ink)",
+        anchor: x > box.value.width - CARD_W ? ("end" as const) : ("start" as const),
       },
     ]
   }),
@@ -1058,10 +1291,22 @@ const onKeydown = (e: KeyboardEvent) => {
     case " ":
       if (active.value < 0) return
       e.preventDefault()
-      emit("pointClick", pointEvent(new MouseEvent("click")))
+      emit("pointClick", pointEvent(new (nodeWindow(e.target as Node).MouseEvent)("click")))
       return
     case "Escape":
       active.value = -1
+      return
+    case "+":
+    case "=":
+    case "-":
+      if (!props.zoomable) return
+      e.preventDefault()
+      zoomBy(e.key === "-" ? 1 / ZOOM_STEP : ZOOM_STEP, active.value < 0 ? 0.5 : active.value / last)
+      return
+    case "0":
+      if (!props.zoomable) return
+      e.preventDefault()
+      resetZoom()
       return
     default:
       return
@@ -1095,13 +1340,13 @@ const readout = computed(() =>
 const svgEl = ref<SVGSVGElement | null>(null)
 
 function exportCsv(options: ChartExportOptions & CsvOptions = {}): string {
-  const rows = labels.value.map((label, i) => ({ label, i }))
+  const rows = fullLabels.value.map((label, i) => ({ label, i }))
   const csv = toCsv(rows, [
     { key: "label", label: strings.value.xColumn },
-    ...allSeries.value.map((s) => ({ key: s.id, label: s.name, value: (r: { i: number }) => s.values[r.i] })),
+    ...fullSeries.value.map((s) => ({ key: s.id, label: s.name, value: (r: { i: number }) => s.values[r.i] })),
   ], options)
   if (options.download !== false) {
-    downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.csv`, csv, "text/csv;charset=utf-8")
+    downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.csv`, csv, "text/csv;charset=utf-8", svgEl.value?.ownerDocument)
   }
   return csv
 }
@@ -1114,8 +1359,8 @@ function exportCsv(options: ChartExportOptions & CsvOptions = {}): string {
  */
 async function exportPng(options: ChartExportOptions & { scale?: number; background?: string } = {}): Promise<Blob | null> {
   const svg = svgEl.value
-  if (!svg || typeof document === "undefined") return null
-  const style = getComputedStyle(root.value ?? svg)
+  if (!svg) return null
+  const style = nodeWindow(svg).getComputedStyle(root.value ?? svg)
   const font = style.fontFamily
   const ink = style.getPropertyValue("--color-ink").trim() || style.color
   const muted = style.getPropertyValue("--color-muted-strong").trim() || style.color
@@ -1151,7 +1396,7 @@ async function exportPng(options: ChartExportOptions & { scale?: number; backgro
       return y ? y + 8 : 0
     },
   })
-  if (options.download !== false) downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.png`, blob)
+  if (options.download !== false) downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.png`, blob, undefined, svgEl.value?.ownerDocument)
   return blob
 }
 
@@ -1295,9 +1540,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           :height="height"
           class="block overflow-visible touch-none select-none"
           aria-hidden="true"
+          @pointerdown="onPointerDown"
           @pointermove="onMove"
           @pointerleave="onLeave"
           @click="onClick"
+          @dblclick="zoomable && resetZoom()"
+          @wheel="onWheel"
           @contextmenu="onContextMenu"
         >
           <defs>
@@ -1399,6 +1647,12 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             opacity="0.5"
           />
 
+          <!-- stretches of the x axis sit under the data -->
+          <g v-for="b in bandMarks" :key="`x-band-${b.key}`">
+            <rect :x="b.x" :y="box.top" :width="b.width" :height="plotHeight(box)" :fill="b.color" opacity="0.1" />
+            <text v-if="b.label" :x="b.x + 4" :y="box.top + 9" class="text-[10px]" :fill="b.color">{{ b.label }}</text>
+          </g>
+
           <!-- threshold bands sit under the data -->
           <rect
             v-for="t in thresholdMarks.filter((m) => m.height > 0)"
@@ -1496,8 +1750,32 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
             </text>
           </g>
 
+          <g v-for="a in annotationMarks" :key="`a-${a.key}`">
+            <circle :cx="a.x" :cy="a.y" r="3.5" :fill="a.color" stroke="var(--color-surface)" stroke-width="1.5" />
+            <text
+              :x="a.anchor === 'end' ? a.x - 6 : a.x + 6"
+              :y="a.y - 6"
+              :text-anchor="a.anchor"
+              class="text-[10px]"
+              :fill="a.color"
+            >
+              {{ a.label }}
+            </text>
+          </g>
+
+          <rect
+            v-if="selectionBox"
+            data-lp-chart-selection
+            :x="selectionBox.x"
+            :y="box.top"
+            :width="selectionBox.width"
+            :height="plotHeight(box)"
+            fill="var(--color-brand)"
+            opacity="0.15"
+          />
+
           <!-- crosshair -->
-          <g v-if="active >= 0 && type !== 'bar'">
+          <g v-if="crosshair >= 0 && type !== 'bar'">
             <line
               :x1="activeX"
               :x2="activeX"
@@ -1572,9 +1850,30 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           </LpShift>
         </Motion>
 
+        <button
+          v-if="zoomable && range && ready"
+          type="button"
+          class="absolute right-1 top-1 rounded-inner bg-surface-raised px-2 py-0.5 text-[11px] text-muted-strong outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          @click="resetZoom"
+        >
+          {{ strings.resetZoom }}
+        </button>
+
         <span class="sr-only" aria-live="polite">{{ readout }}</span>
       </div>
     </LpContextMenu>
+
+    <ChartRangeSelector
+      v-if="rangeSelector && ready && width > 0"
+      :values="(fullSeries.find((s) => s.values.some((v) => v != null))?.values ?? [])"
+      :count="fullCount"
+      :range="range"
+      :width="width"
+      :labels="fullLabels"
+      :start-label="strings.rangeStart"
+      :end-label="strings.rangeEnd"
+      @change="setRange"
+    />
 
     <div v-if="dataTable && ready" class="sr-only">
       <table>
@@ -1582,13 +1881,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <thead>
           <tr>
             <th scope="col"></th>
-            <th v-for="s in allSeries" :key="s.id" scope="col">{{ s.name }}</th>
+            <th v-for="s in fullSeries" :key="s.id" scope="col">{{ s.name }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(label, i) in labels" :key="i">
+          <tr v-for="(label, i) in fullLabels" :key="i">
             <th scope="row">{{ label }}</th>
-            <td v-for="s in allSeries" :key="s.id">
+            <td v-for="s in fullSeries" :key="s.id">
               {{ s.values[i] == null ? "—" : fmtSeries(s, s.values[i] as number) }}
             </td>
           </tr>
