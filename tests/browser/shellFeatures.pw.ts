@@ -179,3 +179,10 @@ test("the document shell keeps main as it was and makes the header sticky", asyn
   await expect(page.locator("header").first()).toHaveClass(/\bsticky\b/)
   await expect(page.locator("header").first()).toHaveClass(/\btop-0\b/)
 })
+
+test("where the browser's bars float over the page, the shell draws none and keeps them", async ({ page }) => {
+  // Headless Chromium's bars float (it hides them), as a phone's do.
+  await open(page, "")
+  await expect(page.locator("html")).not.toHaveClass(/\blp-scrollbar-none\b/)
+  await expect(page.locator("[data-lp-page-scrollbar]")).toBeHidden()
+})

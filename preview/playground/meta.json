@@ -414,6 +414,13 @@
     ]
    },
    {
+    "name": "pageScrollbar",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "While the document scrolls, draw the kit's overlay bar for it\n(LpPageScrollbar) under the header and above the bottom bar, in place of\nthe browser's, which takes width from the page. `false` keeps the\nbrowser's. Where the browser's bars float anyway (phones) it draws none."
+   },
+   {
     "name": "loading",
     "type": "boolean | undefined",
     "required": false,
@@ -4707,8 +4714,105 @@
  "LpInfraNode": {
   "props": [
    {
+    "name": "type",
+    "type": "string",
+    "required": true,
+    "description": "node type"
+   },
+   {
+    "name": "id",
+    "type": "string",
+    "required": true,
+    "description": "unique node id"
+   },
+   {
+    "name": "label",
+    "type": "string | object | VNode<RendererNode, RendererElement, { [key: string]: any; }> | Component | undefined",
+    "required": false
+   },
+   {
+    "name": "connectable",
+    "type": "HandleConnectable",
+    "required": true,
+    "description": "can node handles be connected, you need to forward this to your handles for this prop to have any effect"
+   },
+   {
+    "name": "position",
+    "type": "XYPosition",
+    "required": true
+   },
+   {
+    "name": "dimensions",
+    "type": "Dimensions",
+    "required": true,
+    "description": "dom element dimensions (width, height)"
+   },
+   {
+    "name": "isValidTargetPos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "isValidSourcePos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "parent",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "parentNodeId",
+    "type": "string | undefined",
+    "required": false,
+    "description": "todo: rename to `parentId` in next major release\nparent node id"
+   },
+   {
+    "name": "dragging",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently dragging"
+   },
+   {
+    "name": "resizing",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently resizing"
+   },
+   {
+    "name": "zIndex",
+    "type": "number",
+    "required": true,
+    "description": "node z-index"
+   },
+   {
+    "name": "targetPosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "sourcePosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "dragHandle",
+    "type": "string | undefined",
+    "required": false,
+    "description": "drag handle query selector"
+   },
+   {
     "name": "data",
     "type": "InfraNodeData",
+    "required": true,
+    "description": "additional data of node"
+   },
+   {
+    "name": "events",
+    "type": "NodeEventsOn<object>",
     "required": true
    },
    {
@@ -5010,8 +5114,111 @@
  "LpLaneNode": {
   "props": [
    {
+    "name": "id",
+    "type": "string",
+    "required": true,
+    "description": "unique node id"
+   },
+   {
+    "name": "type",
+    "type": "string",
+    "required": true,
+    "description": "node type"
+   },
+   {
+    "name": "selected",
+    "type": "boolean",
+    "required": true,
+    "description": "is node selected"
+   },
+   {
+    "name": "connectable",
+    "type": "HandleConnectable",
+    "required": true,
+    "description": "can node handles be connected, you need to forward this to your handles for this prop to have any effect"
+   },
+   {
+    "name": "position",
+    "type": "XYPosition",
+    "required": true
+   },
+   {
+    "name": "dimensions",
+    "type": "Dimensions",
+    "required": true,
+    "description": "dom element dimensions (width, height)"
+   },
+   {
+    "name": "label",
+    "type": "string | object | VNode<RendererNode, RendererElement, { [key: string]: any; }> | Component | undefined",
+    "required": false
+   },
+   {
+    "name": "isValidTargetPos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "isValidSourcePos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "parent",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "parentNodeId",
+    "type": "string | undefined",
+    "required": false,
+    "description": "todo: rename to `parentId` in next major release\nparent node id"
+   },
+   {
+    "name": "dragging",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently dragging"
+   },
+   {
+    "name": "resizing",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently resizing"
+   },
+   {
+    "name": "zIndex",
+    "type": "number",
+    "required": true,
+    "description": "node z-index"
+   },
+   {
+    "name": "targetPosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "sourcePosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "dragHandle",
+    "type": "string | undefined",
+    "required": false,
+    "description": "drag handle query selector"
+   },
+   {
     "name": "data",
     "type": "LaneNodeData",
+    "required": true,
+    "description": "additional data of node"
+   },
+   {
+    "name": "events",
+    "type": "NodeEventsOn<object>",
     "required": true
    }
   ],
@@ -6470,6 +6677,24 @@
     "type": "[value: string]"
    }
   ],
+  "slots": []
+ },
+ "LpPageScrollbar": {
+  "props": [
+   {
+    "name": "top",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"0px\""
+   },
+   {
+    "name": "bottom",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"0px\""
+   }
+  ],
+  "events": [],
   "slots": []
  },
  "LpPagination": {
@@ -8335,8 +8560,105 @@
  "LpServiceNode": {
   "props": [
    {
+    "name": "type",
+    "type": "string",
+    "required": true,
+    "description": "node type"
+   },
+   {
+    "name": "id",
+    "type": "string",
+    "required": true,
+    "description": "unique node id"
+   },
+   {
+    "name": "label",
+    "type": "string | object | VNode<RendererNode, RendererElement, { [key: string]: any; }> | Component | undefined",
+    "required": false
+   },
+   {
+    "name": "connectable",
+    "type": "HandleConnectable",
+    "required": true,
+    "description": "can node handles be connected, you need to forward this to your handles for this prop to have any effect"
+   },
+   {
+    "name": "position",
+    "type": "XYPosition",
+    "required": true
+   },
+   {
+    "name": "dimensions",
+    "type": "Dimensions",
+    "required": true,
+    "description": "dom element dimensions (width, height)"
+   },
+   {
+    "name": "isValidTargetPos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "isValidSourcePos",
+    "type": "ValidConnectionFunc | undefined",
+    "required": false
+   },
+   {
+    "name": "parent",
+    "type": "string | undefined",
+    "required": false
+   },
+   {
+    "name": "parentNodeId",
+    "type": "string | undefined",
+    "required": false,
+    "description": "todo: rename to `parentId` in next major release\nparent node id"
+   },
+   {
+    "name": "dragging",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently dragging"
+   },
+   {
+    "name": "resizing",
+    "type": "boolean",
+    "required": true,
+    "description": "is node currently resizing"
+   },
+   {
+    "name": "zIndex",
+    "type": "number",
+    "required": true,
+    "description": "node z-index"
+   },
+   {
+    "name": "targetPosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "sourcePosition",
+    "type": "Position | undefined",
+    "required": false,
+    "description": "handle position"
+   },
+   {
+    "name": "dragHandle",
+    "type": "string | undefined",
+    "required": false,
+    "description": "drag handle query selector"
+   },
+   {
     "name": "data",
     "type": "ServiceNodeData",
+    "required": true,
+    "description": "additional data of node"
+   },
+   {
+    "name": "events",
+    "type": "NodeEventsOn<object>",
     "required": true
    },
    {

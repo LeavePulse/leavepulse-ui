@@ -65,6 +65,7 @@ import LpBottomNav from "./LpBottomNav.vue"
 import LpContextSwitcher from "./LpContextSwitcher.vue"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
+import LpPageScrollbar from "./LpPageScrollbar.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import LpShift from "./LpShift.vue"
 import LpSidebar from "./LpSidebar.vue"
@@ -130,6 +131,13 @@ const props = withDefaults(
      * remounts the page.
      */
     scroll?: "document" | "region"
+    /**
+     * While the document scrolls, draw the kit's overlay bar for it
+     * (LpPageScrollbar) under the header and above the bottom bar, in place of
+     * the browser's, which takes width from the page. `false` keeps the
+     * browser's. Where the browser's bars float anyway (phones) it draws none.
+     */
+    pageScrollbar?: boolean
     /** Loading skeleton for the nav. */
     loading?: boolean
     /** Text overrides: the burger's name and the skip link. */
@@ -206,6 +214,7 @@ const props = withDefaults(
     divider: true,
     contentClass: "mx-auto w-full max-w-6xl",
     scroll: "document",
+    pageScrollbar: true,
     // Unset, not false: an absent boolean would hand the sidebar "expanded"
     // and override the state it remembers.
     compact: undefined,
@@ -380,6 +389,18 @@ watch(bleeding, (bleed) => {
     void nextTick(() => view.scrollTo({ top, behavior: "instant" }))
   }
 })
+// The bottom bar's height, for the page's scrollbar to stop above it (0 where it is hidden).
+const bottomBarEl = ref<{ $el: HTMLElement } | null>(null)
+const bottomBarHeight = ref(0)
+let bottomBarSize: ResizeObserver | undefined
+onMounted(() => {
+  const el = bottomBarEl.value?.$el
+  if (!el || el.nodeType !== 1) return
+  bottomBarSize = new (nodeWindow(el).ResizeObserver)(() => (bottomBarHeight.value = el.offsetHeight))
+  bottomBarSize.observe(el)
+})
+onBeforeUnmount(() => bottomBarSize?.disconnect())
+
 let releaseDocument: (() => void) | undefined
 onMounted(() => {
   if (!documentScroll || !pageEl.value) return
@@ -748,8 +769,10 @@ const backToTopClass = computed(() =>
           <slot name="aside" />
         </LpScrollArea>
       </aside>
+      <LpPageScrollbar v-if="windowScrolls && pageScrollbar" top="var(--lp-shell-top)" :bottom="`${bottomBarHeight}px`" />
       <LpBottomNav
         v-if="bottomNav"
+        ref="bottomBarEl"
         :class="[burgerHidden[mobileBreakpoint], spanClass, windowScrolls && `${STICKY} bottom-0`]"
         :items="bottomItems"
         :is-active="activeTest"

@@ -73,6 +73,7 @@ export const COMPONENT_NAMES = [
   "LpNumberField",
   "LpNumberFlow",
   "LpOtpInput",
+  "LpPageScrollbar",
   "LpPagination",
   "LpPaletteFacts",
   "LpPaletteHeader",

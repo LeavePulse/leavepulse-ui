@@ -50,3 +50,22 @@ export function pageToward(scroller: Element, axis: "x" | "y", before: boolean):
   scroller.scrollBy(axis === "y" ? { top: step, behavior } : { left: step, behavior })
 }
 
+/* Owners per document, so two page bars cannot give the browser's bar back early. */
+const nativeHidden = new WeakMap<Document, number>()
+
+/**
+ * Hide the document's own scrollbar (`lp-scrollbar-none` on <html>) while the
+ * kit draws one. Scrolling is untouched. Returns the release.
+ */
+export function hideNativeBar(doc: Document): () => void {
+  nativeHidden.set(doc, (nativeHidden.get(doc) ?? 0) + 1)
+  doc.documentElement.classList.add("lp-scrollbar-none")
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    const left = (nativeHidden.get(doc) ?? 1) - 1
+    nativeHidden.set(doc, left)
+    if (!left) doc.documentElement.classList.remove("lp-scrollbar-none")
+  }
+}
