@@ -15,6 +15,7 @@ import {
   LpIcon,
   LpImageEditor,
   LpVideoTrim,
+  LpVideoPlayer,
   LpInput,
   LpNumberField,
   LpRepeater,
@@ -1005,7 +1006,7 @@ export const forms: ComponentEntry[] = [
       "Pick a stretch of a video, and optionally an area of its picture, for a server to cut (ffmpeg) or blur. `v-model:range` is `[start, end]` in seconds; `change` fires once a move is done, for the save. `maxClip` / `minClip` bound the length: a dragged handle stops at the limit, while I, O and a typed time move the other end along. The timeline zooms (wheel, pinch, buttons) down to two seconds across, so an hour-long recording still trims to the frame. `region-select` lets a rectangle be drawn on the picture (`v-model:region`, fractions 0..1 of the frame). Keys inside: Space plays, ←/→ step a frame (Shift: a second), I/O set the ends at the playhead. The video streams by range requests and keeps a same-origin session cookie; a load that fails emits `error` with cause \"load\", \"decode\" or \"unsupported\".",
     components: { LpVideoTrim, LpSwitch },
     state: () => reactive({ src: videoTrimSample, range: null as [number, number] | null, region: null as { x: number; y: number; w: number; h: number } | null, regionOn: true, limit: true, saved: "" }),
-    template: `<div class="flex flex-col gap-3" style="max-width: 40rem">
+    template: `<div class="flex w-full max-w-2xl flex-col gap-3">
   <div class="flex flex-wrap gap-4">
     <LpSwitch v-model="regionOn" label="Area to blur" />
     <LpSwitch v-model="limit" label="Clip at most 3 s" />
@@ -1023,16 +1024,65 @@ export const forms: ComponentEntry[] = [
     thumb: `<div class="flex w-64 flex-col gap-2">
   <div class="relative h-24 overflow-hidden rounded-card bg-black">
     <div class="absolute inset-0" style="background: linear-gradient(120deg, #0f172a, #1e3a8a 55%, #0f172a)" />
-    <div class="absolute left-[55%] top-4 h-10 w-14 rounded-inner border-2 border-dashed border-white bg-brand/25" />
+    <div class="absolute h-10 w-14 rounded-inner border-2 border-dashed border-white/90 bg-white/10 shadow-[0_0_0_9999px_rgb(0_0_0/0.3)] transition-[left,top] duration-(--duration-slow) ease-(--ease-emphasized)" :style="{ left: tBoxX + '%', top: tBoxY + '%' }" />
   </div>
-  <div class="relative h-9 rounded-control bg-surface-soft">
-    <div class="absolute inset-y-0 left-0 w-[22%] rounded-l-control bg-black/40" />
-    <div class="absolute inset-y-0 right-0 w-[38%] rounded-r-control bg-black/40" />
-    <div class="absolute inset-y-0 left-[22%] right-[38%] border-y-2 border-brand" />
-    <div class="absolute inset-y-0 left-[22%] w-2 -translate-x-full rounded-l-control bg-brand" />
-    <div class="absolute inset-y-0 right-[38%] w-2 translate-x-full rounded-r-control bg-brand" />
-    <div class="absolute -top-1 bottom-0 left-[40%] w-0.5 bg-white" />
+  <div class="relative h-9 overflow-hidden rounded-control bg-surface-soft" style="background: repeating-linear-gradient(90deg, #1e293b 0 30px, #273449 30px 31px)">
+    <div class="absolute inset-y-0 left-0 bg-black/55 transition-[width] duration-(--duration-slow) ease-(--ease-emphasized)" :style="{ width: tA + '%' }" />
+    <div class="absolute inset-y-0 right-0 bg-black/55 transition-[left] duration-(--duration-slow) ease-(--ease-emphasized)" :style="{ left: tB + '%' }" />
+    <div class="absolute inset-y-0 rounded-control border-y-2 border-white/85 transition-[left,width] duration-(--duration-slow) ease-(--ease-emphasized)" :style="{ left: tA + '%', width: (tB - tA) + '%' }" />
+    <div v-for="x in [tA, tB]" class="absolute inset-y-1 w-2 -translate-x-1/2 rounded-inner bg-white/90 shadow transition-[left] duration-(--duration-slow) ease-(--ease-emphasized)" :style="{ left: x + '%' }" />
   </div>
 </div>`,
+    thumbLoop: {
+      every: 1800,
+      frames: [
+        { tA: 22, tB: 62, tBoxX: 55, tBoxY: 16 },
+        { tA: 34, tB: 74, tBoxX: 18, tBoxY: 30 },
+        { tA: 12, tB: 48, tBoxX: 40, tBoxY: 40 },
+      ],
+    },
+  },
+  {
+    id: "videoplayer",
+    name: "VideoPlayer",
+    description:
+      "A video with the kit's own controls, the same in Chromium, Firefox and WebKitGTK and in every theme. Seek bar with what is buffered and, under the pointer, the time and a still of that moment; volume and speed (remembered between videos, shared with VideoTrim); captions from `<track>` children; picture in picture where the browser has it; fullscreen of the whole player, with its menus opening inside it. Controls step aside while it plays and come back on any movement. Keys: Space/K, J/L, ←/→, ↑/↓, M, F, C, 0–9, < >. Right-click for speed, copy time and copy frame.",
+    components: { LpVideoPlayer, LpIcon },
+    state: () => reactive({ src: videoTrimSample, events: [] as string[] }),
+    template: `<div class="flex w-full max-w-2xl flex-col gap-3">
+  <LpVideoPlayer
+    :src="src"
+    title="Sample clip"
+    @play="events.unshift('play')"
+    @pause="events.unshift('pause')"
+    @ended="events.unshift('ended')"
+  />
+  <p class="text-xs text-muted">Events: {{ events.slice(0, 4).join(", ") || "none yet" }}</p>
+</div>`,
+    thumb: `<div class="relative h-36 w-64 overflow-hidden rounded-card bg-black">
+  <div class="absolute inset-0" style="background: linear-gradient(120deg, #0f172a, #1e3a8a 55%, #0f172a)" />
+  <div class="absolute top-1/2 left-1/2 grid size-11 -translate-1/2 place-items-center rounded-full bg-black/45 ring-1 ring-white/20 transition-[opacity,scale] duration-(--duration-medium) ease-(--ease-emphasized)" :class="tPlay ? 'scale-90 opacity-0' : 'opacity-100'">
+    <LpIcon name="lucide:play" :size="20" class="translate-x-0.5 text-white" />
+  </div>
+  <div class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent px-3 pt-6 pb-2">
+    <div class="h-1 overflow-hidden rounded-pill bg-white/25">
+      <div class="h-full rounded-pill bg-white transition-[width] ease-linear" :style="{ width: tAt + '%', transitionDuration: tPlay ? '1800ms' : '220ms' }" />
+    </div>
+    <div class="mt-1.5 flex items-center gap-2 text-white/85">
+      <LpIcon :name="tPlay ? 'lucide:pause' : 'lucide:play'" :size="12" />
+      <LpIcon name="lucide:volume-2" :size="12" />
+      <span class="font-mono text-[9px] text-white/70">0:0{{ Math.round(tAt / 17) }}.0 / 0:06.0</span>
+    </div>
+  </div>
+</div>`,
+    thumbLoop: {
+      every: 1800,
+      frames: [
+        { tPlay: false, tAt: 8 },
+        { tPlay: true, tAt: 38 },
+        { tPlay: true, tAt: 68 },
+        { tPlay: false, tAt: 68 },
+      ],
+    },
   },
 ]
