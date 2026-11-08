@@ -14,6 +14,7 @@ import {
   LpFormField,
   LpIcon,
   LpImageEditor,
+  LpVideoTrim,
   LpInput,
   LpNumberField,
   LpRepeater,
@@ -39,6 +40,7 @@ import avatarSample from "../../assets/avatar-sample.png"
 import avatarSunny from "../../assets/avatar-sunny.png"
 import { RatingControl } from "../demos"
 import { type ComponentEntry, selectOpts, radioOpts } from "./shared"
+import videoTrimSample from "../../assets/video-backdrop-sample.webm"
 
 // Rows of the repeater card's loop: the same objects in every frame, so a row
 // that stays keeps its identity and only the added or removed one animates.
@@ -993,6 +995,43 @@ export const forms: ComponentEntry[] = [
     <LpButton size="sm" variant="ghost" square aria-label="Rotate right"><LpIcon name="lucide:rotate-cw" :size="15" /></LpButton>
     <LpButton size="sm" variant="ghost" square aria-label="Zoom in"><LpIcon name="lucide:zoom-in" :size="15" /></LpButton>
     <LpButton size="sm">Export</LpButton>
+  </div>
+</div>`,
+  },
+  {
+    id: "videotrim",
+    name: "VideoTrim",
+    description:
+      "Pick a stretch of a video, and optionally an area of its picture, for a server to cut (ffmpeg) or blur. `v-model:range` is `[start, end]` in seconds; `change` fires once a move is done, for the save. `maxClip` / `minClip` bound the length: a dragged handle stops at the limit, while I, O and a typed time move the other end along. The timeline zooms (wheel, pinch, buttons) down to two seconds across, so an hour-long recording still trims to the frame. `region-select` lets a rectangle be drawn on the picture (`v-model:region`, fractions 0..1 of the frame). Keys inside: Space plays, ←/→ step a frame (Shift: a second), I/O set the ends at the playhead. The video streams by range requests and keeps a same-origin session cookie; a load that fails emits `error` with cause \"load\", \"decode\" or \"unsupported\".",
+    components: { LpVideoTrim, LpSwitch },
+    state: () => reactive({ src: videoTrimSample, range: null as [number, number] | null, region: null as { x: number; y: number; w: number; h: number } | null, regionOn: true, limit: true, saved: "" }),
+    template: `<div class="flex flex-col gap-3" style="max-width: 40rem">
+  <div class="flex flex-wrap gap-4">
+    <LpSwitch v-model="regionOn" label="Area to blur" />
+    <LpSwitch v-model="limit" label="Clip at most 3 s" />
+  </div>
+  <LpVideoTrim
+    v-model:range="range"
+    v-model:region="region"
+    :src="src"
+    :max-clip="limit ? 3 : undefined"
+    :region-select="regionOn"
+    @change="(r) => (saved = r.join(' – ') + ' s')"
+  />
+  <p class="text-xs text-muted">Saved: {{ saved || "nothing yet" }}<template v-if="region"> · area {{ Math.round(region.w * 100) }}% × {{ Math.round(region.h * 100) }}%</template></p>
+</div>`,
+    thumb: `<div class="flex w-64 flex-col gap-2">
+  <div class="relative h-24 overflow-hidden rounded-card bg-black">
+    <div class="absolute inset-0" style="background: linear-gradient(120deg, #0f172a, #1e3a8a 55%, #0f172a)" />
+    <div class="absolute left-[55%] top-4 h-10 w-14 rounded-inner border-2 border-dashed border-white bg-brand/25" />
+  </div>
+  <div class="relative h-9 rounded-control bg-surface-soft">
+    <div class="absolute inset-y-0 left-0 w-[22%] rounded-l-control bg-black/40" />
+    <div class="absolute inset-y-0 right-0 w-[38%] rounded-r-control bg-black/40" />
+    <div class="absolute inset-y-0 left-[22%] right-[38%] border-y-2 border-brand" />
+    <div class="absolute inset-y-0 left-[22%] w-2 -translate-x-full rounded-l-control bg-brand" />
+    <div class="absolute inset-y-0 right-[38%] w-2 translate-x-full rounded-r-control bg-brand" />
+    <div class="absolute -top-1 bottom-0 left-[40%] w-0.5 bg-white" />
   </div>
 </div>`,
   },

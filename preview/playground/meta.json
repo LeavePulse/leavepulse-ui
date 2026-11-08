@@ -12171,6 +12171,92 @@
   ],
   "slots": []
  },
+ "LpVideoTrim": {
+  "props": [
+   {
+    "name": "src",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "poster",
+    "type": "string | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
+    "name": "range",
+    "type": "TimeRange | null | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "`[start, end]` in seconds; the whole video (or the first `maxClip`) when unset."
+   },
+   {
+    "name": "maxClip",
+    "type": "number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The longest clip allowed, in seconds (a chat's upload limit)."
+   },
+   {
+    "name": "minClip",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.1",
+    "description": "The shortest clip allowed, in seconds."
+   },
+   {
+    "name": "regionSelect",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Lets a rectangle be drawn on the picture (`v-model:region`), for a part to blur."
+   },
+   {
+    "name": "region",
+    "type": "FrameRegion | null | undefined",
+    "required": false,
+    "default": "null",
+    "description": "The marked rectangle, fractions of the frame (0..1); null when none."
+   },
+   {
+    "name": "frameRate",
+    "type": "number | undefined",
+    "required": false,
+    "default": "30",
+    "description": "Frames per second, for the size of a frame step."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<Record<\"length\" | \"zoomIn\" | \"zoomOut\" | \"region\" | \"end\" | \"start\" | \"left\" | \"failed\" | \"position\" | \"play\" | \"timeline\" | \"overview\" | \"pause\" | \"stepBack\" | \"stepForward\" | \"mute\" | \"unmute\" | \"zoomFit\" | \"regionHint\" | \"regionClear\" | \"unsupported\" | \"invalidTime\", string>> | undefined",
+    "required": false,
+    "default": "{}"
+   }
+  ],
+  "events": [
+   {
+    "name": "error",
+    "type": "[error: { cause: VideoTrimErrorCause; message: string; }]"
+   },
+   {
+    "name": "update:range",
+    "type": "[value: TimeRange]"
+   },
+   {
+    "name": "change",
+    "type": "[value: TimeRange]"
+   },
+   {
+    "name": "update:region",
+    "type": "[value: FrameRegion | null]"
+   }
+  ],
+  "slots": []
+ },
  "LpWaypointEdge": {
   "props": [
    {
