@@ -31,6 +31,10 @@
  *    entries keep working once Back returns past it.
  *  - Someone else's `replaceState` on a kit entry keeps the kit's key, so a
  *    router saving its scroll position does not orphan the entry.
+ *  - Someone else's `pushState` or `replaceState` while a step the kit started
+ *    is on its way (closing an overlay and following a link in it in one tick)
+ *    is held until the step lands, then applied there: the address changes a
+ *    traversal later than the router's own route does.
  *  - An app that keeps an overlay in its query through `replace` rewrites the
  *    address of the kit's entry when the overlay closes, and the entry under it
  *    still holds the old one. Taking the entry out lands there, so the address
@@ -362,7 +366,7 @@ function install() {
 
   const push = history.pushState.bind(history)
   const replace = history.replaceState.bind(history)
-  history.pushState = function (data: unknown, unused: string, url?: string | URL | null) {
+  const pushed = (data: unknown, unused: string, url?: string | URL | null) => {
     const before = location.href
     push(data, unused, url)
     s.href = location.href
@@ -371,12 +375,35 @@ function install() {
     if (pathOf(before) !== pathOf(location.href)) leavePage()
     mute()
   }
-  history.replaceState = function (data: unknown, unused: string, url?: string | URL | null) {
+  const replaced = (data: unknown, unused: string, url?: string | URL | null) => {
     const mark = s.internal ? null : current()
     const keep = mark && data && typeof data === "object" && !markOf(data) ? { ...(data as object), [KEY]: mark } : data
     replace(keep, unused, url)
     s.href = location.href
   }
+  history.pushState = function (data: unknown, unused: string, url?: string | URL | null) {
+    if (!s.internal && s.silent > 0) s.waiting.push(() => pushed(unmarked(data), unused, url))
+    else pushed(data, unused, url)
+  }
+  history.replaceState = function (data: unknown, unused: string, url?: string | URL | null) {
+    if (!s.internal && s.silent > 0) s.waiting.push(() => replaced(unmarked(data), unused, url))
+    else replaced(data, unused, url)
+  }
+}
+
+/*
+ * A change written while a step the kit started is on its way (an overlay
+ * closed and a link inside it navigated in the same tick) waits for the step to
+ * land. Applied at once, the step would then go back from the new entry, and
+ * the page would end on the old path. A router builds its state from the entry
+ * it sat on, the kit's, so the kit's key is taken off: the entry it lands on is
+ * not the kit's any more.
+ */
+function unmarked(data: unknown): unknown {
+  if (!markOf(data)) return data
+  const copy = { ...(data as Record<string, unknown>) }
+  delete copy[KEY]
+  return copy
 }
 
 /** Record an entry on top of the history, under the current address. */

@@ -70,6 +70,7 @@ const Home = defineComponent({
             h(LpButton, { onClick: () => (inner.value = true) }, () => "Open inner"),
             h(LpButton, { onClick: () => (outer.value = false) }, () => "Close outer"),
             h(RouterLink, { to: "/other" }, () => "Go to other page"),
+            h(RouterLink, { to: { path: "/other", query: { user: "1" } }, onClick: () => (outer.value = false) }, () => "Close and go"),
             h(
               LpModal,
               { open: inner.value, "onUpdate:open": (v: boolean) => (inner.value = v), title: "Inner" },

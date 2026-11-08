@@ -460,3 +460,30 @@ for (const name of ["lightbox", "palette"]) {
     expect(await page.evaluate(() => location.search)).toBe("?scenario=overlay-history")
   })
 }
+
+type Pusher = { push(to: unknown): Promise<unknown> }
+for (const how of ["close, then push", "push, then close", "a link inside that closes on click"]) {
+  test(`closing an overlay and navigating in one tick lands on the new page: ${how}`, async ({ page }) => {
+    await start(page)
+    await page.getByRole("button", { name: "Open outer" }).click()
+    const outer = dialog(page, "Outer")
+    await expect(outer).toBeVisible()
+    if (how === "a link inside that closes on click") await outer.getByRole("link", { name: "Close and go" }).click()
+    else
+      await page.evaluate((how) => {
+        const w = window as unknown as { overlayRouter: Pusher; setOuter(v: boolean): void }
+        const go = () => void w.overlayRouter.push({ path: "/other", query: { user: "1" } })
+        if (how === "close, then push") { w.setOuter(false); go() }
+        else { go(); w.setOuter(false) }
+      }, how)
+    await expect(page.getByText("Other page")).toBeVisible()
+    await expect.poll(() => page.evaluate(() => location.pathname + location.search)).toBe("/tests/browser/other?user=1")
+    expect(await page.evaluate(() => history.state?.__lpOverlay ?? null)).toBeNull()
+
+    await page.goBack()
+    await expect(page.getByText("Home page")).toBeVisible()
+    await expect(outer).toBeHidden()
+    expect(await page.evaluate(() => location.search)).toBe("?scenario=overlay-history")
+    expect(await page.evaluate(() => history.state?.__lpOverlay ?? null)).toBeNull()
+  })
+}
