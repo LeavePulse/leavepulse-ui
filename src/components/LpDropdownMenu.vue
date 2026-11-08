@@ -38,7 +38,11 @@ const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
 // a `title` only names the menu with that link taken off. MenuTitle itself is
 // hidden from assistive tech, so nothing is announced twice.
 
+/* Whether the menu is open, for a host that keeps its own chrome up meanwhile (a player's controls). */
+const emit = defineEmits<{ (e: "update:open", open: boolean): void }>()
+
 function opened(open: boolean) {
+  emit("update:open", open)
   if (open && props.rightClickToo) hints.use(HINT_SIGNALS.menuButton)
 }
 
