@@ -334,7 +334,7 @@ export const navigation: ComponentEntry[] = [
     id: "commandpalette",
     name: "CommandPalette",
     description:
-      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; a `fallback` row (\"Search the catalogue for ...\") shows only while something is typed, labelled with the typed words, and with `carryQuery` its mode opens already searching them; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top, including picks made inside a mode or among search results (`remember` hands over what to store, `resolveRecent` rebuilds a fetched result from its `recentData`).",
+      "⌘K command palette (reka Dialog + Listbox): grouped, searchable commands with icons (or an `image`: a picture in the icon's slot that falls back to initials or the icon when it fails), shortcut hints and keyboard nav. Matches label + keywords. Binds a global ⌘K/Ctrl-K toggle by default. A command with `children` opens a mode — a nested list, static or fetched from the query typed inside it (Backspace or the chip leaves it), or typed straight into with its `prefix` (try \"> web\"); `search` adds results from an API alongside the static ones (it is sent the positive words only, the parsed `-word` and `in:group` operators come as a third argument, and the palette still drops fetched rows they rule out: try \"deploy -secrets\"); a fetcher may also yield batches (an async generator) so quick sources show before slow ones — here people land first, docs a moment later, and a bar runs along the box until the last batch (end the query with \"!\" for a source that fails after the first: what came stays, with a retry line), and a hit can carry an `excerpt` (the matched passage, wrapped over `excerptLines` lines) plus `highlight` (word forms the server matched, marked alongside the typed query); `previewPane` shows the highlighted hit's `preview` in full beside the list, and folds away for rows that `hasPreview` (or the row's own `noPreview`) turns down; `href` makes a row a real link; Tab lists a row's `actions`; `groupLimit` folds long groups; a `fallback` row (\"Search the catalogue for ...\") shows only while something is typed, labelled with the typed words, and with `carryQuery` its mode opens already searching them; words match in any order, with a typo or the other keyboard layout; `recent` floats what this person actually runs to the top, including picks made inside a mode or among search results (`remember` hands over what to store, `resolveRecent` rebuilds a fetched result from its `recentData`).",
     components: { LpCommandPalette, LpButton, LpPalettePreview, LpPaletteHeader, LpPaletteFacts, LpPaletteStats, LpKeys, LpIcon },
     state: () => {
       const s: any = reactive({
@@ -429,10 +429,18 @@ export const navigation: ComponentEntry[] = [
         // `excerpt` wraps over a few lines, `highlight` marks the word forms the
         // server matched ("deploys", "deployed") next to the typed query. Each
         // hit is a link (`href`), so Ctrl-click or Ctrl+Enter opens a new tab.
-        docs: async (q: string) => {
-          // Type "offline" to see a provider that throws.
-          if (q.toLowerCase() === "offline") throw new Error("offline")
+        // It is an async generator: people come back quickly and show at
+        // once, the slower docs index lands later, and the bar under the box
+        // runs until both are in.
+        docs: async function* (raw: string) {
+          // Type "offline" to see a provider that throws, or end the query
+          // with "!" ("ada!") for one that fails after the people came back.
+          if (raw.toLowerCase() === "offline") throw new Error("offline")
+          const q = raw.replace(/!$/, "")
           const found = await s.people(q)
+          yield found
+          await new Promise((r) => setTimeout(r, 900))
+          if (raw.endsWith("!")) throw new Error("docs index down")
           const pages = [
             {
               id: "docs:rollback",
@@ -461,7 +469,7 @@ export const navigation: ComponentEntry[] = [
           const docs = pages
             .filter((p) => [p.label, p.excerpt, ...p.highlight].some((t) => t.toLowerCase().includes(text)))
             .map((p) => ({ ...p, icon: "lucide:file-text", group: "Docs" }))
-          return [...found, ...docs]
+          yield [...found, ...docs]
         },
         // Recency is the app's to keep — here in memory, in a real app in
         // storage. The palette hands over what to store with `remember`: a

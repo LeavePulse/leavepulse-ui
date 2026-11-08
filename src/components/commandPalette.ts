@@ -344,3 +344,65 @@ export function modeChipLabel(command: { label: string; modeLabel?: string }): s
     .replace(/\s+(for|in|on|:)$/i, "")
     .trim()
 }
+
+/** What a fetcher may hand back: the rows, a promise of them, or batches of them. */
+export type FetchedRows<T> = T[] | Promise<T[]> | AsyncIterable<T[]>
+
+function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
+  return value != null && typeof (value as AsyncIterable<T>)[Symbol.asyncIterator] === "function"
+}
+
+/**
+ * Settles a fetcher's answer into its final rows. A plain list or a promise is
+ * passed through; batches are walked one by one, each handed to `onBatch` as
+ * it lands (each is the whole list so far, replacing the one before), and the
+ * last is the result — no batches at all is an empty list.
+ *
+ * An abort stops the walk at once rather than at the next batch: the iterator
+ * is closed (`return()`; a generator parked in an `await` closes at its next
+ * `yield`, running its `finally` there) and the wait for the pending batch is
+ * dropped. A batch that lands afterwards is not handed on.
+ */
+export async function settleFetched<T>(
+  result: FetchedRows<T>,
+  signal: AbortSignal,
+  onBatch: (rows: T[]) => void,
+): Promise<T[]> {
+  if (!isAsyncIterable<T[]>(result)) return result
+  const iterator = result[Symbol.asyncIterator]()
+  let closed = false
+  const close = () => {
+    if (closed) return
+    closed = true
+    // A generator still awaiting inside rejects its queued return with the
+    // error it later throws; that is not ours to report.
+    void Promise.resolve(iterator.return?.()).catch(() => {})
+  }
+  let stop: (() => void) | undefined
+  const aborted = new Promise<IteratorResult<T[]>>((resolve) => {
+    stop = () => resolve({ done: true, value: undefined })
+    if (signal.aborted) stop()
+    else signal.addEventListener("abort", stop, { once: true })
+  })
+  let rows: T[] = []
+  try {
+    for (;;) {
+      const step = await Promise.race([iterator.next(), aborted])
+      if (signal.aborted) {
+        close()
+        return rows
+      }
+      if (step.done) {
+        closed = true
+        return rows
+      }
+      rows = step.value
+      onBatch(rows)
+    }
+  } catch (error) {
+    closed = true
+    throw error
+  } finally {
+    if (stop) signal.removeEventListener("abort", stop)
+  }
+}

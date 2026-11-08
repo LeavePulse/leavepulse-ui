@@ -13,6 +13,7 @@ import {
   recentKey,
   recentVisible,
   resolveRecentItems,
+  settleFetched,
   toRecentItem,
   type RecentEntry,
   type RecentItem,
@@ -214,4 +215,57 @@ test("a link is made absolute without a window, and survives being unreadable", 
 test("the unfold row cannot share an id with a command", () => {
   expect(moreRowId("Files")).toContain("\u0000")
   expect(moreRowId("Files")).not.toBe(moreRowId("Other"))
+})
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 1))
+
+test("settleFetched passes a list or a promise through and walks batches in order", async () => {
+  const signal = new AbortController().signal
+  const seen: number[][] = []
+  expect(await settleFetched([1], signal, (r) => seen.push(r))).toEqual([1])
+  expect(await settleFetched(Promise.resolve([2]), signal, (r) => seen.push(r))).toEqual([2])
+  expect(seen).toEqual([])
+  async function* batches() {
+    yield [1]
+    yield [1, 2]
+  }
+  expect(await settleFetched(batches(), signal, (r) => seen.push(r))).toEqual([1, 2])
+  expect(seen).toEqual([[1], [1, 2]])
+  async function* none(): AsyncGenerator<number[]> {}
+  expect(await settleFetched(none(), signal, () => {})).toEqual([])
+})
+
+test("settleFetched stops at an abort without waiting for the slow batch, and closes the iterator", async () => {
+  const controller = new AbortController()
+  const seen: string[][] = []
+  let finalized = false
+  let release!: () => void
+  async function* slow() {
+    try {
+      yield ["fast"]
+      await new Promise<void>((resolve) => (release = resolve))
+      yield ["fast", "slow"]
+    } finally {
+      finalized = true
+    }
+  }
+  const done = settleFetched(slow(), controller.signal, (r) => seen.push(r))
+  await settle()
+  expect(seen).toEqual([["fast"]])
+  controller.abort()
+  expect(await done).toEqual(["fast"])
+  release()
+  await settle()
+  expect(seen).toEqual([["fast"]])
+  expect(finalized).toBe(true)
+})
+
+test("settleFetched rethrows a failure after the batches it already handed on", async () => {
+  const seen: string[][] = []
+  async function* broken() {
+    yield ["local"]
+    throw new Error("remote down")
+  }
+  await expect(settleFetched(broken(), new AbortController().signal, (r) => seen.push(r))).rejects.toThrow("remote down")
+  expect(seen).toEqual([["local"]])
 })

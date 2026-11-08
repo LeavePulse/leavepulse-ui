@@ -83,3 +83,35 @@ test("leaving the scope aborts the running task and drops its answer", async () 
   expect(signal.aborted).toBe(true)
   expect(applied).toEqual([])
 })
+
+test("emit applies a partial value at once and pending holds until the task settles", async () => {
+  const task = useAsyncTask<string>()
+  const applied: string[] = []
+  const rest = deferred<string>()
+  task.run(
+    async (_signal, emit) => {
+      emit("first")
+      return rest.promise
+    },
+    { apply: (v) => applied.push(v) },
+  )
+  await tick()
+  expect(applied).toEqual(["first"])
+  expect(task.pending.value).toBe(true)
+  rest.resolve("done")
+  await tick()
+  expect(applied).toEqual(["first", "done"])
+  expect(task.pending.value).toBe(false)
+})
+
+test("emit from a superseded run is dropped", async () => {
+  const task = useAsyncTask<string>()
+  const applied: string[] = []
+  let emitOld!: (value: string) => void
+  task.run((_s, emit) => ((emitOld = emit), new Promise<string>(() => {})), { apply: (v) => applied.push(v) })
+  await tick()
+  task.run(() => "new", { apply: (v) => applied.push(v) })
+  await tick()
+  emitOld("stale")
+  expect(applied).toEqual(["new"])
+})

@@ -86,3 +86,50 @@ test("a javascript: href is neither a link nor followed", async ({ page }) => {
   await input.press("Enter")
   expect(await page.evaluate(() => window.pwned)).toBeUndefined()
 })
+
+test("streamed batches show before the last, and the highlight stays put as rows arrive", async ({ page }) => {
+  const input = await openPalette(page, "Streamed mode")
+  await input.press("Enter")
+  await expect(option(page, "Fast one")).toBeVisible()
+  // Still going: the bar under the box says so.
+  await expect(page.getByRole("status").filter({ hasText: "Searching…" })).toHaveCount(1)
+  await input.press("ArrowDown")
+  await expect(option(page, "Fast two")).toHaveAttribute("aria-selected", "true")
+  await page.evaluate(() => window.releaseSlow?.())
+  await expect(option(page, "Slow row")).toBeVisible()
+  await expect(option(page, "Fast two")).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByRole("status").filter({ hasText: "Searching…" })).toHaveCount(0)
+})
+
+test("a row under a still pointer keeps the highlight when a batch inserts rows above it", async ({ page }) => {
+  const input = await openPalette(page, "Streamed mode")
+  await input.press("Enter")
+  const fastOne = option(page, "Fast one")
+  await expect(fastOne).toBeVisible()
+  const box = (await fastOne.boundingBox())!
+  await page.mouse.move(box.x + 10, box.y + box.height / 2)
+  await page.mouse.move(box.x + 20, box.y + box.height / 2)
+  await expect(fastOne).toHaveAttribute("aria-selected", "true")
+  await page.evaluate(() => window.releaseSlow?.())
+  await expect(option(page, "Slow row")).toBeVisible()
+  await expect(fastOne).toHaveAttribute("aria-selected", "true")
+})
+
+test("a failure after some batches keeps them, says the rest is missing, and leaving closes the stream", async ({ page }) => {
+  const input = await openPalette(page, "Streamed mode")
+  await input.press("Enter")
+  await expect(option(page, "Fast one")).toBeVisible()
+  await page.evaluate(() => window.releaseSlow?.(true))
+  await expect(page.getByText("Some results could not be loaded.")).toBeVisible()
+  await expect(option(page, "Fast one")).toBeVisible()
+  await page.getByRole("button", { name: "Retry" }).click()
+  await expect(option(page, "Fast one")).toBeVisible()
+  await expect(page.getByText("Some results could not be loaded.")).toHaveCount(0)
+  await input.press("Backspace")
+  await expect(option(page, "Streamed mode")).toBeVisible()
+  // The generator is parked in an await; it is closed at its next yield, and
+  // that batch never reaches the list.
+  await page.evaluate(() => window.releaseSlow?.())
+  await expect.poll(() => page.evaluate(() => window.streamClosed)).toBe(true)
+  await expect(option(page, "Slow row")).toHaveCount(0)
+})

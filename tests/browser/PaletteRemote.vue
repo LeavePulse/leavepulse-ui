@@ -6,9 +6,24 @@ import type { RecentEntry } from "../../src/components/commandPalette"
 const open = ref(false)
 const generation = ref("Old row")
 declare global {
-  interface Window { swapFetcher?: () => void; pwned?: boolean }
+  interface Window { swapFetcher?: () => void; pwned?: boolean; releaseSlow?: (fail?: boolean) => void; streamClosed?: boolean }
 }
 window.swapFetcher = () => (generation.value = "New row")
+
+// Two quick rows at once, then a slow one ahead of them once the test lets it
+// through (or a throw in its place).
+async function* streamed(): AsyncGenerator<Command[]> {
+  window.streamClosed = false
+  const fast: Command[] = [{ id: "fast-1", label: "Fast one" }, { id: "fast-2", label: "Fast two" }]
+  try {
+    yield fast
+    const fail = await new Promise<boolean>((resolve) => (window.releaseSlow = (f = false) => resolve(f)))
+    if (fail) throw new Error("slow source down")
+    yield [{ id: "slow", label: "Slow row" }, ...fast]
+  } finally {
+    window.streamClosed = true
+  }
+}
 
 const commands = computed<Command[]>(() => {
   const row = generation.value
@@ -16,6 +31,7 @@ const commands = computed<Command[]>(() => {
     { id: "services", label: "Services", children: [{ id: "restart", label: "Restart service" }] },
     { id: "restart", label: "Restart root" },
     { id: "live", label: "Live mode", children: async () => [{ id: "row", label: row }] },
+    { id: "stream", label: "Streamed mode", children: streamed },
     { id: "bad", label: "Bad link", href: "javascript:window.pwned=true" },
     { id: "ask", label: "Ask a name", prompt: { placeholder: "Name", submit: () => {} } },
   ]

@@ -14,6 +14,11 @@ import { getCurrentScope, onScopeDispose, ref } from "vue"
  * and an error from a superseded run is dropped unseen. It is also one slot:
  * a new `run` replaces the last, and `pending` speaks for the latest only, so
  * independent requests each need their own `useAsyncTask`.
+ *
+ * A task that has something to show before it is done (the command palette's
+ * streamed results) calls `emit` with it: that reaches `apply` at once, for
+ * the latest run only, while `pending` stays true until the task settles. The
+ * value the task finally resolves to is applied as well, after the last emit.
  */
 export function useAsyncTask<T>() {
   const pending = ref(false)
@@ -31,7 +36,7 @@ export function useAsyncTask<T>() {
   }
 
   function run(
-    task: (signal: AbortSignal) => T | Promise<T>,
+    task: (signal: AbortSignal, emit: (value: T) => void) => T | Promise<T>,
     options: { delay?: number; apply: (value: T) => void; fail?: (error: unknown) => void },
   ) {
     cancel()
@@ -40,7 +45,10 @@ export function useAsyncTask<T>() {
     timer = setTimeout(async () => {
       controller = new AbortController()
       try {
-        const value = await task(controller.signal)
+        const emit = (value: T) => {
+          if (mine === token) options.apply(value)
+        }
+        const value = await task(controller.signal, emit)
         if (mine === token) options.apply(value)
       } catch (error) {
         if (mine === token) options.fail?.(error)

@@ -87,6 +87,7 @@ import {
   toRecentItem,
   type RecentEntry,
   type RecentItem,
+  settleFetched,
 } from "./commandPalette"
 import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
@@ -279,12 +280,31 @@ export interface CommandPrompt {
  * after the palette closed, is discarded and never reaches the list, so a
  * fetcher does not need to check the signal itself. Checking it before an
  * expensive step is only a saving.
+ *
+ * A fetcher that gathers from sources of different speeds (a local index, a
+ * database, a slow remote) can return an async iterable instead — an async
+ * generator is the easy way — and yield as it goes, so the quick sources show
+ * without waiting for the slow one. Each batch is the whole list so far and
+ * replaces the one before; the last is the answer. The search keeps its
+ * loading bar until the iterable ends, the highlight stays on the row it was
+ * on as rows are added, and when the query moves on the signal aborts and the
+ * iterable is closed (`return()`) — a generator parked in an `await` only
+ * closes at its next `yield`, running its `finally` there, so pass the signal
+ * on to what it awaits. A throw after some batches keeps them on screen, with
+ * a line saying the rest could not be fetched:
+ *
+ *   async function* search(q, signal) {
+ *     const local = index.find(q)
+ *     yield local
+ *     const remote = await api.search(q, { signal })
+ *     yield [...local, ...remote]
+ *   }
  */
 export type CommandFetcher = (
   query: string,
   signal: AbortSignal,
   parsed: PaletteQuery,
-) => Command[] | Promise<Command[]>
+) => Command[] | Promise<Command[]> | AsyncIterable<Command[]>
 
 /** Footer hints and the mode chip, spelled out so an app can translate them. */
 export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
@@ -305,6 +325,8 @@ export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
   searching: string
   /** Shown when `search` (or a fetching mode) threw. */
   searchFailed: string
+  /** Shown under streamed results when the fetcher threw after some of them; defaults to "Some results could not be loaded." */
+  searchIncomplete?: string
   retry: string
   /** The row that unfolds a group cut by `groupLimit`; `{count}` is how many are hidden. */
   showMore: string
@@ -508,6 +530,7 @@ const DEFAULT_LABELS: Required<PaletteLabels> = {
   back: "back",
   searching: "Searching…",
   searchFailed: "Search is unavailable right now.",
+  searchIncomplete: "Some results could not be loaded.",
   retry: "Retry",
   showMore: "Show {count} more",
   actions: "actions",
@@ -762,11 +785,14 @@ function cancel() {
  * drops a superseded request before `fail` runs.
  */
 const failed = ref(false)
+/** The failure came after some batches had shown: those stay, the line says the rest is missing. */
+const incomplete = ref(false)
 
 function refresh(keepRows = false) {
   cancel()
   if (!keepRows) found.value = []
   failed.value = false
+  incomplete.value = false
   const run = fetcher()
   if (!run) return
   const parsed = parsePaletteQuery(query.value.trim())
@@ -778,14 +804,25 @@ function refresh(keepRows = false) {
   if (!inMode && q.length < Math.max(1, props.minChars)) return
   // A failing provider: the static commands still stand, with a line saying
   // that the rest could not be fetched.
-  task.run((signal) => run(q, signal, parsed), {
-    delay: props.debounce,
-    apply: (hits) => (found.value = hits),
-    fail: () => {
-      found.value = []
-      failed.value = true
+  // Streamed batches go through `emit`, which drops them once this request
+  // is superseded; `streamed` tells a failure after them from one before.
+  let streamed = false
+  task.run(
+    (signal, emit) =>
+      settleFetched(run(q, signal, parsed), signal, (rows) => {
+        streamed = true
+        emit(rows)
+      }),
+    {
+      delay: props.debounce,
+      apply: (hits) => (found.value = hits),
+      fail: () => {
+        if (!streamed) found.value = []
+        incomplete.value = streamed
+        failed.value = true
+      },
     },
-  })
+  )
 }
 
 // ── filtering + scoring ──────────────────────────────────────
@@ -1483,6 +1520,7 @@ watch(
     modeItems.value = []
     found.value = []
     failed.value = false
+    incomplete.value = false
     if (o) {
       await nextTick()
       // Closed again meanwhile: the box belongs to a dialog on its way out.
@@ -1547,21 +1585,33 @@ const guardOutside = useOutsideGuard()
         <!-- Filter. The trail sits inside the box as chips, the way a scoped
              search reads everywhere else: what you type is filtered by what is
              to its left. -->
-        <div class="flex shrink-0 items-center gap-2.5 border-b border-line px-4">
+        <div class="relative flex shrink-0 items-center gap-2.5 border-b border-line px-4">
           <LpIcon
-            v-if="!searching && !executing && !validating"
+            v-if="!executing && !validating"
             name="lucide:search"
             :size="18"
             class="shrink-0 text-muted"
           />
-          <!-- At once, since it takes the search icon's place. It is the only
-               thing that tells a screen reader a search went out, so it speaks. -->
+          <!-- At once, since it takes the search icon's place. -->
           <LpLoader
             v-else
             size="inline"
             :delay="0"
-            :labels="{ loading: executing || validating ? text.running : text.searching }"
+            :labels="{ loading: text.running }"
             class="shrink-0 text-[18px] text-muted"
+          />
+          <!-- A search under way runs a bar along the box's lower edge, over
+               the border, for as long as it lasts: results that stream in
+               batches are already on screen by then, and the bar is what says
+               more may come. It is also what tells a screen reader a search
+               went out, so it speaks. -->
+          <LpLoader
+            v-if="searching"
+            variant="bar"
+            size="sm"
+            tone="brand"
+            :labels="{ loading: text.searching }"
+            class="pointer-events-none absolute inset-x-0 -bottom-px"
           />
 
           <button
@@ -1733,7 +1783,7 @@ const guardOutside = useOutsideGuard()
               :class="flat.length ? 'pb-1 pt-3' : 'py-10'"
             >
               <LpIcon name="lucide:circle-alert" :size="15" class="shrink-0" />
-              <span>{{ text.searchFailed }}</span>
+              <span>{{ incomplete ? text.searchIncomplete : text.searchFailed }}</span>
               <button
                 type="button"
                 class="rounded-inner px-1.5 py-0.5 font-medium text-brand outline-none transition-colors hover:bg-brand-soft focus-visible:ring-2 focus-visible:ring-ring"
