@@ -25,9 +25,11 @@ import TopologyContracts from "./TopologyContracts.vue"
 import TriggerNesting from "./TriggerNesting.vue"
 import Workspace from "./Workspace.vue"
 import VideoTrim from "./VideoTrim.vue"
+import VideoPlayer from "./VideoPlayer.vue"
+import MediaVideo from "./MediaVideo.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
-const SCENARIOS = { notifications: Notifications, "field-errors": FieldErrors, "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur, "video-trim": VideoTrim }
+const SCENARIOS = { notifications: Notifications, "field-errors": FieldErrors, "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, "autocomplete-blur": AutocompleteBlur, "video-trim": VideoTrim, "video-player": VideoPlayer, "media-video": MediaVideo }
 // A kit component handed an attribute nothing under it takes fails the test
 // (the fixture fails on a console error), so a misspelt prop in a fixture and a
 // false report from the check itself both surface here.

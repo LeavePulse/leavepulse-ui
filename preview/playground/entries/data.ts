@@ -1,4 +1,5 @@
 import { reactive, ref } from "vue"
+import videoSample from "../../assets/video-backdrop-sample.webm"
 import {
   confirm,
   LpMediaGallery,
@@ -1088,7 +1089,7 @@ export const data: ComponentEntry[] = [
     id: "media-gallery",
     name: "MediaGallery",
     description:
-      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through. `itemMenu(item, index)` gives a thumbnail a right-click menu headed by its title and picture (a covered spoiler shows neither); the first grid has one. Texts come from `labels` (\"mediaGallery\" scope).",
+      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. A video item (`kind: \"video\"`, or an address ending in .mp4, .webm…) shows its `poster` or first frame under a play badge and its length, and plays in LpVideoPlayer inside the lightbox: zoom and rotation are left out for it, a drag on its bar never pages, Space plays from anywhere, and paging away stops it. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through. `itemMenu(item, index)` gives a thumbnail a right-click menu headed by its title and picture (a covered spoiler shows neither); the first grid has one. Texts come from `labels` (\"mediaGallery\" scope).",
     components: { LpMediaGallery },
     state: () => {
       const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>
@@ -1106,6 +1107,7 @@ export const data: ComponentEntry[] = [
       return reactive({
         shots: [
           { src: plate("1", "#5865F2", "#8b5cf6"), title: "spawn.png", description: "1200 × 800" },
+          { src: videoSample, title: "flyover.webm", description: "A video: plays in the lightbox" },
           { src: plate("2", "#eb459e", "#f0b35a"), title: "nether.png", description: "1200 × 800" },
           { src: plate("3", "#39e58c", "#00bcff"), title: "base.png", description: "1200 × 800" },
           { src: plate("4", "#f0b35a", "#eb459e"), title: "end.png", description: "1200 × 800" },

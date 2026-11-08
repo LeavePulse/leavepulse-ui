@@ -3469,7 +3469,12 @@
     "description": "The same items are also on a right click (a row's \"…\" next to its context\nmenu). Opening it then counts toward the hint system's right-click tip."
    }
   ],
-  "events": [],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[open: boolean]"
+   }
+  ],
   "slots": [
    {
     "name": "trigger",
@@ -12171,6 +12176,124 @@
   ],
   "slots": []
  },
+ "LpVideoPlayer": {
+  "props": [
+   {
+    "name": "src",
+    "type": "string",
+    "required": true
+   },
+   {
+    "name": "poster",
+    "type": "string | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
+    "name": "title",
+    "type": "string | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Names the player for assistive tech: what the video is."
+   },
+   {
+    "name": "autoplay",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Starts on its own; a browser that refuses sound-on autoplay leaves the play button."
+   },
+   {
+    "name": "loop",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "muted",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Starts muted (and so lets autoplay through)."
+   },
+   {
+    "name": "startAt",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0",
+    "description": "Seconds to start from."
+   },
+   {
+    "name": "rates",
+    "type": "number[] | undefined",
+    "required": false,
+    "default": "[0.5, 0.75, 1, 1.25, 1.5, 2]",
+    "description": "Speeds offered in the menu."
+   },
+   {
+    "name": "remember",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Keep volume and speed between videos on this device; false forgets them."
+   },
+   {
+    "name": "preview",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "A still of the moment under the pointer on the seek bar."
+   },
+   {
+    "name": "fit",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Fit inside the box the player is given (a lightbox's stage) at the\nvideo's own proportions, as a picture with object-fit: contain does,\ninstead of taking the full width at its own height. The parent sets the\nsize; a portrait phone video stands tall and narrow in a wide box."
+   },
+   {
+    "name": "menuItems",
+    "type": "(() => ContextMenuItemDef[]) | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "More items for the right-click menu."
+   },
+   {
+    "name": "labels",
+    "type": "Partial<Record<\"back\" | \"failed\" | \"speed\" | \"play\" | \"unsupported\" | \"player\" | \"pause\" | \"replay\" | \"mute\" | \"unmute\" | \"volume\" | \"normalSpeed\" | \"fullscreen\" | \"exitFullscreen\" | \"pip\" | \"exitPip\" | \"captions\" | \"seek\" | \"forward\" | \"rewind\" | \"fastForward\" | \"menuAt\" | \"copyTime\" | \"copyFrame\" | \"copiedTime\" | \"copiedFrame\" | \"copyFailed\", string>> | undefined",
+    "required": false,
+    "default": "{}"
+   }
+  ],
+  "events": [
+   {
+    "name": "error",
+    "type": "[error: { cause: VideoErrorCause; message: string; }]"
+   },
+   {
+    "name": "play",
+    "type": "[]"
+   },
+   {
+    "name": "pause",
+    "type": "[]"
+   },
+   {
+    "name": "ended",
+    "type": "[]"
+   }
+  ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   },
+   {
+    "name": "actions",
+    "type": "{ buttonClass: \"text-white/85 hover:bg-white/15 hover:text-white\"; }"
+   },
+   {
+    "name": "controls",
+    "type": "{ buttonClass: \"text-white/85 hover:bg-white/15 hover:text-white\"; }"
+   }
+  ]
+ },
  "LpVideoTrim": {
   "props": [
    {
@@ -12226,13 +12349,19 @@
     "description": "Frames per second, for the size of a frame step."
    },
    {
+    "name": "menuItems",
+    "type": "((at: number) => ContextMenuItemDef[]) | undefined",
+    "required": false,
+    "description": "More items for the right-click menu, given the time it was opened at (under the pointer on the timeline, the playhead elsewhere)."
+   },
+   {
     "name": "disabled",
     "type": "boolean | undefined",
     "required": false
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"length\" | \"zoomIn\" | \"zoomOut\" | \"region\" | \"end\" | \"start\" | \"left\" | \"failed\" | \"position\" | \"play\" | \"timeline\" | \"overview\" | \"pause\" | \"stepBack\" | \"stepForward\" | \"mute\" | \"unmute\" | \"zoomFit\" | \"regionHint\" | \"regionClear\" | \"unsupported\" | \"invalidTime\", string>> | undefined",
+    "type": "Partial<Record<\"length\" | \"zoomIn\" | \"zoomOut\" | \"region\" | \"end\" | \"start\" | \"left\" | \"failed\" | \"position\" | \"play\" | \"timeline\" | \"overview\" | \"unsupported\" | \"pause\" | \"mute\" | \"unmute\" | \"volume\" | \"menuAt\" | \"copyTime\" | \"copyFrame\" | \"copiedTime\" | \"copiedFrame\" | \"copyFailed\" | \"stepBack\" | \"stepForward\" | \"zoomFit\" | \"regionHint\" | \"regionClear\" | \"invalidTime\" | \"setStart\" | \"setEnd\" | \"goStart\" | \"goEnd\" | \"zoomHere\", string>> | undefined",
     "required": false,
     "default": "{}"
    }
@@ -12240,7 +12369,7 @@
   "events": [
    {
     "name": "error",
-    "type": "[error: { cause: VideoTrimErrorCause; message: string; }]"
+    "type": "[error: { cause: VideoErrorCause; message: string; }]"
    },
    {
     "name": "update:range",
@@ -12255,7 +12384,12 @@
     "type": "[value: FrameRegion | null]"
    }
   ],
-  "slots": []
+  "slots": [
+   {
+    "name": "actions",
+    "type": "{ buttonClass: \"text-white/85 hover:bg-white/15 hover:text-white\"; }"
+   }
+  ]
  },
  "LpWaypointEdge": {
   "props": [

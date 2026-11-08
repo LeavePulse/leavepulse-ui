@@ -98,3 +98,14 @@ describe("region", () => {
     expect(adjustRegion(r, "se", 1, 1)).toEqual({ x: 0.5, y: 0.5, w: 0.5, h: 0.5 })
   })
 })
+
+import { isVideoItem } from "../src/components/lightbox"
+describe("isVideoItem", () => {
+  test("by kind first, then by the address's extension", () => {
+    expect(isVideoItem({ src: "/e/42.mp4" })).toBe(true)
+    expect(isVideoItem({ src: "https://x/clip.WEBM?token=1" })).toBe(true)
+    expect(isVideoItem({ src: "/e/42.png" })).toBe(false)
+    expect(isVideoItem({ src: "/api/evidence/42", kind: "video" })).toBe(true)
+    expect(isVideoItem({ src: "/still.mp4", kind: "image" })).toBe(false)
+  })
+})

@@ -140,6 +140,7 @@ export const COMPONENT_NAMES = [
   "LpTypewriter",
   "LpUptimeBar",
   "LpVideoBackdrop",
+  "LpVideoPlayer",
   "LpVideoTrim",
   "LpWindow",
   "LpWorkspaceSwitcher"

@@ -27,10 +27,12 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useZoomPan } from "../composables/useZoomPan"
 import { clickLink } from "./exportData"
-import { fileNameOf, type LightboxItem } from "./lightbox"
+import { fileNameOf, isVideoItem, type LightboxItem } from "./lightbox"
 import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
+import LpVideoPlayer from "./LpVideoPlayer.vue"
+import VideoThumb from "./VideoThumb.vue"
 import { useModalLayer } from "./modalDepth"
 import { inTextField } from "../composables/textEntry"
 import { nodeWindow, useOutsideGuard, usePortalTarget, useView, viewDocument } from "../composables/useView"
@@ -160,6 +162,16 @@ const item = computed<LightboxItem | undefined>(() => props.items[current.value]
 const total = computed(() => props.items.length)
 const showStrip = computed(() => props.filmstrip ?? total.value > 1)
 
+/*
+ * A video item plays in LpVideoPlayer on the stage. The picture's own tools
+ * (zoom, pan, rotation) are left out for it, its keys and drags stay its own
+ * while it has them, and it stops when it is paged past or the viewer closes:
+ * the player is keyed on the item, so leaving unmounts it and its stream.
+ */
+const isVideo = computed(() => !!item.value && isVideoItem(item.value))
+const player = ref<InstanceType<typeof LpVideoPlayer> | null>(null)
+const inPlayer = (target: EventTarget | null) => !!(target as Element | null)?.closest?.("[data-lp-video-frame]")
+
 const rotation = ref(0)
 const loading = ref(false)
 const failed = ref(false)
@@ -213,7 +225,7 @@ let wheelTimer: ReturnType<typeof setTimeout> | undefined
 const WHEEL_STEP = 60
 
 function onStageWheel(e: WheelEvent) {
-  const overImage = (e.target as HTMLElement | null)?.closest("[data-lightbox-image]")
+  const overImage = !isVideo.value && (e.target as HTMLElement | null)?.closest("[data-lightbox-image]")
   if (overImage || isZoomed.value) {
     zoom.onWheel(e)
     return
@@ -249,7 +261,7 @@ watch(
     zoom.reset()
     rotation.value = 0
     failed.value = false
-    loading.value = true
+    loading.value = !isVideo.value
     if (props.open) nextTick(scrollThumbIntoView)
   },
 )
@@ -297,6 +309,14 @@ const OWNS_KEYS =
 function onKeydown(e: KeyboardEvent) {
   if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
   if (inTextField(e.target, OWNS_KEYS)) return
+  // A video plays on Space or K from anywhere in the viewer; with the player focused it answers that itself.
+  if (isVideo.value && (e.key === " " || e.key === "k") && !inPlayer(e.target)) {
+    e.preventDefault()
+    player.value?.toggle()
+    return
+  }
+  // The picture's tools are not a video's.
+  if (isVideo.value && ["+", "=", "-", "0", "r"].includes(e.key)) return
   switch (e.key) {
     case "ArrowRight":
       e.preventDefault()
@@ -346,12 +366,17 @@ function rotate() {
 let swipeStart: { x: number; y: number } | null = null
 
 function onPointerDown(e: PointerEvent) {
+  if (isVideo.value) {
+    // A drag on the player's bar is a seek or a volume change, never a page.
+    swipeStart = (e.target as Element).closest?.("[data-lp-player-controls]") ? null : { x: e.clientX, y: e.clientY }
+    return
+  }
   zoom.onPointerDown(e)
   swipeStart = zoom.zoomed.value ? null : { x: e.clientX, y: e.clientY }
 }
 
 function onPointerUp(e: PointerEvent) {
-  zoom.onPointerUp(e)
+  if (!isVideo.value) zoom.onPointerUp(e)
   if (!swipeStart) return
   const dx = e.clientX - swipeStart.x
   const dy = e.clientY - swipeStart.y
@@ -363,6 +388,8 @@ function onPointerUp(e: PointerEvent) {
 }
 
 function onDoubleClick(e: MouseEvent) {
+  // On a video a double click is the player's: full screen.
+  if (isVideo.value) return
   zoom.toggleZoom({ x: e.clientX, y: e.clientY })
 }
 
@@ -428,6 +455,11 @@ let copyTarget: LightboxItem | undefined
 async function imageToCopy(): Promise<Blob> {
   const target = (copyTarget = item.value)
   if (!target) throw new Error("No image")
+  if (isVideo.value) {
+    const frame = await player.value?.captureFrame()
+    if (!frame) throw new Error("No frame")
+    return frame
+  }
   const win = viewerWindow()
   const response = await win.fetch(resolved(target.src).href)
   const blob = await response.blob()
@@ -525,14 +557,14 @@ const guardOutside = useOutsideGuard()
           <div class="ml-auto flex items-center gap-1">
             <slot name="actions" :item="item!" :index="current" />
 
-            <button :class="BTN" type="button" :title="text.zoomOut" @click="zoom.zoomBy(1 / 1.3)">
+            <button v-if="!isVideo" :class="BTN" type="button" :title="text.zoomOut" @click="zoom.zoomBy(1 / 1.3)">
               <LpIcon name="lucide:zoom-out" :size="18" />
             </button>
-            <button :class="BTN" type="button" :title="text.zoomIn" @click="zoom.zoomBy(1.3)">
+            <button v-if="!isVideo" :class="BTN" type="button" :title="text.zoomIn" @click="zoom.zoomBy(1.3)">
               <LpIcon name="lucide:zoom-in" :size="18" />
             </button>
             <button
-              v-if="rotatable"
+              v-if="rotatable && !isVideo"
               :class="BTN"
               type="button"
               :title="text.rotate"
@@ -608,6 +640,19 @@ const guardOutside = useOutsideGuard()
               {{ text.reveal }}
             </button>
           </div>
+          <!-- A video plays in the kit's player, fitted to the stage at its own
+               proportions. Keyed like the image, so paging away unmounts it:
+               it stops, and stops fetching. It starts on its own, the click or
+               key that opened it being the go-ahead for sound. -->
+          <div
+            v-else-if="item && isVideo"
+            :key="`${current}:${item.src}`"
+            data-lightbox-image
+            class="size-full px-14 py-2 animate-[lightbox-frame-in_var(--duration-medium)_var(--ease-emphasized)] motion-reduce:animate-none max-sm:px-2"
+            :style="{ '--frame-from': `${direction * 24}px` }"
+          >
+            <LpVideoPlayer ref="player" fit autoplay :src="item.src" :poster="item.poster" :title="item.title ?? position(current)" />
+          </div>
           <!-- Keyed on position and src so paging remounts the img and replays
                the slide, even between two items with the same source (whose
                load event would otherwise never fire, leaving the spinner up). -->
@@ -671,12 +716,20 @@ const guardOutside = useOutsideGuard()
               :data-index="i"
               type="button"
               :style="{ '--thumb-delay': `${Math.min(i * 30, 240)}ms` }"
-              class="size-14 shrink-0 overflow-hidden rounded-control outline-none ring-2 transition-[opacity,box-shadow,scale] duration-[var(--duration-fast)] hover:scale-105 focus-visible:ring-ring animate-[lightbox-chrome-in_var(--duration-medium)_var(--ease-emphasized)_both] [animation-delay:var(--thumb-delay)] motion-reduce:animate-none"
+              class="relative size-14 shrink-0 overflow-hidden rounded-control outline-none ring-2 transition-[opacity,box-shadow,scale] duration-[var(--duration-fast)] hover:scale-105 focus-visible:ring-ring animate-[lightbox-chrome-in_var(--duration-medium)_var(--ease-emphasized)_both] [animation-delay:var(--thumb-delay)] motion-reduce:animate-none"
               :class="i === current ? 'opacity-100 ring-brand' : 'opacity-45 ring-transparent hover:opacity-80'"
               :aria-label="entry.title ?? position(i)"
               @click="go(i)"
             >
+              <VideoThumb
+                v-if="isVideoItem(entry)"
+                :item="entry"
+                compact
+                :alt="entry.title ?? ''"
+                :media-class="covered(i) ? 'scale-110 blur-md' : undefined"
+              />
               <img
+                v-else
                 :src="entry.thumb ?? entry.src"
                 :alt="entry.title ?? ''"
                 class="size-full object-cover"

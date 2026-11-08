@@ -24,6 +24,29 @@ export interface LightboxItem {
    * a marked picture sitting beside plain ones.
    */
   spoiler?: boolean
+  /**
+   * A video rather than a picture: shown in LpVideoPlayer, with a play badge
+   * on its tile and its strip thumbnail. Left out, an address ending in a
+   * video extension (.mp4, .webm, .mov…) counts as one; set it for an address
+   * that does not say (an API route, a blob: URL).
+   */
+  kind?: "image" | "video"
+  /** A still for a video's tile and thumbnail; the video's first frame when absent. */
+  poster?: string
+  /** A video's length in seconds, for the badge on its tile, when known up front. */
+  duration?: number
+}
+
+const VIDEO_EXTENSION = /\.(mp4|m4v|webm|mov|ogv|ogg|mkv)$/i
+
+/** Whether the item is a video: said outright by `kind`, else told by its address's extension. */
+export function isVideoItem(item: Pick<LightboxItem, "src" | "kind">): boolean {
+  if (item.kind) return item.kind === "video"
+  try {
+    return VIDEO_EXTENSION.test(new URL(item.src, "http://x").pathname)
+  } catch {
+    return false
+  }
 }
 
 /** Last path segment of a URL, or a fallback — used to name a download. */

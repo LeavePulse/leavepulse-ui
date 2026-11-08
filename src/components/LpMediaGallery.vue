@@ -25,12 +25,13 @@
  * usually mixed — one marked screenshot among plain ones.
  */
 import { computed, ref, watch } from "vue"
-import type { LightboxItem } from "./lightbox"
+import { isVideoItem, type LightboxItem } from "./lightbox"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLightbox from "./LpLightbox.vue"
+import VideoThumb from "./VideoThumb.vue"
 
 const DEFAULT_LABELS = {
   /** Accessible name of the grid. */
@@ -306,7 +307,7 @@ defineExpose({
       :key="item.src + i"
       :items="itemMenu?.(item, i) ?? []"
       :title="menuTitle(item, i)"
-      :title-image="isHidden(item) ? undefined : item.thumb || item.src"
+      :title-image="isHidden(item) ? undefined : isVideoItem(item) ? item.poster ?? item.thumb : item.thumb || item.src"
       :subtitle="isHidden(item) ? undefined : item.description"
     >
     <button
@@ -343,7 +344,23 @@ defineExpose({
              image's own edge, so its outermost pixels fade toward transparent
              and the tile gets a soft translucent rim. Growing the image a
              little pushes that feathered edge outside the clip. -->
+        <!-- A video shows its poster or first frame under a play badge, the cover and the overflow dimming riding on it as on a picture. -->
+        <VideoThumb
+          v-if="isVideoItem(item)"
+          :item="item"
+          :alt="isHidden(item) ? '' : item.title || ''"
+          :media-class="[
+            'transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100',
+            isHidden(item)
+              ? 'scale-[1.12] blur-[18px] brightness-[0.6] saturate-[1.1] group-hover:scale-[1.12]'
+              : '',
+            !isHidden(item) && hiddenCount && i === visible.length - 1
+              ? 'scale-[1.06] blur-[2px] brightness-[0.45] group-hover:scale-[1.06]'
+              : '',
+          ]"
+        />
         <img
+          v-else
           :src="item.thumb || item.src"
           :alt="isHidden(item) ? '' : item.title || ''"
           loading="lazy"
