@@ -64,12 +64,29 @@ export function isNativeLoop(plan: LoopPlan, duration: number): boolean {
   return plan.fade === 0 && plan.from === 0 && plan.to >= duration
 }
 
-/** "1:05", "0:07.5": a position on a clip as a range slider labels it. */
-export function formatClipTime(seconds: number, precise = false): string {
+/**
+ * "1:05", "0:07.5": a position on a clip as a range slider labels it.
+ * `precise` adds tenths when there are any; "fixed" always writes them, for a
+ * time that changes while it is read, so it keeps one length ("0:05.0", not
+ * "0:05" between "0:04.9" and "0:05.1").
+ */
+export function formatClipTime(seconds: number, precise: boolean | "fixed" = false): string {
   const t = splitTime(Number.isFinite(seconds) ? seconds * 1000 : 0)
   // Hours fold into minutes: a slider over a clip reads "75:00", not "1:15:00".
   const minutes = (t.days * 24 + t.hours) * 60 + t.minutes
   const secs = String(t.seconds).padStart(2, "0")
   const tenth = Math.floor(t.ms / 100)
-  return precise && tenth ? `${minutes}:${secs}.${tenth}` : `${minutes}:${secs}`
+  return precise === "fixed" || (precise && tenth) ? `${minutes}:${secs}.${tenth}` : `${minutes}:${secs}`
 }
+
+/** The widest a clip time up to `seconds` gets, its digits as zeros: what SteadyText reserves. */
+export function widestClipTime(seconds: number): string {
+  return formatClipTime(seconds, "fixed").replace(/\d/g, "0")
+}
+
+/**
+ * The slowest rate a pause eases down to before the element is paused, and a
+ * start eases up from. Chromium refuses a rate below a sixteenth; past that
+ * point the picture is all but still anyway.
+ */
+export const SLOWEST_RATE = 1 / 16

@@ -39,7 +39,7 @@ import { usePrefersReducedMotion } from "../composables/useReducedMotion"
 import { useView } from "../composables/useView"
 import { useInView } from "../composables/useInView"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { isNativeLoop, planLoop, seamProgress, seamReached } from "./videoBackdrop"
+import { isNativeLoop, planLoop, seamProgress, seamReached, SLOWEST_RATE } from "./videoBackdrop"
 
 const props = withDefaults(
   defineProps<{
@@ -97,12 +97,6 @@ const running = ref(false)
 /** Share of `rate` played at, 0 to 1: below 1 while easing into or out of a pause. */
 const throttle = ref(1)
 
-/**
- * The slowest rate a pause eases down to before the element is paused.
- * Chromium refuses a rate below a sixteenth; past that point the picture is
- * all but still anyway.
- */
-const SLOWEST_RATE = 1 / 16
 
 // Read now as well: the live query reports only after mount, and a first paint
 // must not start a video the viewer asked not to see.

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { compactNumber, decimalMark, formatBytes } from "../src/components/format"
 import { formatModified } from "../src/components/fileTree"
 import { formatTick } from "../src/components/chart"
-import { formatClipTime } from "../src/components/videoBackdrop"
+import { formatClipTime, widestClipTime } from "../src/components/videoBackdrop"
 
 describe("formatBytes", () => {
   test("scales in binary steps with Intl's unit names", () => {
@@ -96,6 +96,9 @@ describe("formatClipTime", () => {
     expect(formatClipTime(3600 + 15 * 60)).toBe("75:00")
     expect(formatClipTime(4.6, true)).toBe("0:04.6")
     expect(formatClipTime(-3)).toBe("0:00")
+    expect(formatClipTime(5, "fixed")).toBe("0:05.0")
+    expect(formatClipTime(5, true)).toBe("0:05")
+    expect(widestClipTime(4500)).toBe("00:00.0")
   })
 })
 
