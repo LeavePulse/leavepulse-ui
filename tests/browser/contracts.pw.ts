@@ -165,9 +165,15 @@ for (const mode of ["card", "control"]) {
     const zone = page.locator(".lp-dropzone")
     const fill = page.locator("[data-test-fill]")
     await expect(fill).toBeVisible()
-    const zoneBox = (await zone.boundingBox())!
-    const fillBox = (await fill.boundingBox())!
-    expect(Math.abs(zoneBox.y + zoneBox.height - (fillBox.y + fillBox.height))).toBeLessThan(1)
+    // Polled: the zone reveals with a short slide, and a slow runner can
+    // measure mid-way (1.6 px off once on CI, failing the v0.80.0 publish).
+    await expect
+      .poll(async () => {
+        const zoneBox = (await zone.boundingBox())!
+        const fillBox = (await fill.boundingBox())!
+        return Math.abs(zoneBox.y + zoneBox.height - (fillBox.y + fillBox.height))
+      })
+      .toBeLessThan(1)
     const [rx, radius] = await zone.evaluate((el) => [
       getComputedStyle(el.querySelector(".lp-dropzone__frame rect")!).rx,
       getComputedStyle(el).borderTopLeftRadius,
