@@ -180,11 +180,21 @@ test("the document shell keeps main as it was and makes the header sticky", asyn
   await expect(page.locator("header").first()).toHaveClass(/\btop-0\b/)
 })
 
-test("where the browser's bars float over the page, the shell draws none and keeps them", async ({ page }) => {
-  // Headless Chromium's bars float (it hides them), as a phone's do.
+test("with a mouse the shell draws its bar even where the browser's float over the page", async ({ page }) => {
+  // Headless Chromium's bars float (it hides them), as GTK's overlay bars do on a Linux desktop.
   await open(page, "")
-  await expect(page.locator("html")).not.toHaveClass(/\blp-scrollbar-none\b/)
-  await expect(page.locator("[data-lp-page-scrollbar]")).toBeHidden()
+  await expect(page.locator("html")).toHaveClass(/\blp-scrollbar-none\b/)
+  await expect(page.locator("[data-lp-page-scrollbar]")).toHaveCount(1)
+})
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true, isMobile: true })
+  test("the shell draws no bar and keeps the browser's", async ({ page }) => {
+    await open(page, "")
+    expect(await page.evaluate(() => matchMedia("(pointer: fine)").matches)).toBe(false)
+    await expect(page.locator("html")).not.toHaveClass(/\blp-scrollbar-none\b/)
+    await expect(page.locator("[data-lp-page-scrollbar]")).toBeHidden()
+  })
 })
 
 test.describe("the shell's variables for a page's own sticky parts", () => {

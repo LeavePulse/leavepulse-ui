@@ -13,8 +13,10 @@
  * (the bar is not printed, and at rest it is not drawn). What the kit adds is
  * the drawing, a thumb that drags, and a press beside it that pages.
  *
- * Where the browser's bars already float over the content (phones, macOS set
- * to show them while scrolling) it draws nothing and leaves the browser's.
+ * With a mouse or touchpad it draws the bar, also where the browser's bars
+ * float over the content (macOS, GTK on Linux, Windows 11's overlay setting).
+ * With a finger as the main pointer (phones, tablets) it draws nothing and
+ * leaves the browser's.
  *
  * `top` and `bottom` keep the bar clear of what covers the window's edges: a
  * sticky header, a bottom bar. Any CSS length, a variable included, and a
@@ -51,14 +53,14 @@ function scroller(): HTMLElement | null {
   return (doc?.scrollingElement as HTMLElement | null) ?? null
 }
 
-/* The width the browser's bar takes from the layout: 0 where it floats over the content. */
-function nativeBarWidth(d: Document): number {
-  const probe = d.createElement("div")
-  probe.style.cssText = "position:absolute;top:-9999px;width:100px;height:100px;overflow:scroll"
-  d.body.append(probe)
-  const width = probe.offsetWidth - probe.clientWidth
-  probe.remove()
-  return width
+/*
+ * Decided by the input, not by the browser's bar: desktop bars float over the
+ * content too (GTK's overlay bars on Linux, Windows 11's setting), and there the
+ * kit's bar is wanted beside the rest of the kit. A finger has no use for a thumb
+ * to drag, so a touch screen keeps the browser's.
+ */
+function finePointer(d: Document): boolean {
+  return nodeWindow(d).matchMedia?.("(pointer: fine)").matches ?? false
 }
 
 function measure() {
@@ -138,7 +140,7 @@ function onThumbPointerDown(event: PointerEvent) {
 onMounted(() => {
   const host = barEl.value ?? undefined
   doc = host?.ownerDocument
-  if (!doc || nativeBarWidth(doc) === 0) return
+  if (!doc || !finePointer(doc)) return
   active.value = true
   releaseNative = hideNativeBar(doc)
   const win = nodeWindow(doc)
