@@ -224,3 +224,14 @@ test("mouse-accessible actions also work on narrow screens", async ({ page }) =>
   await page.getByRole("option", { name: /Copy user ID/ }).click()
   await expect(page.getByRole("status", { name: "Picked action" })).toHaveText("ada")
 })
+
+test("every option is named from its label and description, with or without a highlight", async ({ page }) => {
+  await open(page, "cpu")
+  await expect(page.getByRole("option", { name: "CPU limit", exact: true })).toBeVisible()
+  await page.getByRole("combobox").first().fill("sn")
+  await expect(page.getByRole("option", { name: "Create snapshot An asynchronous action with Undo.", exact: true })).toBeVisible()
+  await page.getByRole("combobox").first().fill("e")
+  const names = await page.getByRole("option").evaluateAll(els => els.map(e => e.getAttribute("aria-label") ?? ""))
+  expect(names.length).toBeGreaterThan(5)
+  expect(names.filter(n => !n.trim())).toEqual([])
+})

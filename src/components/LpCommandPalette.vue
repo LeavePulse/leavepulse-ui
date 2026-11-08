@@ -1696,6 +1696,7 @@ const guardOutside = useOutsideGuard()
                   :type="linkOf(c) ? undefined : 'button'"
                   role="option"
                   tabindex="-1"
+                  :aria-label="c.description ? `${c.label} ${c.description}` : c.label"
                   :aria-selected="flatIndexOf(c) === selectedIndex"
                   :aria-disabled="c.disabled || undefined"
                   :data-cmd-index="flatIndexOf(c)"
@@ -1713,6 +1714,10 @@ const guardOutside = useOutsideGuard()
                   @pointerenter="onPointerEnter(c)"
                   @pointerleave="onPointerLeave"
                 >
+                  <!-- Named from label and description, not from content: split
+                       into <mark> parts, a row's text was not always read as its
+                       name (BotEco's palette showed nameless options), and the
+                       shortcut or prefix kbd is not part of what the row is. -->
                   <!-- A picture takes the icon's slot at the icon's footprint, with
                        a negative margin so a 20px avatar does not make its row
                        taller than its neighbours. -->
