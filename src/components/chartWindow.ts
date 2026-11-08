@@ -1,4 +1,5 @@
 import { clamp } from "../composables/clamp"
+import { shiftSpan, zoomSpan } from "../composables/span"
 
 /*
  * The part of a long series a chart draws: which points are in the window, and
@@ -54,18 +55,13 @@ export function clampRange(range: ChartRange | null | undefined, count: number):
 /** The range after a zoom by `factor` (below 1 is in), keeping `anchor` (0–1 across it) in place. */
 export function zoomRange(range: ChartRange | null, count: number, anchor: number, factor: number): ChartRange | null {
   const from = range ?? { start: 0, end: count - 1 }
-  const span = from.end - from.start
-  const next = Math.max(MIN_RANGE_POINTS - 1, span * factor)
-  const at = from.start + span * clamp(anchor, 0, 1)
-  const start = at - (at - from.start) * (next / (span || 1))
-  return clampRange({ start, end: start + next }, count)
+  const at = from.start + (from.end - from.start) * clamp(anchor, 0, 1)
+  return clampRange(zoomSpan(from.start, from.end, at, factor, MIN_RANGE_POINTS - 1), count)
 }
 
 /** The range moved by `delta` points, keeping its width at the ends of the data. */
 export function panRange(range: ChartRange, count: number, delta: number): ChartRange | null {
-  const span = range.end - range.start
-  const start = Math.max(0, Math.min(count - 1 - span, range.start + delta))
-  return clampRange({ start, end: start + span }, count)
+  return clampRange(shiftSpan(range.start, range.end, delta, 0, count - 1), count)
 }
 
 /**
