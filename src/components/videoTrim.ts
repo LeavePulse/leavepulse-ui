@@ -182,17 +182,5 @@ export function adjustRegion(r: FrameRegion, handle: RegionHandle, dx: number, d
   return { x: fix(x0), y: fix(y0), w: fix(x1 - x0), h: fix(y1 - y0) }
 }
 
-/**
- * Why the editor has no video to show, as its `error` event reports it:
- * - "load": the address did not answer (network, 404, an expired session);
- * - "decode": the file arrived but is damaged;
- * - "unsupported": a format or codec this browser cannot play (H.265 in
- *   Chromium without hardware support, ProRes anywhere).
- */
-export type VideoTrimErrorCause = "load" | "decode" | "unsupported"
-
-export function mediaErrorCause(error: MediaError | null): VideoTrimErrorCause {
-  if (error?.code === 3) return "decode"
-  if (error?.code === 4) return "unsupported"
-  return "load"
-}
+/** Why the editor has no video to show; see `VideoErrorCause`. */
+export type { VideoErrorCause as VideoTrimErrorCause } from "../composables/useVideoMedia"
