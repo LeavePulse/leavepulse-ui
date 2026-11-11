@@ -15,6 +15,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 
+import { useLocale } from "../composables/useLocale"
 import { useLabels } from "../composables/useLpConfig"
 import {
   canTranscodeVideo,
@@ -108,13 +109,15 @@ const text = useLabels<VideoCompressLabels>(
 )
 
 const FIT_BYTES = 10 * 1024 * 1024
+const locale = useLocale()
+const size = (bytes: number) => formatBytes(bytes, locale.value)
 
 const choices = computed<VideoCompressPreset[]>(() => props.presets ?? [
   { key: "original", label: text.value.original },
   { key: "p1080", label: text.value.p1080, maxHeight: 1080 },
   { key: "p720", label: text.value.p720, maxHeight: 720 },
   { key: "p480", label: text.value.p480, maxHeight: 480 },
-  { key: "fit", label: text.value.fit.replace("{size}", formatBytes(FIT_BYTES)), maxHeight: 720, targetBytes: FIT_BYTES },
+  { key: "fit", label: text.value.fit.replace("{size}", size(FIT_BYTES)), maxHeight: 720, targetBytes: FIT_BYTES },
 ])
 
 const url = ref("")
@@ -167,7 +170,7 @@ const worthIt = computed(() => estimate.value !== null && (estimate.value < prop
 const estimateLine = computed(() => {
   if (estimate.value === null) return text.value.probing
   if (!worthIt.value) return text.value.bigger
-  return text.value.estimate.replace("{size}", formatBytes(estimate.value)).replace("{original}", formatBytes(props.file.size))
+  return text.value.estimate.replace("{size}", size(estimate.value)).replace("{original}", size(props.file.size))
 })
 
 const busy = computed(() => progress.value !== null)
