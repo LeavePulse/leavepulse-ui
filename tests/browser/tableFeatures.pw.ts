@@ -47,6 +47,19 @@ test("pinned columns stay at their edges while the table scrolls", async ({ page
   expect(right.x + right.width).toBeLessThanOrEqual(edge.x + edge.width + 1)
 })
 
+test("the page's toolbar, the row count and Export share one line above the table", async ({ page }) => {
+  await page.goto(open("toolbar"))
+  const search = page.getByRole("textbox", { name: "Page search" })
+  const exportButton = page.getByRole("button", { name: "Export CSV" })
+  await expect(search).toBeVisible()
+  await expect(exportButton).toBeVisible()
+  const a = (await search.boundingBox())!
+  const b = (await exportButton.boundingBox())!
+  // One row: their vertical centres agree, and Export sits to the right.
+  expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2))).toBeLessThan(6)
+  expect(b.x).toBeGreaterThan(a.x + a.width)
+})
+
 test("groups head their rows and collapse", async ({ page }) => {
   await page.goto(open("group"))
   const group = page.getByRole("button", { name: "Collapse b (2)" })

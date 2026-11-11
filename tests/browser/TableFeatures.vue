@@ -79,6 +79,9 @@ const token = ref<TableSelectionToken | null>(null)
     </template>
     <LpTable v-else-if="part === 'pin'" :columns="pinned" :rows="wideRows" row-key="id" aria-label="Pinned" />
     <LpTable v-else-if="part === 'group'" :columns="columns" :rows="base" row-key="id" group-by="site" aria-label="Grouped" />
+    <LpTable v-else-if="part === 'toolbar'" :columns="columns" :rows="base" row-key="id" exportable summary aria-label="With toolbar">
+      <template #toolbar><input aria-label="Page search" placeholder="search"></template>
+    </LpTable>
     <LpTable v-else-if="part === 'expand'" :columns="columns" :rows="base" row-key="id" :expandable="(row) => row.id !== 2" aria-label="Expanding">
       <template #expanded="{ row }"><p>Details of {{ row.name }}</p></template>
     </LpTable>

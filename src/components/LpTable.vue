@@ -5,7 +5,7 @@ export default { inheritAttrs: false }
 </script>
 
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, useId, watch } from "vue"
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useAttrs, useId, useSlots, watch } from "vue"
 import { suppressPaletteDiscovery, usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
 import { menuPaletteCommands } from "./commandPalette"
 import LpDataList from "./LpDataList.vue"
@@ -1383,8 +1383,14 @@ const countText = computed(() => {
 // As documented on `summary`: the bar shows on its own while filters are
 // active or rows are selected, not merely because rows can be selected, which
 // left a lone "75 rows" over every selectable table.
+const slots = useSlots()
 const showBar = computed(
-  () => props.summary || (!!props.selectable && props.selected.length > 0) || activeFilters.value.length > 0,
+  () =>
+    props.summary ||
+    props.exportable ||
+    !!slots.toolbar ||
+    (!!props.selectable && props.selected.length > 0) ||
+    activeFilters.value.length > 0,
 )
 const filteredOut = computed(() => {
   if (busy.value || failed.value || displayRows.value.length) return false
@@ -1606,12 +1612,6 @@ usePaletteCommands(() => {
   <!-- No top fade: a sticky header sits in the masked band and would be dimmed
        by it. The bottom edge is left crisp with it for symmetry. -->
   <div ref="frameEl" class="flex flex-col gap-3" :class="rootClass">
-  <div v-if="exportable" class="flex justify-end">
-    <LpButton variant="ghost" size="sm" @click="exportCsv()">
-      <LpIcon name="lucide:download" :size="14" />
-      {{ text.exportCsv }}
-    </LpButton>
-  </div>
   <!-- What the table is showing right now: the filters in force, each one
        a chip that clears it, the row count, and what is selected with room
        for the consumer's bulk actions. Eased in and out (LpShift), so the
@@ -1619,7 +1619,14 @@ usePaletteCommands(() => {
   <!-- The gap below the bar lives inside the eased box (pb-3), cancelled
        outside it (-mb-3): an empty box must not leave the root's gap behind. -->
   <LpShift class="-mb-3">
-    <div v-if="showBar" class="flex min-h-8 items-center gap-x-3 pb-3 text-xs">
+    <!-- One line above the table: the page's own controls (#toolbar), the
+         filters in force, then the status and Export at the end. Export used
+         to sit on a line of its own and the page's search and filters on a
+         third, so every table opened with two bands of mostly empty space. -->
+    <div v-if="showBar" class="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2 pb-3 text-xs">
+      <div v-if="$slots.toolbar" class="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+        <slot name="toolbar" />
+      </div>
       <div v-if="activeFilters.length" class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         <LpBadge
           v-for="f in activeFilters"
@@ -1689,6 +1696,10 @@ usePaletteCommands(() => {
             <slot name="bulk" :selected="selected" :all-matching="allMatching" :clear="clearSelection" />
           </span>
         </Transition>
+        <LpButton v-if="exportable" variant="ghost" size="sm" @click="exportCsv()">
+          <LpIcon name="lucide:download" :size="14" />
+          {{ text.exportCsv }}
+        </LpButton>
       </div>
       </LpShift>
     </div>
