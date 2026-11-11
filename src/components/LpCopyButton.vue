@@ -39,7 +39,7 @@ export type CopyValue =
  * `failed` state and the `error` event rather than as an exception.
  */
 import { computed, ref, useAttrs } from "vue"
-import { useClipboard } from "../composables/useClipboard"
+import { COPY_LABELS, useClipboard } from "../composables/useClipboard"
 import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
@@ -92,7 +92,7 @@ const emit = defineEmits<{
 
 const text = useLabels<CopyButtonLabels>(
   "copyButton",
-  { copy: "Copy", copied: "Copied", failed: "Couldn't copy" },
+  COPY_LABELS,
   () => props.labels,
 )
 

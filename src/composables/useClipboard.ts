@@ -1,4 +1,5 @@
 import { onScopeDispose, ref } from "vue"
+import { useLabels } from "./useLpConfig"
 import { useToast } from "./useToast"
 
 /*
@@ -90,19 +91,30 @@ async function writeBlob(blob: Blob): Promise<boolean> {
 /** How long `copied` stays true — long enough to read, short enough to not linger. */
 const COPIED_MS = 1400
 
+/**
+ * The kit's words for copying, scope "copyButton": LpCopyButton's own text and
+ * what `toast: true` says. One set, so an app that translates the scope once
+ * has every copy in it speak the same language.
+ */
+export const COPY_LABELS = { copy: "Copy", copied: "Copied", failed: "Couldn't copy" }
+
 export interface CopyOptions {
   /**
    * Toast to raise on success. `false` (the default) stays silent, for callers
    * whose button already shows the tick and would otherwise say it twice.
+   * `true` says the kit's "Copied", in the app's language when its config
+   * translates the "copyButton" scope, so a menu item that copies does not
+   * have to bring its own word for it.
    */
-  toast?: string | false
+  toast?: string | boolean
   /**
    * Toast to raise when the copy fails. Defaults to silence for the same
    * reason the kit's other best-effort paths are silent: a copy that didn't
    * happen is usually obvious, and a scary red box over a blocked clipboard
-   * helps nobody. Pass a string where losing the copy actually costs something.
+   * helps nobody. Pass a string where losing the copy actually costs something,
+   * or `true` for the kit's own "Couldn't copy".
    */
-  errorToast?: string | false
+  errorToast?: string | boolean
 }
 
 export interface UseClipboard {
@@ -143,6 +155,7 @@ export interface UseClipboard {
 export function useClipboard(): UseClipboard {
   const copied = ref(false)
   const { success, error } = useToast()
+  const labels = useLabels("copyButton", COPY_LABELS)
   let timer: ReturnType<typeof setTimeout> | undefined
 
   async function copy(data: string | Blob, options: CopyOptions = {}): Promise<boolean> {
@@ -155,10 +168,10 @@ export function useClipboard(): UseClipboard {
       copied.value = true
       clearTimeout(timer)
       timer = setTimeout(() => (copied.value = false), COPIED_MS)
-      if (toast) success(toast)
+      if (toast) success(toast === true ? labels.value.copied : toast)
       return true
     } catch {
-      if (errorToast) error(errorToast)
+      if (errorToast) error(errorToast === true ? labels.value.failed : errorToast)
       return false
     }
   }
