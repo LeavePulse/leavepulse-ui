@@ -7,6 +7,15 @@ entry is deleted, not ticked: the commit says what changed.
 
 ## Flaws
 
+- **A height cap on `LpVideoPlayer` hides its controls.** Without `fit` the
+  frame takes the full width at the video's own proportions, so a
+  `max-h-96` on the player (the BotEco case evidence did this) cuts the
+  frame's bottom off together with the bar: no play, volume or seek, and
+  nothing says why. The consumer switched to `fit` inside a sized box. The
+  kit should either honour a max height in the default mode (cap the frame
+  and letterbox the picture) or say in the docs that a height belongs to
+  `fit`.
+
 - **Forward onto an overlay entry is a router visit.** With overlay history
   on, Back from a kit entry mutes the router, but Forward starts from the
   router's own entry, so vue-router runs its guards and `afterEach` for the
