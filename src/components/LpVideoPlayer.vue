@@ -610,7 +610,7 @@ const frameStyle = computed(() => {
     <!-- The menu's trigger is a wrapper of its own: reka's as-child puts its ref on the element it wraps. -->
     <LpContextMenu :items="menu" :title="menuTitle" always>
     <!-- A size container, so the bar gives up what does not fit a narrow player (see the controls below). -->
-    <div class="@container" :class="fit && !fullscreen ? FRAME : ''" :style="frameStyle" data-lp-video-frame>
+    <div class="@container" :class="fullscreen ? 'w-full' : fit ? FRAME : ''" :style="frameStyle" data-lp-video-frame>
     <div class="relative w-full" :class="fullscreen ? 'h-dvh' : ''" :style="fullscreen ? undefined : { aspectRatio: aspect }">
       <video
         ref="videoEl"

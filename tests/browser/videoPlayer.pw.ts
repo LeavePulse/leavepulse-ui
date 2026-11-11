@@ -143,3 +143,15 @@ test("an app's button in #actions sits over the picture and works", async ({ pag
   await remove.click()
   await expect(page.locator("[data-test=events]")).toHaveText("removed")
 })
+
+test("a fitted player in full screen fills the screen instead of going black", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await page.goto("/tests/browser/?scenario=video-player&fit")
+  const fitted = page.getByRole("region", { name: "Fitted clip" })
+  await fitted.hover()
+  await fitted.getByRole("button", { name: "Full screen" }).click()
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true)
+  const box = await fitted.locator("video").first().boundingBox()
+  expect(box?.width).toBe(1000)
+  expect(box?.height).toBe(800)
+})
