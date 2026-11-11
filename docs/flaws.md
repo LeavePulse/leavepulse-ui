@@ -40,6 +40,12 @@ entry is deleted, not ticked: the commit says what changed.
 
 ## Ideas
 
+- **A group order on `LpTable`.** Groups follow the first row of each after
+  sorting, so a table grouped by kind (control-panel's services) shows its
+  sections in whatever order the sort leaves them, and the app can only
+  pre-sort the rows and drop the default sort to get its order back. A
+  `groupOrder` (a list, or a compare on the group values) would let the
+  sections stay put while rows sort inside them.
 - **Context switcher in the rail header**: server, workspace or machine, which
   every app now draws in the header slot itself.
 - **Reorder pins** by dragging within the pinned block, and pin by dragging a
