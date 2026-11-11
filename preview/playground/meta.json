@@ -12176,6 +12176,65 @@
   ],
   "slots": []
  },
+ "LpVideoCompress": {
+  "props": [
+   {
+    "name": "file",
+    "type": "File",
+    "required": true
+   },
+   {
+    "name": "presets",
+    "type": "VideoCompressPreset[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The presets offered; the default set is original, 1080p, 720p, 480p and \"fits 10 MB\"."
+   },
+   {
+    "name": "maxClip",
+    "type": "number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The longest clip allowed, in seconds."
+   },
+   {
+    "name": "disabled",
+    "type": "boolean | undefined",
+    "required": false
+   },
+   {
+    "name": "labels",
+    "type": "Partial<Record<\"cancel\" | \"failed\" | \"quality\" | \"fit\" | \"original\" | \"p1080\" | \"p720\" | \"p480\" | \"estimate\" | \"same\" | \"probing\" | \"shrink\" | \"skip\" | \"encoding\" | \"unsupported\" | \"bigger\", string>> | undefined",
+    "required": false,
+    "default": "{}"
+   },
+   {
+    "name": "preset",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"p720\""
+   }
+  ],
+  "events": [
+   {
+    "name": "done",
+    "type": "[file: File, info: { range: TimeRange; preset: string; }]"
+   },
+   {
+    "name": "busy",
+    "type": "[value: boolean]"
+   },
+   {
+    "name": "skip",
+    "type": "[]"
+   },
+   {
+    "name": "update:preset",
+    "type": "[value: string]"
+   }
+  ],
+  "slots": []
+ },
  "LpVideoPlayer": {
   "props": [
    {

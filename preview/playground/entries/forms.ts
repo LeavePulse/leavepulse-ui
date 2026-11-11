@@ -15,6 +15,7 @@ import {
   LpIcon,
   LpImageEditor,
   LpVideoTrim,
+  LpVideoCompress,
   LpVideoPlayer,
   LpInput,
   LpNumberField,
@@ -1041,6 +1042,33 @@ export const forms: ComponentEntry[] = [
         { tA: 12, tB: 48, tBoxX: 40, tBoxY: 40 },
       ],
     },
+  },
+  {
+    id: "video-compress",
+    name: "VideoCompress",
+    description:
+      "Trim and shrink a video on the person's own machine before it is uploaded, so the upload costs only the part that matters. LpVideoTrim picks the range; a preset picks the height and bitrate or a target size (\"Fits 10 MB\"), and the line under it estimates the result against the original. \"Shrink\" encodes through WebCodecs (hardware encoders where the device has them, via mediabunny loaded on first use) with a progress bar and a cancel, and `done` hands back the new MP4 with the range and preset; \"Upload as is\" emits `skip`. A browser without a video encoder only offers `skip` and says why. `transcodeVideo`, `probeVideo`, `estimateTranscodedBytes` and `canTranscodeVideo` are exported for flows of their own.",
+    components: { LpVideoCompress, LpDropzone },
+    thumbState: false,
+    state: () => {
+      const s = reactive({ file: null as File | null, result: "" })
+      void fetch(videoTrimSample).then((r) => r.blob()).then((b) => { s.file = new File([b], "sample.webm", { type: b.type || "video/webm" }) })
+      return s
+    },
+    template: `<div class="flex w-full max-w-2xl flex-col gap-3">
+  <LpDropzone accept="video/*" title="Drop a video of your own" tone="soft" @files="(f) => { file = f[0]; result = '' }" />
+  <LpVideoCompress
+    v-if="file"
+    :file="file"
+    @done="(out) => (result = out.name + ' · ' + (out.size / 1048576).toFixed(1) + ' MB')"
+    @skip="result = 'kept the original'"
+  />
+  <p class="text-xs text-muted">Result: {{ result || "nothing yet" }}</p>
+</div>`,
+    thumb: `<div class="flex w-64 flex-col gap-2">
+  <div class="h-20 rounded-card" style="background: linear-gradient(120deg, #0f172a, #1e3a8a 55%, #0f172a)" />
+  <div class="flex items-center justify-between text-xs text-muted"><span>48 MB</span><span>→</span><span class="font-medium text-ink">7.9 MB</span></div>
+</div>`,
   },
   {
     id: "videoplayer",

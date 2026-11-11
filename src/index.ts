@@ -243,6 +243,17 @@ export { default as LpVideoBackdrop } from "./components/LpVideoBackdrop.vue"
 export { formatClipTime, isNativeLoop, planLoop, seamProgress, seamReached } from "./components/videoBackdrop"
 export type { LoopPlan } from "./components/videoBackdrop"
 export { default as LpVideoTrim } from "./components/LpVideoTrim.vue"
+export { default as LpVideoCompress } from "./components/LpVideoCompress.vue"
+export type { VideoCompressLabels, VideoCompressPreset } from "./components/LpVideoCompress.vue"
+export {
+  bitrateForHeight,
+  canTranscodeVideo,
+  estimateTranscodedBytes,
+  probeVideo,
+  transcodeVideo,
+  transcodedName,
+} from "./composables/videoTranscode"
+export type { TranscodeVideoOptions, VideoInfo } from "./composables/videoTranscode"
 export { default as LpVideoPlayer } from "./components/LpVideoPlayer.vue"
 export type { VideoPlayerLabels } from "./components/LpVideoPlayer.vue"
 export { useVideoMedia } from "./composables/useVideoMedia"

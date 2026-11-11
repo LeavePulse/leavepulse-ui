@@ -82,6 +82,7 @@ import type { ToasterLabels } from "../components/LpToaster.vue"
 import type { TopologyLabels } from "../components/LpTopologyCanvas.vue"
 import type { TourLabels } from "../components/LpTour.vue"
 import type { UptimeBarLabels } from "../components/LpUptimeBar.vue"
+import type { VideoCompressLabels } from "../components/LpVideoCompress.vue"
 import type { VideoPlayerLabels } from "../components/LpVideoPlayer.vue"
 import type { VideoTrimLabels } from "../components/LpVideoTrim.vue"
 import type { WindowLabels } from "../components/LpWindow.vue"
@@ -168,6 +169,7 @@ export interface KitLabels {
   topology: FullLabels<TopologyLabels>
   tour: FullLabels<TourLabels>
   uptimeBar: FullLabels<UptimeBarLabels>
+  videoCompress: FullLabels<VideoCompressLabels>
   videoPlayer: FullLabels<VideoPlayerLabels>
   videoTrim: FullLabels<VideoTrimLabels>
   window: FullLabels<WindowLabels>
@@ -646,6 +648,23 @@ export const uk: KitLabels = {
     empty: "Немає даних",
     loading: "Завантаження",
     uptime: "доступність",
+  },
+  videoCompress: {
+    original: "Оригінал",
+    p1080: "1080p",
+    p720: "720p",
+    p480: "480p",
+    fit: "До {size}",
+    quality: "Якість",
+    estimate: "До ~{size} замість {original}",
+    probing: "Читання відео…",
+    shrink: "Стиснути",
+    skip: "Завантажити як є",
+    encoding: "Кодування на цьому пристрої… {percent}%",
+    cancel: "Скасувати",
+    unsupported: "Цей браузер не вміє кодувати відео, тому буде завантажено оригінал.",
+    failed: "Не вдалося закодувати: {error}",
+    bigger: "Результат не був би меншим, тож краще оригінал.",
   },
   videoPlayer: {
     player: "Відеоплеєр: пробіл відтворює, стрілки перемотують, F на весь екран",
