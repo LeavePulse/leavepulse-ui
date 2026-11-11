@@ -72,7 +72,8 @@
     "check:size": "node scripts/check-size.mjs",
     "test:coverage": "bun test --coverage",
     "gen:icons": "node scripts/gen-kit-icons.mjs",
-    "gen:meta": "node scripts/gen-preview-meta.mjs"
+    "gen:meta": "node scripts/gen-preview-meta.mjs",
+    "gen:readme": "node scripts/readme-catalogue.mjs"
   },
   "peerDependencies": {
     "@iconify-json/lucide": "^1.2.0",
