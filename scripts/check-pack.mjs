@@ -30,6 +30,24 @@ for (const quoted of names) {
   want(`dist/components/${name}.vue.d.ts`)
 }
 
+// Nuxt writes the module's paths into its component declarations without the
+// trailing .js ("dist/components/LpModal.vue"). If that spelling resolves to
+// no declaration, every component types as any in the app and a handler like
+// @update:open="(v) => ..." stops compiling under noImplicitAny.
+const ts = await import("typescript").then((m) => m.default ?? m)
+const resolve = (spec) =>
+  ts.resolveModuleName(spec, new URL("../src/index.ts", import.meta.url).pathname, {
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+  }, ts.sys).resolvedModule?.resolvedFileName
+for (const quoted of names.slice(0, 1)) {
+  const name = quoted.slice(1, -1)
+  for (const spec of [`@leavepulse/ui/dist/components/${name}.vue`, `@leavepulse/ui/dist/components/${name}.vue.js`]) {
+    const got = resolve(spec)
+    if (!got?.endsWith(`dist/components/${name}.vue.d.ts`)) missing.push(`${spec} -> types (resolved: ${got ?? "nothing"})`)
+  }
+}
+
 // Everything ./dist/*.js exposes has its code beside its types.
 for (const path of files) {
   if (/^dist\/(theme|layout)\/.*\.d\.ts$/.test(path)) want(path.replace(/\.d\.ts$/, ".js"))
