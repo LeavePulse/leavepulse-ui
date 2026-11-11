@@ -61,6 +61,37 @@ import { formatClipTime, widestClipTime } from "./videoBackdrop"
 import { FrameSampler } from "./videoFrames"
 import { FADE, FADE_SCALE, ICON_SWAP, OVERLAY_BUTTON } from "./videoMotion"
 
+/** Wording of the video player. `{n}` is seconds, `{time}` the playhead's time. */
+export type VideoPlayerLabels = {
+  player: string
+  play: string
+  pause: string
+  replay: string
+  mute: string
+  unmute: string
+  volume: string
+  speed: string
+  normalSpeed: string
+  fullscreen: string
+  exitFullscreen: string
+  pip: string
+  exitPip: string
+  captions: string
+  seek: string
+  failed: string
+  unsupported: string
+  back: string
+  forward: string
+  rewind: string
+  fastForward: string
+  menuAt: string
+  copyTime: string
+  copyFrame: string
+  copiedTime: string
+  copiedFrame: string
+  copyFailed: string
+}
+
 const props = withDefaults(
   defineProps<{
     src: string
@@ -89,12 +120,7 @@ const props = withDefaults(
     fit?: boolean
     /** More items for the right-click menu. */
     menuItems?: () => ContextMenuItemDef[]
-    labels?: Partial<Record<
-      | "player" | "play" | "pause" | "replay" | "mute" | "unmute" | "volume" | "speed" | "normalSpeed"
-      | "fullscreen" | "exitFullscreen" | "pip" | "exitPip" | "captions" | "seek" | "failed" | "unsupported"
-      | "back" | "forward" | "rewind" | "fastForward" | "menuAt" | "copyTime" | "copyFrame" | "copiedTime" | "copiedFrame" | "copyFailed",
-      string
-    >>
+    labels?: Partial<VideoPlayerLabels>
   }>(),
   {
     poster: undefined,
@@ -115,7 +141,7 @@ const emit = defineEmits<{
   (e: "error", error: { cause: VideoErrorCause; message: string }): void
 }>()
 
-const text = useLabels(
+const text = useLabels<VideoPlayerLabels>(
   "videoPlayer",
   {
     player: "Video player — Space plays, arrows seek, F fullscreen",

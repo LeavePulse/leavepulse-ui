@@ -50,6 +50,18 @@ import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useResizeObserver } from "../composables/useResizeObserver"
 
+/** Wording of the image editor's controls and errors. */
+export type ImageEditorLabels = {
+  rotateLeft: string
+  rotateRight: string
+  zoomIn: string
+  zoomOut: string
+  reset: string
+  canvas: string
+  failed: string
+  cors: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** The picture to work on: a file, or an http(s)/data address. */
@@ -86,12 +98,7 @@ const props = withDefaults(
      * kit cannot reach the consumer's translations. Apps with i18n pass their
      * own strings.
      */
-    labels?: Partial<
-      Record<
-        "rotateLeft" | "rotateRight" | "zoomIn" | "zoomOut" | "reset" | "canvas" | "failed" | "cors",
-        string
-      >
-    >
+    labels?: Partial<ImageEditorLabels>
     /** Fade the picture in when the editor first comes into view. */
     animate?: boolean
   }>(),
@@ -107,7 +114,7 @@ const emit = defineEmits<{
 // mount. An editor inside a dialog that opens a minute later still draws.
 const { el: revealAnchor, revealed } = useReveal({ immediate: () => !props.animate })
 
-const text = useLabels(
+const text = useLabels<ImageEditorLabels>(
   "imageEditor",
   {
     rotateLeft: "Rotate left",

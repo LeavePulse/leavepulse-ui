@@ -24,6 +24,12 @@ import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
+/** Wording of a hint note. */
+export type HintLayerLabels = {
+  gotIt: string
+  badge: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Ids to mark, most important first. */
@@ -31,15 +37,15 @@ const props = withDefaults(
     notes: Record<string, HintNote>
     /** At most this many dots at once, so a page full of news stays calm. */
     limit?: number
-    labels?: Partial<typeof DEFAULT_LABELS>
+    labels?: Partial<HintLayerLabels>
   }>(),
   { limit: 3 },
 )
 
 const emit = defineEmits<{ (e: "read", id: string): void }>()
 
-const DEFAULT_LABELS = { gotIt: "Got it", badge: "New" }
-const labels = useLabels("hintLayer", DEFAULT_LABELS, () => props.labels)
+const DEFAULT_LABELS: HintLayerLabels = { gotIt: "Got it", badge: "New" }
+const labels = useLabels<HintLayerLabels>("hintLayer", DEFAULT_LABELS, () => props.labels)
 
 const OPEN_DELAY_MS = 350
 

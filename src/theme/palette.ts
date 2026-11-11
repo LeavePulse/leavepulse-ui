@@ -2,6 +2,7 @@ import { defineAsyncComponent, defineComponent, h, toValue, type MaybeRefOrGette
 import { usePaletteCommands, usePaletteScope, type PaletteScope } from "../composables/usePaletteCommands"
 import type { PreviewableThemeStudio, ThemeStudio } from "./studio"
 import type { ThemeStudioPart } from "../components/LpThemeStudio.vue"
+import type { PaletteThemeLabels } from "../components/LpPaletteTheme.vue"
 import { useLabels } from "../composables/useLpConfig"
 
 const Editor = defineAsyncComponent(() => import("../components/LpPaletteTheme.vue"))
@@ -10,7 +11,7 @@ const Editor = defineAsyncComponent(() => import("../components/LpPaletteTheme.v
 /** `hide` leaves out the same studio rows the app hides in its own studio; `keywords` adds the app's own search words. */
 export function usePaletteTheme(studio: MaybeRefOrGetter<ThemeStudio | undefined>, options: { id?: string; label?: string; scope?: PaletteScope; hide?: ThemeStudioPart[]; keywords?: string[] } = {}) {
   const scope = options.scope ?? usePaletteScope()
-  const text = useLabels("paletteTheme", { title: "Theme" })
+  const text = useLabels<Pick<PaletteThemeLabels, "title">>("paletteTheme", { title: "Theme" })
   const currentStudio = () => {
     const current = toValue(studio)
     return current && "preview" in current && typeof current.preview === "function" ? current as PreviewableThemeStudio : undefined

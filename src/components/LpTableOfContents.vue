@@ -23,6 +23,11 @@ export interface TocLink {
   children?: TocLink[]
 }
 
+/** Wording of the table of contents. */
+export type TableOfContentsLabels = {
+  title: string
+}
+
 const props = withDefaults(
   defineProps<{
     links: TocLink[]
@@ -35,7 +40,7 @@ const props = withDefaults(
      * near the top kept the previous section lit under it.
      */
     offset?: number
-    labels?: Partial<{ title: string }>
+    labels?: Partial<TableOfContentsLabels>
     /**
      * The bar glides under the hovered link and springs back on leave (the
      * default), as in LpTabs. False pins it to the section in view: calmer for
@@ -46,7 +51,7 @@ const props = withDefaults(
   { offset: 96, hoverFollow: true },
 )
 
-const text = useLabels("toc", { title: "On this page" }, () => props.labels)
+const text = useLabels<TableOfContentsLabels>("toc", { title: "On this page" }, () => props.labels)
 const heading = computed(() => props.title ?? text.value.title)
 
 // Every level of the tree as one ordered list; depth drives the indent, so

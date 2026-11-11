@@ -1,5 +1,10 @@
 <script lang="ts">
 export default { inheritAttrs: false }
+
+/** Wording of the input's clear button. */
+export type InputLabels = {
+  clear: string
+}
 </script>
 
 <script setup lang="ts">
@@ -61,7 +66,7 @@ const props = withDefaults(
     icon?: string
     /** Show an accessible clear button, returning focus to the input. */
     clearable?: boolean
-    labels?: Partial<{ clear: string }>
+    labels?: Partial<InputLabels>
     /**
      * Marks the label with the required indicator. The attribute still reaches
      * the underlying <input> for native validation; this only makes the field
@@ -148,7 +153,7 @@ const field = useFieldControl(() => ({
   required: props.required,
   disabled: props.disabled,
 }))
-const text = useLabels("input", { clear: "Clear" }, () => props.labels)
+const text = useLabels<InputLabels>("input", { clear: "Clear" }, () => props.labels)
 const showClear = computed(() => props.clearable && !!props.modelValue && !field.value.disabled && !isAttrOn(attrs.readonly) && !isAttrOn(attrs.readOnly))
 const isInvalidState = computed(() => field.value.invalid)
 const shellClass = computed(() =>

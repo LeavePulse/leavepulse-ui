@@ -29,6 +29,17 @@ import LpCopyButton from "./LpCopyButton.vue"
 import LpIcon from "./LpIcon.vue"
 import { useMergedAttrs } from "../composables/useMergedClass"
 
+/** Wording of the code block. `{n}` in `lines` is the line count. */
+export type CodeBlockLabels = {
+  unlock: string
+  lock: string
+  copy: string
+  copied: string
+  imports: string
+  details: string
+  lines: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** The code (v-model when editable). */
@@ -50,7 +61,7 @@ const props = withDefaults(
     height?: string
     /** Auto-collapse a leading import/package block (no markers needed). */
     foldImports?: boolean
-    labels?: Partial<Record<"unlock" | "lock" | "copy" | "copied" | "imports" | "details" | "lines", string>>
+    labels?: Partial<CodeBlockLabels>
   }>(),
   {
     lang: "plain",
@@ -68,7 +79,7 @@ const emit = defineEmits<{
   (e: "update:locked", value: boolean): void
 }>()
 
-const text = useLabels(
+const text = useLabels<CodeBlockLabels>(
   "codeBlock",
   {
     unlock: "Unlock to edit",

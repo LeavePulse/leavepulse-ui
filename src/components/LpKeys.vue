@@ -12,6 +12,7 @@ import { computed } from "vue"
 import { appleModifierLabel, useAppleKeyboard } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
 import { comboSteps } from "./keys"
+import type { ShortcutsLabels } from "./LpShortcutsDialog.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -24,7 +25,7 @@ const props = withDefaults(
   { size: "md" },
 )
 
-const text = useLabels("shortcuts", { then: "then" })
+const text = useLabels<Pick<ShortcutsLabels, "then">>("shortcuts", { then: "then" })
 const apple = useAppleKeyboard()
 
 const steps = computed(() => (Array.isArray(props.combo) ? [props.combo] : comboSteps(props.combo)))

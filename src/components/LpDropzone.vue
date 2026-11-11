@@ -48,6 +48,15 @@ import { inTextField } from "../composables/textEntry"
 import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
 
+/** Wording of the dropzone's link entry. */
+export type DropzoneLabels = {
+  orLink: string
+  placeholder: string
+  done: string
+  keys: string
+  invalid: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Same syntax as the input's: "image/*", ".yaml,.yml". */
@@ -89,7 +98,7 @@ const props = withDefaults(
      * "or a link". Arrives as the `link` event.
      */
     links?: boolean
-    labels?: Partial<{ orLink: string; placeholder: string; done: string; keys: string; invalid: string }>
+    labels?: Partial<DropzoneLabels>
   }>(),
   {
     accept: "",
@@ -120,7 +129,7 @@ const emit = defineEmits<{
   (e: "link", url: string): void
 }>()
 
-const labels = useLabels(
+const labels = useLabels<DropzoneLabels>(
   "dropzone",
   {
     orLink: "or a link",

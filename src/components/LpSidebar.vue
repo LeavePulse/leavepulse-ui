@@ -28,6 +28,19 @@ import type { SidebarItem, SidebarSection } from "./sidebar"
 
 export type { SidebarItem, SidebarSection } from "./sidebar"
 
+/** Wording of the sidebar's landmark and controls. */
+export type SidebarLabels = {
+  nav: string
+  search: string
+  pinned: string
+  pin: string
+  unpin: string
+  expand: string
+  compact: string
+  expandRail: string
+  resize: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Active item id (v-model). Ignored when `isActive` is provided. */
@@ -55,17 +68,7 @@ const props = withDefaults(
     /** Placeholder for that field (defaults to the `search` label). */
     searchPlaceholder?: string
     /** Text overrides: `nav` names the landmark, `search` the filter field. */
-    labels?: Partial<{
-      nav: string
-      search: string
-      pinned: string
-      pin: string
-      unpin: string
-      expand: string
-      compact: string
-      expandRail: string
-      resize: string
-    }>
+    labels?: Partial<SidebarLabels>
     /** The query, when the app wants to own it (v-model:search). */
     search?: string
     /** Show a skeleton placeholder instead of the items. */
@@ -215,7 +218,7 @@ defineSlots<{
   item?: (props: { item: SidebarItem; active: boolean }) => unknown
 }>()
 
-const text = useLabels(
+const text = useLabels<SidebarLabels>(
   "sidebar",
   {
     nav: "Sidebar",

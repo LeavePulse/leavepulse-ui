@@ -6,9 +6,14 @@
  */
 import { useLabels } from "../composables/useLpConfig"
 
-const props = defineProps<{ labels?: Partial<{ badge: string }> }>()
+/** Wording of the example tag. */
+export type HintExampleLabels = {
+  badge: string
+}
 
-const labels = useLabels("hintExample", { badge: "Example" }, () => props.labels)
+const props = defineProps<{ labels?: Partial<HintExampleLabels> }>()
+
+const labels = useLabels<HintExampleLabels>("hintExample", { badge: "Example" }, () => props.labels)
 </script>
 
 <template>

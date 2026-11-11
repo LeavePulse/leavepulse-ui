@@ -83,6 +83,28 @@ app.use(lpConfig({
 
 A component's own `labels` prop wins over the configuration.
 
+#### Ukrainian label pack
+
+The kit ships a complete Ukrainian pack, `uk`, with an entry for every label
+scope. Pass it once at the root instead of a `labels` prop on each use:
+
+```ts
+import { lpConfig, uk } from "@leavepulse/ui"
+
+app.use(lpConfig({ labels: uk }))
+// or, inside a component's setup: provideLpConfig({ labels: uk })
+```
+
+English stays the components' built-in default, so an app without the pack is
+unchanged. To adjust a few strings, layer them on top: a nested
+`provideLpConfig({ labels: { table: { empty: "Порожньо" } } })` refines the
+scope rather than replacing it, and a component's `labels` prop still wins.
+
+The pack is typed as `KitLabels`, which requires every key of every scope, so a
+new label that lacks a translation fails the type check. A test also fails when
+a `useLabels("scope", ...)` call has no entry in the pack. Writing a pack for
+another language against `KitLabels` gets the same checks.
+
 ### Back and Forward for overlays
 
 `provideOverlayHistory()` (at the app root, like `provideGlass()`) makes the

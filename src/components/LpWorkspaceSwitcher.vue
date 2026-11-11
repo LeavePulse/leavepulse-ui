@@ -18,22 +18,25 @@ import LpDropdownMenu, { type MenuItem } from "./LpDropdownMenu.vue"
 import LpInput from "./LpInput.vue"
 import LpModal from "./LpModal.vue"
 
+/** Wording of the workspace switcher. */
+export type WorkspaceSwitcherLabels = {
+  menu: string
+  create: string
+  duplicate: string
+  rename: string
+  remove: string
+  name: string
+  save: string
+  cancel: string
+  required: string
+}
+
 const props = defineProps<{
   workspaces: UseWorkspaces
-  labels?: Partial<{
-    menu: string
-    create: string
-    duplicate: string
-    rename: string
-    remove: string
-    name: string
-    save: string
-    cancel: string
-    required: string
-  }>
+  labels?: Partial<WorkspaceSwitcherLabels>
 }>()
 
-const text = useLabels(
+const text = useLabels<WorkspaceSwitcherLabels>(
   "workspaces",
   {
     menu: "Workspaces",

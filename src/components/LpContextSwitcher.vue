@@ -17,6 +17,12 @@ import LpIcon from "./LpIcon.vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 import type { AppContext } from "./sidebar"
 
+/** Wording of the context switcher. `{label}` is the current context. */
+export type ContextSwitcherLabels = {
+  switch: string
+  title: string
+}
+
 const props = withDefaults(
   defineProps<{
     contexts: AppContext[]
@@ -24,14 +30,14 @@ const props = withDefaults(
     modelValue?: string
     /** The icon rail: the trigger is a square with the icon or an initial. */
     compact?: boolean
-    labels?: Partial<{ switch: string; title: string }>
+    labels?: Partial<ContextSwitcherLabels>
   }>(),
   { compact: false },
 )
 
 const emit = defineEmits<{ (e: "update:modelValue", id: string): void }>()
 
-const text = useLabels("contextSwitcher", { switch: "{label}, switch", title: "Switch to" }, () => props.labels)
+const text = useLabels<ContextSwitcherLabels>("contextSwitcher", { switch: "{label}, switch", title: "Switch to" }, () => props.labels)
 
 const current = computed(() => props.contexts.find((c) => c.id === props.modelValue) ?? props.contexts[0])
 const initial = computed(() => [...(current.value?.label ?? "")][0] ?? "")

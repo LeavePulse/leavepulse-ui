@@ -3,6 +3,15 @@
 // appended to it, so opt out of the automatic pass-through that would add it
 // a second time, unmerged.
 export default { inheritAttrs: false }
+
+/** Wording of the shell's own controls and landmarks. */
+export type AppShellLabels = {
+  openMenu: string
+  skipToContent: string
+  backToTop: string
+  aside: string
+  contextNav: string
+}
 </script>
 
 <script setup lang="ts">
@@ -151,7 +160,7 @@ const props = withDefaults(
     /** Loading skeleton for the nav. */
     loading?: boolean
     /** Text overrides: the burger's name and the skip link. */
-    labels?: Partial<{ openMenu: string; skipToContent: string; backToTop: string; aside: string; contextNav: string }>
+    labels?: Partial<AppShellLabels>
     /** Icon-only rail (v-model:compact). Forwarded to LpSidebar. */
     compact?: boolean
     /** The person sizes the rail and folds it to icons. Forwarded to LpSidebar. */
@@ -292,7 +301,7 @@ const pageTitle = computed(() => {
 // Its own state when the app does not bind it: the shell's burger must open
 // the drawer either way. v-model:open still controls it from outside.
 const drawerOpen = defineModel<boolean>("open", { default: false })
-const text = useLabels(
+const text = useLabels<AppShellLabels>(
   "appShell",
   { openMenu: "Open menu", skipToContent: "Skip to content", backToTop: "Back to top", aside: "Details", contextNav: "In this section" },
   () => props.labels,

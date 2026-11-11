@@ -22,6 +22,9 @@ import { DEFAULT_UNIT_LABELS, formatTime, toEpoch, type TimeUnitLabels } from ".
 import { UPTIME_SEVERITY, uptimeFigure, uptimeRange, uptimeShare, type UptimeSegment, type UptimeStatus } from "./uptimeBar"
 
 
+/** Wording of the uptime bar: one name per status, plus its own states. */
+export type UptimeBarLabels = Record<UptimeStatus | "empty" | "loading" | "uptime", string>
+
 const props = withDefaults(
   defineProps<{
     /** Oldest → newest. Each entry is one slice of the timeline. */
@@ -48,7 +51,7 @@ const props = withDefaults(
      */
     colors?: Partial<Record<UptimeStatus, string>>
     /** Status names, for the tooltip and screen readers. */
-    labels?: Partial<Record<UptimeStatus | "loading" | "uptime", string>>
+    labels?: Partial<UptimeBarLabels>
     /**
      * The history is on its way. The row of ticks pulses in place of the
      * slices (as many as `segments` already holds, else `skeletonSlices`) at
@@ -83,7 +86,7 @@ const opacityFor = (status: UptimeStatus): number =>
 const colorFor = (status: UptimeStatus): string =>
   props.colors?.[status] ?? defaultColor[status]
 
-const statusLabel = useLabels(
+const statusLabel = useLabels<UptimeBarLabels>(
   "uptimeBar",
   {
     operational: "Operational",

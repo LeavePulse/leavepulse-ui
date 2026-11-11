@@ -5,6 +5,11 @@ import type { ContextMenuItemDef } from "../components/LpContextMenu.vue"
 import { provideField, useField } from "./useField"
 import { useLabels } from "./useLpConfig"
 
+/** Wording of the palette command a form control registers. */
+export type PaletteControlLabels = {
+  focus: string
+}
+
 export interface PaletteRegistration {
   commands: () => readonly Command[]
   priority: number
@@ -185,7 +190,7 @@ export function usePaletteControl(options: {
   const blocked = inject(BLOCKED, false)
   if (options.ownsChildren) suppressPaletteDiscovery()
   if (!instance || !scope || blocked) return
-  const text = useLabels("paletteControl", { focus: "Go to field" })
+  const text = useLabels<PaletteControlLabels>("paletteControl", { focus: "Go to field" })
   const field = useField()
   const settings = () => (instance.attrs.palette ?? instance.props.palette) as PaletteControlOptions | undefined
   const label = () => (settings() || {}).label ?? options.label?.() ?? field?.value.label

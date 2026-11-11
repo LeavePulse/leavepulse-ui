@@ -27,6 +27,14 @@ import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpThemeStudio, { type ThemeStudioPart } from "./LpThemeStudio.vue"
 
+/** Wording of the theme switcher. `{name}` in `trigger` is the current theme. */
+export type ThemeSwitcherLabels = {
+  trigger: string
+  system: string
+  studio: string
+  openStudio: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Active theme NAME (v-model). Falls back to the first theme. */
@@ -66,7 +74,7 @@ const props = withDefaults(
      */
     system?: { light: string | TokenSet; dark: string | TokenSet }
     /** Text overrides. `trigger` may contain `{name}`. */
-    labels?: Partial<{ trigger: string; system: string; studio: string; openStudio: string }>
+    labels?: Partial<ThemeSwitcherLabels>
     /**
      * The right-click menu ends with "Theme studio…", set apart from the
      * themes, which opens LpThemeStudio by the trigger: the theme plus brand
@@ -125,7 +133,7 @@ function keepForTrigger(event: Event) {
   }
 }
 
-const text = useLabels(
+const text = useLabels<ThemeSwitcherLabels>(
   "themeSwitcher",
   {
     trigger: "Theme: {name}. Click to switch, right-click to choose.",

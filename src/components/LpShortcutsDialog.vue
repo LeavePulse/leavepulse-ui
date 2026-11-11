@@ -27,6 +27,17 @@ import {
 } from "../composables/useHotkeys"
 import { useLabels } from "../composables/useLpConfig"
 
+/**
+ * Wording of the shortcuts dialog. The scope is shared with LpKeys, which reads
+ * `then` (between the steps of a sequence such as "g then i").
+ */
+export type ShortcutsLabels = {
+  title: string
+  conflict: string
+  group: string
+  then: string
+}
+
 const props = withDefaults(
   defineProps<{
     open?: boolean
@@ -49,7 +60,7 @@ const props = withDefaults(
   { open: false, groups: () => [], live: false, title: undefined, glass: undefined, history: undefined },
 )
 
-const text = useLabels("shortcuts", {
+const text = useLabels<Omit<ShortcutsLabels, "then">>("shortcuts", {
   title: "Keyboard shortcuts",
   conflict: "Also bound elsewhere: only one of them runs",
   group: "General",

@@ -32,14 +32,14 @@
  */
 import { computed, watch } from "vue"
 import { hints } from "../composables/useHints"
-import HintSampleTag from "./HintSampleTag.vue"
+import HintSampleTag, { type HintExampleLabels } from "./HintSampleTag.vue"
 import LpCollapse from "./LpCollapse.vue"
 
 const props = defineProps<{
   /** The hint id this stands in for, as in `v-hint`, or several for a sample with parts. */
   hint: string | string[]
   inline?: boolean
-  labels?: Partial<{ badge: string }>
+  labels?: Partial<HintExampleLabels>
 }>()
 
 const ids = computed(() => (Array.isArray(props.hint) ? props.hint : [props.hint]))

@@ -25,6 +25,11 @@ import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { meterFraction, TONE_COLOR, type MeterTone } from "./meter"
 
+/** Wording of the activity line. */
+export type ActivityLineLabels = {
+  busy: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Work is in flight. Going false finishes the line and fades it out. */
@@ -46,12 +51,12 @@ const props = withDefaults(
      * line at all: a flash of activity for a 90 ms request is noise.
      */
     delay?: number
-    labels?: Partial<{ busy: string }>
+    labels?: Partial<ActivityLineLabels>
   }>(),
   { active: true, value: null, max: 100, tone: "brand", placement: "top", height: 2, delay: 150 },
 )
 
-const text = useLabels("activityLine", { busy: "Loading" }, () => props.labels)
+const text = useLabels<ActivityLineLabels>("activityLine", { busy: "Loading" }, () => props.labels)
 
 /*
  * Whether it is up at all is the same question LpLoader answers, so it is

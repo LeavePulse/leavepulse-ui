@@ -8,9 +8,22 @@ import LpThemeProvider from "./LpThemeProvider.vue"
 import LpButton from "./LpButton.vue"
 import LpInput from "./LpInput.vue"
 
+/**
+ * Wording of the theme editor in the command palette. The scope is shared with
+ * `usePaletteTheme`, which names the command after `title`.
+ */
+export type PaletteThemeLabels = {
+  title: string
+  apply: string
+  revert: string
+  sample: string
+  action: string
+  placeholder: string
+}
+
 const props = defineProps<{ studio: PreviewableThemeStudio; hide?: ThemeStudioPart[] }>()
 suppressPaletteDiscovery()
-const text = useLabels("paletteTheme", { title: "Theme", apply: "Apply theme", revert: "Revert draft", sample: "Preview", action: "Continue", placeholder: "A field in this theme" })
+const text = useLabels<PaletteThemeLabels>("paletteTheme", { title: "Theme", apply: "Apply theme", revert: "Revert draft", sample: "Preview", action: "Continue", placeholder: "A field in this theme" })
 const snapshot = ref({ ...props.studio.state.value })
 const state = ref<StudioState>({ ...snapshot.value })
 const preview = computed(() => props.studio.preview(state.value))

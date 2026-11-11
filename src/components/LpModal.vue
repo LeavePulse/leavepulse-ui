@@ -41,6 +41,11 @@ import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 const panelRef = ref<HTMLElement | null>(null)
 const { claim, release, layer } = useModalLayer({ element: () => panelRef.value?.parentElement })
 
+/** Wording of the modal's close button. */
+export type ModalLabels = {
+  close: string
+}
+
 const props = withDefaults(
   defineProps<{
     open?: boolean
@@ -104,12 +109,12 @@ const props = withDefaults(
      * overlay the app already drives from its route.
      */
     history?: OverlayHistoryMode
-    labels?: Partial<{ close: string }>
+    labels?: Partial<ModalLabels>
   }>(),
   { size: "md", autoFocus: "auto", glass: undefined, dismissible: true, guard: undefined, history: undefined },
 )
 
-const text = useLabels("modal", { close: "Close" }, () => props.labels)
+const text = useLabels<ModalLabels>("modal", { close: "Close" }, () => props.labels)
 
 const frosted = useGlass(() => props.glass)
 

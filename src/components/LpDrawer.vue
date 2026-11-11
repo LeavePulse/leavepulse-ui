@@ -7,6 +7,11 @@ import { ref as sharedRef, type Ref } from "vue"
 const EDGE_KEY = Symbol.for("@leavepulse/ui:drawer-edge-owner")
 type GlobalWithEdge = typeof globalThis & { [EDGE_KEY]?: Ref<symbol | null> }
 const edgeOwner = ((globalThis as GlobalWithEdge)[EDGE_KEY] ??= sharedRef<symbol | null>(null))
+
+/** Wording of the drawer's close button. */
+export type DrawerLabels = {
+  close: string
+}
 </script>
 
 <script setup lang="ts">
@@ -142,7 +147,7 @@ const props = withDefaults(
      * overlay the app already drives from its route.
      */
     history?: OverlayHistoryMode
-    labels?: Partial<{ close: string }>
+    labels?: Partial<DrawerLabels>
   }>(),
   {
     history: undefined,
@@ -159,7 +164,7 @@ const props = withDefaults(
 )
 
 const frosted = useGlass(() => props.glass)
-const text = useLabels("drawer", { close: "Close" }, () => props.labels)
+const text = useLabels<DrawerLabels>("drawer", { close: "Close" }, () => props.labels)
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void

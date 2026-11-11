@@ -50,6 +50,11 @@ export interface ActionBarAction {
   hotkey?: string
 }
 
+/** Wording of the action bar's own controls. */
+export type ActionBarLabels = {
+  dismiss: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Shown or not (v-model:open, or a plain :open). */
@@ -97,7 +102,7 @@ const props = withDefaults(
     maxWidth?: string
     /** Accessible name for the landmark. Falls back to `title`. */
     ariaLabel?: string
-    labels?: Partial<{ dismiss: string }>
+    labels?: Partial<ActionBarLabels>
   }>(),
   {
     open: true,
@@ -113,7 +118,7 @@ const emit = defineEmits<{
 }>()
 
 const slots = useSlots()
-const text = useLabels("actionBar", { dismiss: "Dismiss" }, () => props.labels)
+const text = useLabels<ActionBarLabels>("actionBar", { dismiss: "Dismiss" }, () => props.labels)
 
 // The last action is the primary one unless the caller has said otherwise; the
 // rest default to `ghost` so a bar with three buttons still has one obvious

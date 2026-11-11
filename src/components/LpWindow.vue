@@ -1,5 +1,11 @@
 <script lang="ts">
 export default { inheritAttrs: false }
+
+/** Wording of the window's controls. */
+export type WindowLabels = {
+  close: string
+  move: string
+}
 </script>
 
 <script setup lang="ts">
@@ -93,7 +99,7 @@ const props = withDefaults(
     guard?: CloseGuard
     /** Frosted glass instead of a solid panel. Unset follows `provideGlass`. */
     glass?: boolean
-    labels?: Partial<{ close: string; move: string }>
+    labels?: Partial<WindowLabels>
   }>(),
   {
     minWidth: 240,
@@ -113,7 +119,7 @@ const emit = defineEmits<{
   (e: "change", value: { rect: WindowRect; dock: WindowDock | null }): void
 }>()
 
-const text = useLabels("window", { close: "Close", move: "Move window" }, () => props.labels)
+const text = useLabels<WindowLabels>("window", { close: "Close", move: "Move window" }, () => props.labels)
 const frosted = useGlass(() => props.glass)
 const portalTo = usePortalTarget()
 const view = useView()

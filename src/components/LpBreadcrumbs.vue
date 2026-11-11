@@ -24,6 +24,11 @@ export interface Crumb {
   icon?: string
 }
 
+/** Wording of the breadcrumb landmark. */
+export type BreadcrumbsLabels = {
+  nav: string
+}
+
 const props = defineProps<{
   items: Crumb[]
   /**
@@ -31,11 +36,11 @@ const props = defineProps<{
    * link component from provideLpConfig and other hrefs a plain <a>.
    */
   as?: string | Component
-  labels?: Partial<{ nav: string }>
+  labels?: Partial<BreadcrumbsLabels>
 }>()
 defineEmits<{ (e: "navigate", item: Crumb, index: number): void }>()
 
-const text = useLabels("breadcrumbs", { nav: "Breadcrumb" }, () => props.labels)
+const text = useLabels<BreadcrumbsLabels>("breadcrumbs", { nav: "Breadcrumb" }, () => props.labels)
 const linkComponent = useLinkComponent()
 
 function linkOf(item: Crumb) {

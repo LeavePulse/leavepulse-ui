@@ -67,6 +67,44 @@ import {
   type VideoTrimErrorCause,
 } from "./videoTrim"
 
+/** Wording of the video trimmer. `{left}`, `{max}` and `{time}` are times. */
+export type VideoTrimLabels = {
+  play: string
+  pause: string
+  stepBack: string
+  stepForward: string
+  mute: string
+  unmute: string
+  zoomIn: string
+  zoomOut: string
+  zoomFit: string
+  start: string
+  end: string
+  position: string
+  length: string
+  left: string
+  overview: string
+  timeline: string
+  region: string
+  regionHint: string
+  regionClear: string
+  failed: string
+  unsupported: string
+  invalidTime: string
+  menuAt: string
+  setStart: string
+  setEnd: string
+  goStart: string
+  goEnd: string
+  zoomHere: string
+  volume: string
+  copyTime: string
+  copyFrame: string
+  copiedTime: string
+  copiedFrame: string
+  copyFailed: string
+}
+
 const props = withDefaults(
   defineProps<{
     src: string
@@ -86,14 +124,7 @@ const props = withDefaults(
     /** More items for the right-click menu, given the time it was opened at (under the pointer on the timeline, the playhead elsewhere). */
     menuItems?: (at: number) => ContextMenuItemDef[]
     disabled?: boolean
-    labels?: Partial<Record<
-      | "play" | "pause" | "stepBack" | "stepForward" | "mute" | "unmute" | "zoomIn" | "zoomOut" | "zoomFit"
-      | "start" | "end" | "position" | "length" | "left" | "overview" | "timeline"
-      | "region" | "regionHint" | "regionClear" | "failed" | "unsupported" | "invalidTime"
-      | "menuAt" | "setStart" | "setEnd" | "goStart" | "goEnd" | "zoomHere" | "volume"
-      | "copyTime" | "copyFrame" | "copiedTime" | "copiedFrame" | "copyFailed",
-      string
-    >>
+    labels?: Partial<VideoTrimLabels>
   }>(),
   { poster: undefined, range: undefined, maxClip: undefined, minClip: 0.1, region: null, frameRate: 30, labels: () => ({}) },
 )
@@ -106,7 +137,7 @@ const emit = defineEmits<{
   (e: "error", error: { cause: VideoTrimErrorCause; message: string }): void
 }>()
 
-const text = useLabels(
+const text = useLabels<VideoTrimLabels>(
   "videoTrim",
   {
     play: "Play",

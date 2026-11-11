@@ -1,3 +1,12 @@
+<script lang="ts">
+/** Wording of the repeater. `{index}` in `remove` is the item's position. */
+export type RepeaterLabels = {
+  add: string
+  remove: string
+  empty: string
+}
+</script>
+
 <script setup lang="ts" generic="T extends object">
 import FieldWrapper from "./FieldWrapper.vue"
 import { nextTick, ref } from "vue"
@@ -20,7 +29,7 @@ const props = defineProps<{
   disabled?: boolean
   /** A message under the control, as on LpInput: it marks it invalid and shows under it (what `form.field()` hands it). */
   error?: string
-  labels?: Partial<{ add: string; remove: string; empty: string }>
+  labels?: Partial<RepeaterLabels>
 }>()
 const model = defineModel<T[]>({ default: () => [] })
 defineSlots<{
@@ -29,7 +38,7 @@ defineSlots<{
 }>()
 
 const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
-const text = useLabels("repeater", { add: "Add item", remove: "Remove item {index}", empty: "No items" }, () => props.labels)
+const text = useLabels<RepeaterLabels>("repeater", { add: "Add item", remove: "Remove item {index}", empty: "No items" }, () => props.labels)
 const list = useRepeater({
   value: () => model.value,
   set: (items) => { model.value = items },

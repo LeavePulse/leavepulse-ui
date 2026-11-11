@@ -35,7 +35,10 @@ export const STATUS_LOOK: Record<StatusKind, StatusLook> = {
   unknown: { tone: "neutral", pulse: false },
 }
 
-export const STATUS_LABELS: Record<StatusKind, string> = {
+/** A name for each status, as LpStatus shows and announces it. */
+export type StatusLabels = Record<StatusKind, string>
+
+export const STATUS_LABELS: StatusLabels = {
   online: "Online",
   offline: "Offline",
   degraded: "Degraded",

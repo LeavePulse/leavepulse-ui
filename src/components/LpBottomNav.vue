@@ -19,6 +19,12 @@ import LpTabFace from "./LpTabFace.vue"
 import type { SidebarItem } from "./sidebar"
 import { BOTTOM_BAR, BOTTOM_ITEM, BOTTOM_MARKER } from "./tabs"
 
+/** Wording of the bottom navigation. */
+export type BottomNavLabels = {
+  nav: string
+  more: string
+}
+
 const props = withDefaults(
   defineProps<{
     items: SidebarItem[]
@@ -34,7 +40,7 @@ const props = withDefaults(
     /** The id of what "More" opens, while it is in the page. */
     moreControls?: string
     label?: string
-    labels?: Partial<{ nav: string; more: string }>
+    labels?: Partial<BottomNavLabels>
   }>(),
   { more: false, moreActive: false, moreExpanded: false },
 )
@@ -44,7 +50,7 @@ const emit = defineEmits<{
   (e: "more"): void
 }>()
 
-const text = useLabels("bottomNav", { nav: "Main", more: "More" }, () => props.labels)
+const text = useLabels<BottomNavLabels>("bottomNav", { nav: "Main", more: "More" }, () => props.labels)
 const linkComponent = useLinkComponent()
 const pillTransition = usePillTransition()
 const markerId = `lp-bottom-nav-${useId()}`

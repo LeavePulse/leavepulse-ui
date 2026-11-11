@@ -2,6 +2,11 @@
 // The root class is merged with the consumer's (useMergedClass), so the raw
 // `class` must not also land on the span unmerged.
 export default { inheritAttrs: false }
+
+/** Wording of the badge's remove button. */
+export type BadgeLabels = {
+  remove: string
+}
 </script>
 
 <script setup lang="ts">
@@ -94,7 +99,7 @@ defineSlots<{
   remove?: () => unknown
 }>()
 
-const text = useLabels("badge", { remove: "Remove" })
+const text = useLabels<BadgeLabels>("badge", { remove: "Remove" })
 
 const classes = useMergedClass(() => badge({ tone: props.tone, size: props.size, removable: props.removable }))
 

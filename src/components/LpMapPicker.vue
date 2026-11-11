@@ -30,6 +30,15 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 import { useResizeObserver } from "../composables/useResizeObserver"
 
+/** Wording of the map picker's controls. */
+export type MapPickerLabels = {
+  zoomIn: string
+  zoomOut: string
+  locate: string
+  recentre: string
+  map: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Picked point. Bind with v-model; undefined leaves the map unpinned. */
@@ -63,7 +72,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{ (e: "update:modelValue", value: LatLon): void }>()
 
-const labelSet = useLabels("mapPicker", {
+const labelSet = useLabels<MapPickerLabels>("mapPicker", {
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
   locate: "Use my location",

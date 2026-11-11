@@ -75,12 +75,24 @@ import type { Box } from "../composables/spatialNav"
 import { holeClip, holeOf, panelsAround } from "./tour"
 import { usePortalTarget } from "../composables/useView"
 
+/** Wording of the tour. `{n}` and `{total}` in `progress` are replaced. */
+export type TourLabels = {
+  next: string
+  back: string
+  done: string
+  close: string
+  progress: string
+  perform: string
+  tryIt: string
+  example: string
+}
+
 const props = withDefaults(
   defineProps<{
     steps: TourStep[]
     /** Room around the target inside the lit hole, px. */
     padding?: number
-    labels?: Partial<typeof DEFAULT_LABELS>
+    labels?: Partial<TourLabels>
   }>(),
   { padding: 6 },
 )
@@ -95,7 +107,7 @@ const emit = defineEmits<{
 const open = defineModel<boolean>("open", { default: false })
 const index = defineModel<number>("step", { default: 0 })
 
-const DEFAULT_LABELS = {
+const DEFAULT_LABELS: TourLabels = {
   next: "Next",
   back: "Back",
   done: "Done",
@@ -105,7 +117,7 @@ const DEFAULT_LABELS = {
   tryIt: "Try it: press the highlighted control.",
   example: "This is an example: there are none right now.",
 }
-const labels = useLabels("tour", DEFAULT_LABELS, () => props.labels)
+const labels = useLabels<TourLabels>("tour", DEFAULT_LABELS, () => props.labels)
 
 const WAIT_MS = 800
 const TRY_SETTLE_MS = 120

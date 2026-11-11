@@ -21,8 +21,15 @@ import LpIcon from "./LpIcon.vue"
 import { toneLook } from "./tone"
 import { nodeWindow, usePortalTarget, useView, viewDocument, viewWindow } from "../composables/useView"
 
-const props = defineProps<{ labels?: Partial<{ dismiss: string; copy: string; copied: string }> }>()
-const text = useLabels("toast", { dismiss: "Dismiss", copy: "Copy message", copied: "Copied" }, () => props.labels)
+/** Wording of a toast's controls. */
+export type ToasterLabels = {
+  dismiss: string
+  copy: string
+  copied: string
+}
+
+const props = defineProps<{ labels?: Partial<ToasterLabels> }>()
+const text = useLabels<ToasterLabels>("toast", { dismiss: "Dismiss", copy: "Copy message", copied: "Copied" }, () => props.labels)
 
 const { queue, dismiss } = useToast()
 

@@ -2,6 +2,11 @@
 // The consumer's `class` is merged into the root's own rather than appended,
 // so `class="h-12"` or `class="px-6"` beats the size's defaults.
 export default { inheritAttrs: false }
+
+/** Wording of the button's menu group. */
+export type ButtonLabels = {
+  group: string
+}
 </script>
 
 <script setup lang="ts">
@@ -133,7 +138,7 @@ const props = withDefaults(
     hotkey?: string
     /** The key reference's section for `hotkey`. */
     hotkeyGroup?: string
-    labels?: Partial<{ group: string }>
+    labels?: Partial<ButtonLabels>
   }>(),
   { palette: undefined, type: "button" },
 )
@@ -145,7 +150,7 @@ const emit = defineEmits<{
   (e: "error", error: unknown): void
 }>()
 
-const labels = useLabels("button", { group: "Actions" }, () => props.labels)
+const labels = useLabels<ButtonLabels>("button", { group: "Actions" }, () => props.labels)
 const toast = useToast()
 const attrs = useAttrs()
 const instance = getCurrentInstance()

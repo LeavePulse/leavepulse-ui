@@ -16,12 +16,26 @@ import LpActionBar, { type ActionBarAction } from "./LpActionBar.vue"
 import LpHintLayer from "./LpHintLayer.vue"
 import LpTour from "./LpTour.vue"
 
+/** Wording of the hint offers. `{page}` is the page's name. */
+export type HintsLabels = {
+  tourTitle: string
+  tourText: string
+  assignedTitle: string
+  assignedText: string
+  newsTitle: string
+  show: string
+  notNow: string
+  never: string
+  gotIt: string
+  noThanks: string
+}
+
 const props = defineProps<{
   system: HintSystem
-  labels?: Partial<typeof DEFAULT_LABELS>
+  labels?: Partial<HintsLabels>
 }>()
 
-const DEFAULT_LABELS = {
+const DEFAULT_LABELS: HintsLabels = {
   tourTitle: "New to {page}?",
   tourText: "A one-minute look at what you can do here.",
   assignedTitle: "You were asked to look at {page}",
@@ -33,7 +47,7 @@ const DEFAULT_LABELS = {
   gotIt: "Got it",
   noThanks: "No thanks",
 }
-const labels = useLabels("hints", DEFAULT_LABELS, () => props.labels)
+const labels = useLabels<HintsLabels>("hints", DEFAULT_LABELS, () => props.labels)
 
 provideHintSystem(props.system)
 

@@ -33,7 +33,16 @@ import LpIcon from "./LpIcon.vue"
 import LpLightbox from "./LpLightbox.vue"
 import VideoThumb from "./VideoThumb.vue"
 
-const DEFAULT_LABELS = {
+/** Wording of the media gallery. `{n}` and `{total}` are replaced. */
+export type MediaGalleryLabels = {
+  gallery: string
+  image: string
+  spoiler: string
+  showSpoiler: string
+  showMore: string
+}
+
+const DEFAULT_LABELS: MediaGalleryLabels = {
   /** Accessible name of the grid. */
   gallery: "Media",
   /** Name of an image without a title; `{n}` and `{total}` are replaced. */
@@ -80,7 +89,7 @@ const props = withDefaults(
      * image without one; it keeps the browser's own menu.
      */
     itemMenu?: (item: LightboxItem, index: number) => ContextMenuItemDef[]
-    labels?: Partial<typeof DEFAULT_LABELS>
+    labels?: Partial<MediaGalleryLabels>
   }>(),
   {
     columns: 3,
@@ -92,7 +101,7 @@ const props = withDefaults(
   },
 )
 
-const text = useLabels("mediaGallery", DEFAULT_LABELS, () => props.labels)
+const text = useLabels<MediaGalleryLabels>("mediaGallery", DEFAULT_LABELS, () => props.labels)
 
 /** `{n}` is the image's position, `{total}` the size of the set. */
 function fill(template: string, n: number, total = 0): string {

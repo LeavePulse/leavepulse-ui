@@ -24,6 +24,16 @@ import { useLabels } from "../composables/useLpConfig"
 import { areaPath, extent, linePath, normalise, type Box } from "./chart"
 import { toneLook, type ToneName } from "./tone"
 
+/** Wording of the sparkline's states and trend. */
+export type SparklineLabels = {
+  empty: string
+  up: string
+  down: string
+  flat: string
+  latest: string
+  loading: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Oldest → newest. `null` breaks the line, as in LpChart. */
@@ -74,7 +84,7 @@ const props = withDefaults(
      * says it is an example). Off: the flat stub shows on the tour too.
      */
     sample?: boolean
-    labels?: Partial<Record<"empty" | "up" | "down" | "flat" | "latest" | "loading", string>>
+    labels?: Partial<SparklineLabels>
   }>(),
   { width: 84, height: 24, tone: "brand", smooth: 0.9, animate: true, duration: 900, sample: true },
 )
@@ -184,7 +194,7 @@ const lastPoint = computed(() => {
 const hasData = computed(() => series.value[0].values.some((v) => v != null))
 
 /* A bare <svg> is invisible to a screen reader; say the shape out loud. */
-const text = useLabels(
+const text = useLabels<SparklineLabels>(
   "sparkline",
   {
     empty: "No data",

@@ -27,6 +27,13 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 import { useLabels } from "../composables/useLpConfig"
 import { useResizeObserver } from "../composables/useResizeObserver"
 
+/** Wording of the pagination controls. */
+export type PaginationLabels = {
+  nav: string
+  previous: string
+  next: string
+}
+
 const props = withDefaults(
   defineProps<{
     /** Current page, 1-based (v-model:page). */
@@ -39,12 +46,12 @@ const props = withDefaults(
     /** Pages shown on each side of the current one in the inner run. */
     siblings?: number
     disabled?: boolean
-    labels?: Partial<Record<"nav" | "previous" | "next", string>>
+    labels?: Partial<PaginationLabels>
   }>(),
   { page: 1, pageSize: 10, siblings: 1 },
 )
 
-const text = useLabels(
+const text = useLabels<PaginationLabels>(
   "pagination",
   { nav: "Pagination", previous: "Previous page", next: "Next page" },
   () => props.labels,

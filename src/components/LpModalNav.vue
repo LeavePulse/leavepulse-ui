@@ -26,6 +26,11 @@ export type { SidebarItem, SidebarSection } from "./sidebar"
 
 type Breakpoint = "sm" | "md" | "lg" | "xl"
 
+/** Wording of the modal's section navigation. */
+export type ModalNavLabels = {
+  nav: string
+}
+
 const props = withDefaults(
   defineProps<{
     open?: boolean
@@ -74,7 +79,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void
 }>()
 
-const text = useLabels("modalNav", { nav: "Sections" })
+const text = useLabels<ModalNavLabels>("modalNav", { nav: "Sections" })
 const navName = computed(() => props.navLabel ?? text.value.nav)
 
 const navOpen = ref(false)

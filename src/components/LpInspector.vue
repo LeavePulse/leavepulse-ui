@@ -16,6 +16,14 @@ export interface InspectorSection {
 }
 
 export default { inheritAttrs: false }
+
+/** Wording of the inspector panel. */
+export type InspectorLabels = {
+  close: string
+  empty: string
+  resize: string
+  region: string
+}
 </script>
 
 <script setup lang="ts" generic="T">
@@ -71,14 +79,14 @@ const props = withDefaults(
     closable?: boolean
     /** Unsaved edits: `true` asks before closing, a function asks the app. */
     guard?: CloseGuard
-    labels?: Partial<{ close: string; empty: string; resize: string; region: string }>
+    labels?: Partial<InspectorLabels>
   }>(),
   { side: "right", width: 320, minWidth: 240, maxWidth: 640, closable: true, subject: undefined },
 )
 
 const open = defineModel<boolean>("open", { default: true })
 const slots = useSlots()
-const text = useLabels(
+const text = useLabels<InspectorLabels>(
   "inspector",
   { close: "Close", empty: "Nothing selected", resize: "Resize panel", region: "Details" },
   () => props.labels,
