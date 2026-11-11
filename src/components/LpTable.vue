@@ -1704,6 +1704,17 @@ usePaletteCommands(() => {
       </LpShift>
     </div>
   </LpShift>
+  <!-- The frame eases to its new height as rows come and go. A leaving row
+       stays in the flow while it fades (a positioned <tr> loses the column
+       grid), so when it is finally removed the table lost its height in one
+       frame: the rows slid aside smoothly and the box under them snapped.
+       Always on rather than only while `animating`: LpShift starts over when
+       it is switched on, so the change that switched it on was never eased.
+       Rows the parent replaces wholesale still swap at once; only the frame
+       eases. A virtual table owns its own height and stays out. -->
+  <!-- flex-auto, not flex-1: a zero basis overrides the height LpShift sets
+       while it eases, and the box jumped to its new size regardless. -->
+  <LpShift :disabled="!!virtualRowHeight" class="flex min-h-0 flex-auto flex-col">
   <LpScrollArea
     v-bind="scrollAttrs"
     :fade="false"
@@ -2005,6 +2016,7 @@ usePaletteCommands(() => {
     </table>
     </LpContextMenu>
   </LpScrollArea>
+  </LpShift>
   <LpPagination
     v-if="load && total > pageSize"
     v-model:page="page"

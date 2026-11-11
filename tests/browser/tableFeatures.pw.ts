@@ -60,6 +60,29 @@ test("the page's toolbar, the row count and Export share one line above the tabl
   expect(b.x).toBeGreaterThan(a.x + a.width)
 })
 
+test("a table that loses rows to a filter eases its height instead of snapping", async ({ page }) => {
+  await page.goto(open("shrink"))
+  await expect(page.locator("tbody tr")).toHaveCount(3)
+  // Every frame's height from the click until the motion is over: a snap is
+  // two values (before, after); an eased box passes through the ones between.
+  const heights = await page.evaluate(async () => {
+    const box = document.querySelector("table")!.closest(".rounded-card")!.parentElement as HTMLElement
+    const seen: number[] = []
+    ;(document.querySelector("button") as HTMLButtonElement).click()
+    const end = performance.now() + 900
+    while (performance.now() < end) {
+      await new Promise(requestAnimationFrame)
+      seen.push(Math.round(box.getBoundingClientRect().height))
+    }
+    return seen
+  })
+  await expect(page.locator("tbody tr")).toHaveCount(1)
+  const first = heights[0]!
+  const last = heights.at(-1)!
+  expect(last).toBeLessThan(first)
+  expect(heights.filter((h) => h < first && h > last).length).toBeGreaterThan(2)
+})
+
 test("groups head their rows and collapse", async ({ page }) => {
   await page.goto(open("group"))
   const group = page.getByRole("button", { name: "Collapse b (2)" })

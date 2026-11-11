@@ -18,6 +18,9 @@ const columns: TableColumn<Row>[] = [
   { key: "load", label: "Load", sortable: true },
 ]
 
+const shrinkFilters = ref<Record<string, unknown[]>>({})
+const filterColumns: TableColumn<Row>[] = columns.map((col) => (col.key === "site" ? { ...col, filterable: true } : col))
+
 const sorts = ref<SortState[]>([])
 const sortsText = computed(() => sorts.value.map((s) => `${s.key}:${s.dir}`).join(","))
 
@@ -79,6 +82,10 @@ const token = ref<TableSelectionToken | null>(null)
     </template>
     <LpTable v-else-if="part === 'pin'" :columns="pinned" :rows="wideRows" row-key="id" aria-label="Pinned" />
     <LpTable v-else-if="part === 'group'" :columns="columns" :rows="base" row-key="id" group-by="site" aria-label="Grouped" />
+    <div v-else-if="part === 'shrink'">
+      <button type="button" @click="shrinkFilters = { site: ['b'] }">Hide site b</button>
+      <LpTable v-model:filters="shrinkFilters" :columns="filterColumns" :rows="base" row-key="id" aria-label="Shrinking" />
+    </div>
     <LpTable v-else-if="part === 'toolbar'" :columns="columns" :rows="base" row-key="id" exportable summary aria-label="With toolbar">
       <template #toolbar><input aria-label="Page search" placeholder="search"></template>
     </LpTable>
