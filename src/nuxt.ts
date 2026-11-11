@@ -114,7 +114,11 @@ export default defineNuxtModule<LeavepulseUiOptions>({
     // the build into the server bundle.
     nuxt.options.runtimeConfig.public.leavepulseUi = {
       ...((nuxt.options.runtimeConfig.public.leavepulseUi as Record<string, unknown> | undefined) ?? {}),
-      defaultTheme: options.defaultTheme,
+      // A string even when unset: Nuxt types runtimeConfig.public from what the
+      // app wrote, so an app that sets `leavepulseUi.defaultTheme` made this
+      // field `string`, and `undefined` here failed the APP's typecheck. The
+      // plugin finds no theme named "" and falls back to Dark, as before.
+      defaultTheme: options.defaultTheme ?? "",
     }
 
     addPlugin({ src: resolver.resolve("./runtime/theme.plugin"), mode: "all" })
