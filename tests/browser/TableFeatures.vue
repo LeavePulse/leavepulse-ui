@@ -153,6 +153,14 @@ const token = ref<TableSelectionToken | null>(null)
       </LpTable>
       <output aria-label="Clicked">{{ clicked }}</output>
     </template>
+    <template v-else-if="part === 'own-line'">
+      <div style="width: 360px">
+        <LpTable :columns="layoutColumns" :rows="base" row-key="id" :layout-below="480" :row-menu="rowMenu" aria-label="Own lines" @row-click="(row) => (clicked = `click:${row.name}`)">
+          <template #line="{ row }"><div class="own-line">{{ row.name }} on {{ row.site }}</div></template>
+        </LpTable>
+      </div>
+      <output aria-label="Clicked">{{ clicked }}</output>
+    </template>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable

@@ -250,3 +250,17 @@ test("a card of one's own fills the frame edge to edge and keeps the table's cli
   await page.getByRole("menuitem", { name: "Open alpha" }).click()
   await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("menu:alpha")
 })
+
+test("a line of one's own replaces the built line of a narrow table and keeps its click and menu", async ({ page }) => {
+  await page.goto(open("own-line"))
+  const own = page.locator(".own-line")
+  await expect(own).toHaveCount(3)
+  await expect(own.first()).toHaveText("alpha on b")
+  // The built line is gone, not drawn beside the own one.
+  await expect(page.locator(".lp-item .font-medium")).toHaveCount(0)
+  await own.first().click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("click:alpha")
+  await own.first().click({ button: "right" })
+  await page.getByRole("menuitem", { name: "Open alpha" }).click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("menu:alpha")
+})

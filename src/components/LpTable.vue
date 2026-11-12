@@ -2362,7 +2362,18 @@ usePaletteCommands(() => {
               </dl>
             </div>
           </slot>
+          <!-- `#line` is to a list line what `#card` is to a card: the inside
+               only. Without it the line is built from the columns: the first
+               names the row, the rest follow it in one muted line, which
+               reads well for words and badly for meters or several badges. -->
           <div v-else class="min-w-0 flex-1">
+            <slot
+              name="line"
+              :row="entry.row"
+              :selected="isSelected(keyFor(entry.row, entry.index))"
+              :toggle="() => toggleRow(keyFor(entry.row, entry.index), !isSelected(keyFor(entry.row, entry.index)))"
+              :open-menu="openRowMenu"
+            >
               <div v-if="titleColumn" class="min-w-0 truncate font-medium text-ink">
                 <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
               </div>
@@ -2374,7 +2385,8 @@ usePaletteCommands(() => {
                   </span>
                 </template>
               </div>
-            </div>
+            </slot>
+          </div>
         </div>
       </template>
     </TransitionGroup>
