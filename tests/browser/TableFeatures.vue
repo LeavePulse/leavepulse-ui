@@ -73,6 +73,13 @@ const layoutColumns: TableColumn<Row>[] = [
   { key: "site", label: "Site", sortable: true, filterable: true },
   { key: "load", label: "Load", sortable: true },
 ]
+const lineColumns: TableColumn<Row>[] = [
+  { key: "name", label: "Name" },
+  { key: "note", label: "Note" },
+  { key: "site", label: "Site", list: (row) => (row.site === "a" ? false : true) },
+  { key: "load", label: "Load", list: "label" },
+  { key: "act", label: "Actions", list: false },
+]
 const layoutPicks = ref<(string | number)[]>([])
 const clicked = ref("")
 const rowMenu = (row: Row) => [{ label: `Open ${row.name}`, onSelect: () => (clicked.value = `menu:${row.name}`) }]
@@ -161,6 +168,10 @@ const token = ref<TableSelectionToken | null>(null)
       </div>
       <output aria-label="Clicked">{{ clicked }}</output>
     </template>
+    <LpTable v-else-if="part === 'line-columns'" :columns="lineColumns" :rows="base" row-key="id" layout="list" aria-label="Line columns">
+      <template #cell-note="{ row }"><template v-if="row.name === 'alpha'">only alpha</template></template>
+      <template #cell-act><button type="button">Act</button></template>
+    </LpTable>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable

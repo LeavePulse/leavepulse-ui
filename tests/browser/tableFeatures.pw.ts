@@ -264,3 +264,22 @@ test("a line of one's own replaces the built line of a narrow table and keeps it
   await page.getByRole("menuitem", { name: "Open alpha" }).click()
   await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("menu:alpha")
 })
+
+test("a list line names the figures it is told to, leaves out what it is told to, and dots only what is there", async ({ page }) => {
+  await page.goto(open("line-columns"))
+  const line = (name: string) => page.locator(".lp-item").filter({ hasText: name })
+  const shown = (name: string) =>
+    line(name)
+      .locator(".lp-line-field")
+      .evaluateAll((els) => els.filter((el) => getComputedStyle(el).display !== "none").map((el) => (el.textContent ?? "").replace(/\s+/g, " ").trim()))
+  // "label" prefixes the label; false leaves the column out of the line.
+  expect(await shown("alpha")).toEqual(["only alpha", "b", "Load 2"])
+  await expect(line("alpha").getByRole("button", { name: "Act" })).toHaveCount(0)
+  // A cell that drew nothing takes no place and no dot; a column can leave a
+  // row out by itself (beta's site is "a").
+  expect(await shown("beta")).toEqual(["Load 2"])
+  // The dot before the first fact sits outside the clip box.
+  const box = (await line("beta").locator(".lp-line").boundingBox())!
+  const first = (await line("beta").locator(".lp-line-field").filter({ hasText: "Load" }).first().boundingBox())!
+  expect(first.x).toBeLessThan(box.x)
+})

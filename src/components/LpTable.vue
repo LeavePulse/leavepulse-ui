@@ -62,6 +62,9 @@ import {
 } from "./tableFilter"
 import { resolveRowMenu, type TableRowMenuResult } from "./tableRowMenu"
 
+/** How a column reads in a list line: alone, after its label, or not at all. */
+export type TableListMode = boolean | "label"
+
 export interface TableColumn<Row> {
   key: string
   label: string
@@ -118,6 +121,19 @@ export interface TableColumn<Row> {
    * user's own show/hide applies as usual.
    */
   hideBelow?: number
+  /**
+   * How the column reads in a list line (the `list` layout, and a table drawn
+   * as a list below `layoutBelow`), where there are no headers to name it.
+   * `true` (default) puts the value alone in the line; `"label"` prefixes its
+   * label, for a figure that means nothing on its own ("Cores 28"); `false`
+   * leaves it out: an actions column (the row menu holds the same actions),
+   * or a fact the line already says. A function decides per row, for a fact
+   * worth a place only when it holds something ("needs attention", a stack
+   * that is set): a cell slot cannot say "nothing" itself, since an empty
+   * slot falls back to the raw value. Cards always show labels and are not
+   * affected.
+   */
+  list?: TableListMode | ((row: Row) => TableListMode)
   /** Stick to this edge while the table scrolls sideways. Pinned columns move to that edge. */
   pin?: ColumnPin
   /** Bounds in px for `resizableColumns`. */
@@ -1545,6 +1561,10 @@ const cardColumns = computed(() =>
 )
 const titleColumn = computed(() => cardColumns.value[0])
 const fieldColumns = computed(() => cardColumns.value.slice(1).filter((col) => col.label))
+const lineColumns = computed(() => fieldColumns.value.filter((col) => col.list !== false))
+function lineMode(col: TableColumn<T>, row: T): TableListMode {
+  return (typeof col.list === "function" ? col.list(row) : col.list) ?? true
+}
 
 watch(chosenLayout, (layout) => {
   if (storageKey.value && restored.value) store.set(`${storageKey.value}:layout`, layout)
@@ -2377,13 +2397,19 @@ usePaletteCommands(() => {
               <div v-if="titleColumn" class="min-w-0 truncate font-medium text-ink">
                 <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
               </div>
-              <div v-if="fieldColumns.length" class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                <template v-for="(col, ci) in fieldColumns" :key="col.key">
-                  <span v-if="ci > 0" aria-hidden="true">·</span>
-                  <span class="min-w-0 truncate" :title="col.label">
-                    <slot :name="`cell-${col.key}`" :row="entry.row" :value="entry.row[col.key]" :open-menu="openRowMenu">{{ entry.row[col.key] }}</slot>
+              <!-- Separators belong between the facts that are there: a cell
+                   that drew nothing takes no dot, and the dot that would open
+                   a wrapped line is clipped off (the inner row starts one
+                   separator to the left of the clip box). -->
+              <div v-if="lineColumns.length" class="lp-line min-w-0 overflow-hidden text-xs text-muted">
+                <div class="lp-line-row flex flex-wrap items-center gap-y-0.5">
+                  <template v-for="col in lineColumns" :key="col.key">
+                  <span v-if="lineMode(col, entry.row) !== false" class="lp-line-field min-w-0 truncate" :title="col.label">
+                    <span v-if="lineMode(col, entry.row) === 'label'" class="lp-line-label">{{ `${col.label} ` }}</span>
+                    <span class="lp-line-value"><slot :name="`cell-${col.key}`" :row="entry.row" :value="entry.row[col.key]" :open-menu="openRowMenu">{{ entry.row[col.key] }}</slot></span>
                   </span>
-                </template>
+                  </template>
+                </div>
               </div>
             </slot>
           </div>
@@ -2403,6 +2429,32 @@ usePaletteCommands(() => {
 </template>
 
 <style scoped>
+/*
+ * A list line's facts, one dot between each two that are there. Every field
+ * carries its own dot before it; the row sits one dot to the left inside a
+ * box that clips, so the dot opening the line, or any wrapped line, falls
+ * outside and only the dots between facts are seen. A cell whose slot drew
+ * nothing (a v-if that failed, an empty value) is left out, dot and all.
+ */
+.lp-line {
+  --lp-line-sep: 1rem;
+}
+
+.lp-line-row {
+  margin-left: calc(-1 * var(--lp-line-sep));
+}
+
+.lp-line-field::before {
+  content: "·" / "";
+  display: inline-block;
+  width: var(--lp-line-sep);
+  text-align: center;
+}
+
+.lp-line-field:has(> .lp-line-value:empty) {
+  display: none;
+}
+
 /*
  * Rows arriving, leaving and moving as the filter changes.
  *
