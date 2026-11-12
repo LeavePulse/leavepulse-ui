@@ -16,12 +16,18 @@ concurrency:
 
 permissions:
   contents: read
+  # Read the ci workflow's runs, to know whether the commit under the release
+  # was already tested.
+  actions: read
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The release commit and its parent, to see what the release changed.
+          fetch-depth: 2
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -47,13 +53,43 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # A release commit only bumps the version in package.json, on top of a
+      # commit `ci` has just tested in full. Re-running the same suites here
+      # doubled the time of every release (~6 min). They are skipped only when
+      # BOTH hold: ci's own run on the parent concluded success, and the tag
+      # differs from the parent in package.json's version alone. Anything else
+      # runs the full suite as before.
+      - name: Decide whether the parent was already tested
+        id: tested
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          parent="$(git rev-parse HEAD^)"
+          changed="$(git diff --name-only HEAD^ HEAD)"
+          version_only=false
+          if [ "$changed" = "package.json" ]; then
+            other="$(git diff -U0 HEAD^ HEAD -- package.json | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]*"version":' || true)"
+            [ -z "$other" ] && version_only=true
+          fi
+          ci="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci --commit "$parent" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')"
+          if [ "$version_only" = true ] && [ "${ci:-0}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Tests skipped: ci passed on ${parent} and this release only changes the version." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Full test run: version_only=${version_only}, green ci runs on ${parent}: ${ci:-0}." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Test
+        if: steps.tested.outputs.skip != 'true'
         run: bun test
 
       - name: Install Chromium
+        if: steps.tested.outputs.skip != 'true'
         run: bunx playwright install --with-deps chromium
 
       - name: Browser tests
+        if: steps.tested.outputs.skip != 'true'
         run: bun run test:browser
 
       - name: Build library
