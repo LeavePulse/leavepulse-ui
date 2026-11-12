@@ -2301,7 +2301,7 @@ usePaletteCommands(() => {
           class="lp-item group relative outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           :class="[
             activeLayout === 'cards'
-              ? ['flex min-w-0 flex-col gap-2 rounded-card border bg-surface p-4 hover:border-line-strong focus-visible:ring-offset-0', isSelected(keyFor(entry.row, entry.index)) ? 'border-brand bg-brand-soft/30' : 'border-line']
+              ? ['flex min-w-0 flex-col overflow-hidden rounded-card border bg-surface hover:border-line-strong focus-visible:ring-offset-0', isSelected(keyFor(entry.row, entry.index)) ? 'border-brand bg-brand-soft/30' : 'border-line']
               : ['flex min-w-0 items-center gap-3 border-b border-line/60 px-4 last:border-0 hover:bg-surface-soft/60 focus-visible:ring-inset data-[active]:bg-surface-soft/40', cellY, isSelected(keyFor(entry.row, entry.index)) ? 'bg-brand-soft/40' : ''],
           ]"
           v-bind="roving.itemProps(String(keyFor(entry.row, entry.index)))"
@@ -2331,18 +2331,19 @@ usePaletteCommands(() => {
               />
             </div>
           </div>
+          <!-- `#card` draws the inside of a card; the frame, selection, focus
+               and menu stay the table's, so every card answers alike. Without
+               it the card is built from the columns and their cell slots: the
+               first column names the row, the rest are its facts. -->
           <slot
+            v-if="activeLayout === 'cards'"
             name="card"
             :row="entry.row"
             :selected="isSelected(keyFor(entry.row, entry.index))"
             :toggle="() => toggleRow(keyFor(entry.row, entry.index), !isSelected(keyFor(entry.row, entry.index)))"
             :open-menu="openRowMenu"
-            :layout="activeLayout"
           >
-            <!-- Built from the columns and their cell slots, so a table that
-                 never thought about cards still has good ones: the first column
-                 names the row, the rest are its facts. -->
-            <template v-if="activeLayout === 'cards'">
+            <div class="flex min-w-0 flex-col gap-2 p-4">
               <div v-if="titleColumn" class="min-w-0 truncate pr-6 font-medium text-ink">
                 <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
               </div>
@@ -2354,8 +2355,9 @@ usePaletteCommands(() => {
                   </dd>
                 </template>
               </dl>
-            </template>
-            <div v-else class="min-w-0 flex-1">
+            </div>
+          </slot>
+          <div v-else class="min-w-0 flex-1">
               <div v-if="titleColumn" class="min-w-0 truncate font-medium text-ink">
                 <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
               </div>
@@ -2368,7 +2370,6 @@ usePaletteCommands(() => {
                 </template>
               </div>
             </div>
-          </slot>
         </div>
       </template>
     </TransitionGroup>

@@ -147,6 +147,12 @@ const token = ref<TableSelectionToken | null>(null)
       <LpTable v-model:selected="layoutPicks" :columns="layoutColumns" :rows="base" row-key="id" layout="list" selectable="hold" aria-label="Hold list" />
       <output aria-label="Picked">{{ layoutPicks.join(",") }}</output>
     </template>
+    <template v-else-if="part === 'own-card'">
+      <LpTable :columns="layoutColumns" :rows="base" row-key="id" layout="cards" :row-menu="rowMenu" aria-label="Own cards" @row-click="(row) => (clicked = `click:${row.name}`)">
+        <template #card="{ row }"><div class="own-card" style="background: rgb(1, 2, 3); height: 40px">{{ row.name }} on {{ row.site }}</div></template>
+      </LpTable>
+      <output aria-label="Clicked">{{ clicked }}</output>
+    </template>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable

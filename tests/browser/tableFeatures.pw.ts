@@ -234,3 +234,17 @@ test("a held list line starts selection and only then opens room for the ticks",
   await expect(page.getByRole("status", { name: "Picked" })).toHaveText("1")
   await expect.poll(async () => (await title.boundingBox())!.x).toBeGreaterThan(startX + 16)
 })
+
+test("a card of one's own fills the frame edge to edge and keeps the table's click and menu", async ({ page }) => {
+  await page.goto(open("own-card"))
+  const own = page.locator(".own-card").first()
+  await expect(own).toHaveText("alpha on b")
+  const inner = (await own.boundingBox())!
+  const frame = (await page.locator(".lp-item").first().boundingBox())!
+  expect(inner.x - frame.x).toBeLessThan(2)
+  await own.click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("click:alpha")
+  await own.click({ button: "right" })
+  await page.getByRole("menuitem", { name: "Open alpha" }).click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("menu:alpha")
+})
