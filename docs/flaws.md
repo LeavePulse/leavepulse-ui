@@ -38,6 +38,27 @@ entry is deleted, not ticked: the commit says what changed.
   v0.77.0 and v0.77.1 runs and never locally against the preview. Likely the
   button is measured mid-mount of the example frame, before the row lays out.
 
+- **`LpTopologyCanvas` and its parts, found redrawing control-panel's
+  network map:**
+  - `LpInfraNode` knows only `online: boolean`, so a node that serves but
+    takes no instruction, or one merely unreachable, draws as down. It wants a
+    `status: StatusKind` like LpStatus.
+  - `LpWaypointEdge` does not declare Vue Flow's edge props, so Vue warns in
+    dev for every edge; the app falls back to plain beziers.
+  - The lane node takes the pointer, so an edge inside a lane cannot be
+    right-clicked; the app turns pointer events off on lanes by class.
+  - The canvas cancels `contextmenu` and has no node/edge menu prop, so
+    LpContextMenu cannot open on a node or edge; the app replays the event.
+  - The built-in search cannot be controlled (no v-model, no initial query)
+    and does not match edge labels, so a linkable `?q=` needs its own box.
+  - Neighbour highlight cannot be cleared from outside and stays on a node
+    that is no longer drawn.
+  - `minZoom` (fixed 0.3) and zoom on double click are not props; a wide
+    graph cannot be framed on a phone.
+  - `layeredLayout` does not route long edges around nodes, and edge labels
+    are placed without avoiding each other, so where edges bunch their
+    labels overprint ("e wireguard e").
+
 ## Ideas
 
 - **A group order on `LpTable`.** Groups follow the first row of each after
