@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { afterLead, lead, plain } from "./prose"
 import { computed, defineComponent, h, markRaw, ref, watchEffect, type Component } from "vue"
 import {
   LpAppShell,
@@ -99,7 +100,7 @@ const previews = new Map<string, Component>()
 function previewOf(entry: (typeof registry)[number]): Component {
   let made = previews.get(entry.id)
   if (!made) {
-    const lead = entry.description.split(/(?<=[.!?])\s/)[0]
+    const first = lead(entry.description)
     made = markRaw(
       defineComponent({
         render: () =>
@@ -107,7 +108,7 @@ function previewOf(entry: (typeof registry)[number]): Component {
             h(ThumbView, { entry }),
             h("div", { class: "border-t border-line px-3 py-2.5" }, [
               h("p", { class: "text-sm font-medium text-ink" }, entry.name),
-              h("p", { class: "mt-0.5 line-clamp-2 text-xs text-muted" }, lead),
+              h("p", { class: "mt-0.5 line-clamp-2 text-xs text-muted" }, first),
             ]),
           ]),
       }),
@@ -167,24 +168,19 @@ const pageLink = (id: string) => href({ kind: "page", id })
  * page is open. The start of the example's source used to stand here: a block
  * of markup said less than the thing it draws.
  */
-type Prose = { text: string; code: boolean }[]
-const prose = (text: string): Prose =>
-  text.split(/`([^`]+)`/).map((part, i) => ({ text: part, code: i % 2 === 1 })).filter((part) => part.text)
 function componentPreview(id: string) {
   const entry = registry.find((e) => e.id === id.replace(/^component\//, ""))
   if (!entry) return null
-  const text = entry.description.trim()
-  const cut = text.search(/[.!?](\s|$)/)
-  const lead = (cut > 0 ? text.slice(0, cut + 1) : text).replace(/`/g, "")
-  const rest = prose(cut > 0 ? text.slice(cut + 1).trim() : "")
-  return { entry, lead, rest, path: `/component/${entry.id}` }
+  const first = lead(entry.description)
+  const rest = afterLead(entry.description)
+  return { entry, lead: first, rest, path: `/component/${entry.id}` }
 }
 
 const commands = computed<Command[]>(() => [
   ...registry.map((entry) => ({
     id: `component/${entry.id}`,
     label: entry.name,
-    description: entry.description.replace(/`/g, ""),
+    description: plain(entry.description),
     preview: entry.description,
     icon: "lucide:box",
     group: "Components",

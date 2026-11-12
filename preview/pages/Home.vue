@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { lead } from "../prose"
 import { computed, ref } from "vue"
 import { LpBadge, LpButton, LpCard, LpEmptyState, LpIcon, LpInput, LpStat, presets } from "../../src"
 import ThumbView from "../playground/ThumbView.vue"
@@ -36,11 +37,6 @@ const found = computed(() =>
     .filter((section) => section.entries.length),
 )
 
-/** The first sentence of a description: the card's one line. */
-function lead(text: string): string {
-  const cut = text.search(/[.!?](\s|$)/)
-  return (cut > 0 ? text.slice(0, cut + 1) : text).replace(/`/g, "")
-}
 </script>
 
 <template>

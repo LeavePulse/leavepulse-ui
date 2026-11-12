@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Prose from "../Prose.vue"
+import { plain } from "../prose"
 import { computed, ref, watch } from "vue"
 import { LpBadge, LpButton, LpCodeBlock, LpIcon, LpSegmented, LpTabs } from "../../src"
 import ApiTables from "./ApiTables.vue"
@@ -74,7 +76,7 @@ function go(e: MouseEvent, id: string) {
         <LpBadge v-for="name in documented" :key="name" tone="neutral" class="font-mono">{{ name }}</LpBadge>
       </div>
       <h1 class="text-3xl font-semibold tracking-tight text-ink">{{ entry.name }}</h1>
-      <p class="max-w-3xl text-sm leading-relaxed text-muted">{{ entry.description }}</p>
+      <Prose :text="entry.description" />
       <LpCodeBlock v-if="importLine" :model-value="importLine" lang="ts" copyable class="max-w-3xl" />
     </header>
 
@@ -85,7 +87,7 @@ function go(e: MouseEvent, id: string) {
           class="flex min-w-0 flex-col gap-1 rounded-card border border-line p-3 transition-colors hover:bg-surface-soft focus-visible:outline-2 focus-visible:outline-ring"
           @click="go($event, link.id)">
           <span class="text-sm font-medium text-ink">{{ link.entry?.name ?? link.id }} ↗</span>
-          <span class="text-xs leading-relaxed text-muted">{{ link.description }}</span>
+          <span class="text-xs leading-relaxed text-muted">{{ plain(link.description ?? "") }}</span>
         </a>
       </div>
     </nav>
