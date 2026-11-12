@@ -59,6 +59,24 @@ entry is deleted, not ticked: the commit says what changed.
     are placed without avoiding each other, so where edges bunch their
     labels overprint ("e wireguard e").
 
+- **The nightly Firefox and WebKit run is red on its own.** WebKit fails
+  about 45 tests and Firefox about 12 every night, so a new failure there
+  hides among old ones. Most of the WebKit ones are the page-error fixture
+  catching "ResizeObserver loop completed with undelivered notifications",
+  which WebKit raises where Chromium does not; which table or sidebar tests
+  it hits changes from run to run. The fix is to ignore that one message in
+  `tests/browser/fixtures.ts` (it is not a kit error) and then fix or mark
+  the rest, so the run goes green and a new failure stands out. On the
+  0.88.0 run Firefox also failed "a fitted player in full screen fills the
+  screen instead of going black" once; whether it repeats is unknown.
+- **The phone pass left open items.** LpTable's column-resize handle is 6px
+  wide, and a wider hit area would take taps from the header sort buttons.
+  LpDrawer's top and bottom size is `94vh`, where `dvh` is safer on iOS.
+  The LayoutCanvas splitter has no `touch-action`. LpVideoPlayer's seek bar
+  is 16px tall on touch. Search, tags and palette fields have no
+  `enterkeyhint` or `inputmode`. None of the kit has been tried on a real
+  iPhone or Android.
+
 ## Ideas
 
 - **A group order on `LpTable`.** Groups follow the first row of each after
