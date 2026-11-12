@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import * as presets from "../src/theme/presets"
 import { dark, light, nord } from "../src/theme/presets"
 import { normalizeTheme, parseTheme, revealTransition, themeEntries, themeFromCookie, themeToCssRule, useTheme } from "../src/theme/useTheme"
@@ -152,6 +152,19 @@ describe("revealTransition", () => {
 })
 
 describe("useTheme on the server", () => {
+  // The server is the absence of a window. Made here rather than assumed, so a
+  // window another file left on globalThis cannot turn this into a browser.
+  const g = globalThis as { window?: unknown }
+  let had = false
+  let saved: unknown
+  beforeEach(() => {
+    had = "window" in g
+    saved = g.window
+    delete g.window
+  })
+  afterEach(() => {
+    if (had) g.window = saved
+  })
   test("init keeps nothing between requests", () => {
     const theme = useTheme()
     expect(theme.init(dark)).toBe(dark)

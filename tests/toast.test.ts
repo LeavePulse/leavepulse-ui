@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, test } from "bun:test"
 import { useToast } from "../src/composables/useToast"
 
+// Put back at the end: a window left behind makes every later file that tells
+// the server from the browser by `typeof window` read as a browser.
+const hadWindow = "window" in globalThis
 ;(globalThis as { window?: unknown }).window ??= globalThis
+afterAll(() => {
+  if (!hadWindow) delete (globalThis as { window?: unknown }).window
+})
 
 describe("toast details", () => {
   const toast = useToast()
