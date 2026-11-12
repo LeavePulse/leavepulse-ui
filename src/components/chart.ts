@@ -91,9 +91,9 @@ export interface ChartAnnotation {
 
 /**
  * Which x labels to print with every `stride`-th one shown. The last point is
- * always labelled (it is usually "now"), and when it lands within half a
- * stride to the previous shown label that one gives way: "20 22 23" read as
- * one smudge at the end of an hourly axis.
+ * always labelled (it is usually "now"), and when it lands closer than a
+ * full stride to the previous shown label that one gives way: "20 22 23" read
+ * as one smudge at the end of an hourly axis.
  */
 export function xLabelIndices(count: number, stride: number): number[] {
   if (count <= 0) return []
@@ -102,7 +102,10 @@ export function xLabelIndices(count: number, stride: number): number[] {
   for (let i = 0; i < count; i += step) out.push(i)
   const last = count - 1
   if (out[out.length - 1] !== last) {
-    if (out.length > 1 && last - out[out.length - 1] <= step / 2) out.pop()
+    // The stride is the spacing at which labels fit, so a last label closer
+    // than a full step to the one before would print over it ("10:03 PM10:09
+    // PM"): the earlier one gives way.
+    if (out.length > 1 && last - out[out.length - 1] < step) out.pop()
     out.push(last)
   }
   return out

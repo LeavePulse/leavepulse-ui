@@ -49,6 +49,8 @@ test("summary names the span and each series' range", () => {
 test("x labels keep the last point and drop a neighbour that would touch it", () => {
   expect(xLabelIndices(24, 2)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 23])
   expect(xLabelIndices(25, 2)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24])
+  // The last label never sits closer than a full step to the one before it.
+  expect(xLabelIndices(23, 6)).toEqual([0, 6, 12, 22])
   expect(xLabelIndices(10, 4)).toEqual([0, 4, 9])
   expect(xLabelIndices(1, 3)).toEqual([0])
   expect(xLabelIndices(0, 3)).toEqual([])
