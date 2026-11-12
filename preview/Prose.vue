@@ -7,7 +7,7 @@ const parts = computed(() => blocks(props.text))
 </script>
 
 <template>
-  <div class="flex max-w-3xl flex-col gap-2 text-sm leading-relaxed text-muted">
+  <div class="flex flex-col gap-2 text-sm leading-relaxed text-muted">
     <template v-for="(block, b) in parts" :key="b">
       <p v-if="block.kind === 'p'">
         <template v-for="(part, i) in block.parts" :key="i">

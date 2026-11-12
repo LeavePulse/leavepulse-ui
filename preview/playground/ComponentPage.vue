@@ -77,7 +77,7 @@ function go(e: MouseEvent, id: string) {
       </div>
       <h1 class="text-3xl font-semibold tracking-tight text-ink">{{ entry.name }}</h1>
       <Prose :text="entry.description" />
-      <LpCodeBlock v-if="importLine" :model-value="importLine" lang="ts" copyable class="max-w-3xl" />
+      <LpCodeBlock v-if="importLine" :model-value="importLine" lang="ts" copyable />
     </header>
 
     <nav v-if="related.length" :aria-label="entry.related ? 'When to use each component' : 'Compare and compose'" class="flex flex-col gap-3">
