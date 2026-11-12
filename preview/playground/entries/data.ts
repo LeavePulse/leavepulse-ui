@@ -958,6 +958,56 @@ export const data: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "table-lines",
+    name: "Table · List lines",
+    description:
+      "How a row reads as a list line (the `list` layout, and any table below `layoutBelow`), where no header names the columns. The first column names the row; the rest follow it, each with its own dot, and a dot never opens a line or a wrapped line. A column's `list` decides its place: `true` (default) the value alone, `\"label\"` prefixes the label for a bare figure (\"Cores 32\"), `false` leaves it out (an actions column: the row menu holds the same actions), and a function of the row keeps a fact only when it holds something (alerts here). A cell that draws blocks (owner over team) keeps its left edge clear of the dot. `expandable` opens a row's panel from a line or a card as well as from the table. `#line` draws the inside of a line yourself, the way `#card` draws a card, for rows that read badly as one muted line (a meter here); the frame, click, menu, selection and hold stay the table's.",
+    components: { LpTable, LpBadge, LpButton },
+    state: () =>
+      reactive({
+        open: [] as string[],
+        columns: [
+          { key: "name", label: "Server" },
+          { key: "state", label: "State" },
+          { key: "cores", label: "Cores", align: "right", list: "label" },
+          { key: "owner", label: "Owner" },
+          { key: "alerts", label: "Alerts", list: (row: { alerts: number }) => row.alerts > 0 },
+          { key: "actions", label: "", list: false },
+        ],
+        rows: [
+          { name: "fra-01", state: "online", cores: 32, owner: "Anya", team: "Infra", alerts: 0, cpu: 42, deploy: "2 h ago" },
+          { name: "fra-02", state: "degraded", cores: 16, owner: "Max", team: "Billing", alerts: 3, cpu: 91, deploy: "yesterday" },
+          { name: "kyiv-01", state: "online", cores: 64, owner: "Oksana", team: "Infra", alerts: 0, cpu: 17, deploy: "10 min ago" },
+          { name: "waw-01", state: "offline", cores: 8, owner: "Piotr", team: "Edge", alerts: 1, cpu: 0, deploy: "3 days ago" },
+        ],
+        tone: (state: string) => (state === "online" ? "success" : state === "degraded" ? "warning" : "danger"),
+      }),
+    template: `<div class="flex flex-col gap-6">
+  <div class="max-w-sm">
+    <LpTable :columns="columns" :rows="rows" row-key="name" layout="list" expandable v-model:expanded="open">
+      <template #cell-state="{ value }"><LpBadge :tone="tone(value)" size="sm">{{ value }}</LpBadge></template>
+      <template #cell-owner="{ row }">
+        <div class="flex flex-col leading-tight"><span>{{ row.owner }}</span><span class="text-xs text-muted">{{ row.team }}</span></div>
+      </template>
+      <template #cell-alerts="{ value }"><span class="text-danger">{{ value }} {{ value === 1 ? 'alert' : 'alerts' }}</span></template>
+      <template #cell-actions><LpButton size="sm" variant="ghost">Open</LpButton></template>
+      <template #expanded="{ row }"><p class="px-3 py-2 text-sm text-muted">{{ row.name }}: last deploy {{ row.deploy }}</p></template>
+    </LpTable>
+  </div>
+  <div class="max-w-sm">
+    <LpTable :columns="columns" :rows="rows" row-key="name" layout="list">
+      <template #line="{ row }">
+        <div class="flex items-center gap-3">
+          <span class="w-16 shrink-0 font-medium text-ink">{{ row.name }}</span>
+          <div class="h-1.5 flex-1 rounded-full bg-surface-soft"><div class="h-full rounded-full bg-brand" :style="{ width: row.cpu + '%' }" /></div>
+          <span class="w-10 text-right text-xs tabular-nums text-muted">{{ row.cpu }}%</span>
+        </div>
+      </template>
+    </LpTable>
+  </div>
+</div>`,
+  },
+  {
     id: "pagination",
     name: "Pagination",
     description:
