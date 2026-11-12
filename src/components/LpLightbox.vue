@@ -534,7 +534,7 @@ const guardOutside = useOutsideGuard()
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         ref="contentRef"
-        class="fixed inset-0 flex flex-col outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
+        class="fixed inset-0 flex flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] outline-none data-[state=open]:animate-[lightbox-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[lightbox-out_140ms_cubic-bezier(0.4,0,1,1)] motion-reduce:animate-none"
         :style="{ zIndex: layer.panel }"
         @keydown="onKeydown"
       >

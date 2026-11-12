@@ -197,11 +197,14 @@ onBeforeUnmount(release)
 const contentClass = computed(() => {
   const surface = frosted.value ? (layer.value.nested ? "lp-glass-overlay lp-glass-overlay--nested" : "lp-glass-overlay") : "bg-surface-raised"
   const base = `fixed z-(--z-modal) flex flex-col border-line ${surface} shadow-panel outline-none`
+  // The panel pads itself by the safe area of each screen edge it touches, so
+  // on a phone with a notch or a home indicator its header, close button and
+  // last row stay clear of them while its surface still reaches the edge.
   const map: Record<Direction, string> = {
-    left: "inset-y-0 left-0 border-r rounded-r-card",
-    right: "inset-y-0 right-0 border-l rounded-l-card",
-    top: "inset-x-0 top-0 border-b rounded-b-card",
-    bottom: "inset-x-0 bottom-0 border-t rounded-t-card",
+    left: "inset-y-0 left-0 border-r rounded-r-card pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
+    right: "inset-y-0 right-0 border-l rounded-l-card pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)]",
+    top: "inset-x-0 top-0 border-b rounded-b-card pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]",
+    bottom: "inset-x-0 bottom-0 border-t rounded-t-card pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]",
   }
   return [base, map[dir.value]]
 })

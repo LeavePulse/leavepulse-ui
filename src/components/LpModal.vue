@@ -15,7 +15,7 @@ import { useGlass } from "../composables/useGlass"
 import { useModelOverlayHistory, type OverlayHistoryMode } from "../composables/useOverlayHistory"
 import { useLabels } from "../composables/useLpConfig"
 import { useShift } from "../composables/useShift"
-import { useModalLayer } from "./modalDepth"
+import { MODAL_MAX_HEIGHT, useModalLayer } from "./modalDepth"
 import { CLOSE_ICON } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
@@ -379,7 +379,7 @@ const guardOutside = useOutsideGuard()
            the link to DialogDescription. -->
       <DialogContent
         class="pointer-events-auto flex min-h-0 items-start outline-none data-[state=open]:animate-[rise-in_var(--duration-medium)_var(--ease-emphasized)] data-[state=closed]:animate-[rise-out_120ms_cubic-bezier(0.4,0,1,1)]"
-        :style="{ maxHeight: 'min(90vh, calc(100dvh - 2rem))' }"
+        :style="{ maxHeight: MODAL_MAX_HEIGHT }"
         v-bind="describedByAttrs"
         @open-auto-focus="onOpenAutoFocus"
         @interact-outside="onInteractOutside"
@@ -395,9 +395,9 @@ const guardOutside = useOutsideGuard()
       </aside>
       <div
         ref="panelRef"
-        class="relative flex max-h-[min(90vh,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
+        class="relative flex min-h-0 flex-col overflow-hidden rounded-card border border-line shadow-panel"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', widthClass, tweening ? 'transition-[height] duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none' : '']"
-        :style="{ ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
+        :style="{ maxHeight: MODAL_MAX_HEIGHT, ...(width ? { width } : {}), ...(hasAside ? { alignSelf: 'stretch' } : {}) }"
       >
         <DialogTitle v-if="!(title || $slots.title) && ariaLabel" class="sr-only">
           {{ ariaLabel }}

@@ -3,6 +3,12 @@ import { computed, ref, type ComputedRef, type Ref } from "vue"
 const STEP = 20
 
 /*
+ * A dialog's ceiling: 90% of the window, and never closer than 1rem to its
+ * edges or to a notch or home indicator on a phone that draws under them.
+ */
+export const MODAL_MAX_HEIGHT = "min(90vh, calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)))"
+
+/*
  * One opening-order stack for every modal surface. Pinned to a global symbol
  * like the toast queue: a barrel import and a deep import can load this module
  * twice, and two stacks would put a deep-imported dialog's scrim under a

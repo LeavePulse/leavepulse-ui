@@ -18,6 +18,7 @@ import { useGlass } from "../composables/useGlass"
 import { useLabels } from "../composables/useLpConfig"
 import LpButton from "./LpButton.vue"
 import LpIcon from "./LpIcon.vue"
+import { MODAL_MAX_HEIGHT } from "./modalDepth"
 import LpModal from "./LpModal.vue"
 import LpSidebar from "./LpSidebar.vue"
 import type { SidebarItem, SidebarSection } from "./sidebar"
@@ -132,7 +133,7 @@ const triggerClass = computed(() => TRIGGER_VISIBILITY[props.mobileBreakpoint])
  * mirrors LpModal's max-height, which is not a class this file can put in the
  * consuming app's scan.
  */
-const railStyle = { maxHeight: "min(90vh, calc(100dvh - 2rem))" }
+const railStyle = { maxHeight: MODAL_MAX_HEIGHT }
 
 /*
  * The rail is part of the dialog, so it takes the same surface: a glass

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { LpAutocomplete, LpButton, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpInput, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
+import { LpAutocomplete, LpButton, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -19,6 +19,9 @@ const menu = [{ label: "Rename", onSelect: () => {} }, { label: "A rather long a
 const toast = useToast()
 const many = Array.from({ length: 30 }, (_, i) => ({ value: `o${i + 1}`, label: `Option ${i + 1}` }))
 const manyPicked = ref("o1")
+const lightbox = ref(false)
+const pixel = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="gray"/></svg>')
+const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" }]
 </script>
 
 <template>
@@ -67,6 +70,8 @@ const manyPicked = ref("o1")
       <LpNotificationBell :items="[]" />
       <LpButton @click="toast.success('Saved')">Toast</LpButton>
       <LpToaster />
+      <LpButton @click="lightbox = true">Open lightbox</LpButton>
+      <LpLightbox v-model:open="lightbox" :items="images" />
     </section>
   </main>
 </template>

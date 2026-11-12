@@ -330,7 +330,7 @@ const portalTo = usePortalTarget()
     <Teleport :to="portalTo">
       <ToastViewport
         :data-lp-toasts="viewportId"
-        class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 outline-none"
+        class="fixed bottom-0 right-0 z-(--z-toast) flex w-[min(92vw,22rem)] flex-col gap-2 p-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] outline-none"
       />
     </Teleport>
   </ToastProvider>
