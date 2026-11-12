@@ -75,6 +75,7 @@ const layoutColumns: TableColumn<Row>[] = [
 ]
 const lineColumns: TableColumn<Row>[] = [
   { key: "name", label: "Name" },
+  { key: "block", label: "Block" },
   { key: "note", label: "Note" },
   { key: "site", label: "Site", list: (row) => (row.site === "a" ? false : true) },
   { key: "load", label: "Load", list: "label" },
@@ -171,6 +172,7 @@ const token = ref<TableSelectionToken | null>(null)
     <LpTable v-else-if="part === 'line-columns'" :columns="lineColumns" :rows="base" row-key="id" layout="list" aria-label="Line columns">
       <template #cell-note="{ row }"><template v-if="row.name === 'alpha'">only alpha</template></template>
       <template #cell-act><button type="button">Act</button></template>
+      <template #cell-block="{ row }"><div class="block-cell"><div>top {{ row.name }}</div><div>bottom</div></div></template>
     </LpTable>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">

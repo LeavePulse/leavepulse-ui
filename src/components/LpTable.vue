@@ -2444,9 +2444,18 @@ usePaletteCommands(() => {
   margin-left: calc(-1 * var(--lp-line-sep));
 }
 
+/* The dot lives in the field's own left padding, so whatever the cell draws,
+   a word or a block of two lines, starts after it and never in the clipped
+   strip. */
+.lp-line-field {
+  position: relative;
+  padding-left: var(--lp-line-sep);
+}
+
 .lp-line-field::before {
   content: "·" / "";
-  display: inline-block;
+  position: absolute;
+  left: 0;
   width: var(--lp-line-sep);
   text-align: center;
 }

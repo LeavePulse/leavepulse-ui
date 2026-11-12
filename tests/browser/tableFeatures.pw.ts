@@ -271,15 +271,19 @@ test("a list line names the figures it is told to, leaves out what it is told to
   const shown = (name: string) =>
     line(name)
       .locator(".lp-line-field")
-      .evaluateAll((els) => els.filter((el) => getComputedStyle(el).display !== "none").map((el) => (el.textContent ?? "").replace(/\s+/g, " ").trim()))
+      .evaluateAll((els) => els.filter((el) => getComputedStyle(el).display !== "none").map((el) => ((el as HTMLElement).innerText ?? "").replace(/\s+/g, " ").trim()))
   // "label" prefixes the label; false leaves the column out of the line.
-  expect(await shown("alpha")).toEqual(["only alpha", "b", "Load 2"])
+  expect(await shown("alpha")).toEqual(["top alpha bottom", "only alpha", "b", "Load 2"])
   await expect(line("alpha").getByRole("button", { name: "Act" })).toHaveCount(0)
   // A cell that drew nothing takes no place and no dot; a column can leave a
   // row out by itself (beta's site is "a").
-  expect(await shown("beta")).toEqual(["Load 2"])
+  expect(await shown("beta")).toEqual(["top beta bottom", "Load 2"])
   // The dot before the first fact sits outside the clip box.
   const box = (await line("beta").locator(".lp-line").boundingBox())!
-  const first = (await line("beta").locator(".lp-line-field").filter({ hasText: "Load" }).first().boundingBox())!
+  const first = (await line("beta").locator(".lp-line-field").first().boundingBox())!
   expect(first.x).toBeLessThan(box.x)
+  // A cell that draws blocks starts after its dot, inside the clip box, not
+  // under it (the dot used to push block content to a line of its own).
+  const block = (await line("beta").locator(".block-cell").boundingBox())!
+  expect(block.x).toBeGreaterThanOrEqual(box.x)
 })
