@@ -55,17 +55,17 @@ export const POPOVER_PANEL = PANEL_SURFACE + " " + POPOVER_ANIM
 export const PANEL_FIT = "max-w-[calc(100vw-1rem)] max-h-(--reka-popper-available-height) overflow-y-auto"
 
 /**
- * A selectable option row: layout, highlight state, and the staggered cascade.
- * Cascades downward by default and upward when the panel is flipped above the
- * trigger (group-data-[side=top]). Pair with an inline animationDelay for the
- * stagger (optionStagger). `flex` + gap are included; add justify/extra layout if needed.
- */
-/**
  * A list row on a touch screen: 2.5rem tall instead of 2, so a thumb picks the
  * row it is on and not its neighbour. A mouse keeps the compact row.
  */
 export const TOUCH_ROW = "[@media(hover:none)_and_(pointer:coarse)]:py-2.5"
 
+/**
+ * A selectable option row: layout, highlight state, and the staggered cascade.
+ * Cascades downward by default and upward when the panel is flipped above the
+ * trigger (group-data-[side=top]). Pair with an inline animationDelay for the
+ * stagger (optionStagger). `flex` + gap are included; add justify/extra layout if needed.
+ */
 export const OPTION_ITEM =
   "flex cursor-pointer items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm text-ink outline-none " +
   TOUCH_ROW + " " +
