@@ -20,6 +20,7 @@ const toast = useToast()
 const many = Array.from({ length: 30 }, (_, i) => ({ value: `o${i + 1}`, label: `Option ${i + 1}` }))
 const manyPicked = ref("o1")
 const lightbox = ref(false)
+const tipClicks = ref(0)
 const pixel = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="gray"/></svg>')
 const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" }]
 </script>
@@ -65,7 +66,8 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       <LpDatePicker v-model="date" aria-label="Date" presets time />
       <LpDateRangePicker v-model="range" aria-label="Range" />
       <LpColorPicker v-model="colour" aria-label="Colour" />
-      <LpTooltip content="Tooltip text"><LpButton>Has tooltip</LpButton></LpTooltip>
+      <LpTooltip content="Tooltip text"><LpButton @click="tipClicks++">Has tooltip</LpButton></LpTooltip>
+      <output aria-label="Tip clicks">{{ tipClicks }}</output>
       <LpHoverCard><template #trigger><a href="#hc">Hover card</a></template><p>Card body</p></LpHoverCard>
       <LpNotificationBell :items="[]" />
       <LpButton @click="toast.success('Saved')">Toast</LpButton>

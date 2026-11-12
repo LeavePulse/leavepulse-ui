@@ -34,8 +34,9 @@ import {
   HoverCardRoot,
   HoverCardTrigger,
 } from "reka-ui"
-import { computed, onBeforeUnmount, watch } from "vue"
+import { computed, mergeProps, useAttrs, watch } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
+import { useTouchHold } from "../composables/useTouchHold"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 
@@ -87,90 +88,26 @@ const panel = computed(() =>
 const portalTo = usePortalTarget()
 const guardOutside = useOutsideGuard()
 
-/*
- * Press-and-hold. A hold that drifts is a scroll, not a hold, so moving past
- * a few pixels cancels it. Once it has opened the card, the click the finger
- * produces on lifting is swallowed: the reader asked for the preview, not for
- * the link under it.
- */
-const SLOP = 8
-/* A long press may produce no click at all; past this the next click is the user's own. */
-const CLICK_AFTER_RELEASE_MS = 350
-let holdTimer = 0
-/* The finger the hold belongs to: a second one must not move or end it. */
-let holdPointer: number | null = null
-let start = { x: 0, y: 0 }
-let held = false
-
-function cancelHold() {
-  window.clearTimeout(holdTimer)
-  holdTimer = 0
-}
-
-function onPointerUp(event: PointerEvent) {
-  if (holdPointer !== null && event.pointerId !== holdPointer) return
-  holdPointer = null
-  cancelHold()
-  if (held) window.setTimeout(() => (held = false), CLICK_AFTER_RELEASE_MS)
-}
-
-// A cancelled press produces no click, so there is nothing left to swallow.
-function onPointerCancel(event?: PointerEvent) {
-  if (event && holdPointer !== null && event.pointerId !== holdPointer) return
-  holdPointer = null
-  cancelHold()
-  held = false
-}
-
-function onPointerDown(event: PointerEvent) {
-  // Any new press starts over: on a hybrid laptop the mouse click after a hold
-  // must not be taken for that hold's own click.
-  if (holdTimer && event.pointerId !== holdPointer) return
-  held = false
-  if (event.pointerType !== "touch" || props.touch !== "hold" || props.disabled) return
-  holdPointer = event.pointerId
-  start = { x: event.clientX, y: event.clientY }
-  cancelHold()
-  holdTimer = window.setTimeout(() => {
-    holdTimer = 0
-    held = true
-    open.value = true
-  }, props.holdDelay)
-}
-
-function onPointerMove(event: PointerEvent) {
-  if (!holdTimer || event.pointerId !== holdPointer) return
-  if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > SLOP) cancelHold()
-}
-
-function onClickCapture(event: MouseEvent) {
-  if (!held) return
-  held = false
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-// A long press would otherwise also bring up the system's own menu for the link.
-function onContextMenu(event: Event) {
-  if (holdTimer || held) event.preventDefault()
-}
+// Press-and-hold opens the card on a touch screen, where there is no hover.
+const hold = useTouchHold({ enabled: () => props.touch === "hold" && !props.disabled, delay: () => props.holdDelay, onHold: () => (open.value = true) })
 
 watch(
   () => props.disabled,
   (off) => {
     if (!off) return
-    onPointerCancel()
+    hold.cancel()
     open.value = false
   },
 )
-
-onBeforeUnmount(cancelHold)
 
 // Several roots (trigger and portal), so Vue cannot hand attributes on by
 // itself and dropped them: a trigger wrapped around this one from outside (an
 // LpPopover's, as-child) lost its id, ARIA state and click, and its popover
 // never opened. They go to the trigger, which merges them onto the slot's element.
 defineOptions({ inheritAttrs: false })
+// The caller's own listeners on the trigger run beside the hold's, not instead of them.
+const attrs = useAttrs()
+const triggerAttrs = computed(() => mergeProps(attrs, hold.handlers))
 </script>
 
 <template>
@@ -178,14 +115,8 @@ defineOptions({ inheritAttrs: false })
   <HoverCardRoot v-else v-model:open="open" :open-delay="openDelay" :close-delay="closeDelay">
     <HoverCardTrigger
       as-child
-      v-bind="$attrs"
+      v-bind="triggerAttrs"
       :class="touch === 'hold' ? '[-webkit-touch-callout:none]' : undefined"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerCancel"
-      @click.capture="onClickCapture"
-      @contextmenu="onContextMenu"
     >
       <slot name="trigger" />
     </HoverCardTrigger>

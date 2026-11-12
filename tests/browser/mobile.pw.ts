@@ -154,3 +154,43 @@ test.describe("notched phone", () => {
     })
   })
 })
+
+// A finger resting on the screen: Chromium turns these into touch pointer
+// events, which Playwright's tap cannot hold.
+async function hold(page: import("@playwright/test").Page, target: import("@playwright/test").Locator, ms = 700) {
+  await target.scrollIntoViewIfNeeded()
+  const box = (await target.boundingBox())!
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] })
+  await page.waitForTimeout(ms)
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+  await cdp.detach()
+}
+
+test.describe("touch hold", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "touches are sent through Chromium's DevTools protocol")
+
+  test("a press-and-hold shows a tooltip without pressing the button, and the next touch hides it", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const button = page.getByRole("button", { name: "Has tooltip" })
+    // reka's visible tip carries no role (a hidden copy does), so it is found by its panel.
+    const tip = page.locator("[data-reka-popper-content-wrapper]", { hasText: "Tooltip text" })
+    await hold(page, button)
+    await expect(tip).toBeVisible()
+    // Still there after the finger has gone, and the press did not press the button.
+    await page.waitForTimeout(400)
+    await expect(tip).toBeVisible()
+    await expect(page.getByLabel("Tip clicks")).toHaveText("0")
+    await page.touchscreen.tap(5, 5)
+    await expect(tip).toHaveCount(0)
+    await button.tap()
+    await expect(page.getByLabel("Tip clicks")).toHaveText("1")
+  })
+
+  test("a press-and-hold still opens a hover card", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await hold(page, page.getByRole("link", { name: "Hover card" }))
+    await expect(page.getByText("Card body")).toBeVisible()
+  })
+})

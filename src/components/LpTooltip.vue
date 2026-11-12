@@ -36,13 +36,14 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
-import { onBeforeUnmount, ref, watch, type FunctionalComponent } from "vue"
+import { computed, mergeProps, onBeforeUnmount, ref, useAttrs, watch, type FunctionalComponent } from "vue"
 import {
   springSettled,
   springStep,
   type SpringState,
 } from "../composables/usePillTransition"
 import { PANEL_SURFACE, TOOLTIP_ANIM } from "./dropdown"
+import { useTouchHold } from "../composables/useTouchHold"
 import { prefersReducedMotion } from "../composables/easing"
 import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
@@ -86,8 +87,16 @@ const props = withDefaults(
      * a scroll that should have dismissed it.
      */
     disabled?: boolean
+    /**
+     * Touch has no hover, and a tap is the control's own. With `hold` a
+     * press-and-hold shows the tip (and that press does not also press the
+     * control); the next touch anywhere, or Escape, hides it. `none` leaves
+     * touch to the trigger. A followed tip (`followCursor`) never holds: its
+     * trigger is a chart or canvas with its own touch reading.
+     */
+    touch?: "hold" | "none"
   }>(),
-  { side: "top" },
+  { side: "top", touch: "hold" },
 )
 
 /*
@@ -122,6 +131,9 @@ const PassThrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 const target = { x: 0, y: 0 }
 const offset = ref({ x: 0, y: 0 })
 const tipBody = ref<HTMLElement | null>(null)
+
+/* How long a finger rests on the trigger before the tip shows. */
+const HOLD_MS = 450
 
 /* reka's own collision padding, which the follow offset would otherwise undo. */
 const EDGE = 8
@@ -241,7 +253,30 @@ const open = ref(false)
 /* What reka last asked for, regardless of whether it was allowed at the time. */
 const wanted = ref(false)
 
+/*
+ * A tip opened by a touch hold stays until the next touch or Escape. reka
+ * would close it as soon as the finger lifts (a touch leaves the trigger
+ * then), so while it is held its own requests to close are not taken.
+ */
+const heldOpen = ref(false)
+const hold = useTouchHold({
+  enabled: () => props.touch === "hold" && !props.followCursor && !props.disabled,
+  delay: () => HOLD_MS,
+  onHold: () => {
+    heldOpen.value = true
+    wanted.value = true
+    open.value = true
+  },
+})
+
+function release() {
+  heldOpen.value = false
+  wanted.value = false
+  open.value = false
+}
+
 const onOpenChange = (next: boolean) => {
+  if (!next && heldOpen.value) return
   // What reka wants, kept apart from what is currently allowed.
   wanted.value = next
   open.value = next && !props.disabled
@@ -265,8 +300,11 @@ const onOpenChange = (next: boolean) => {
 watch(
   () => props.disabled,
   (off) => {
-    if (off) open.value = false
-    else if (wanted.value) open.value = true
+    if (off) {
+      hold.cancel()
+      heldOpen.value = false
+      open.value = false
+    } else if (wanted.value) open.value = true
   },
 )
 
@@ -289,6 +327,18 @@ watch(
   },
 )
 
+watch(heldOpen, (held, _, onCleanup) => {
+  if (!held) return
+  const win = viewWindow(view.value)
+  const onKey = (event: KeyboardEvent) => event.key === "Escape" && release()
+  win.addEventListener("pointerdown", release, true)
+  win.addEventListener("keydown", onKey, true)
+  onCleanup(() => {
+    win.removeEventListener("pointerdown", release, true)
+    win.removeEventListener("keydown", onKey, true)
+  })
+})
+
 onBeforeUnmount(stopSpring)
 
 // Overlays open in the window this component renders in (an LpFrame's, inside one).
@@ -302,6 +352,9 @@ const guardOutside = useOutsideGuard()
 // LpPopover's, as-child) lost its id, ARIA state and click, and its popover
 // never opened. They go to the trigger, which merges them onto the slot's element.
 defineOptions({ inheritAttrs: false })
+// The caller's own listeners on the trigger run beside the hold's, not instead of them.
+const attrs = useAttrs()
+const triggerAttrs = computed(() => mergeProps(attrs, hold.handlers))
 </script>
 
 <template>
@@ -324,8 +377,9 @@ defineOptions({ inheritAttrs: false })
            lands on the real button rather than on a wrapper. -->
       <TooltipTrigger
         as-child
-        v-bind="$attrs"
+        v-bind="triggerAttrs"
         :aria-label="label ? content : undefined"
+        :class="touch === 'hold' && !followCursor ? '[-webkit-touch-callout:none]' : undefined"
         @pointermove="onPointerMove"
       >
         <slot />
