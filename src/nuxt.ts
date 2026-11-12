@@ -18,11 +18,16 @@
  *   link         false to skip providing NuxtLink as the kit's link component
  *   exclude      component names not to auto-register (e.g. ["LayoutCanvas"]
  *                when the app has its own component of that name)
- *   icons        which lucide icons render in the server pass and ship in the
- *                main bundle: "scan" (default) finds "lucide:*" literals in the
- *                app's source, "all" registers the whole set, "kit" only the
- *                kit's own, or a list of names. Anything else still renders,
- *                from a lazily loaded chunk of the bundled collection.
+ *   icons        which icons render in the server pass and ship in the main
+ *                bundle: "scan" (default) finds "lucide:*" literals in the
+ *                app's source, "all" registers the whole lucide set, "kit"
+ *                only the kit's own, or a list of names. Anything else in
+ *                lucide still renders, from a lazily loaded chunk of the
+ *                bundled collection. Other sets ("logos:google-icon") are
+ *                found the same way, by "scan" or in the list, for every
+ *                prefix the app has an @iconify-json/<prefix> package for:
+ *                registered offline from that package, never fetched from
+ *                the iconify API.
  *   propCheck    false to skip the dev warning for an unknown prop on a kit
  *                component (default: on in `nuxt dev`, never in a build)
  */
@@ -30,7 +35,7 @@ import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { addComponent, addPlugin, addPluginTemplate, addTemplate, createResolver, defineNuxtModule } from "@nuxt/kit"
 import { COMPONENT_NAMES } from "./component-names"
-import { namesInDirs, subset } from "./iconSubset.mjs"
+import { type IconCollection, refsInDirs, subset } from "./iconSubset.mjs"
 
 export interface LeavepulseUiOptions {
   /** Register the SSR theme plugin. Disable to wire theming yourself. */
@@ -43,18 +48,52 @@ export interface LeavepulseUiOptions {
   link?: boolean
   /** Component names to leave unregistered. */
   exclude?: string[]
-  /** Lucide icons registered up front (default "scan"). */
+  /** Icons registered up front (default "scan"). */
   icons?: "scan" | "all" | "kit" | string[]
   /** Warn in `nuxt dev` about an unknown prop on a kit component (default true). */
   propCheck?: boolean
 }
 
-function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string): string {
+/** The names asked for, as prefix -> names; a bare name is lucide. */
+function iconRefs(mode: LeavepulseUiOptions["icons"], srcDir: string): Map<string, Set<string>> {
+  if (!Array.isArray(mode)) return refsInDirs([srcDir])
+  const refs = new Map<string, Set<string>>()
+  for (const ref of mode) {
+    const [prefix, name] = ref.includes(":") ? ref.split(":", 2) : ["lucide", ref]
+    if (!refs.has(prefix!)) refs.set(prefix!, new Set())
+    refs.get(prefix!)!.add(name!)
+  }
+  return refs
+}
+
+/** An installed iconify set, read from the app's own dependencies; null if it has none. */
+function collectionOf(prefix: string, rootDir: string): IconCollection | null {
+  try {
+    const path = createRequire(`${rootDir}/package.json`).resolve(`@iconify-json/${prefix}/icons.json`)
+    return JSON.parse(readFileSync(path, "utf8")) as IconCollection
+  } catch {
+    return null
+  }
+}
+
+export function iconsPlugin(mode: LeavepulseUiOptions["icons"], srcDir: string, rootDir: string): string {
   if (mode === "kit") return ""
-  if (mode === "all") return 'import "@leavepulse/ui/icons-all"\n'
-  const lucide = JSON.parse(readFileSync(createRequire(import.meta.url).resolve("@iconify-json/lucide/icons.json"), "utf8"))
-  const names = Array.isArray(mode) ? mode.map((n) => n.replace(/^lucide:/, "")) : namesInDirs([srcDir])
-  return `import { registerIconCollection } from "@leavepulse/ui"\nregisterIconCollection(${JSON.stringify(subset(lucide, names))})\n`
+  const refs = iconRefs(mode, srcDir)
+  const sets: IconCollection[] = []
+  if (mode !== "all") {
+    const lucide = JSON.parse(readFileSync(createRequire(import.meta.url).resolve("@iconify-json/lucide/icons.json"), "utf8"))
+    sets.push(subset(lucide, refs.get("lucide") ?? []))
+  }
+  for (const [prefix, names] of refs) {
+    if (prefix === "lucide") continue
+    const collection = collectionOf(prefix, rootDir)
+    if (!collection) continue
+    const cut = subset(collection, names)
+    if (Object.keys(cut.icons).length) sets.push(cut)
+  }
+  const head = mode === "all" ? 'import "@leavepulse/ui/icons-all"\n' : ""
+  if (!sets.length) return head
+  return `${head}import { registerIconCollection } from "@leavepulse/ui"\n${sets.map((set) => `registerIconCollection(${JSON.stringify(set)})\n`).join("")}`
 }
 
 export default defineNuxtModule<LeavepulseUiOptions>({
@@ -74,7 +113,7 @@ export default defineNuxtModule<LeavepulseUiOptions>({
       })
     }
 
-    const icons = iconsPlugin(options.icons, nuxt.options.srcDir)
+    const icons = iconsPlugin(options.icons, nuxt.options.srcDir, nuxt.options.rootDir)
     if (icons) {
       addPluginTemplate({
         filename: "leavepulse-ui-icons.mjs",

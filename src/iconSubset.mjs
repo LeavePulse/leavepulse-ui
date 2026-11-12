@@ -1,19 +1,32 @@
 // Shared by the kit's own icon generator and the Nuxt module's app scan: find
-// "lucide:<name>" literals in source text and cut an iconify collection down to
-// just those icons (aliases keep their parent).
+// "<prefix>:<name>" literals in source text and cut an iconify collection down
+// to just those icons (aliases keep their parent). Any prefix is collected;
+// whoever reads the result decides which prefixes are icon sets (the module
+// keeps those the app has an @iconify-json package for), so "node:fs" in a
+// source file costs nothing.
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-const NAME = /lucide:([a-z0-9]+(?:-[a-z0-9]+)*)/g
+const PART = "[a-z0-9]+(?:-[a-z0-9]+)*"
+const REF = new RegExp(`(?<![a-z0-9-])(${PART}):(${PART})`, "g")
 const SOURCE = /\.(vue|ts|tsx|js|jsx|mjs|md|html)$/
 const SKIP = new Set(["node_modules", "dist", ".nuxt", ".output", ".git"])
 
-export function namesInText(text) {
-  return [...text.matchAll(NAME)].map((m) => m[1])
+/** Every "<prefix>:<name>" literal, as [prefix, name] pairs. */
+export function refsInText(text) {
+  return [...text.matchAll(REF)].map((m) => [m[1], m[2]])
 }
 
-export function namesInDirs(dirs) {
-  const names = new Set()
+/** The lucide names in a text. */
+export function namesInText(text) {
+  return refsInText(text)
+    .filter(([prefix]) => prefix === "lucide")
+    .map(([, name]) => name)
+}
+
+/** Every "<prefix>:<name>" literal under the dirs, as prefix -> names. */
+export function refsInDirs(dirs) {
+  const refs = new Map()
   const walk = (dir) => {
     let entries
     try {
@@ -25,11 +38,21 @@ export function namesInDirs(dirs) {
       if (SKIP.has(entry)) continue
       const path = join(dir, entry)
       if (statSync(path).isDirectory()) walk(path)
-      else if (SOURCE.test(entry)) for (const n of namesInText(readFileSync(path, "utf8"))) names.add(n)
+      else if (SOURCE.test(entry)) {
+        for (const [prefix, name] of refsInText(readFileSync(path, "utf8"))) {
+          if (!refs.has(prefix)) refs.set(prefix, new Set())
+          refs.get(prefix).add(name)
+        }
+      }
     }
   }
   for (const dir of dirs) walk(dir)
-  return names
+  return refs
+}
+
+/** The lucide names under the dirs. */
+export function namesInDirs(dirs) {
+  return refsInDirs(dirs).get("lucide") ?? new Set()
 }
 
 export function subset(collection, names) {
