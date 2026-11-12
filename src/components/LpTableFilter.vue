@@ -163,7 +163,7 @@ const action =
           <span v-if="option.count !== undefined" class="text-xs text-muted tabular-nums">{{ option.count }}</span>
           <button
             type="button"
-            class="rounded-control px-1.5 py-0.5 text-xs font-medium text-brand opacity-0 outline-none transition-opacity duration-fast group-hover/opt:opacity-100 hover:bg-brand-soft focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+            class="rounded-control px-1.5 py-0.5 text-xs font-medium text-brand opacity-0 outline-none transition-opacity duration-fast group-hover/opt:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-brand-soft focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
             @click="set(onlyValues(values, [option.value]))"
           >
             {{ labels.only }}

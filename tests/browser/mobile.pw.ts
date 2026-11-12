@@ -194,3 +194,11 @@ test.describe("touch hold", () => {
     await expect(page.getByText("Card body")).toBeVisible()
   })
 })
+
+test("a column filter shows its Only buttons on a touch screen, where there is no hover to reveal them", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=table&part=layouts")
+  await page.getByRole("button", { name: "Filter Site" }).click()
+  const only = page.getByRole("button", { name: "Only" }).first()
+  await expect(only).toBeVisible()
+  await expect.poll(() => only.evaluate((el) => getComputedStyle(el).opacity)).toBe("1")
+})
