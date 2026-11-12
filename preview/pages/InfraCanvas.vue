@@ -10,10 +10,12 @@ import { computed, ref } from "vue"
 import {
   LpBadge,
   LpButton,
+  LpStatus,
   LpTopologyCanvas,
   useToast,
   type EdgeObserved,
   type InfraNodeData,
+  type StatusKind,
   type TopologyEdge,
   type TopologyNode,
 } from "../../src"
@@ -32,11 +34,11 @@ const isInfraNode = (n: TopologyNode): n is InfraNode =>
 
 const nodes = ref<TopologyNode[]>([
   { id: "api", position: { x: 40, y: 220 }, data: { name: "platform-api", role: "edge", overlay: "10.0.0.2", online: true, project: "infra" } },
-  { id: "lobby", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", online: true, project: "42" } },
+  { id: "lobby", position: { x: 330, y: 120 }, data: { name: "lobby", role: "game", overlay: "10.42.0.2", status: "degraded", project: "42" } },
   { id: "survival", position: { x: 620, y: 120 }, data: { name: "survival", role: "game", overlay: "10.42.0.3", online: true, project: "42" } },
-  { id: "db42", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", online: false, project: "42" } },
+  { id: "db42", position: { x: 475, y: 300 }, data: { name: "postgres", role: "hypervisor", overlay: "10.42.0.4", status: "down", project: "42" } },
   { id: "hub43", position: { x: 330, y: 470 }, data: { name: "router", role: "router", overlay: "10.43.0.2", online: true, project: "43" } },
-  { id: "mc43", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", online: true, project: "43" } },
+  { id: "mc43", position: { x: 620, y: 470 }, data: { name: "smp", role: "game", overlay: "10.43.0.3", status: "maintenance", project: "43" } },
 
   // Service layer demo: two host frames (group nodes) with services inside, and
   // a depends_on edge crossing the frames (auth-service -> auth-db on a
@@ -109,8 +111,12 @@ const selPeers = computed(() => {
 function obsTone(o: EdgeObserved): "success" | "outline" | "danger" {
   return o === "applied" ? "success" : o === "pending" ? "outline" : "danger"
 }
-function toggleOnline() {
-  if (sel.value) sel.value.data.online = !sel.value.data.online
+// A node's `status` drives its light, frame and role bar; only down and offline
+// draw the dashed, faded frame. Switching here shows the frame easing over.
+const STATES: StatusKind[] = ["online", "degraded", "maintenance", "starting", "down"]
+const stateOf = (data: InfraNodeData): StatusKind => data.status ?? (data.online === false ? "offline" : "online")
+function setState(state: StatusKind) {
+  if (sel.value) sel.value.data.status = state
 }
 </script>
 
@@ -134,9 +140,7 @@ function toggleOnline() {
       <template v-if="sel">
         <div class="flex items-center justify-between">
           <span class="text-sm font-semibold text-ink">{{ sel.data.name }}</span>
-          <LpBadge :tone="sel.data.online ? 'success' : 'danger'">
-            {{ sel.data.online ? "online" : "offline" }}
-          </LpBadge>
+          <LpStatus :state="stateOf(sel.data)" />
         </div>
         <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
           <dt class="text-muted">role</dt>
@@ -159,9 +163,18 @@ function toggleOnline() {
         </div>
         <p v-else class="mt-2 text-xs text-muted">no project peers — isolated.</p>
 
-        <LpButton size="sm" variant="soft" class="mt-4 w-full" @click="toggleOnline">
-          simulate {{ sel.data.online ? "offline" : "online" }}
-        </LpButton>
+        <div class="mt-4 text-xs font-semibold uppercase tracking-wider text-muted">simulate</div>
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <LpButton
+            v-for="state in STATES"
+            :key="state"
+            size="sm"
+            :variant="stateOf(sel.data) === state ? 'solid' : 'soft'"
+            @click="setState(state)"
+          >
+            {{ state }}
+          </LpButton>
+        </div>
       </template>
       <p v-else class="text-sm text-muted">Select a node.</p>
 
