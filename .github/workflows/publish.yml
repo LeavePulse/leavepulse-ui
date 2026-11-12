@@ -65,10 +65,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           parent="$(git rev-parse HEAD^)"
-          changed="$(git diff --name-only HEAD^ HEAD)"
+          # `npm version` writes the version into package.json and
+          # package-lock.json; no other file, and no other line, may differ.
+          changed="$(git diff --name-only HEAD^ HEAD | grep -vxE 'package(-lock)?\.json' || true)"
           version_only=false
-          if [ "$changed" = "package.json" ]; then
-            other="$(git diff -U0 HEAD^ HEAD -- package.json | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]*"version":' || true)"
+          if [ -z "$changed" ]; then
+            other="$(git diff -U0 HEAD^ HEAD -- package.json package-lock.json | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]*"version":' || true)"
             [ -z "$other" ] && version_only=true
           fi
           ci="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci --commit "$parent" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')"
