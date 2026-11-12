@@ -447,6 +447,7 @@ export const uk: KitLabels = {
     running: "Виконується…",
     select: "вибрати",
     close: "закрити",
+    dismiss: "Закрити",
     back: "назад",
     searching: "Пошук…",
     searchFailed: "Пошук зараз недоступний.",

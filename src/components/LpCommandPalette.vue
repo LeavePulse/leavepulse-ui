@@ -320,6 +320,8 @@ export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
   pinned?: string
   select: string
   close: string
+  /** The close button that stands in for Esc on a touch screen. */
+  dismiss: string
   /** Hint for leaving a mode, shown only while inside one. */
   back: string
   searching: string
@@ -527,6 +529,7 @@ const DEFAULT_LABELS: Required<PaletteLabels> = {
   running: "Running…",
   select: "select",
   close: "close",
+  dismiss: "Close",
   back: "back",
   searching: "Searching…",
   searchFailed: "Search is unavailable right now.",
@@ -650,6 +653,43 @@ function actionsOf(c: Command | undefined): Command[] {
 const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]))
 
 /*
+ * On a phone the palette is a sheet over the whole screen, and the on-screen
+ * keyboard takes the bottom of it without resizing the layout viewport: the
+ * last rows would sit under the keys. The visible part is tracked instead and
+ * handed to the CSS, so the list ends where the keyboard begins.
+ */
+const viewport = ref<Record<string, string>>({})
+function trackViewport() {
+  const vv = typeof window === "undefined" ? undefined : window.visualViewport
+  // The whole visible rectangle, not only its height: a page wider than the
+  // phone is zoomed out to fit, and a fixed sheet then measures the wider
+  // layout instead of the screen the person is looking at.
+  viewport.value = vv
+    ? {
+        "--lp-cmd-vh": `${vv.height}px`,
+        "--lp-cmd-vw": `${vv.width}px`,
+        "--lp-cmd-vx": `${vv.offsetLeft}px`,
+        "--lp-cmd-vy": `${vv.offsetTop}px`,
+      }
+    : {}
+}
+watch(
+  () => props.open,
+  (open, _, onCleanup) => {
+    const vv = typeof window === "undefined" ? undefined : window.visualViewport
+    if (!open || !vv) return
+    trackViewport()
+    vv.addEventListener("resize", trackViewport)
+    vv.addEventListener("scroll", trackViewport)
+    onCleanup(() => {
+      vv.removeEventListener("resize", trackViewport)
+      vv.removeEventListener("scroll", trackViewport)
+    })
+  },
+  { immediate: true },
+)
+
+/*
  * Tab is free for this: the rows are out of the tab order and the box is the
  * only field, so Tab otherwise just walks off to the dialog's edge. Without
  * actions it keeps that default.
@@ -666,6 +706,18 @@ function onTab(event: KeyboardEvent) {
   event.stopPropagation()
   openActions(c)
 }
+/*
+ * A long press on a phone, a right click elsewhere: the row's actions. On a
+ * touch screen there is no hover to make a row the active one, so this is the
+ * only way to the actions of any row but the first. A row without actions
+ * keeps the browser's own menu.
+ */
+function onRowContextMenu(event: MouseEvent, c: Command) {
+  if (!actionsOf(c).length) return
+  event.preventDefault()
+  openActions(c)
+}
+
 function openActions(c: Command) {
   const actions = actionsOf(c)
   if (!actions.length) return
@@ -1573,7 +1625,7 @@ const guardOutside = useOutsideGuard()
         ref="contentRef"
         class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
-        :style="{ zIndex: layer.panel }"
+        :style="{ zIndex: layer.panel, ...viewport }"
         :data-pane="paneOpen ? 'open' : undefined"
         :data-editing="editing ? '' : undefined"
         @open-auto-focus.prevent
@@ -1646,7 +1698,16 @@ const guardOutside = useOutsideGuard()
             @keydown.esc="onEscape"
             @keydown.tab="onTab"
           />
-          <kbd class="shrink-0 rounded-small border border-line px-1.5 py-0.5 text-[10px] text-muted">{{ text.esc }}</kbd>
+          <kbd class="shrink-0 rounded-small border border-line px-1.5 py-0.5 text-[10px] text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden">{{ text.esc }}</kbd>
+          <!-- A finger has no Esc, and tapping the dim edge is not there when
+               the palette fills the screen: the way out is a button. -->
+          <button
+            type="button"
+            class="hidden shrink-0 rounded-inner px-2 py-1.5 text-sm font-medium text-brand outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(hover:none)_and_(pointer:coarse)]:inline-flex"
+            @click="emit('update:open', false)"
+          >
+            {{ text.dismiss }}
+          </button>
         </div>
 
         <div v-if="promptCommand" class="flex flex-col gap-3 p-4">
@@ -1659,8 +1720,8 @@ const guardOutside = useOutsideGuard()
              the only way to the row's actions and pin. On a pointer the same
              buttons live in the footer, so the list never shifts under this strip. -->
         <div v-if="active && (canPin || selectedActions.length) && !promptCommand" class="hidden items-center justify-end gap-2 border-b border-line px-3 py-1 [@media(hover:none)_and_(pointer:coarse)]:flex">
-          <LpButton v-if="selectedActions.length" size="xs" variant="ghost" @click="openActions(active)">{{ text.actions }} <span class="text-muted">Tab</span></LpButton>
-          <LpButton v-if="canPin" size="xs" variant="ghost" :aria-label="isPinned(active) ? text.unpin : text.pin" :aria-pressed="isPinned(active)" @click="togglePin(active)"><LpIcon name="lucide:star" :size="14" />{{ isPinned(active) ? text.unpin : text.pin }} <span class="text-muted">Alt+P</span></LpButton>
+          <LpButton v-if="selectedActions.length" size="xs" variant="ghost" @click="openActions(active)">{{ text.actions }}</LpButton>
+          <LpButton v-if="canPin" size="xs" variant="ghost" :aria-label="isPinned(active) ? text.unpin : text.pin" :aria-pressed="isPinned(active)" @click="togglePin(active)"><LpIcon name="lucide:star" :size="14" />{{ isPinned(active) ? text.unpin : text.pin }}</LpButton>
         </div>
         <!-- Results -->
         <div class="flex min-h-0 flex-1" @pointermove="onPointerMove">
@@ -1711,6 +1772,7 @@ const guardOutside = useOutsideGuard()
                         : 'text-ink hover:bg-surface-soft/60',
                   ]"
                   @click="onRowClick($event, c)"
+                  @contextmenu="onRowContextMenu($event, c)"
                   @pointerenter="onPointerEnter(c)"
                   @pointerleave="onPointerLeave"
                 >
@@ -1761,12 +1823,13 @@ const guardOutside = useOutsideGuard()
                       </template>
                     </span>
                   </span>
-                  <MenuShortcut v-if="c.shortcut" :combo="c.shortcut" />
+                  <!-- Keys mean nothing to a finger: hidden on a touch screen. -->
+                  <MenuShortcut v-if="c.shortcut" :combo="c.shortcut" class="[@media(hover:none)_and_(pointer:coarse)]:hidden" />
                   <!-- The prefix that opens this mode from the box, so the
                        shortcut is learned by seeing it rather than reading docs. -->
                   <kbd
                     v-else-if="c.prefix && c.children"
-                    class="shrink-0 rounded-small border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted"
+                    class="shrink-0 rounded-small border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden"
                   >{{ c.prefix }}</kbd>
                   <!-- Drills in rather than runs: worth saying before the click,
                        since the two look identical otherwise. -->
@@ -1942,6 +2005,25 @@ const guardOutside = useOutsideGuard()
 }
 .lp-cmd-pane {
   width: var(--lp-cmd-pane);
+}
+/*
+ * A phone: a sheet over the whole visible screen rather than a card floating
+ * a tenth of the way down, which left a band of nothing above it and let the
+ * keyboard cover its lower half. Keyed to touch as well as width, so a narrow
+ * desktop window keeps the card.
+ */
+@media (hover: none) and (pointer: coarse) and (max-width: 639px) {
+  .lp-cmd-dialog {
+    inset: var(--lp-cmd-vy, 0) auto auto var(--lp-cmd-vx, 0);
+    translate: none;
+    width: var(--lp-cmd-vw, 100%);
+    height: var(--lp-cmd-vh, 100dvh);
+    max-height: var(--lp-cmd-vh, 100dvh);
+    border-width: 0;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 .lp-cmd-dialog[data-editing] .lp-cmd-pane {
   width: 100%;
