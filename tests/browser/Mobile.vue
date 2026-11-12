@@ -17,6 +17,8 @@ const range = ref<{ start?: string; end?: string }>()
 const colour = ref("#3366ff")
 const menu = [{ label: "Rename", onSelect: () => {} }, { label: "A rather long action label that will not fit on a narrow phone screen", onSelect: () => {} }, { label: "Delete", onSelect: () => {} }]
 const toast = useToast()
+const many = Array.from({ length: 30 }, (_, i) => ({ value: `o${i + 1}`, label: `Option ${i + 1}` }))
+const manyPicked = ref("o1")
 </script>
 
 <template>
@@ -32,6 +34,7 @@ const toast = useToast()
       <LpPhoneInput v-model="phone" aria-label="Phone" />
       <LpEditable v-model="name" label="Name" />
       <LpCodeBlock v-model="code" :locked="false" lang="ts" />
+      <LpSelect v-model="manyPicked" searchable aria-label="Many" :options="many" />
       <LpSelect v-model="picked" searchable aria-label="Searchable" :options="[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]" />
     </section>
     <section aria-label="Overlays" class="flex flex-wrap gap-2">

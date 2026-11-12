@@ -40,7 +40,7 @@ import { computed, nextTick, ref, useId, watch, useAttrs } from "vue"
 import { useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
-import { CLOSE_ICON, OPTION_ITEM, optionStagger, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
+import { CLOSE_ICON, OPTION_ITEM, optionStagger, COMBOBOX_FIT, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
 import type { LpOptionBase, OptionSelection } from "./options"
@@ -388,11 +388,11 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         v-bind="COMBOBOX_PANEL"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"
+        :class="[POPOVER_PANEL, 'z-(--z-popover) w-(--reka-combobox-trigger-width) overflow-hidden', COMBOBOX_FIT]"
         @open-auto-focus.prevent
         @mousedown.prevent
       >
-        <ComboboxViewport class="max-h-72 overflow-y-auto p-1">
+        <ComboboxViewport class="max-h-72 min-h-0 flex-1 overflow-y-auto p-1">
           <div v-if="loading" class="px-3 py-4 text-center text-sm italic text-muted">
             {{ loadingText ?? labels.loading }}
           </div>

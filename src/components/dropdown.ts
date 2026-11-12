@@ -83,6 +83,14 @@ export const optionStagger = (index: number): { animationDelay: string } => ({
 /* Where a combobox list sits under its field. */
 export const COMBOBOX_PANEL = { collisionPadding: 8, position: "popper", sideOffset: 6 } as const
 
+/*
+ * A combobox list's height: 18rem, or less where reka measured less room on the
+ * side it opened (a phone in landscape has about 170px under a field). The
+ * panel is a column so its option list, which carries `min-h-0 flex-1`, is what
+ * shrinks and scrolls; the search field above it stays.
+ */
+export const COMBOBOX_FIT = "flex flex-col max-h-[min(18rem,var(--reka-popper-available-height,18rem))]"
+
 export const CLOSE_ICON =
   "transition-transform duration-medium ease-[var(--ease-emphasized)] " +
   "group-hover:rotate-90 group-active:scale-90 motion-reduce:group-hover:rotate-0"

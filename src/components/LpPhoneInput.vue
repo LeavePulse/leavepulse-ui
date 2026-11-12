@@ -55,7 +55,7 @@ import { useFieldNotice, type FieldNoticeOptions } from "../composables/useField
 import { useInputFilter } from "../composables/useInputFilter"
 import { useLabels } from "../composables/useLpConfig"
 import { type Country, filterCountries, flagEmoji, loadCountries, matchCountryByValue } from "./countries"
-import { OPTION_ITEM, optionStagger, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
+import { OPTION_ITEM, optionStagger, COMBOBOX_FIT, COMBOBOX_PANEL, POPOVER_PANEL } from "./dropdown"
 import LpFieldNotice from "./LpFieldNotice.vue"
 import LpIcon from "./LpIcon.vue"
 import {
@@ -403,7 +403,7 @@ const guardOutside = useOutsideGuard()
           @escape-key-down="guardOutside"
           v-bind="COMBOBOX_PANEL"
           align="start"
-          :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-72 overflow-hidden']"
+          :class="[POPOVER_PANEL, 'z-(--z-popover) w-72 max-w-[calc(100vw-1rem)] overflow-hidden', COMBOBOX_FIT]"
         >
           <div class="border-b border-line p-2">
             <!--
@@ -421,7 +421,7 @@ const guardOutside = useOutsideGuard()
               @input="query = ($event.target as HTMLInputElement).value"
             />
           </div>
-          <ComboboxViewport class="max-h-56 overflow-y-auto p-1">
+          <ComboboxViewport class="max-h-56 min-h-0 flex-1 overflow-y-auto p-1">
             <ComboboxEmpty class="px-3 py-4 text-center text-sm italic text-muted">
               {{ emptyText ?? text.empty }}
             </ComboboxEmpty>

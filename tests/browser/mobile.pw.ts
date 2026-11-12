@@ -63,3 +63,20 @@ test.describe("landscape phone", () => {
     await insideWindow(page, page.getByRole("dialog"))
   })
 })
+
+test.describe("landscape phone list", () => {
+  test.use({ viewport: { width: 844, height: 390 } })
+  test("a long select list fits under its field and scrolls to the last option", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const trigger = page.getByRole("button", { name: "Many, Option 1" })
+    await trigger.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 120))
+    await trigger.click()
+    const panel = page.locator("[data-reka-popper-content-wrapper] > *")
+    await insideWindow(page, panel)
+    const last = page.getByRole("option", { name: "Option 30" })
+    await last.scrollIntoViewIfNeeded()
+    const box = (await last.boundingBox())!
+    const panelBox = (await panel.boundingBox())!
+    expect(box.y + box.height).toBeLessThanOrEqual(panelBox.y + panelBox.height + 0.5)
+  })
+})

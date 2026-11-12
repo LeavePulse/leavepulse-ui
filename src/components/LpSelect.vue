@@ -43,7 +43,7 @@ import FieldWrapper from "./FieldWrapper.vue"
 import { useFieldBlur, useOwnField, mergeDescribedBy } from "../composables/useField"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
-import { OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
+import { COMBOBOX_FIT, OPTION_ITEM, optionStagger, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import OptionContent from "./OptionContent.vue"
 import LpRollingText from "./LpRollingText.vue"
@@ -599,7 +599,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
         @escape-key-down="guardOutside"
         position="popper"
         :side-offset="6"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-combobox-trigger-width) overflow-hidden']"
+        :class="[POPOVER_PANEL, 'z-(--z-popover) w-(--reka-combobox-trigger-width) overflow-hidden', COMBOBOX_FIT]"
       >
         <div v-if="searchable || serverSide" class="border-b border-line p-2">
           <ComboboxInput
@@ -610,7 +610,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
           />
         </div>
 
-        <ComboboxViewport class="max-h-56 overflow-y-auto p-1">
+        <ComboboxViewport class="max-h-56 min-h-0 flex-1 overflow-y-auto p-1">
           <div v-if="loading" class="px-3 py-4 text-center text-sm italic text-muted">
             {{ loadingLabel }}
           </div>

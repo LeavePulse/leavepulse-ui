@@ -535,7 +535,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
             align="start"
             :side-offset="6"
             :collision-padding="8"
-            :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-72 w-(--reka-popper-anchor-width) overflow-y-auto p-1 outline-none']"
+            :class="[POPOVER_PANEL, 'z-(--z-popover) max-h-[min(18rem,var(--reka-popper-available-height,18rem))] w-(--reka-popper-anchor-width) overflow-y-auto p-1 outline-none']"
             @open-auto-focus.prevent
             @close-auto-focus.prevent
             @interact-outside="keepOpenInside"
