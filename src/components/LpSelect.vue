@@ -606,7 +606,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
             v-model="query"
             :placeholder="searchPlaceholderText"
             :aria-label="labels.searchLabel"
-            class="h-(--size-control-sm) w-full rounded-md border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
+            class="lp-entry h-(--size-control-sm) w-full rounded-md border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
           />
         </div>
 

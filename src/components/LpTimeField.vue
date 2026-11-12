@@ -80,7 +80,7 @@ const shellSize = CONTROL_SIZE
 // `w-full` is the default, not a rule: a time column of `w-28` must win over it.
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   [
-    "flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
+    "lp-entry flex w-full items-center gap-0.5 rounded-control border bg-surface-soft px-3 text-ink transition-colors duration-[var(--duration-fast)] focus-within:ring-2 focus-within:ring-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-55",
     shellSize[props.size],
     field.value.invalid ? "border-danger focus-within:ring-danger-soft" : "border-line focus-within:border-brand",
   ].join(" "), () => ownAttrs())

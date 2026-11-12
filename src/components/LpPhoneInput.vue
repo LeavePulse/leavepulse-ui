@@ -417,7 +417,7 @@ const guardOutside = useOutsideGuard()
               :placeholder="searchPlaceholder ?? text.search"
               :aria-label="text.searchLabel"
               auto-focus
-              class="h-(--size-control-sm) w-full rounded-inner border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
+              class="lp-entry h-(--size-control-sm) w-full rounded-inner border border-line bg-surface-soft px-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand"
               @input="query = ($event.target as HTMLInputElement).value"
             />
           </div>
@@ -454,7 +454,7 @@ const guardOutside = useOutsideGuard()
       :required="field.required || undefined"
       :aria-invalid="field.invalid || undefined"
       :aria-describedby="mergeDescribedBy(rest['aria-describedby'], field.describedBy, notice.message.value ? noticeId : undefined)"
-      class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent px-3 outline-none placeholder:text-muted"
+      class="lp-autofill lp-entry min-w-0 flex-1 self-stretch bg-transparent px-3 outline-none placeholder:text-muted"
       @beforeinput="onBeforeEdit"
       @paste="onPaste"
       @compositionend="onCompositionEnd"

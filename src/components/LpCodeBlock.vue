@@ -295,7 +295,7 @@ const CodeLine: FunctionalComponent<{ n: number }> = ({ n }) =>
         v-if="!locked && !hasFolds"
         :value="code"
         spellcheck="false"
-        class="lp-scrollbar-none absolute inset-0 size-full resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-relaxed text-transparent caret-brand outline-none"
+        class="lp-entry lp-scrollbar-none absolute inset-0 size-full resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-relaxed text-transparent caret-brand outline-none"
         :class="[wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre', lineNumbers ? 'pl-13' : '']"
         @input="onInput"
         @scroll="syncScroll"
@@ -305,7 +305,7 @@ const CodeLine: FunctionalComponent<{ n: number }> = ({ n }) =>
         class="lp-scrollbar-none m-0 overflow-auto p-3 leading-relaxed"
         :class="[
           wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre',
-          editing ? 'pointer-events-none' : '',
+          editing ? 'lp-entry pointer-events-none' : '',
           editing && height ? 'h-full overflow-hidden' : '',
         ]"
       ><code class="block"><template

@@ -302,7 +302,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
           <input
             v-if="isRenaming"
             ref="renameField"
-            class="w-full min-w-0 rounded-sm border bg-surface-soft px-1 text-sm text-ink outline-none"
+            class="lp-entry w-full min-w-0 rounded-sm border bg-surface-soft px-1 text-sm text-ink outline-none"
             :class="renameInvalid ? 'border-danger' : 'border-line-strong'"
             :value="renameValue"
             :aria-label="renameLabel"

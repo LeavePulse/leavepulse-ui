@@ -171,3 +171,16 @@
     animation: none;
   }
 }
+
+/*
+ * Text entry on a touch screen. iOS Safari zooms the page in when a field whose
+ * text is smaller than 16px takes focus, and leaves it zoomed after the field
+ * loses it. Every kit field that takes typing carries this class, so on a
+ * coarse pointer its text is 16px; a mouse keeps the size it was drawn at.
+ * Unlayered on purpose: it has to win over the field's own `text-sm`.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .lp-entry {
+    font-size: 16px;
+  }
+}

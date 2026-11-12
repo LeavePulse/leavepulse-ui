@@ -335,7 +335,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
           :required="field.required || undefined"
           :aria-invalid="isInvalidState || undefined"
           :aria-describedby="describedBy"
-          class="lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
+          class="lp-autofill lp-entry min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted"
           :class="showSelected && 'text-transparent placeholder:text-transparent'"
           @beforeinput="onBeforeInput"
           @paste="onPaste"

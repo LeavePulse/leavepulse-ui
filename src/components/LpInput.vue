@@ -209,7 +209,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
         :aria-invalid="isInvalidState || undefined"
         :aria-describedby="mergeDescribedBy(attrs['aria-describedby'], field.describedBy)"
         :class="[
-          'lp-autofill min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
+          'lp-autofill lp-entry min-w-0 flex-1 self-stretch bg-transparent outline-none placeholder:text-muted',
           clearable && '[&::-webkit-search-cancel-button]:hidden',
           hasLeading ? 'pl-2' : padX[size ?? 'md'],
           hasTrailing ? '' : padX[size ?? 'md'],

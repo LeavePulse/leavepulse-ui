@@ -82,7 +82,7 @@ defineExpose({ el: box, fit })
 const textareaClass = computed(() =>
   mergeClass(
     props.autosize ? "w-full resize-none" : "w-full resize-y",
-    "rounded-control border bg-surface-soft px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--duration-fast)] placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-55",
+    "lp-entry rounded-control border bg-surface-soft px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--duration-fast)] placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-55",
     field.value.invalid ? "border-danger focus:border-danger focus:ring-danger-soft" : "border-line",
     hasField.value ? "" : (attrs.class as string),
   ),

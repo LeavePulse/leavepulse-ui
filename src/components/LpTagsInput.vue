@@ -513,7 +513,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
           :aria-expanded="options ? listOpen : undefined"
           :aria-controls="options ? listId : undefined"
           :aria-activedescendant="listOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined"
-          class="min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted"
+          class="lp-entry min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted"
           @focus="onFocus"
           @keydown="onKeydown"
           @beforeinput="onBeforeInput"

@@ -264,7 +264,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => "relative inline-
       >
         <span
           aria-hidden="true"
-          class="invisible col-start-1 row-start-1 min-w-[4ch]"
+          class="lp-entry invisible col-start-1 row-start-1 min-w-[4ch]"
           :class="[PAD[size], multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-pre']"
         >{{ (draft || placeholder || " ") + (multiline ? "\n" : "\u200a") }}</span>
         <component
@@ -280,7 +280,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() => "relative inline-
           :disabled="disabled"
           :readonly="readonly"
           :rows="multiline ? 1 : undefined"
-          class="col-start-1 row-start-1 w-full min-w-0 resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-muted"
+          class="lp-entry col-start-1 row-start-1 w-full min-w-0 resize-none overflow-hidden bg-transparent text-ink outline-none placeholder:text-muted"
           :class="PAD[size]"
           @input="draft = ($event.target as HTMLInputElement).value"
           @keydown="onFieldKey"

@@ -177,7 +177,7 @@ usePaletteControl({ disabled: () => field.value.disabled, invalid: () => field.v
       :id="field.id"
       :aria-describedby="describedBy"
       :aria-invalid="field.invalid || undefined"
-      class="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      class="lp-entry min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       :class="steppers ? 'text-center @max-[8.5rem]:px-3 @max-[8.5rem]:text-left' : icon || $slots.leading ? 'pl-2 pr-3' : 'px-3'"
     />
     <!-- The unit sits between the value and the increment button, so a long one
