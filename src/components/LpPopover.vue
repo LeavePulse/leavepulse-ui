@@ -7,7 +7,7 @@ import {
 } from "reka-ui"
 import { computed, useAttrs } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
 // The trigger owns its attributes through the slot; fallthrough tags the panel.
@@ -37,7 +37,7 @@ const open = defineModel<boolean>("open")
 // Merged rather than appended, so `panelClass="w-80 p-0"` replaces the default
 // width and padding instead of racing them in stylesheet order.
 const panel = computed(() =>
-  mergeClass(POPOVER_PANEL, "z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none", props.panelClass),
+  mergeClass(POPOVER_PANEL, PANEL_FIT, "z-(--z-popover) w-64 rounded-card p-3 text-sm text-ink outline-none", props.panelClass),
 )
 
 /*

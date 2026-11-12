@@ -56,7 +56,7 @@ import {
 } from "./color"
 import { useClipboard } from "../composables/useClipboard"
 import { useLabels } from "../composables/useLpConfig"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpIcon from "./LpIcon.vue"
 import LpRollingText from "./LpRollingText.vue"
@@ -716,7 +716,7 @@ const guardOutside = useOutsideGuard()
         :side="side"
         :align="align"
         :side-offset="6"
-        :class="[POPOVER_PANEL, 'z-(--z-popover) w-64 select-none rounded-card p-3 outline-none']"
+        :class="[POPOVER_PANEL, PANEL_FIT, 'z-(--z-popover) w-64 select-none rounded-card p-3 outline-none']"
         @open-auto-focus="onPanelOpen"
       >
         <!-- The same menu inside the panel: copy/paste is wanted most while

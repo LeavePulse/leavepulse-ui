@@ -37,7 +37,7 @@ import {
 import { computed, onBeforeUnmount, watch } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 
 const props = withDefaults(
   defineProps<{
@@ -81,7 +81,7 @@ const props = withDefaults(
 const open = defineModel<boolean>("open", { default: false })
 
 const panel = computed(() =>
-  mergeClass(POPOVER_PANEL, "z-(--z-popover) w-72 rounded-card p-4 text-sm text-ink outline-none", props.panelClass),
+  mergeClass(POPOVER_PANEL, PANEL_FIT, "z-(--z-popover) w-72 rounded-card p-4 text-sm text-ink outline-none", props.panelClass),
 )
 
 const portalTo = usePortalTarget()

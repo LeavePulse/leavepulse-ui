@@ -11,7 +11,7 @@ import { HINT_SIGNALS } from "../composables/useHintSystem"
 import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from "reka-ui"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 import MenuTitle from "./MenuTitle.vue"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
 
@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<{
   rightClickToo?: boolean
 }>(), { palette: undefined })
 
-const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-44 p-1 outline-none`
+const PANEL = `${POPOVER_PANEL} ${PANEL_FIT} z-(--z-popover) min-w-44 p-1 outline-none`
 // reka names the menu after its trigger, and aria-labelledby beats aria-label:
 // a `title` only names the menu with that link taken off. MenuTitle itself is
 // hidden from assistive tech, so nothing is announced twice.

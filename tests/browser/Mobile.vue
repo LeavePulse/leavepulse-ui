@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { LpAutocomplete, LpCodeBlock, LpEditable, LpInput, LpNumberField, LpPhoneInput, LpSelect, LpTagsInput, LpTextarea, LpTimeField } from "../../src"
+import { LpAutocomplete, LpButton, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpInput, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -9,6 +9,14 @@ const code = ref("let a = 1")
 const picked = ref("a")
 const typed = ref("")
 const phone = ref("")
+const modal = ref(false)
+const drawer = ref(false)
+const bottom = ref(false)
+const date = ref<string>()
+const range = ref<{ start?: string; end?: string }>()
+const colour = ref("#3366ff")
+const menu = [{ label: "Rename", onSelect: () => {} }, { label: "A rather long action label that will not fit on a narrow phone screen", onSelect: () => {} }, { label: "Delete", onSelect: () => {} }]
+const toast = useToast()
 </script>
 
 <template>
@@ -25,6 +33,37 @@ const phone = ref("")
       <LpEditable v-model="name" label="Name" />
       <LpCodeBlock v-model="code" :locked="false" lang="ts" />
       <LpSelect v-model="picked" searchable aria-label="Searchable" :options="[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]" />
+    </section>
+    <section aria-label="Overlays" class="flex flex-wrap gap-2">
+      <LpButton @click="modal = true">Open modal</LpButton>
+      <LpModal v-model:open="modal" title="A modal with a rather long title on a phone" size="lg">
+        <div class="flex flex-col gap-3">
+          <LpInput label="First field" />
+          <p v-for="n in 30" :key="n">Line {{ n }}</p>
+          <LpInput label="Last field" />
+        </div>
+        <template #footer><LpButton @click="modal = false">Done</LpButton></template>
+      </LpModal>
+      <LpButton @click="drawer = true">Open drawer</LpButton>
+      <LpDrawer v-model:open="drawer" title="Side drawer" size="lg"><p v-for="n in 40" :key="n">Row {{ n }}</p></LpDrawer>
+      <LpButton @click="bottom = true">Open sheet</LpButton>
+      <LpDrawer v-model:open="bottom" direction="bottom" title="Bottom sheet"><LpInput label="Sheet field" /></LpDrawer>
+      <LpPopover aria-label="Wide popover" panel-class="w-96">
+        <template #trigger><LpButton>Open popover</LpButton></template>
+        <p>Popover body that is fairly wide</p>
+      </LpPopover>
+      <LpDropdownMenu :items="menu">
+        <template #trigger><LpButton>Open menu</LpButton></template>
+      </LpDropdownMenu>
+      <LpContextMenu :items="menu"><div class="h-12 w-40 border border-line">Press and hold</div></LpContextMenu>
+      <LpDatePicker v-model="date" aria-label="Date" presets time />
+      <LpDateRangePicker v-model="range" aria-label="Range" />
+      <LpColorPicker v-model="colour" aria-label="Colour" />
+      <LpTooltip content="Tooltip text"><LpButton>Has tooltip</LpButton></LpTooltip>
+      <LpHoverCard><template #trigger><a href="#hc">Hover card</a></template><p>Card body</p></LpHoverCard>
+      <LpNotificationBell :items="[]" />
+      <LpButton @click="toast.success('Saved')">Toast</LpButton>
+      <LpToaster />
     </section>
   </main>
 </template>

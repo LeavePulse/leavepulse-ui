@@ -27,3 +27,39 @@ test("an editable code block keeps its highlighted text under the caret at 16px"
   const sizes = await editor.evaluate((el) => [getComputedStyle(el).fontSize, getComputedStyle(el.nextElementSibling!).fontSize])
   expect(sizes).toEqual(["16px", "16px"])
 })
+
+async function insideWindow(page: import("@playwright/test").Page, panel: import("@playwright/test").Locator) {
+  await expect(panel).toBeVisible()
+  await expect.poll(async () => {
+    const box = await panel.boundingBox()
+    const size = page.viewportSize()!
+    return !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= size.width + 0.5 && box.y + box.height <= size.height + 0.5
+  }).toBe(true)
+}
+
+test.describe("narrow phone", () => {
+  test.use({ viewport: { width: 360, height: 740 } })
+  test("a wide popover and a long menu label stay inside the screen", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await page.getByRole("button", { name: "Open popover" }).click()
+    await insideWindow(page, page.getByRole("dialog", { name: "Wide popover" }))
+    await page.mouse.click(5, 5)
+    await page.getByRole("button", { name: "Open menu" }).click()
+    await insideWindow(page, page.getByRole("menu"))
+  })
+})
+
+test.describe("landscape phone", () => {
+  test.use({ viewport: { width: 844, height: 390 } })
+  test("a date picker and a colour picker that cannot fit scroll inside the screen instead of hanging off it", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await page.getByRole("button", { name: "Date" }).first().click()
+    const panel = page.getByRole("dialog")
+    await insideWindow(page, panel)
+    expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+    await page.keyboard.press("Escape")
+    await expect(panel).toHaveCount(0)
+    await page.getByRole("button", { name: /Colour/ }).first().click()
+    await insideWindow(page, page.getByRole("dialog"))
+  })
+})

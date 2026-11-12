@@ -14,7 +14,7 @@ import { hints } from "../composables/useHints"
 import { HINT_SIGNALS, noteContextTarget } from "../composables/useHintSystem"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 import { useOutsideGuard, usePortalTarget, useView, viewDocument } from "../composables/useView"
 
 export interface ContextMenuItemDef {
@@ -82,7 +82,7 @@ const props = withDefaults(defineProps<{
 const enabled = computed(() => props.always || props.items.length > 0)
 const hinted = computed(() => enabled.value && !props.noHint)
 
-const PANEL = `${POPOVER_PANEL} z-(--z-popover) min-w-48 p-1 outline-none`
+const PANEL = `${POPOVER_PANEL} ${PANEL_FIT} z-(--z-popover) min-w-48 p-1 outline-none`
 
 // A menu opened over a text field takes focus, and on close reka hands it to the
 // trigger, so the caret and the selection the user right-clicked are gone — the

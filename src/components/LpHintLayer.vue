@@ -19,7 +19,7 @@ import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
-import { PANEL_SURFACE, POPOVER_ANIM } from "./dropdown"
+import { PANEL_FIT, PANEL_SURFACE, POPOVER_ANIM } from "./dropdown"
 import LpBadge from "./LpBadge.vue"
 import LpButton from "./LpButton.vue"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
@@ -147,7 +147,7 @@ const guardOutside = useOutsideGuard()
           side="bottom"
           :side-offset="8"
           :collision-padding="8"
-          :class="[PANEL_SURFACE, POPOVER_ANIM, 'z-(--z-popover) w-72 rounded-card p-3 text-sm text-ink outline-none']"
+          :class="[PANEL_SURFACE, POPOVER_ANIM, PANEL_FIT, 'z-(--z-popover) w-72 rounded-card p-3 text-sm text-ink outline-none']"
         >
           <p class="flex items-center gap-2 font-medium">
             <LpBadge tone="brand" size="sm">{{ labels.badge }}</LpBadge>

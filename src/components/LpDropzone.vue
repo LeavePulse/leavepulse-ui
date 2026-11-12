@@ -42,7 +42,7 @@ import { useMergedAttrs } from "../composables/useMergedClass"
 import { useReveal } from "../composables/useReveal"
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from "reka-ui"
 import DropzoneLinkField from "./DropzoneLinkField.vue"
-import { POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
 import LpIcon from "./LpIcon.vue"
 import { inTextField } from "../composables/textEntry"
 import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
@@ -568,7 +568,7 @@ const guardOutside = useOutsideGuard()
           side="bottom"
           align="start"
           :side-offset="6"
-          :class="POPOVER_PANEL"
+          :class="[POPOVER_PANEL, PANEL_FIT]"
           class="z-(--z-popover) w-80 rounded-card p-3 outline-none"
           @open-auto-focus.prevent
         >

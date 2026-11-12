@@ -46,6 +46,15 @@ export const PANEL_SURFACE =
 export const POPOVER_PANEL = PANEL_SURFACE + " " + POPOVER_ANIM
 
 /**
+ * Keeps a free-form panel (popover, menu, hover card) inside the window. Its
+ * width stops 0.5rem short of each edge, so a w-96 panel or a long menu label
+ * no longer runs off a phone; its height stops at the room reka measured on the
+ * side it opened, and the rest scrolls. A date picker opened in landscape used
+ * to hang off the top of the screen with its first weeks out of reach.
+ */
+export const PANEL_FIT = "max-w-[calc(100vw-1rem)] max-h-(--reka-popper-available-height) overflow-y-auto"
+
+/**
  * A selectable option row: layout, highlight state, and the staggered cascade.
  * Cascades downward by default and upward when the panel is flipped above the
  * trigger (group-data-[side=top]). Pair with an inline animationDelay for the
