@@ -30,6 +30,12 @@ const frameNodes: TopologyNode[] = [
   { id: "other", position: { x: 700, y: 0 }, data: { name: "Other", role: "host" } },
 ]
 const frameEdges: TopologyEdge[] = [{ id: "s", source: "svc", target: "other", kind: "wg" }]
+const statusNodes: TopologyNode[] = [
+  { id: "ok", position: { x: 0, y: 0 }, data: { name: "Healthy", role: "host", status: "online" } },
+  { id: "unmanaged", position: { x: 260, y: 0 }, data: { name: "Unmanaged", role: "host", status: "degraded" } },
+  { id: "gone", position: { x: 520, y: 0 }, data: { name: "Gone", role: "host", status: "down" } },
+  { id: "legacy", position: { x: 780, y: 0 }, data: { name: "Legacy", role: "host", online: false } },
+]
 const earlier: TopologySnapshot = { label: "Monday", nodes: nodes.slice(0, 2), edges: edges.slice(0, 1) }
 const history: TopologySnapshot[] = [earlier, { label: "Tuesday", nodes, edges }]
 
@@ -43,8 +49,8 @@ onMounted(() => ((window as unknown as { canvas: unknown }).canvas = canvas.valu
   <main style="height: 640px; width: 1100px">
     <LpTopologyCanvas
       ref="canvas"
-      :nodes="mode === 'frame' ? frameNodes : nodes"
-      :edges="mode === 'frame' ? frameEdges : edges"
+      :nodes="mode === 'frame' ? frameNodes : mode === 'status' ? statusNodes : nodes"
+      :edges="mode === 'frame' ? frameEdges : mode === 'status' ? [] : edges"
       :auto-size-groups="mode === 'frame'"
       :detail="mode === 'simple' ? 'simple' : mode === 'overview' ? 'overview' : 'full'"
       :group-by="mode === 'overview' || mode === 'group' ? 'region' : undefined"

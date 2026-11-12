@@ -12,6 +12,8 @@ import { Handle, Position, type NodeProps } from "@vue-flow/core"
 import { computed } from "vue"
 import LpBadge from "./LpBadge.vue"
 import LpStatus from "./LpStatus.vue"
+import { TONE_COLOR } from "./meter"
+import { STATUS_LOOK, type StatusKind } from "./status"
 
 export interface InfraNodeData {
   name: string
@@ -23,7 +25,15 @@ export interface InfraNodeData {
    */
   roleLabel?: string
   overlay?: string
+  /** Up or down. Superseded by `status` when that is set. */
   online?: boolean
+  /**
+   * The node's state in the kit's status words, for a fleet that knows more
+   * than up and down: a box that serves but takes no instruction, one merely
+   * unreachable, one starting. Drawn with LpStatus's light and tone; only
+   * `down` and `offline` take the dashed, faded frame of a lost machine.
+   */
+  status?: StatusKind
   kind?: string
   project?: string
   /** Control-plane firewall rule count on this host (badge when > 0). */
@@ -126,6 +136,18 @@ const icon = computed(() => role.value.icon)
 const accentLine = computed(
   () => `color-mix(in srgb, ${accent.value} 35%, var(--color-line))`,
 )
+
+/** `status` when given, else the old up/down flag read as a status. */
+const state = computed<StatusKind | undefined>(
+  () => props.data.status ?? (props.data.online === undefined ? undefined : props.data.online ? "online" : "down"),
+)
+/** A state other than healthy takes the frame and the role bar in its own tone. */
+const troubled = computed(() => state.value !== undefined && state.value !== "online")
+/** No contact at all: dashed and faded, the way a lost machine has always looked. */
+const lost = computed(() => state.value === "down" || state.value === "offline")
+const stateColor = computed(() =>
+  state.value ? `color-mix(in srgb, ${TONE_COLOR[STATUS_LOOK[state.value].tone]} 50%, transparent)` : undefined,
+)
 </script>
 
 <template>
@@ -139,18 +161,16 @@ const accentLine = computed(
     signals on a node agree instead of arguing.
   -->
   <div
-    class="w-[168px] overflow-hidden rounded-card border bg-surface-raised shadow-panel transition-[border-color,box-shadow]"
+    class="w-[168px] overflow-hidden rounded-card border bg-surface-raised shadow-panel transition-[border-color,box-shadow,opacity] duration-medium ease-[var(--ease-emphasized)]"
     :class="[
-      selected
-        ? 'border-[var(--accent)]'
-        : data.online === false
-          ? 'border-dashed border-danger/50'
-          : 'border-[var(--accent-line)]',
+      selected ? 'border-[var(--accent)]' : troubled ? 'border-[var(--state-line)]' : 'border-[var(--accent-line)]',
+      !selected && lost ? 'border-dashed' : '',
     ]"
     :style="{
       '--accent': accent,
       '--accent-line': accentLine,
-      opacity: data.dimmed ? 0.3 : data.online === false ? 0.75 : 1,
+      '--state-line': stateColor,
+      opacity: data.dimmed ? 0.3 : lost ? 0.75 : 1,
       ...(selected
         ? { boxShadow: '0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-panel)' }
         : {}),
@@ -167,23 +187,18 @@ const accentLine = computed(
       class="!size-2 !border-2 !border-[var(--accent)] !bg-surface"
     />
 
-    <!-- The role bar reads as "this node is alive and is a proxy"; on an
-         offline host it must not keep asserting the first half. -->
+    <!-- The role bar reads as "this node is alive and is a proxy"; on a host
+         in trouble it must not keep asserting the first half. -->
     <div
-      class="h-[3px]"
-      :class="data.online === false ? 'bg-danger/50' : 'bg-[var(--accent)]'"
+      class="h-[3px] transition-[background-color] duration-medium ease-[var(--ease-emphasized)]"
+      :class="troubled ? 'bg-[var(--state-line)]' : 'bg-[var(--accent)]'"
     />
     <div class="px-[11px] pb-2.5 pt-[9px]">
       <div class="flex items-center gap-[7px]">
         <span class="text-[13px] text-[var(--accent)]">{{ icon }}</span>
         <span class="flex-1 truncate text-[13px] font-semibold text-ink">{{ data.name }}</span>
-        <!-- The kit's status light: a live host breathes, a lost one is a steady red. -->
-        <LpStatus
-          v-if="data.online !== undefined"
-          :state="data.online ? 'online' : 'down'"
-          :pulse="data.online"
-          hide-label
-        />
+        <!-- The kit's status light, with LpStatus's own tone and pulse for each state. -->
+        <LpStatus v-if="state" :state="state" hide-label />
       </div>
       <div class="mt-1.5 flex items-center justify-between">
         <span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">

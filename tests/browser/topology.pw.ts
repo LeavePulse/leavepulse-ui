@@ -148,3 +148,26 @@ test("group lanes wrap their nodes", async ({ page }) => {
   await open(page, "group")
   await expect(page.locator(".vue-flow__node-lane")).toHaveCount(2)
 })
+
+test("a node's status picks its light and frame; only a lost one is dashed and faded", async ({ page }) => {
+  await open(page, "status")
+  const card = (id: string) => page.locator(`.vue-flow__node[data-id="${id}"] > div`).first()
+  const look = (id: string) =>
+    card(id).evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { dashed: s.borderTopStyle === "dashed", faded: Number(s.opacity) < 1, border: s.borderTopColor }
+    })
+  // Let the frame's colour transition settle before reading it.
+  await page.waitForTimeout(600)
+  const ok = await look("ok")
+  const unmanaged = await look("unmanaged")
+  const gone = await look("gone")
+  const legacy = await look("legacy")
+  expect(ok).toMatchObject({ dashed: false, faded: false })
+  // Serving but not taking instruction is trouble, not death: its own tone, solid.
+  expect(unmanaged).toMatchObject({ dashed: false, faded: false })
+  expect(unmanaged.border).not.toBe(ok.border)
+  expect(gone).toMatchObject({ dashed: true, faded: true })
+  // The old up/down flag still reads as before.
+  expect(legacy).toMatchObject({ dashed: true, faded: true })
+})

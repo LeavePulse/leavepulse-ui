@@ -40,9 +40,6 @@ entry is deleted, not ticked: the commit says what changed.
 
 - **`LpTopologyCanvas` and its parts, found redrawing control-panel's
   network map:**
-  - `LpInfraNode` knows only `online: boolean`, so a node that serves but
-    takes no instruction, or one merely unreachable, draws as down. It wants a
-    `status: StatusKind` like LpStatus.
   - `LpWaypointEdge` does not declare Vue Flow's edge props, so Vue warns in
     dev for every edge; the app falls back to plain beziers.
   - The lane node takes the pointer, so an edge inside a lane cannot be
