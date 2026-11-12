@@ -15,6 +15,7 @@ const PAGE_LEVEL: Record<string, string> = {
   "composables/useHintSystem.ts": "tips live on the page",
   "composables/useHints.ts": "tips live on the page",
   "composables/useClipboard.ts": "the legacy copy fallback uses the page's document",
+  "composables/useAppUpdate.ts": "it reloads the page and reads the page's focus",
   "theme/backdrop.ts": "the theme belongs to the page",
   "theme/studio.ts": "the theme belongs to the page",
 }
