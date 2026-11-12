@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { LpAutocomplete, LpButton, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
+import { LpAutocomplete, LpButton, LpCheckbox, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSegmented, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -21,6 +21,10 @@ const many = Array.from({ length: 30 }, (_, i) => ({ value: `o${i + 1}`, label: 
 const manyPicked = ref("o1")
 const lightbox = ref(false)
 const tipClicks = ref(0)
+const ticked = ref(false)
+const on = ref(false)
+const choice = ref("a")
+const segment = ref("a")
 const pixel = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="gray"/></svg>')
 const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" }]
 </script>
@@ -40,6 +44,13 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       <LpCodeBlock v-model="code" :locked="false" lang="ts" />
       <LpSelect v-model="manyPicked" searchable aria-label="Many" :options="many" />
       <LpSelect v-model="picked" searchable aria-label="Searchable" :options="[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]" />
+    </section>
+    <section aria-label="Targets" class="flex flex-col items-start gap-6">
+      <LpCheckbox v-model="ticked" label="Tick" />
+      <LpSwitch v-model="on" label="Toggle" />
+      <LpRadioGroup v-model="choice" aria-label="Choice" :options="[{ value: 'a', label: 'First' }, { value: 'b', label: 'Second' }]" />
+      <LpSegmented v-model="segment" size="sm" aria-label="Segments" :options="[{ value: 'a', label: 'One' }, { value: 'b', label: 'Two' }]" />
+      <LpButton size="xs" square aria-label="Tiny">+</LpButton>
     </section>
     <section aria-label="Overlays" class="flex flex-wrap gap-2">
       <LpButton @click="modal = true">Open modal</LpButton>

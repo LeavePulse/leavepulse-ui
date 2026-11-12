@@ -202,3 +202,49 @@ test("a column filter shows its Only buttons on a touch screen, where there is n
   await expect(only).toBeVisible()
   await expect.poll(() => only.evaluate((el) => getComputedStyle(el).opacity)).toBe("1")
 })
+
+test.describe("fingertip targets", () => {
+  // What a thumb landing 19px from a control's centre (inside a 40px square)
+  // actually presses.
+  async function reach(control: import("@playwright/test").Locator) {
+    return control.evaluate((el) => {
+      el.scrollIntoView({ block: "center" })
+      const box = el.getBoundingClientRect()
+      const cx = box.left + box.width / 2
+      const cy = box.top + box.height / 2
+      return [[0, -19], [0, 19], [-19, 0], [19, 0]].map(([dx, dy]) => {
+        const hit = document.elementFromPoint(cx + dx, cy + dy)
+        return !!hit && (el === hit || el.contains(hit)) ? true : `${dx},${dy}:${hit?.tagName}.${hit?.className}`.slice(0, 120)
+      })
+    })
+  }
+
+  test("small controls answer a thumb within 40px of their centre without growing", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const targets = page.getByRole("region", { name: "Targets" })
+    const controls = [
+      targets.getByRole("checkbox", { name: "Tick" }),
+      targets.getByRole("switch", { name: "Toggle" }),
+      targets.getByRole("radio", { name: "Second" }),
+      targets.getByRole("button", { name: "Tiny" }),
+      page.getByRole("button", { name: "Remove alpha" }),
+    ]
+    for (const control of controls) {
+      const size = async () => control.evaluate((el) => [el.offsetWidth, el.offsetHeight])
+      const before = await size()
+      expect(await reach(control), await control.evaluate((el) => el.outerHTML.slice(0, 80))).toEqual([true, true, true, true])
+      expect(await size()).toEqual(before)
+    }
+    // A segment answers above and below; beside it is its neighbour.
+    const segment = targets.getByRole("button", { name: "One" })
+    expect((await reach(segment)).slice(0, 2)).toEqual([true, true])
+  })
+
+  test("menu rows are a thumb tall on a touch screen", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await page.getByRole("button", { name: "Open menu" }).click()
+    const row = page.getByRole("menuitem", { name: "Rename" })
+    await expect(row).toBeVisible()
+    expect(await row.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(40)
+  })
+})

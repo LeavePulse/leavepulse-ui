@@ -184,3 +184,24 @@
     font-size: 16px;
   }
 }
+
+/*
+ * A control drawn smaller than a fingertip: a checkbox, a switch, an icon or a
+ * small button, a chip's remove. On a coarse pointer an invisible ::after
+ * grows what it answers to to 40px on each axis, centred on the control, so it
+ * keeps its look and a thumb still lands on it. Bigger controls are left as
+ * they are. Both rules sit in the components layer, so a control placed with
+ * `absolute`, or one that draws its own ::after, keeps what its classes say.
+ */
+@layer components {
+  @media (hover: none) and (pointer: coarse) {
+    .lp-tap {
+      position: relative;
+    }
+    .lp-tap::after {
+      content: "";
+      position: absolute;
+      inset: min(0px, calc((100% - 40px) / 2));
+    }
+  }
+}

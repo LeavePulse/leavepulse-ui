@@ -12,7 +12,7 @@ defineProps<{ label: string; inline?: boolean }>()
 <template>
   <button
     type="button"
-    class="group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
+    class="lp-tap group flex shrink-0 items-center text-muted outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink"
     :class="inline ? undefined : 'rounded-inner p-1 focus-visible:ring-2 focus-visible:ring-ring'"
     :aria-label="label"
   >

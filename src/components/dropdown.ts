@@ -60,8 +60,15 @@ export const PANEL_FIT = "max-w-[calc(100vw-1rem)] max-h-(--reka-popper-availabl
  * trigger (group-data-[side=top]). Pair with an inline animationDelay for the
  * stagger (optionStagger). `flex` + gap are included; add justify/extra layout if needed.
  */
+/**
+ * A list row on a touch screen: 2.5rem tall instead of 2, so a thumb picks the
+ * row it is on and not its neighbour. A mouse keeps the compact row.
+ */
+export const TOUCH_ROW = "[@media(hover:none)_and_(pointer:coarse)]:py-2.5"
+
 export const OPTION_ITEM =
   "flex cursor-pointer items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm text-ink outline-none " +
+  TOUCH_ROW + " " +
   "animate-[rise-in_180ms_var(--ease-emphasized)_both] [--rise:-6px] group-data-[side=top]:[--rise:6px] " +
   "data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand"
 
