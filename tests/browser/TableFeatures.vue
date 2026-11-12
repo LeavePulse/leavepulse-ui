@@ -66,6 +66,16 @@ const load = (query: TableQuery): TablePage<Row> => ({
   total: remote.length,
 })
 const selected = ref<(string | number)[]>([])
+
+const layout = ref<"table" | "cards" | "list">("cards")
+const layoutColumns: TableColumn<Row>[] = [
+  { key: "name", label: "Name", sortable: true },
+  { key: "site", label: "Site", sortable: true, filterable: true },
+  { key: "load", label: "Load", sortable: true },
+]
+const layoutPicks = ref<(string | number)[]>([])
+const clicked = ref("")
+const rowMenu = (row: Row) => [{ label: `Open ${row.name}`, onSelect: () => (clicked.value = `menu:${row.name}`) }]
 const all = ref(false)
 const token = ref<TableSelectionToken | null>(null)
 </script>
@@ -110,6 +120,34 @@ const token = ref<TableSelectionToken | null>(null)
       <LpTable v-model:column-preset="preset" :columns="columns" :rows="base" row-key="id" :column-presets="presets" aria-label="Presets" />
       <output aria-label="Preset">{{ preset }}</output>
     </template>
+    <template v-else-if="part === 'layouts'">
+      <LpTable
+        v-model:layout="layout"
+        v-model:selected="layoutPicks"
+        :columns="layoutColumns"
+        :rows="base"
+        row-key="id"
+        :layouts="['table', 'cards', 'list']"
+        :row-menu="rowMenu"
+        selectable
+        persist="layouts-test"
+        aria-label="Layouts"
+        @row-click="(row) => (clicked = `click:${row.name}`)"
+      >
+        <template #cell-load="{ value }"><b>load {{ value }}</b></template>
+      </LpTable>
+      <output aria-label="Layout">{{ layout }}</output>
+      <output aria-label="Clicked">{{ clicked }}</output>
+      <output aria-label="Picked">{{ layoutPicks.join(",") }}</output>
+    </template>
+    <div v-else-if="part === 'narrow'" style="width: 360px">
+      <LpTable :columns="layoutColumns" :rows="base" row-key="id" :layout-below="480" aria-label="Narrow" />
+    </div>
+    <template v-else-if="part === 'hold-list'">
+      <LpTable v-model:selected="layoutPicks" :columns="layoutColumns" :rows="base" row-key="id" layout="list" selectable="hold" aria-label="Hold list" />
+      <output aria-label="Picked">{{ layoutPicks.join(",") }}</output>
+    </template>
+    <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable
         v-model:selected="selected"

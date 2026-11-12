@@ -22,6 +22,8 @@ import LpScrollArea from "./LpScrollArea.vue"
 import LpRollingText from "./LpRollingText.vue"
 import LpShift from "./LpShift.vue"
 import LpTableFilter, { type TableFilterOption } from "./LpTableFilter.vue"
+import LpDropdownMenu from "./LpDropdownMenu.vue"
+import LpSegmented from "./LpSegmented.vue"
 import { useKitStorage } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useTableFacets } from "./tableFacets"
@@ -41,6 +43,7 @@ import {
   sortByKeys,
   type ColumnPin,
   type ColumnPreset,
+  type TableLayout,
 } from "./tableFeatures"
 import { devWarn } from "../composables/devWarn"
 import { startPointerDrag } from "../composables/pointerDrag"
@@ -194,6 +197,11 @@ export interface TableLabels {
   groupCount: string
   expandGroup: string
   collapseGroup: string
+  layoutTable: string
+  layoutCards: string
+  layoutList: string
+  layoutSwitch: string
+  sortBy: string
 }
 
 export interface TableExportOptions extends CsvOptions {
@@ -239,6 +247,7 @@ export interface TablePage<Row> {
 }
 
 type RowKey = string | number
+
 
 
 const props = withDefaults(
@@ -411,6 +420,30 @@ const props = withDefaults(
     virtualRowHeight?: number
     /** Rows drawn beyond each edge of the view. */
     virtualOverscan?: number
+    /**
+     * How the rows are drawn (v-model:layout): `table`, `cards` or `list`. Left
+     * unset the table keeps the choice itself, remembered with `persist`.
+     */
+    layout?: TableLayout
+    /**
+     * The layouts the user can switch between, offered as a switch in the bar
+     * above the rows. One layout, or none given, means no switch.
+     */
+    layouts?: readonly TableLayout[]
+    /**
+     * Below this width in px (the table's own, not the window's) a `table`
+     * layout is drawn as a `list`: a phone gets one line per row instead of a
+     * table that loses its columns to `hideBelow` or scrolls sideways.
+     */
+    layoutBelow?: number
+    /**
+     * `framed` (default) draws the rows on a surface with a border; `plain`
+     * leaves the frame out, for a table that already sits in a card or a
+     * section of its own.
+     */
+    variant?: "framed" | "plain"
+    /** The narrowest a card may get in the `cards` layout; the grid fits as many as fit. */
+    cardWidth?: string
   }>(),
   { palette: undefined,
     rows: () => [],
@@ -436,6 +469,11 @@ const props = withDefaults(
     expanded: undefined,
     virtualRowHeight: undefined,
     virtualOverscan: 6,
+    layout: undefined,
+    layouts: undefined,
+    layoutBelow: undefined,
+    variant: "framed",
+    cardWidth: "16rem",
   },
 )
 
@@ -482,6 +520,11 @@ const labelSet = useLabels<TableLabels>(
     groupCount: "{label} ({count})",
     expandGroup: "Expand {label}",
     collapseGroup: "Collapse {label}",
+    layoutTable: "Table",
+    layoutCards: "Cards",
+    layoutList: "List",
+    layoutSwitch: "View",
+    sortBy: "Sort",
   },
   () => props.labels,
 )
@@ -528,6 +571,7 @@ const emit = defineEmits<{
   (e: "update:expanded", value: RowKey[]): void
   (e: "cellEdit", edit: TableCellEdit<T>): void
   (e: "rowClick", row: T): void
+  (e: "update:layout", value: TableLayout): void
 }>()
 
 function keyFor(row: T, index: number): RowKey {
@@ -1174,6 +1218,14 @@ onMounted(() => {
       if (state.hidden) writeHidden(mergeRestored(hiddenValues.value, state.hidden))
       if (state.columns) hiddenColumns.value = new Set(state.columns)
     }
+    // Kept beside the table state rather than in it: the layout is a choice
+    // about how to look, and an older table state must not lose its sort and
+    // filters to a field it never had.
+    const layout = store.get(`${storageKey.value}:layout`)
+    if ((layout === "table" || layout === "cards" || layout === "list") && (!props.layouts || props.layouts.includes(layout))) {
+      ownLayout.value = layout
+      if (props.layout !== undefined && props.layout !== layout) emit("update:layout", layout)
+    }
   }
   restored.value = true
 })
@@ -1389,6 +1441,7 @@ const showBar = computed(
     props.summary ||
     props.exportable ||
     !!slots.toolbar ||
+    layoutChoices.value.length > 0 ||
     (!!props.selectable && props.selected.length > 0) ||
     activeFilters.value.length > 0,
 )
@@ -1400,6 +1453,97 @@ const filteredOut = computed(() => {
 })
 
 const cellY = computed(() => (props.density === "compact" ? "py-1.5" : "py-3"))
+
+// ── layouts ──────────────────────────────────────────────────
+//
+// One set of rows and tools, drawn three ways. Everything above this line
+// (sort, filters, selection, the menu, export, the palette) reads
+// `displayRows` and knows nothing of how they are drawn, so a card grid or a
+// list gets all of it for free instead of every page building its own.
+const ownLayout = ref<TableLayout>("table")
+const chosenLayout = computed<TableLayout>(() => props.layout ?? ownLayout.value)
+
+// The table's own width, not the window's: the same table sits in a wide page
+// and in a narrow side panel.
+const frameWidth = ref(Number.POSITIVE_INFINITY)
+useResizeObserver(frameEl, (_, el) => (frameWidth.value = el.clientWidth), { immediate: true })
+
+const activeLayout = computed<TableLayout>(() =>
+  chosenLayout.value === "table" && props.layoutBelow && frameWidth.value < props.layoutBelow
+    ? "list"
+    : chosenLayout.value,
+)
+const layoutChoices = computed(() => (props.layouts && props.layouts.length > 1 ? props.layouts : []))
+const LAYOUT_ICONS: Record<TableLayout, string> = {
+  table: "lucide:table-2",
+  cards: "lucide:layout-grid",
+  list: "lucide:list",
+}
+const layoutOptions = computed(() =>
+  layoutChoices.value.map((value) => {
+    const label = text.value[`layout${value[0]!.toUpperCase()}${value.slice(1)}`] ?? value
+    return { value, icon: LAYOUT_ICONS[value], ariaLabel: label }
+  }),
+)
+
+function chooseLayout(next: string) {
+  const layout = next as TableLayout
+  if (layout === chosenLayout.value) return
+  ownLayout.value = layout
+  emit("update:layout", layout)
+}
+
+// Without a header the sort and the column filters need a home: the bar.
+const headerless = computed(() => activeLayout.value !== "table")
+const sortableColumns = computed(() => props.columns.filter((col) => col.sortable && col.label))
+const filterableColumns = computed(() => props.columns.filter((col) => col.filterable && col.label))
+
+function sortMenu(): ContextMenuItemDef[] {
+  const current = activeSort.value
+  const dir = current?.dir ?? "asc"
+  return [
+    // The columns, the one sorted by ticked; picking one keeps the direction.
+    ...sortableColumns.value.map((col): ContextMenuItemDef => ({
+      label: col.label,
+      selected: current?.key === col.key,
+      onSelect: () => writeSorts([{ key: col.key, dir }]),
+    })),
+    {
+      label: text.value.sortAsc,
+      icon: "lucide:arrow-up",
+      separatorBefore: true,
+      disabled: !current,
+      selected: current?.dir === "asc",
+      onSelect: () => current && writeSorts([{ key: current.key, dir: "asc" }]),
+    },
+    {
+      label: text.value.sortDesc,
+      icon: "lucide:arrow-down",
+      disabled: !current,
+      selected: current?.dir === "desc",
+      onSelect: () => current && writeSorts([{ key: current.key, dir: "desc" }]),
+    },
+    { label: text.value.sortClear, icon: "lucide:x", separatorBefore: true, disabled: !current, onSelect: () => writeSorts([]) },
+  ]
+}
+
+const sortSummary = computed(() => {
+  const current = activeSort.value
+  const col = current && props.columns.find((c) => c.key === current.key)
+  return col ? col.label : text.value.sortBy
+})
+
+// A card shows the columns the user keeps, not the ones a narrow table drops:
+// the card has its own room, and `hideBelow` was a decision about a row.
+const cardColumns = computed(() =>
+  orderPinned(props.columns.filter((col) => !hiddenColumns.value.has(col.key))),
+)
+const titleColumn = computed(() => cardColumns.value[0])
+const fieldColumns = computed(() => cardColumns.value.slice(1).filter((col) => col.label))
+
+watch(chosenLayout, (layout) => {
+  if (storageKey.value && restored.value) store.set(`${storageKey.value}:layout`, layout)
+})
 
 /*
  * Skeleton bars of uneven width, the way real cells are: a column of identical
@@ -1484,7 +1628,7 @@ watch(viewportEl, (el, _, onCleanup) => {
 useResizeObserver(viewportEl, (_, el) => (viewportHeight.value = el.clientHeight), { immediate: true })
 
 const rowWindowed = computed(() =>
-  props.virtualRowHeight
+  props.virtualRowHeight && !headerless.value
     ? rowWindow(scrollTop.value, viewportHeight.value, props.virtualRowHeight, allEntries.value.length, props.virtualOverscan)
     : null,
 )
@@ -1627,6 +1771,47 @@ usePaletteCommands(() => {
       <div v-if="$slots.toolbar" class="flex min-w-0 flex-wrap items-center gap-2 text-sm">
         <slot name="toolbar" />
       </div>
+      <!-- Without a header the sort and the column funnels live here: the same
+           menu and the same filter, reached from the bar instead. -->
+      <div v-if="headerless && (sortableColumns.length || filterableColumns.length)" class="flex flex-wrap items-center gap-1 text-sm">
+        <LpDropdownMenu v-if="sortableColumns.length" :items="sortMenu()">
+          <template #trigger>
+            <LpButton variant="ghost" size="sm" :aria-label="text.sortBy">
+              <LpIcon
+                :name="activeSort ? (activeSort.dir === 'asc' ? 'lucide:arrow-up' : 'lucide:arrow-down') : 'lucide:arrow-up-down'"
+                :size="14"
+              />
+              {{ sortSummary }}
+            </LpButton>
+          </template>
+        </LpDropdownMenu>
+        <LpPopover
+          v-for="col in filterableColumns"
+          :key="col.key"
+          align="start"
+          panel-class="w-72"
+          :aria-label="text.filterColumn.replace('{column}', col.label)"
+        >
+          <template #trigger>
+            <LpButton
+              variant="ghost"
+              size="sm"
+              :class="hiddenValues[col.key]?.size ? 'text-brand' : ''"
+              :aria-label="text.filterColumn.replace('{column}', col.label)"
+              :data-lp-filter="col.key"
+            >
+              <LpIcon :name="hiddenValues[col.key]?.size ? 'lucide:filter-x' : 'lucide:filter'" :size="14" />
+              {{ col.label }}
+            </LpButton>
+          </template>
+          <LpTableFilter
+            :options="facetOptions.get(col.key)?.value ?? []"
+            :hidden="hiddenValues[col.key] ?? new Set()"
+            :labels="filterLabels()"
+            @update:hidden="(next) => setHidden(col.key, next)"
+          />
+        </LpPopover>
+      </div>
       <div v-if="activeFilters.length" class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         <LpBadge
           v-for="f in activeFilters"
@@ -1696,6 +1881,14 @@ usePaletteCommands(() => {
             <slot name="bulk" :selected="selected" :all-matching="allMatching" :clear="clearSelection" />
           </span>
         </Transition>
+        <LpSegmented
+          v-if="layoutOptions.length"
+          :model-value="chosenLayout"
+          :options="layoutOptions"
+          size="sm"
+          :aria-label="text.layoutSwitch"
+          @update:model-value="chooseLayout"
+        />
         <LpButton v-if="exportable" variant="ghost" size="sm" @click="exportCsv()">
           <LpIcon name="lucide:download" :size="14" />
           {{ text.exportCsv }}
@@ -1718,7 +1911,9 @@ usePaletteCommands(() => {
   <LpScrollArea
     v-bind="scrollAttrs"
     :fade="false"
-    class="min-h-0 flex-1 rounded-card border border-line bg-surface"
+    v-if="!headerless"
+    class="min-h-0 flex-1"
+    :class="variant === 'framed' ? 'rounded-card border border-line bg-surface' : ''"
     :style="load && floor ? { minHeight: `${floor + 2}px` } : undefined"
     :bar-inset-top="barInsetTop"
   >
@@ -1790,7 +1985,7 @@ usePaletteCommands(() => {
             <LpContextMenu v-if="col.sortable || col.filterable" :items="headerMenu(col)">
             <button
               type="button"
-              class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 uppercase outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
                 sortOf(col) ? 'text-ink' : '',
@@ -2016,6 +2211,168 @@ usePaletteCommands(() => {
     </table>
     </LpContextMenu>
   </LpScrollArea>
+  <!-- Cards and list: the same rows, menu, selection and keyboard, drawn
+       without a header. The one menu wraps the lot, as it does the table. -->
+  <LpContextMenu
+    v-else
+    :items="contextMenu"
+    always
+    :no-hint="!rowMenu"
+    :title="menuHead?.title"
+    :subtitle="menuHead?.subtitle"
+    :title-icon="menuHead?.icon"
+    :title-image="menuHead?.image"
+  >
+    <TransitionGroup
+      :key="activeLayout"
+      tag="div"
+      name="lp-row"
+      :css="animating"
+      v-bind="scrollAttrs"
+      class="min-h-0 transition-opacity"
+      :class="[
+        busy && displayRows.length ? 'opacity-60' : '',
+        activeLayout === 'cards'
+          ? 'grid gap-3'
+          : variant === 'framed' ? 'overflow-hidden rounded-card border border-line bg-surface' : '',
+      ]"
+      :style="activeLayout === 'cards' ? { gridTemplateColumns: `repeat(auto-fill, minmax(min(${cardWidth}, 100%), 1fr))` } : undefined"
+      :aria-busy="busy || undefined"
+      :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
+    >
+      <template v-if="displayRows.length === 0 && busy">
+        <div
+          v-for="n in skeletonRows"
+          :key="`lp-table-skeleton-${n}`"
+          class="lp-row-empty"
+          :class="activeLayout === 'cards' ? 'flex flex-col gap-3 rounded-card border border-line bg-surface p-4' : ['flex flex-col gap-2 border-b border-line/60 px-4 last:border-0', cellY]"
+        >
+          <LpSkeleton class="h-3.5" :style="{ width: skeletonWidth(n, 0) }" />
+          <LpSkeleton class="h-3" :style="{ width: skeletonWidth(n, 1) }" />
+          <LpSkeleton v-if="activeLayout === 'cards'" class="h-3" :style="{ width: skeletonWidth(n, 2) }" />
+          <span v-if="n === 1" class="sr-only">{{ text.loading }}</span>
+        </div>
+      </template>
+      <div
+        v-else-if="displayRows.length === 0"
+        key="lp-table-empty"
+        class="lp-row-empty"
+        :class="activeLayout === 'cards' ? 'col-span-full rounded-card border border-line bg-surface' : ''"
+      >
+        <LpEmptyState
+          compact
+          :icon="failed ? 'lucide:circle-alert' : filteredOut ? 'lucide:filter-x' : emptyIcon"
+          :title="failed ? text.error : filteredOut ? text.noMatches : text.empty"
+        >
+          <LpButton v-if="filteredOut" variant="outline" size="sm" @click="resetFilters">
+            {{ text.resetFilters }}
+          </LpButton>
+        </LpEmptyState>
+      </div>
+      <template v-for="entry in allEntries" :key="entry.id">
+        <div
+          v-if="entry.kind === 'group'"
+          class="text-xs font-medium text-muted"
+          :class="activeLayout === 'cards' ? 'col-span-full pt-2' : ['border-b border-line/60 bg-surface-soft/60 px-4', cellY]"
+        >
+          <slot name="group" :value="entry.value" :rows="entry.rows" :label="entry.label" :collapsed="entry.collapsed" :toggle="() => toggleGroup(entry.group)">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-small outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              :aria-expanded="!entry.collapsed"
+              :aria-label="(entry.collapsed ? text.expandGroup : text.collapseGroup).replace('{label}', entry.label)"
+              @click="toggleGroup(entry.group)"
+            >
+              <LpIcon name="lucide:chevron-right" :size="14" class="transition-transform duration-fast motion-reduce:transition-none" :class="entry.collapsed ? '' : 'rotate-90'" />
+              {{ entry.label }}
+            </button>
+          </slot>
+        </div>
+        <div
+          v-else-if="entry.kind === 'detail'"
+          class="px-4 py-3"
+          :class="activeLayout === 'cards' ? 'col-span-full' : 'border-b border-line/60 last:border-0'"
+          data-lp-row-detail
+        >
+          <slot name="expanded" :row="entry.row" :close="() => toggleExpanded(keyFor(entry.row, entry.index))" />
+        </div>
+        <div
+          v-else
+          class="lp-item group relative outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+          :class="[
+            activeLayout === 'cards'
+              ? ['flex min-w-0 flex-col gap-2 rounded-card border bg-surface p-4 hover:border-line-strong focus-visible:ring-offset-0', isSelected(keyFor(entry.row, entry.index)) ? 'border-brand bg-brand-soft/30' : 'border-line']
+              : ['flex min-w-0 items-center gap-3 border-b border-line/60 px-4 last:border-0 hover:bg-surface-soft/60 focus-visible:ring-inset data-[active]:bg-surface-soft/40', cellY, isSelected(keyFor(entry.row, entry.index)) ? 'bg-brand-soft/40' : ''],
+          ]"
+          v-bind="roving.itemProps(String(keyFor(entry.row, entry.index)))"
+          :data-paint-key="selectable ? String(keyFor(entry.row, entry.index)) : undefined"
+          :data-lp-context-row="rowMenu ? '' : undefined"
+          @contextmenu="onRowContextMenu(entry.row)"
+          @click="onRowClick(entry.row, keyFor(entry.row, entry.index))"
+          @pointerdown="onRowPointerDown($event, keyFor(entry.row, entry.index))"
+          @keydown="onRowKeydown"
+        >
+          <div
+            v-if="selectable"
+            class="cursor-pointer select-none"
+            :class="activeLayout === 'cards' ? 'absolute top-2 right-2 z-[1]' : ['shrink-0 transition-[margin] duration-medium ease-[var(--ease-emphasized)] motion-reduce:transition-none', ticksShown ? '' : '-mr-3']"
+            @click.stop
+            @pointerdown.stop="paint.onPointerDown($event, keyFor(entry.row, entry.index))"
+          >
+            <div
+              class="lp-tick"
+              :class="activeLayout === 'cards' ? 'lp-tick-card' : ticksShown ? 'lp-tick-line' : ''"
+              :data-cue="activeLayout === 'cards' && !ticksShown ? '' : undefined"
+              :inert="activeLayout !== 'cards' && !ticksShown"
+            >
+              <LpCheckbox
+                :model-value="isSelected(keyFor(entry.row, entry.index))"
+                @update:model-value="(v) => toggleRow(keyFor(entry.row, entry.index), v)"
+              />
+            </div>
+          </div>
+          <slot
+            name="card"
+            :row="entry.row"
+            :selected="isSelected(keyFor(entry.row, entry.index))"
+            :toggle="() => toggleRow(keyFor(entry.row, entry.index), !isSelected(keyFor(entry.row, entry.index)))"
+            :open-menu="openRowMenu"
+            :layout="activeLayout"
+          >
+            <!-- Built from the columns and their cell slots, so a table that
+                 never thought about cards still has good ones: the first column
+                 names the row, the rest are its facts. -->
+            <template v-if="activeLayout === 'cards'">
+              <div v-if="titleColumn" class="min-w-0 truncate pr-6 font-medium text-ink">
+                <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
+              </div>
+              <dl v-if="fieldColumns.length" class="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1 text-sm">
+                <template v-for="col in fieldColumns" :key="col.key">
+                  <dt class="text-xs text-muted">{{ col.label }}</dt>
+                  <dd class="min-w-0 truncate text-ink">
+                    <slot :name="`cell-${col.key}`" :row="entry.row" :value="entry.row[col.key]" :open-menu="openRowMenu">{{ entry.row[col.key] }}</slot>
+                  </dd>
+                </template>
+              </dl>
+            </template>
+            <div v-else class="min-w-0 flex-1">
+              <div v-if="titleColumn" class="min-w-0 truncate font-medium text-ink">
+                <slot :name="`cell-${titleColumn.key}`" :row="entry.row" :value="entry.row[titleColumn.key]" :open-menu="openRowMenu">{{ entry.row[titleColumn.key] }}</slot>
+              </div>
+              <div v-if="fieldColumns.length" class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+                <template v-for="(col, ci) in fieldColumns" :key="col.key">
+                  <span v-if="ci > 0" aria-hidden="true">·</span>
+                  <span class="min-w-0 truncate" :title="col.label">
+                    <slot :name="`cell-${col.key}`" :row="entry.row" :value="entry.row[col.key]" :open-menu="openRowMenu">{{ entry.row[col.key] }}</slot>
+                  </span>
+                </template>
+              </div>
+            </div>
+          </slot>
+        </div>
+      </template>
+    </TransitionGroup>
+  </LpContextMenu>
   </LpShift>
   <LpPagination
     v-if="load && total > pageSize"
@@ -2129,6 +2486,41 @@ tr:hover .lp-tick-cue,
   .lp-tick-cue {
     max-width: 0;
     padding-inline: 0;
+  }
+}
+
+/*
+ * A list line's tick opens from nothing, as the table's column does, so lines
+ * do not carry an empty gap until selection starts.
+ */
+.lp-tick-line {
+  max-width: 2rem;
+  opacity: 1;
+}
+
+/*
+ * A card's tick sits in its corner at its own size, with no column to hold
+ * open; a cue shows it only while
+ * the card is pointed at or holds focus, the same rule as a row's.
+ */
+.lp-tick-card {
+  max-width: none;
+  padding-inline: 0;
+  opacity: 1;
+}
+
+.lp-tick[data-cue] {
+  opacity: 0;
+}
+
+.lp-item:hover .lp-tick[data-cue],
+.lp-tick[data-cue]:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .lp-item:hover .lp-tick[data-cue] {
+    opacity: 0;
   }
 }
 

@@ -905,6 +905,59 @@ export const data: ComponentEntry[] = [
     },
   },
   {
+    id: "table-layouts",
+    name: "Table · Layouts",
+    description:
+      "The same rows and tools drawn three ways. `layout` (v-model) is `table`, `cards` or `list`; `layouts` offers a switch between them in the bar, remembered with `persist`. Cards and list lines are built from the columns and their `#cell-*` slots, so a table that never thought about cards has good ones: the first column names the row, the rest are its facts. `#card` draws a card of your own (it gets `row`, `selected`, `toggle`, `openMenu`). Without a header the sort and the column funnels move to the bar; selection, the row menu, keyboard, export, grouping and the palette work in every layout. `layoutBelow` turns a table into a list while it is narrower than that (the narrow frame below). `variant=\"plain\"` drops the frame for a table that already sits in a card. Not in cards and lists: virtual rows, column resizing and pins, which are about a header.",
+    components: { LpTable, LpBadge },
+    state: () =>
+      reactive({
+        layout: "cards",
+        selected: [] as string[],
+        columns: [
+          { key: "name", label: "Server", sortable: true },
+          { key: "region", label: "Region", sortable: true, filterable: true },
+          { key: "state", label: "State", filterable: true },
+          { key: "cpu", label: "CPU", align: "right", sortable: true },
+        ],
+        rows: [
+          { name: "fra-01", region: "Frankfurt", state: "online", cpu: 42 },
+          { name: "fra-02", region: "Frankfurt", state: "degraded", cpu: 91 },
+          { name: "waw-01", region: "Warsaw", state: "online", cpu: 17 },
+          { name: "kyiv-01", region: "Kyiv", state: "offline", cpu: 0 },
+          { name: "kyiv-02", region: "Kyiv", state: "online", cpu: 63 },
+        ],
+        tone: (state: string) => (state === "online" ? "success" : state === "degraded" ? "warning" : "danger"),
+        rowMenu: (row: { name: string }) => ({
+          title: row.name,
+          items: [{ label: "Copy name", icon: "lucide:copy", onSelect: () => navigator.clipboard?.writeText(row.name) }],
+        }),
+      }),
+    template: `<div class="flex flex-col gap-6">
+  <LpTable
+    v-model:layout="layout"
+    v-model:selected="selected"
+    :columns="columns"
+    :rows="rows"
+    row-key="name"
+    :layouts="['table', 'cards', 'list']"
+    :row-menu="rowMenu"
+    selectable="hold"
+    persist="preview-layouts"
+    exportable
+    summary
+  >
+    <template #cell-state="{ value }"><LpBadge :tone="tone(value)" size="sm">{{ value }}</LpBadge></template>
+    <template #cell-cpu="{ value }"><span class="tabular-nums">{{ value }}%</span></template>
+  </LpTable>
+  <div class="max-w-sm">
+    <LpTable :columns="columns" :rows="rows" row-key="name" :layout-below="480" variant="plain">
+      <template #cell-state="{ value }"><LpBadge :tone="tone(value)" size="sm">{{ value }}</LpBadge></template>
+    </LpTable>
+  </div>
+</div>`,
+  },
+  {
     id: "pagination",
     name: "Pagination",
     description:

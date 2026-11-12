@@ -122,6 +122,28 @@ const ICON =
       <MenuShortcut v-if="item.shortcut" :combo="item.shortcut" />
     </component>
 
+    <!-- One choice among its neighbours: a plain item that closes the menu,
+         told to assistive tech as a radio item with its state. -->
+    <component
+      :is="P.Item"
+      v-else-if="item.selected !== undefined"
+      role="menuitemradio"
+      :aria-checked="item.selected"
+      :class="[ITEM, 'justify-between text-ink data-[highlighted]:text-brand']"
+      :disabled="item.disabled"
+      @select="item.onSelect?.()"
+    >
+      <span class="flex items-center gap-2">
+        <LpIcon
+          :name="item.selected ? 'lucide:check' : (item.icon ?? 'lucide:minus')"
+          :size="15"
+          :class="[ICON, item.selected || item.icon ? '' : 'opacity-25']"
+        />
+        {{ item.label }}
+      </span>
+      <MenuShortcut v-if="item.shortcut" :combo="item.shortcut" />
+    </component>
+
     <component
       :is="P.Item"
       v-else

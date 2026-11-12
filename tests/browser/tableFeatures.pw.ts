@@ -157,3 +157,80 @@ test("all matching survives paging as a query with exceptions", async ({ page })
   await expect(page.getByRole("status", { name: "Token" })).toHaveText("6-2")
   await expect(page.getByText("5 selected")).toBeVisible()
 })
+
+test("cards draw the rows from the columns and keep sort, filter, menu, click and selection", async ({ page }) => {
+  await page.goto(open("layouts"))
+  const cards = page.locator(".lp-item")
+  await expect(cards).toHaveCount(3)
+  // The cell slot draws the field in a card too.
+  await expect(cards.first()).toContainText("load 2")
+  await expect(page.locator("table")).toHaveCount(0)
+  // No header, so the sort is in the bar.
+  await page.getByRole("button", { name: "Sort" }).click()
+  await page.getByRole("menuitemradio", { name: "Load" }).click()
+  await expect(cards.locator(".font-medium")).toHaveText(["gamma", "alpha", "beta"])
+  await page.getByRole("button", { name: "Sort" }).click()
+  await page.getByRole("menuitemradio", { name: "Sort descending" }).click()
+  await expect(cards.first()).toContainText("alpha")
+  // The column funnel too.
+  await page.getByRole("button", { name: "Filter Site" }).click()
+  await page.getByRole("checkbox", { name: /^a/ }).click()
+  await page.keyboard.press("Escape")
+  await expect(cards).toHaveCount(2)
+  await page.getByRole("button", { name: "Clear the Site filter" }).click()
+  await expect(cards).toHaveCount(3)
+  await cards.filter({ hasText: "beta" }).click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("click:beta")
+  await cards.filter({ hasText: "alpha" }).click({ button: "right" })
+  await page.getByRole("menuitem", { name: "Open alpha" }).click()
+  await expect(page.getByRole("status", { name: "Clicked" })).toHaveText("menu:alpha")
+  await cards.filter({ hasText: "gamma" }).getByRole("checkbox").click()
+  await expect(page.getByRole("status", { name: "Picked" })).toHaveText("3")
+})
+
+test("the layout switch changes the drawing and is remembered", async ({ page }) => {
+  await page.goto(open("layouts"))
+  await page.getByRole("button", { name: "List", exact: true }).click()
+  await expect(page.getByRole("status", { name: "Layout" })).toHaveText("list")
+  await expect(page.locator(".lp-item")).toHaveCount(3)
+  await page.getByRole("button", { name: "Table", exact: true }).click()
+  await expect(page.locator("tbody tr")).toHaveCount(3)
+  await page.reload()
+  await expect(page.getByRole("status", { name: "Layout" })).toHaveText("table")
+  await expect(page.locator("tbody tr")).toHaveCount(3)
+})
+
+test("a table narrower than layoutBelow is drawn as a list", async ({ page }) => {
+  await page.goto(open("narrow"))
+  await expect(page.locator("table")).toHaveCount(0)
+  await expect(page.locator(".lp-item")).toHaveCount(3)
+  await expect(page.locator(".lp-item").first()).toContainText("alpha")
+})
+
+test("every header reads in the same case, sortable or not", async ({ page }) => {
+  await page.goto(open("sort"))
+  const transform = await page.getByRole("button", { name: /^Name/ }).evaluate((el) => getComputedStyle(el).textTransform)
+  expect(transform).toBe("uppercase")
+})
+
+test("a plain table has no frame of its own", async ({ page }) => {
+  await page.goto(open("plain"))
+  const border = await page.locator("[data-reka-scroll-area-viewport]").evaluate((el) => getComputedStyle(el.parentElement!).borderTopWidth)
+  expect(border).toBe("0px")
+})
+
+test("a held list line starts selection and only then opens room for the ticks", async ({ page }) => {
+  await page.goto(open("hold-list"))
+  const title = page.locator(".lp-item .font-medium").first()
+  const line = page.locator(".lp-item").first()
+  const startX = (await title.boundingBox())!.x
+  const lineX = (await line.boundingBox())!.x
+  expect(startX - lineX).toBeLessThan(20)
+  const box = (await line.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(600)
+  await page.mouse.up()
+  await expect(page.getByRole("status", { name: "Picked" })).toHaveText("1")
+  await expect.poll(async () => (await title.boundingBox())!.x).toBeGreaterThan(startX + 16)
+})

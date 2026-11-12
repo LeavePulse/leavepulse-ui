@@ -147,3 +147,13 @@ export function presetHidden(
   // A preset naming nothing that exists must not leave a table with no columns.
   return hidden.length === columns.length ? new Set() : new Set(hidden)
 }
+
+/**
+ * How the rows are drawn. The table's tools (sort, filters, search, selection,
+ * the row menu, export, persistence, the palette) are the same in each; only
+ * the drawing changes.
+ * - `table`: rows under a header.
+ * - `cards`: a grid of cards, for rows that are pictures or read best as a whole.
+ * - `list`: one compact line per row with no header, for narrow places.
+ */
+export type TableLayout = "table" | "cards" | "list"

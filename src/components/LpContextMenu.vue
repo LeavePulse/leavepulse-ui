@@ -38,6 +38,13 @@ export interface ContextMenuItemDef {
    * would mean reopening the menu for every tick.
    */
   checked?: boolean
+  /**
+   * One choice among its neighbours (sort by, density, view): ticked when it
+   * is the one in force, and picking it closes the menu, since there is
+   * nothing else to set. Announced as a radio item. `checked` wins when both
+   * are given.
+   */
+  selected?: boolean
 }
 
 const props = withDefaults(defineProps<{

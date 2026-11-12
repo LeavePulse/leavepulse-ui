@@ -590,6 +590,11 @@ export const uk: KitLabels = {
     groupCount: "{label} ({count})",
     expandGroup: "Розгорнути {label}",
     collapseGroup: "Згорнути {label}",
+    layoutTable: "Таблиця",
+    layoutCards: "Картки",
+    layoutList: "Список",
+    layoutSwitch: "Вигляд",
+    sortBy: "Сортування",
   },
   tagsInput: {
     remove: "Прибрати {tag}",
