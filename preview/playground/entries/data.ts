@@ -186,7 +186,7 @@ export const data: ComponentEntry[] = [
     id: "pie",
     name: "Pie / Donut",
     description:
-      "Shares of a whole. Takes any number of slices: the tail folds into \"Other\" (which keeps its total and a count) so twenty categories stay readable without losing data. Hover lifts a slice; click pins a selection — Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu. The legend works from the keyboard, and `data-table` (on Services) adds a visually hidden table for screen readers. `loading` draws a pulsing ring (a disc for `pie`) at the chart's size with legend rows beside it, and eases into the chart; the sweep waits for the data.",
+      "Shares of a whole, as a pie or a donut.\n\n- Slices: any number; the tail folds into \"Other\" (which keeps its total and a count), so twenty categories stay readable without losing data.\n- Pointer: hover lifts a slice; click pins a selection; Ctrl toggles, Shift takes a range, dragging across gathers, right-click opens a menu.\n- Accessibility: the legend works from the keyboard, and `data-table` (on Services) adds a visually hidden table for screen readers.\n- Loading: `loading` draws a pulsing ring (a disc for `pie`) at the chart's size with legend rows beside it, and eases into the chart; the sweep waits for the data.",
     components: { LpPie, LpSwitch },
     state: () =>
       reactive({
@@ -363,7 +363,7 @@ export const data: ComponentEntry[] = [
   {
     id: "uptime-bar",
     name: "Uptime Bar",
-    description: "Status-page uptime scale. The figure counts real time: give each slice its `durations` (ms in each state) and one bad minute costs a minute, not a whole slice; without them slices weigh by their `start`–`end` span. It is never rounded up to 100% over an outage, and `uptime` takes an exact figure from the server instead. Hovering a slice shows its span, the time it spent in each state and its `events`. `loading` pulses a row of ticks at the bar's height and holds the figure, so the captions around it stay put.",
+    description: "Status-page uptime scale.\n\n- Real time: give each slice its `durations` (ms in each state) and one bad minute costs a minute, not a whole slice; without them slices weigh by their `start` to `end` span.\n- The figure is never rounded up to 100% over an outage; `uptime` takes an exact figure from the server instead.\n- Hover: a slice shows its span, the time it spent in each state and its `events`.\n- Loading: `loading` pulses a row of ticks at the bar's height and holds the figure, so the captions around it stay put.",
     components: { LpUptimeBar, LpSwitch },
     state: () =>
       reactive({
@@ -417,7 +417,7 @@ export const data: ComponentEntry[] = [
     id: "chart",
     name: "Chart",
     description:
-      "Line, area and bar off one data shape. Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series. `thresholds` draws reference lines or bands (`to`), `markers` pins events to an x position. The plot is keyboard reachable (arrows, Home, End, Enter), reads out a generated summary, and `data-table` adds a visually hidden table of the values. `loading` keeps the plot's height and pulses a stand-in of the chart's type in the plot area (bars, or a line; tick stubs on the axes), then swaps to the marks; an empty chart shows LpEmptyState.",
+      "Line, area and bar charts off one data shape.\n\n- Hover snaps a crosshair to the nearest point and reads every series at once; the legend toggles series.\n- Annotations: `thresholds` draws reference lines or bands (`to`); `markers` pins events to an x position.\n- Accessibility: the plot is keyboard reachable (arrows, Home, End, Enter), reads out a generated summary, and `data-table` adds a visually hidden table of the values.\n- Loading: `loading` keeps the plot's height and pulses a stand-in of the chart's type (bars, or a line; tick stubs on the axes), then swaps to the marks. An empty chart shows LpEmptyState.",
     components: { LpChart, LpButton, LpSwitch },
     state: () =>
       reactive({
@@ -570,7 +570,7 @@ export const data: ComponentEntry[] = [
     id: "log-viewer",
     name: "Log Viewer",
     description:
-      "Terminal-flavoured log stream: tonal level rail, timestamps, source chips, search highlighting, and a sticky tail that glides to the bottom as lines arrive (jump-to-latest pill when you scroll up). New rows fade in. The filter button (shown only while searching) collapses the view to matching lines. `compact` folds consecutive identical lines into one, badged ×N. Right-click a line for copy actions (message / line / timestamp), \"filter by\" source·level (emits @filter), and your own extraRowItems.",
+      "Terminal-flavoured log stream with a tonal level rail, timestamps, source chips and search highlighting.\n\n- Tail: a sticky tail glides to the bottom as lines arrive, with a jump-to-latest pill when you scroll up; new rows fade in.\n- Search: the filter button (shown only while searching) collapses the view to matching lines.\n- `compact` folds consecutive identical lines into one, badged ×N.\n- Right-click a line for copy actions (message, line, timestamp), \"filter by\" source or level (emits @filter), and your own extraRowItems.",
     components: { LpLogViewer, LpInput, LpButton, LpSwitch, LpIcon },
     state: () => {
       const samples: { level: string; source: string; message: string }[] = [
@@ -1192,7 +1192,7 @@ export const data: ComponentEntry[] = [
     id: "media-gallery",
     name: "MediaGallery",
     description:
-      "Thumbnail grid that opens into the Lightbox. `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image. A video item (`kind: \"video\"`, or an address ending in .mp4, .webm…) shows its `poster` or first frame under a play badge and its length, and plays in LpVideoPlayer inside the lightbox: zoom and rotation are left out for it, a drag on its bar never pages, Space plays from anywhere, and paging away stops it. An item marked `spoiler` arrives covered: one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it. Items are LightboxItem, so a set passes straight through. `itemMenu(item, index)` gives a thumbnail a right-click menu headed by its title and picture (a covered spoiler shows neither); the first grid has one. Texts come from `labels` (\"mediaGallery\" scope).",
+      "Thumbnail grid that opens into the Lightbox.\n\n- Grid: `columns` takes a number or a per-breakpoint object; `max` caps the grid and badges the last tile with the remainder, which opens at the first hidden image.\n- Video: an item with `kind: \"video\"`, or an address ending in .mp4, .webm and so on, shows its `poster` or first frame under a play badge and its length, and plays in LpVideoPlayer inside the lightbox. Zoom and rotation are left out for it, a drag on its bar never pages, Space plays from anywhere, and paging away stops it.\n- Spoilers: an item marked `spoiler` arrives covered; one click uncovers it, a second opens it, and while covered it stays out of the lightbox so paging cannot land on it.\n- Items are LightboxItem, so a set passes straight through.\n- Menu: `itemMenu(item, index)` gives a thumbnail a right-click menu headed by its title and picture (a covered spoiler shows neither); the first grid has one.\n- Texts come from `labels` (\"mediaGallery\" scope).",
     components: { LpMediaGallery },
     state: () => {
       const plate = (label: string, from: string, to: string, w = 1200, h = 800) =>

@@ -28,7 +28,7 @@ export const textMotion: ComponentEntry[] = [
     id: "text-reveal",
     name: "TextReveal",
     description:
-      "Text that arrives word by word or letter by letter: each piece fades in, rises a little and comes into focus. For the one line a screen is about (a hero heading, an empty state, a fresh result), not body copy. Plays the first time it is on screen; `play` hands the moment to the app and a new `replay-key` plays it again. A changed `text` only moves the words that changed: the gone ones fade, the new ones arrive in their place. Screen readers get the whole string once; it wraps like ordinary text.",
+      "Text that arrives word by word or letter by letter: each piece fades in, rises a little and comes into focus.\n\n- For the one line a screen is about (a hero heading, an empty state, a fresh result), not body copy.\n- Plays the first time it is on screen; `play` hands the moment to the app and a new `replay-key` plays it again.\n- A changed `text` only moves the words that changed: the gone ones fade, the new ones arrive in their place.\n- Screen readers get the whole string once; it wraps like ordinary text.",
     components: { LpTextReveal, LpSegmented, LpButton, LpInput, LpCard },
     state: () =>
       reactive({
@@ -72,7 +72,7 @@ export const textMotion: ComponentEntry[] = [
     id: "shiny-text",
     name: "ShinyText",
     description:
-      "Accent text with light moving through it, pure CSS. `shine` keeps the tone and sweeps a band across it now and then: a \"New\" tag, a plan name, a status still at work. `gradient` paints the word with the theme's brand, accent and action colours drifting across it, for a display headline. The band moves toward the theme's ink, so it lightens on dark and darkens on light and never washes the word out. Pauses off screen and in hidden tabs; stands still under reduced motion.",
+      "Accent text with light moving through it, pure CSS.\n\n- `shine` keeps the tone and sweeps a band across it now and then: a \"New\" tag, a plan name, a status still at work.\n- `gradient` paints the word with the theme's brand, accent and action colours drifting across it, for a display headline.\n- The band moves toward the theme's ink, so it lightens on dark and darkens on light and never washes the word out.\n- Pauses off screen and in hidden tabs; stands still under reduced motion.",
     components: { LpShinyText, LpSegmented, LpSwitch },
     state: () => reactive({ tone: "brand", tones: options(["brand", "accent", "action", "ink"]), speed: 3, paused: false }),
     template: `<div class="flex w-[28rem] flex-col gap-5">
@@ -93,7 +93,7 @@ export const textMotion: ComponentEntry[] = [
     id: "typewriter",
     name: "Typewriter",
     description:
-      "Text typed a character at a time, optionally cycling strings: type, hold, erase, next. For a line that suggests rather than states (what a search can find, a hero line, a terminal-style empty state), never for text the reader has to wait for. Keystrokes are uneven and pause after punctuation; erasing stops at what the next string shares. The box reserves the longest string's size so the line around it holds still (`reserve` off to flow in a sentence). Screen readers hear each whole string once it is typed, never characters. Starts on sight, pauses off screen; under reduced motion whole strings swap.",
+      "Text typed a character at a time, optionally cycling strings: type, hold, erase, next.\n\n- For a line that suggests rather than states (what a search can find, a hero line, a terminal-style empty state), never for text the reader has to wait for.\n- Keystrokes are uneven and pause after punctuation; erasing stops at what the next string shares.\n- The box reserves the longest string's size so the line around it holds still (`reserve` off to flow in a sentence).\n- Screen readers hear each whole string once it is typed, never characters.\n- Starts on sight, pauses off screen; under reduced motion whole strings swap.",
     components: { LpTypewriter, LpSwitch, LpInput },
     state: () => reactive({ loop: true, log: "", items: ["servers", "logs", "people", "invoices"] }),
     template: `<div class="flex w-[28rem] flex-col gap-4">
@@ -115,7 +115,7 @@ export const textMotion: ComponentEntry[] = [
     id: "scramble",
     name: "Scramble",
     description:
-      "A value that decrypts into place: each character churns through random glyphs and settles, left to right (`sequential`) or in one burst (`together`). For values that were just produced: a new API key, a hash a job returned, an invite code. Plays on sight, at mount, on hover or only when `value` changes. Each position is sized by the character it will land on, so the width holds still even in a proportional font, and a length change eases. Screen readers get the value once. The clock is `useScramble`, for a component that wants the effect on its own markup.",
+      "A value that decrypts into place: each character churns through random glyphs and settles.\n\n- Order: left to right (`sequential`) or in one burst (`together`).\n- For values that were just produced: a new API key, a hash a job returned, an invite code.\n- Plays on sight, at mount, on hover or only when `value` changes.\n- Each position is sized by the character it will land on, so the width holds still even in a proportional font, and a length change eases.\n- Screen readers get the value once.\n- The clock is `useScramble`, for a component that wants the effect on its own markup.",
     components: { LpScramble, LpButton, LpSegmented, LpCard },
     state: () => reactive({ keys: KEYS, i: 0, order: "sequential", orders: options(["sequential", "together"]) }),
     template: `<div class="flex w-[28rem] flex-col gap-4">

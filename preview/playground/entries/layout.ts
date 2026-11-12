@@ -48,7 +48,7 @@ export const layoutBasics: ComponentEntry[] = [
     id: "masonry",
     name: "Masonry",
     description:
-      "Items of different heights packed into columns without the gaps a grid leaves: memo cards, screenshots, mod tiles. Each item goes, in order, into the shortest column, so the newest stay at the top and an appended item leaves the rest alone. The column count follows the container (`minColumnWidth`, or `columns` as a number or a `{ minWidth: count }` table). Items glide to their new places when the width, an item's size or the list changes, the height eases along, and the block makes a staggered entrance the first time it is seen.",
+      "Items of different heights packed into columns without the gaps a grid leaves: memo cards, screenshots, mod tiles.\n\n- Placement: each item goes, in order, into the shortest column, so the newest stay at the top and an appended item leaves the rest alone.\n- Columns: the count follows the container (`minColumnWidth`, or `columns` as a number or a `{ minWidth: count }` table).\n- Motion: items glide to their new places when the width, an item's size or the list changes, the height eases along, and the block makes a staggered entrance the first time it is seen.",
     components: { LpMasonry, LpCard, LpButton, LpSegmented },
     state: () =>
       reactive({
@@ -105,7 +105,7 @@ export const layoutBasics: ComponentEntry[] = [
     id: "dock",
     name: "Dock",
     description:
-      "A bar of icon buttons that swell under the mouse, the neighbours less with distance, for aiming at small targets in a dense quick bar (the launcher's apps, instances, tools). Touch, pen and reduced motion get plain buttons at rest size. Sizes are springs stepped per frame and written straight to the elements, so moving the pointer costs no re-render. One Tab stop with arrow keys inside (the focused icon swells too), labels in tooltips that also name the buttons, a dot under the ids in `active`. `orientation=\"vertical\"` for a side bar; `focusAt` drives the swell from outside for demos and tours.",
+      "A bar of icon buttons that swell under the mouse, the neighbours less with distance, for aiming at small targets in a dense quick bar (the launcher's apps, instances, tools).\n\n- Touch, pen and reduced motion get plain buttons at rest size.\n- Performance: sizes are springs stepped per frame and written straight to the elements, so moving the pointer costs no re-render.\n- Keyboard: one Tab stop with arrow keys inside; the focused icon swells too.\n- Labels sit in tooltips that also name the buttons; a dot marks the ids in `active`.\n- `orientation=\"vertical\"` for a side bar; `focusAt` drives the swell from outside for demos and tours.",
     components: { LpDock, LpSwitch },
     state: () =>
       reactive({
@@ -145,7 +145,7 @@ export const layoutMotion: ComponentEntry[] = [
     id: "reveal-on-scroll",
     name: "Reveal on scroll",
     description:
-      "Content that arrives the first time it is scrolled into view: a block of cards, a section further down a long page. `preset` is `fade`, `rise`, `blur` or `scale`, `direction` the way it travels, `delay` and `duration` in ms; `stagger` animates the direct children one after another (the steps stop growing after ten, so long lists still finish quickly). Plays once, through the Web Animations API on transform and opacity; reduced motion shows everything at once. Components that animate their own arrival (charts, progress) do not need it: they wait for `useReveal` themselves.",
+      "Content that arrives the first time it is scrolled into view: a block of cards, a section further down a long page.\n\n- Motion: `preset` is `fade`, `rise`, `blur` or `scale`; `direction` is the way it travels; `delay` and `duration` are in ms.\n- `stagger` animates the direct children one after another (the steps stop growing after ten, so long lists still finish quickly).\n- Plays once, through the Web Animations API on transform and opacity; reduced motion shows everything at once.\n- Components that animate their own arrival (charts, progress) do not need it: they wait for `useReveal` themselves.",
     components: { LpRevealOnScroll, LpCard, LpSegmented },
     state: () =>
       reactive({
@@ -200,7 +200,7 @@ export const layoutMotion: ComponentEntry[] = [
     id: "glow-border",
     name: "Glow border",
     description:
-      "A gradient running round the edge, for the one item that must be noticed first: a new release, the recommended option. Several on one screen cancel each other out. On a card it is LpCard's `glow`; LpGlowBorder wraps anything else (pass a radius class matching the child). Pure CSS: the angle is a registered property, so where `@property` is missing (older WebKitGTK) and under reduced motion the ring is a still gradient. `active` fades it out without changing the layout.",
+      "A gradient running round the edge, for the one item that must be noticed first: a new release, the recommended option.\n\n- Several on one screen cancel each other out.\n- On a card it is LpCard's `glow`; LpGlowBorder wraps anything else (pass a radius class matching the child).\n- Pure CSS: the angle is a registered property, so where `@property` is missing (older WebKitGTK) and under reduced motion the ring is a still gradient.\n- `active` fades it out without changing the layout.",
     components: { LpGlowBorder, LpCard, LpBadge, LpButton, LpSwitch },
     state: () => reactive({ on: true }),
     template: `<div class="flex w-96 flex-col gap-4">

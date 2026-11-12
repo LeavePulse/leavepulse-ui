@@ -108,7 +108,7 @@ export const looksOverlays: ComponentEntry[] = [
     id: "hover-card",
     name: "HoverCard",
     description:
-      "A preview that opens when the pointer rests on a name or a link: a profile, a server's status, where a link goes. Waits longer than a tooltip (passing over a list flashes nothing), opens at once on keyboard focus, stays open while the pointer crosses to it, and on touch opens on press-and-hold without following the link (`touch=\"none\"` to leave touch alone). Not a place for the only way to do something: whatever it holds must be reachable without it.",
+      "A preview that opens when the pointer rests on a name or a link: a profile, a server's status, where a link goes.\n\n- Timing: waits longer than a tooltip (passing over a list flashes nothing), opens at once on keyboard focus, and stays open while the pointer crosses to it.\n- Touch: opens on press-and-hold without following the link (`touch=\"none\"` to leave touch alone).\n- Not a place for the only way to do something: whatever it holds must be reachable without it.",
     components: { LpHoverCard, LpAvatar, LpBadge, LpButton, LpIcon, LpSwitch },
     state: () => reactive({ arrow: true, open: false }),
     template: `<div class="flex w-96 flex-col gap-4 text-sm text-muted">

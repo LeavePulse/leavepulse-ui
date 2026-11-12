@@ -194,7 +194,7 @@ export const forms: ComponentEntry[] = [
     id: "select",
     name: "Select",
     description:
-      "Searchable / multiple select on reka-ui. Option values may be string OR number; options can carry an `image` or `icon` and be `disabled`. The trigger shows the pick with its picture and a muted hint; `multiple` shows chips that collapse to \"+N\" when the row is full, and `@change` carries the value just toggled. Server-side search via v-model:searchTerm + :loading: a pick stays named after it drops out of the results (remembered for the session, or told through `selected`). Placeholder and list texts come from the `select` labels.",
+      "Searchable or multiple select on reka-ui.\n\n- Options: values may be string OR number; an option can carry an `image` or `icon` and be `disabled`.\n- Trigger: shows the pick with its picture and a muted hint; `multiple` shows chips that collapse to \"+N\" when the row is full, and `@change` carries the value just toggled.\n- Server-side search: v-model:searchTerm + :loading; a pick stays named after it drops out of the results (remembered for the session, or told through `selected`).\n- Placeholder and list texts come from the `select` labels.",
     components: { LpSelect },
     state: () => reactive({
       people: [
@@ -255,7 +255,7 @@ export const forms: ComponentEntry[] = [
     id: "switch",
     name: "Switch · Checkbox · Radio",
     description:
-      "Boolean and choice controls. LpSwitch and LpCheckbox take a `label` and a `description` (a secondary line the control is described by); LpSwitch also `label-position=\"start\"` for a settings row with the switch at the right edge. LpRadioGroup takes `:options` (each may carry a `description` line, an `icon`, or be `disabled`), or LpRadio children when a row needs custom content. A switch with `action` saves its own state: it flips at once, spins in its thumb while the work runs, and flips back with an error toast if it fails (the last row fails every other time).",
+      "Boolean and choice controls: LpSwitch, LpCheckbox and LpRadioGroup.\n\n- LpSwitch and LpCheckbox take a `label` and a `description` (a secondary line the control is described by); LpSwitch also takes `label-position=\"start\"` for a settings row with the switch at the right edge.\n- LpRadioGroup takes `:options` (each may carry a `description` line, an `icon`, or be `disabled`), or LpRadio children when a row needs custom content.\n- Saving: a switch with `action` saves its own state. It flips at once, spins in its thumb while the work runs, and flips back with an error toast if it fails (the last row fails every other time).",
     components: { LpSwitch, LpCheckbox, LpRadioGroup, LpRadio },
     state: () => {
       let saves = 0
@@ -400,7 +400,7 @@ export const forms: ComponentEntry[] = [
     id: "input-mask",
     name: "Input mask",
     description:
-      "`mask` on LpInput formats as you type and keeps the caret where it was: `0` is a digit, `a` a letter, `A` a letter shown upper-case, `*` either, and a backslash makes the next character literal. A list picks the first mask the value fits, a function derives it from what was typed so far, and `mask-tokens` adds your own. Backspace skips over separators. v-model holds the formatted text; `@update:raw` the characters alone. The same engine is `useInputMask()` for your own input. The phone here picks its mask from the country code typed so far (+380, +1, +7, anything else grouped by three); for a full international field with a country list, use LpPhoneInput.",
+      "`mask` on LpInput formats as you type and keeps the caret where it was.\n\n- Tokens: `0` is a digit, `a` a letter, `A` a letter shown upper-case, `*` either, and a backslash makes the next character literal; `mask-tokens` adds your own.\n- Choosing: a list picks the first mask the value fits; a function derives it from what was typed so far.\n- Editing: Backspace skips over separators.\n- Model: v-model holds the formatted text; `@update:raw` the characters alone.\n- The same engine is `useInputMask()` for your own input.\n- The phone here picks its mask from the country code typed so far (+380, +1, +7, anything else grouped by three); for a full international field with a country list, use LpPhoneInput.",
     components: { LpInput },
     state: () => reactive({ phone: "", card: "", hex: "", raw: "" }),
     template: `<div class="flex w-80 flex-col gap-4">
@@ -433,7 +433,7 @@ export const forms: ComponentEntry[] = [
     id: "tags-input",
     name: "TagsInput",
     description:
-      "Free-form list of short values. A comma, a newline or Enter turns the text into a tag, a paste of several is split, Backspace in an empty field selects the last tag and removes it on the next press, and the arrow keys walk the tags. A tag refused by `validate`, `max` or the duplicate policy (`reject` keeps it typed, `ignore` drops it, `allow` keeps the repeat) gets a note that floats under the field without moving anything below, and the tag it repeats pulses. Works inside LpFormField like any kit control. `display` draws a tag as what it stands for (picture, name, muted hint) while the model keeps the values; `options` suggest while typing (↑/↓ walk them, Enter picks; Enter without walking still adds the typed text), `loading` and `@search` fetch them server-side. `size` is sm, md or lg.",
+      "Free-form list of short values.\n\n- Adding: a comma, a newline or Enter turns the text into a tag, and a paste of several is split.\n- Keyboard: Backspace in an empty field selects the last tag and removes it on the next press; the arrow keys walk the tags.\n- Refusals: a tag refused by `validate`, `max` or the duplicate policy (`reject` keeps it typed, `ignore` drops it, `allow` keeps the repeat) gets a note that floats under the field without moving anything below, and the tag it repeats pulses.\n- Works inside LpFormField like any kit control.\n- Display: `display` draws a tag as what it stands for (picture, name, muted hint) while the model keeps the values.\n- Suggestions: `options` suggest while typing (↑/↓ walk them, Enter picks; Enter without walking still adds the typed text); `loading` and `@search` fetch them server-side.\n- `size` is sm, md or lg.",
     components: { LpTagsInput, LpFormField },
     state: () => {
       const people = [
@@ -531,7 +531,7 @@ export const forms: ComponentEntry[] = [
     id: "phone",
     name: "PhoneInput",
     description:
-      "Phone field with a country picker (flag + dial code). Numbers are formatted as you type (+380 50 123 4567, +1 555 123 4567, +33 1 23 45 67 89) and the flag follows the code you type. Digits past the longest number the country allows are dropped with a note under the field, and a number that cannot be right is marked when you leave the field, with the reason. v-model is the formatted text; @change carries { country, dialCode, number, e164, possible, valid } — store `e164`. The formatter (libphonenumber-js) loads with the first phone field. With no placeholder the field shows an example number for its country.",
+      "Phone field with a country picker (flag and dial code).\n\n- Formatting: numbers are formatted as you type (+380 50 123 4567, +1 555 123 4567, +33 1 23 45 67 89) and the flag follows the code you type.\n- Checks: digits past the longest number the country allows are dropped with a note under the field, and a number that cannot be right is marked when you leave the field, with the reason.\n- Model: v-model is the formatted text; @change carries { country, dialCode, number, e164, possible, valid }. Store `e164`.\n- The formatter (libphonenumber-js) loads with the first phone field.\n- With no placeholder the field shows an example number for its country.",
     components: { LpPhoneInput, LpFormField },
     state: () => reactive({ value: "", work: "", detail: null as null | { e164: string; valid: boolean; possible: boolean; country?: { name: string } } }),
     template: `<div class="flex w-80 flex-col gap-4">
@@ -560,7 +560,7 @@ export const forms: ComponentEntry[] = [
     id: "address",
     name: "AddressInput",
     description:
-      "Postal address form with live suggestions on the street and city fields, plus a map to drop a pin when typing won't do — the picked point is reverse-geocoded back into the fields. v-model is { line, city, postalCode, country, lat, lon }. The geocoder (`provider`), tile server (`tiles`) and the map itself (the `map` slot) are all replaceable; the picker is loaded on demand, so forms that never open the map don't pay for it. Inside an LpFormField the field's label names the whole group, its error describes it, and its invalid/disabled states reach every part; `invalid` does the same on its own.",
+      "Postal address form with live suggestions on the street and city fields, plus a map to drop a pin when typing won't do.\n\n- Map: the picked point is reverse-geocoded back into the fields; the picker is loaded on demand, so forms that never open the map don't pay for it.\n- Model: v-model is { line, city, postalCode, country, lat, lon }.\n- Replaceable: the geocoder (`provider`), the tile server (`tiles`) and the map itself (the `map` slot).\n- Inside an LpFormField the field's label names the whole group, its error describes it, and its invalid/disabled states reach every part; `invalid` does the same on its own.",
     components: { LpAddressInput, LpFormField, LpSwitch, LpInput, LpButton, LpIcon },
     state: () =>
       reactive({ value: { line: "", city: "", postalCode: "", country: "" }, broken: false, locked: false }),
@@ -612,7 +612,7 @@ export const forms: ComponentEntry[] = [
     id: "otp",
     name: "OtpInput",
     description:
-      "One-time-code (TOTP / 2FA) input — a row of cells with auto-advance, backspace (a phone's on-screen one too), and full-code paste. v-model is the joined string; @complete fires it once every cell is filled. Digits-only by default; `length`, `mask`, `alphanumeric`, `invalid`. Alphanumeric codes are capitalised as typed and open a phone's keyboard in capitals (`:uppercase=\"false\"` for a case-sensitive code); `group` draws a separator every N cells. The cells shrink with a narrow container instead of overflowing it (the 300px box).",
+      "One-time-code (TOTP, 2FA) input: a row of cells with auto-advance, backspace (a phone's on-screen one too) and full-code paste.\n\n- Model: v-model is the joined string; @complete fires it once every cell is filled.\n- Options: digits only by default; `length`, `mask`, `alphanumeric`, `invalid`.\n- Alphanumeric codes are capitalised as typed and open a phone's keyboard in capitals (`:uppercase=\"false\"` for a case-sensitive code).\n- `group` draws a separator every N cells.\n- The cells shrink with a narrow container instead of overflowing it (the 300px box).",
     components: { LpOtpInput },
     state: () => reactive({ code: "", done: "", backup: "" }),
     template: `<div class="flex flex-col gap-3">
@@ -631,7 +631,7 @@ export const forms: ComponentEntry[] = [
     id: "colorpicker",
     name: "ColorPicker",
     description:
-      "Colour field + popover: a saturation/brightness area over a hue rail, an optional alpha rail, a hex/CSS text field and preset swatches. v-model is a CSS colour STRING — `format` picks hex/rgb/hsl on the way out, and all three are parsed on the way in. @change fires on release (commit-vs-preview), and the area and rails are arrow-key operable. Right-click either the field or the panel to copy as hex/rgb/hsl, switch which format it shows via `Show as`, or paste a colour in — pasting takes hex, rgb() and hsl() in any CSS form, plus loose shapes like `255 0 0` or `rgb 17 34 51`; `recent` remembers what you settle on and offers it back above the presets. Every string it renders — menu items, the Recent heading, the accessible names on the area and rails, the copy toast — goes through `labels` and the app-wide config (scope \"colorPicker\"); an explicit `copy-toast` still wins, and `false` copies silently.",
+      "Colour field with a popover: a saturation/brightness area over a hue rail, an optional alpha rail, a hex/CSS text field and preset swatches.\n\n- Model: v-model is a CSS colour STRING; `format` picks hex/rgb/hsl on the way out, and all three are parsed on the way in.\n- Events: @change fires on release (commit versus preview).\n- Keyboard: the area and rails are arrow-key operable.\n- Menu: right-click the field or the panel to copy as hex/rgb/hsl, switch which format it shows via `Show as`, or paste a colour in. Pasting takes hex, rgb() and hsl() in any CSS form, plus loose shapes like `255 0 0` or `rgb 17 34 51`.\n- `recent` remembers what you settle on and offers it back above the presets.\n- Texts: every string it renders (menu items, the Recent heading, the accessible names on the area and rails, the copy toast) goes through `labels` and the app-wide config (scope \"colorPicker\"); an explicit `copy-toast` still wins, and `false` copies silently.",
     components: { LpColorPicker },
     state: () => reactive({ brand: "#3b82f6", tint: "rgba(236, 72, 153, 0.6)" }),
     template: `<div class="flex flex-col gap-4">
@@ -661,7 +661,7 @@ export const forms: ComponentEntry[] = [
     id: "calendar",
     name: "Calendar · DatePicker",
     description:
-      "Inline month calendar and a field+popover date picker (reka Calendar + @internationalized/date). Model is an ISO \"YYYY-MM-DD\" string; min/max bounds, an isDisabled predicate and `is-date-unavailable` for struck-through days (weekends below). Same core props as the range pair: `months`, `locale`, `labels` (month buttons, scope \"calendar\"). The picker adds `presets`: `true` for Today / Tomorrow / In a week, or your own `{ label, date }` list; a preset that falls on a day the rules forbid is disabled. Its placeholder and Done button come from `labels` (scope \"datePicker\"). Today is tinted, the selection is a brand pill.",
+      "Inline month calendar and a field with a popover date picker (reka Calendar and @internationalized/date).\n\n- Model: an ISO \"YYYY-MM-DD\" string.\n- Limits: min/max bounds, an isDisabled predicate and `is-date-unavailable` for struck-through days (weekends below).\n- Same core props as the range pair: `months`, `locale`, `labels` (month buttons, scope \"calendar\").\n- Presets: the picker adds `presets`, `true` for Today / Tomorrow / In a week or your own `{ label, date }` list; a preset that falls on a day the rules forbid is disabled.\n- The picker's placeholder and Done button come from `labels` (scope \"datePicker\").\n- Today is tinted; the selection is a brand pill.",
     components: { LpCalendar, LpDatePicker, LpIcon },
     state: () =>
       reactive({
@@ -705,7 +705,7 @@ export const forms: ComponentEntry[] = [
     id: "date-range",
     name: "DateRangePicker",
     description:
-      "Range field + popover (reka RangeCalendar). Model is `{ start, end }` of ISO days, both inclusive; presets on the side (Today, Last 7/30 days, this and last month, or your own `{ label, range }`), two months where there is room and one on a phone. A preset outside min/max is clipped to it, or disabled when nothing of it is left. Like selecting text on a phone, a range can be pressed out by dragging across the days (a finger holds for a moment first, so a swipe still scrolls), and either end of a finished range can be grabbed and pulled; Shift+arrows move the focused end. The popover stays open after a pick, so the ends can still be adjusted before clicking away.",
+      "Date range field with a popover (reka RangeCalendar).\n\n- Model: `{ start, end }` of ISO days, both inclusive.\n- Presets on the side: Today, Last 7/30 days, this and last month, or your own `{ label, range }`. A preset outside min/max is clipped to it, or disabled when nothing of it is left.\n- Months: two where there is room, one on a phone.\n- Dragging: like selecting text on a phone, a range can be pressed out by dragging across the days (a finger holds for a moment first, so a swipe still scrolls), and either end of a finished range can be grabbed and pulled.\n- Keyboard: Shift+arrows move the focused end.\n- The popover stays open after a pick, so the ends can still be adjusted before clicking away.",
     components: { LpDateRangePicker, LpRangeCalendar, LpFormField, LpIcon },
     state: () => reactive({ range: undefined, inline: { start: "2026-06-08", end: "2026-06-14" } }),
     template: `<div class="flex flex-wrap items-start gap-6">
@@ -732,7 +732,7 @@ export const forms: ComponentEntry[] = [
     id: "formfield",
     name: "FormField",
     description:
-      "Label + control + hint/error wrapper. The field hands its control the label's id, the id of the hint or error line and its invalid/required/disabled state, so kit controls need no wiring. A control of your own reads the same context with `useField()`, as the rating below does. For a passing remark rather than a validation error, `notify(text, { tone, duration })` (on the field's ref, or on `useField()` from a control inside) floats a note under the control and fades the hint out under it, so nothing below moves; `useFieldNotice()` with `LpFieldNotice` does the same for a control outside any field.",
+      "Label, control and hint/error wrapper.\n\n- Wiring: the field hands its control the label's id, the id of the hint or error line and its invalid/required/disabled state, so kit controls need no wiring.\n- Own controls read the same context with `useField()`, as the rating below does.\n- Notes: for a passing remark rather than a validation error, `notify(text, { tone, duration })` (on the field's ref, or on `useField()` from a control inside) floats a note under the control and fades the hint out under it, so nothing below moves.\n- Outside a field: `useFieldNotice()` with `LpFieldNotice` does the same for a control outside any field.",
     components: { LpFormField, LpInput, LpButton, RatingControl },
     state: () => reactive({ value: "", rating: 0 }),
     template: `<div class="flex w-80 flex-col gap-4">
@@ -846,7 +846,7 @@ export const forms: ComponentEntry[] = [
     id: "dropzone",
     name: "Dropzone",
     description:
-      "Drop files, click to browse, or paste from the clipboard — three routes to the same intent, because a zone that takes only one of them is the one people call broken. `accept` filters a drop the same way it filters a browse, so the two cannot disagree. `links` adds an address by the same routes: drag a picture in from another tab (a browser gives its address, not a file), paste a copied link, or press \"or a link\" and type it where the zone was (a zone narrower than 280px opens the field in a popover under itself instead); Enter adds, Escape goes back. Only http(s) is taken, and it arrives as the `link` event; whether it serves a picture is the app's call.",
+      "Drop files, click to browse, or paste from the clipboard: three routes to the same intent, because a zone that takes only one of them is the one people call broken.\n\n- `accept` filters a drop the same way it filters a browse, so the two cannot disagree.\n- Links: `links` adds an address by the same routes. Drag a picture in from another tab (a browser gives its address, not a file), paste a copied link, or press \"or a link\" and type it where the zone was (a zone narrower than 280px opens the field in a popover under itself instead); Enter adds, Escape goes back.\n- Only http(s) is taken, and it arrives as the `link` event; whether it serves a picture is the app's call.",
     components: { LpDropzone, LpSelect },
     state: () => reactive({ taken: [] as string[], refused: [] as string[], link: "", tone: "sunken" }),
     template: `<div class="flex w-full max-w-md flex-col gap-3">
@@ -899,7 +899,7 @@ export const forms: ComponentEntry[] = [
     id: "imageeditor",
     name: "ImageEditor",
     description:
-      "Straighten and crop on the way to an upload: quarter turns, wheel/pinch zoom, drag to pan. `export()` returns the visible region as a Blob, or null when nothing was changed — an untouched picture uploads byte-for-byte rather than a generation worse. `file` also takes an address (a link from LpDropzone's `link` event), loaded with CORS. A file that does not open draws a failed state and emits `error` (cause \"decode\", or \"load\" for an address); a picture whose server refuses CORS is still shown and edited, and export emits `error` with cause \"cors\" instead of throwing.",
+      "Straighten and crop a picture on the way to an upload: quarter turns, wheel/pinch zoom, drag to pan.\n\n- Export: `export()` returns the visible region as a Blob, or null when nothing was changed, so an untouched picture uploads byte for byte rather than a generation worse.\n- Addresses: `file` also takes an address (a link from LpDropzone's `link` event), loaded with CORS.\n- Errors: a file that does not open draws a failed state and emits `error` (cause \"decode\", or \"load\" for an address).\n- CORS: a picture whose server refuses CORS is still shown and edited, and export emits `error` with cause \"cors\" instead of throwing.",
     components: { LpImageEditor, LpButton, LpSelect, LpIcon },
     state: () => {
       // A deliberately sideways photograph, the case this exists for.
@@ -1004,7 +1004,7 @@ export const forms: ComponentEntry[] = [
     id: "videotrim",
     name: "VideoTrim",
     description:
-      "Pick a stretch of a video, and optionally an area of its picture, for a server to cut (ffmpeg) or blur. `v-model:range` is `[start, end]` in seconds; `change` fires once a move is done, for the save. `maxClip` / `minClip` bound the length: a dragged handle stops at the limit, while I, O and a typed time move the other end along. The timeline zooms (wheel, pinch, buttons) down to two seconds across, so an hour-long recording still trims to the frame. `region-select` lets a rectangle be drawn on the picture (`v-model:region`, fractions 0..1 of the frame). Keys inside: Space plays, ←/→ step a frame (Shift: a second), I/O set the ends at the playhead. The video streams by range requests and keeps a same-origin session cookie; a load that fails emits `error` with cause \"load\", \"decode\" or \"unsupported\".",
+      "Pick a stretch of a video, and optionally an area of its picture, for a server to cut (ffmpeg) or blur.\n\n- Model: `v-model:range` is `[start, end]` in seconds; `change` fires once a move is done, for the save.\n- Limits: `maxClip` / `minClip` bound the length; a dragged handle stops at the limit, while I, O and a typed time move the other end along.\n- Zoom: the timeline zooms (wheel, pinch, buttons) down to two seconds across, so an hour-long recording still trims to the frame.\n- Region: `region-select` lets a rectangle be drawn on the picture (`v-model:region`, fractions 0..1 of the frame).\n- Keys inside: Space plays, ←/→ step a frame (Shift: a second), I/O set the ends at the playhead.\n- Loading: the video streams by range requests and keeps a same-origin session cookie; a load that fails emits `error` with cause \"load\", \"decode\" or \"unsupported\".",
     components: { LpVideoTrim, LpSwitch },
     state: () => reactive({ src: videoTrimSample, range: null as [number, number] | null, region: null as { x: number; y: number; w: number; h: number } | null, regionOn: true, limit: true, saved: "" }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-3">
@@ -1047,7 +1047,7 @@ export const forms: ComponentEntry[] = [
     id: "video-compress",
     name: "VideoCompress",
     description:
-      "Trim and shrink a video on the person's own machine before it is uploaded, so the upload costs only the part that matters. LpVideoTrim picks the range; a preset picks the height and bitrate or a target size (\"Fits 10 MB\"), and the line under it estimates the result against the original. \"Shrink\" encodes through WebCodecs (hardware encoders where the device has them, via mediabunny loaded on first use) with a progress bar and a cancel, and `done` hands back the new MP4 with the range and preset; \"Upload as is\" emits `skip`. A browser without a video encoder only offers `skip` and says why. `transcodeVideo`, `probeVideo`, `estimateTranscodedBytes` and `canTranscodeVideo` are exported for flows of their own.",
+      "Trim and shrink a video on the person's own machine before it is uploaded, so the upload costs only the part that matters.\n\n- LpVideoTrim picks the range; a preset picks the height and bitrate or a target size (\"Fits 10 MB\"), and the line under it estimates the result against the original.\n- \"Shrink\" encodes through WebCodecs (hardware encoders where the device has them, via mediabunny loaded on first use) with a progress bar and a cancel; `done` hands back the new MP4 with the range and preset.\n- \"Upload as is\" emits `skip`. A browser without a video encoder only offers `skip` and says why.\n- `transcodeVideo`, `probeVideo`, `estimateTranscodedBytes` and `canTranscodeVideo` are exported for flows of their own.",
     components: { LpVideoCompress, LpDropzone },
     thumbState: false,
     state: () => {
@@ -1074,7 +1074,7 @@ export const forms: ComponentEntry[] = [
     id: "videoplayer",
     name: "VideoPlayer",
     description:
-      "A video with the kit's own controls, the same in Chromium, Firefox and WebKitGTK and in every theme. Seek bar with what is buffered and, under the pointer, the time and a still of that moment; volume and speed (remembered between videos, shared with VideoTrim); captions from `<track>` children; picture in picture where the browser has it; fullscreen of the whole player, with its menus opening inside it. Controls step aside while it plays and come back on any movement. Keys: Space/K, J/L, ←/→, ↑/↓, M, F, C, 0–9, < >. Right-click for speed, copy time and copy frame.",
+      "A video with the kit's own controls, the same in Chromium, Firefox and WebKitGTK and in every theme.\n\n- Seek bar: shows what is buffered and, under the pointer, the time and a still of that moment.\n- Volume and speed are remembered between videos and shared with VideoTrim.\n- Captions from `<track>` children; picture in picture where the browser has it; fullscreen of the whole player, with its menus opening inside it.\n- Controls step aside while it plays and come back on any movement.\n- Keys: Space/K, J/L, ←/→, ↑/↓, M, F, C, 0–9, < >.\n- Right-click for speed, copy time and copy frame.",
     components: { LpVideoPlayer, LpIcon },
     state: () => reactive({ src: videoTrimSample, events: [] as string[] }),
     template: `<div class="flex w-full max-w-2xl flex-col gap-3">

@@ -67,7 +67,7 @@ export const motion: ComponentEntry[] = [
     id: "shift",
     name: "Shift",
     description:
-      "Eases a box whose size comes from its content, so what sits around it glides instead of jumping. Reach for it wherever a change of content changes measurements: a toolbar gaining a button, a label swapped by a translation, a validation message appearing under a field. `axis` picks the dimension that is content-derived \u2014 pin only the one that actually moves. Note it is the NEIGHBOURS that motivate it: the row below is what jolts when a box above resizes in one frame.",
+      "Eases a box whose size comes from its content, so what sits around it glides instead of jumping.\n\n- Use it wherever a change of content changes measurements: a toolbar gaining a button, a label swapped by a translation, a validation message appearing under a field.\n- `axis` picks the dimension that is content-derived; pin only the one that actually moves.\n- It is the NEIGHBOURS that motivate it: the row below is what jolts when a box above resizes in one frame.",
     components: { LpShift, LpButton, LpBadge, LpCard },
     state: () =>
       reactive({
@@ -160,7 +160,7 @@ export const motion: ComponentEntry[] = [
     id: "video-backdrop",
     name: "VideoBackdrop",
     description:
-      "A muted looping video behind something, filling the positioned box it sits in. Loops a stretch of the clip (start, end), blends the seam so a clip whose last frame does not match its first loops without a jump (crossfade), plays faster or slower (rate) and darkens under text (dim). Pauses on paused, in a hidden tab, off screen and under reduced motion, where it shows the stretch's first frame. The sample clip jumps from its last frame to its first: set crossfade to 0 to see the cut it hides.",
+      "A muted looping video behind something, filling the positioned box it sits in.\n\n- Loop: plays a stretch of the clip (`start`, `end`) and blends the seam, so a clip whose last frame does not match its first loops without a jump (`crossfade`).\n- `rate` plays it faster or slower; `dim` darkens it under text.\n- Pauses on `paused`, in a hidden tab, off screen and under reduced motion, where it shows the stretch's first frame.\n- The sample clip jumps from its last frame to its first: set crossfade to 0 to see the cut it hides.",
     components: { LpVideoBackdrop, LpRangeSlider, LpSlider, LpSwitch },
     state: () =>
       reactive({

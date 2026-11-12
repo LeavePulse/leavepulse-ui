@@ -28,7 +28,7 @@ export const statusBasics: ComponentEntry[] = [
     id: "status",
     name: "Status",
     description:
-      "What state something is in, as a light and a word: online, offline, degraded, down, maintenance, starting, unknown. The caller passes the state; tone, pulse and wording follow, so every status in an app agrees. Live and transitional states pulse (in phase across the page), steady ones stay still; a change crossfades the light and rolls the word. `variant=\"pill\"` for a header chip, `hide-label` for a dense column (the word stays for screen readers and on hover), `announce` for the one status the user is waiting on.",
+      "What state something is in, as a light and a word: online, offline, degraded, down, maintenance, starting, unknown.\n\n- The caller passes the state; tone, pulse and wording follow, so every status in an app agrees.\n- Live and transitional states pulse (in phase across the page), steady ones stay still; a change crossfades the light and rolls the word.\n- `variant=\"pill\"` for a header chip, `hide-label` for a dense column (the word stays for screen readers and on hover), `announce` for the one status the user is waiting on.",
     components: { LpStatus, LpSegmented },
     state: () => reactive({ state: "starting" }),
     template: `<div class="flex flex-col gap-6">
@@ -109,7 +109,7 @@ export const statusData: ComponentEntry[] = [
     id: "gauge",
     name: "Gauge",
     description:
-      "One reading within a range, as a dial: CPU load, disk, a score. Steps of the scale (`thresholds`, in the gauge's own units) colour the arc and notch the track; unset, the capacity scale applies (warning from 80%, danger from 90%), the same one LpProgress and LpQuota use. Arc and figure move off one tweened value, sweep in when first seen, and the gauge is a `role=\"meter\"` whose spoken value names the step it is in. `variant=\"full\"` is a 270° dial. LpProgress's ring stays the shape for progress toward done.",
+      "One reading within a range, as a dial: CPU load, disk, a score.\n\n- Scale: steps (`thresholds`, in the gauge's own units) colour the arc and notch the track; unset, the capacity scale applies (warning from 80%, danger from 90%), the same one LpProgress and LpQuota use.\n- Motion: arc and figure move off one tweened value and sweep in when first seen.\n- Accessibility: a `role=\"meter\"` whose spoken value names the step it is in.\n- `variant=\"full\"` is a 270° dial. LpProgress's ring stays the shape for progress toward done.",
     components: { LpGauge, LpSlider },
     state: () => reactive({ load: 64, score: 72 }),
     template: `<div class="flex flex-col gap-8">
@@ -151,7 +151,7 @@ export const statusData: ComponentEntry[] = [
     id: "quota",
     name: "Quota",
     description:
-      "\"Used of limit\": label, reading in its unit (`unit=\"bytes\"` scales in binary steps through Intl's own unit names, a string is a suffix, a function says it its own way), a bar, and what is left. The tone rises toward the limit; past it the bar stretches to hold what is used and the limit becomes a mark along it, so 12 of 10 GB reads as running over a line instead of as a full bar. `parts` stack the bar with a legend. No limit reads \"No limit\" and drops the bar.",
+      "\"Used of limit\": a label, a reading in its unit, a bar, and what is left.\n\n- Units: `unit=\"bytes\"` scales in binary steps through Intl's own unit names, a string is a suffix, a function says it its own way.\n- The tone rises toward the limit; past it the bar stretches to hold what is used and the limit becomes a mark along it, so 12 of 10 GB reads as running over a line instead of as a full bar.\n- `parts` stack the bar with a legend.\n- No limit reads \"No limit\" and drops the bar.",
     components: { LpQuota, LpSlider },
     state: () => reactive({ used: 6.2 }),
     template: `<div class="flex w-96 flex-col gap-8">

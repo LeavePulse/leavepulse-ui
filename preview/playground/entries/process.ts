@@ -112,7 +112,7 @@ export const processData: ComponentEntry[] = [
     id: "pipeline",
     name: "Pipeline",
     description:
-      "A run of jobs and the state each is in: pending, running, success, failed, skipped, cancelled. Durations come from `duration` or from `startedAt`/`finishedAt` (a running step's clock ticks on its own, paused while the tab is hidden). The line fills behind passed steps and breaks where the run stopped; a running step sends a light along it. Vertical (default) folds sub-steps and a `detail` slot under a step and opens failed or running ones by itself; horizontal is a strip, compact turns it into marks with tooltips. `follow` keeps the current step in view. Not LpStepper: that is a wizard with one current step, this is a monitor where every step has its own state. LpStepMark is the glyph on its own.",
+      "A run of jobs and the state each is in: pending, running, success, failed, skipped, cancelled.\n\n- Durations come from `duration` or from `startedAt`/`finishedAt`; a running step's clock ticks on its own, paused while the tab is hidden.\n- The line fills behind passed steps and breaks where the run stopped; a running step sends a light along it.\n- Layouts: vertical (default) folds sub-steps and a `detail` slot under a step and opens failed or running ones by itself; horizontal is a strip; compact turns it into marks with tooltips.\n- `follow` keeps the current step in view.\n- Not LpStepper: that is a wizard with one current step, this is a monitor where every step has its own state. LpStepMark is the glyph on its own.",
     components: { LpPipeline, LpButton, LpSwitch, LpSegmented, LpBadge, LpStepMark },
     state: () => {
       const s = reactive({
@@ -223,7 +223,7 @@ export const processData: ComponentEntry[] = [
     id: "countdown",
     name: "Countdown",
     description:
-      "Time left until a moment (`to`) or for a wait (`seconds`): a clock under an hour, the two largest units above (\"2d 3h\"), rounded up so 0:00 means now. Each digit rolls on its own. The time is always deadline minus now, ticks land on the second, and a hidden tab stops ticking and is right again on return: no drift. A ring or bar shows what is left, `urgent-at` turns it danger, `paused` freezes it, `done` fires once and a `done` slot replaces the digits. role=\"timer\", with polite announcements only at round marks. Pure helpers (`splitTime`, `formatTime`, `timeParts`) are exported.",
+      "Time left until a moment (`to`) or for a wait (`seconds`).\n\n- Format: a clock under an hour, the two largest units above (\"2d 3h\"), rounded up so 0:00 means now; each digit rolls on its own.\n- No drift: the time is always deadline minus now, ticks land on the second, and a hidden tab stops ticking and is right again on return.\n- A ring or bar shows what is left; `urgent-at` turns it danger; `paused` freezes it.\n- `done` fires once, and a `done` slot replaces the digits.\n- role=\"timer\", with polite announcements only at round marks.\n- Pure helpers (`splitTime`, `formatTime`, `timeParts`) are exported.",
     components: { LpCountdown, LpButton, LpSwitch },
     state: () =>
       reactive({

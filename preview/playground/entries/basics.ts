@@ -112,7 +112,7 @@ export const basics: ComponentEntry[] = [
     id: "card",
     name: "Card",
     description:
-      "Surface container in raised / flat / ghost. Pass `menuItems` for a right-click menu, headed by `menuTitle` / `menuSubtitle` (items arriving late no longer remount the card's content). `loading` keeps the surface and pulses a skeleton in place of the content (a few lines by default, or the `#loading` slot written as the real layout with `.lp-skeleton-item` blocks); the swap to the content eases its height. `accent` draws a stripe down the leading edge in ANY CSS colour — for a value that arrives from data (a Discord role colour, a per-project hex) rather than from the palette; it costs no layout, so accented and plain cards line their content up.",
+      "Surface container in raised, flat or ghost.\n\n- Menu: `menuItems` gives a right-click menu, headed by `menuTitle` / `menuSubtitle`; items arriving late no longer remount the card's content.\n- Loading: `loading` keeps the surface and pulses a skeleton in place of the content (a few lines by default, or the `#loading` slot written as the real layout with `.lp-skeleton-item` blocks); the swap to the content eases its height.\n- Accent: `accent` draws a stripe down the leading edge in ANY CSS colour, for a value that arrives from data (a Discord role colour, a per-project hex) rather than from the palette. It costs no layout, so accented and plain cards line their content up.",
     components: { LpCard, LpSwitch },
     state: () =>
       reactive({
@@ -148,7 +148,7 @@ export const basics: ComponentEntry[] = [
   {
     id: "avatar",
     name: "Avatar",
-    description: "User image with initials fallback, three sizes. `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline. `icon` replaces the initials for things with no name worth abbreviating. Pass `menuItems` for a right-click account menu, headed by `alt` and the picture (`menuTitle`/`menuSubtitle` override). The avatar is wrapped the same way with or without items, so a menu that arrives after the first render does not remount it (the one marked \"late menu\").",
+    description: "User image with an initials fallback, in three sizes.\n\n- Shape: `shape` switches between people (circle) and things (soft/square); `ring` adds a hairline.\n- Icon: `icon` replaces the initials for things with no name worth abbreviating.\n- Menu: `menuItems` gives a right-click account menu, headed by `alt` and the picture (`menuTitle`/`menuSubtitle` override).\n- The avatar is wrapped the same way with or without items, so a menu that arrives after the first render does not remount it (the one marked \"late menu\").",
     components: { LpAvatar },
     state: () => {
       const s = reactive({
@@ -414,7 +414,7 @@ export const basics: ComponentEntry[] = [
     id: "tooltip",
     name: "Tooltip",
     description:
-      "Themed replacement for the native `title` attribute, which the OS draws (so it looks different on every platform), delays about a second, cannot wrap, and is read inconsistently by screen readers. Opens on keyboard focus as well as hover and closes on Escape. Use `label` when the tip IS the control's name — an icon button — and it becomes the accessible name; leave it off when the control already has a name and the tip only adds to it. `side`, `delay` and `side-offset` tune placement and timing. Wrap a group in LpTooltipProvider and neighbouring tips open without a second delay.",
+      "Themed replacement for the native `title` attribute, which the OS draws (so it looks different on every platform), delays about a second, cannot wrap, and is read inconsistently by screen readers.\n\n- Opens on keyboard focus as well as hover and closes on Escape.\n- Naming: use `label` when the tip IS the control's name (an icon button) and it becomes the accessible name; leave it off when the control already has a name and the tip only adds to it.\n- Placement: `side`, `delay` and `side-offset` tune placement and timing.\n- Groups: wrap a group in LpTooltipProvider and neighbouring tips open without a second delay.",
     components: { LpTooltip, LpTooltipProvider, LpButton, LpIcon },
     state: () => reactive({}),
     template: `<div class="flex flex-wrap items-center gap-3">
@@ -499,7 +499,7 @@ export const basics: ComponentEntry[] = [
   {
     id: "scrollarea",
     name: "ScrollArea",
-    description: "Drawn overlay scrollbar (themed, hover-grow). `fade` softens edges; `floating` is for a region inside a card rather than against a wall: the bar keeps a gap from the edge and is rounded at both ends; `content-class` styles the scrollable content (gap/padding). The kit uses this for its own scroll regions (Table, Modal/Drawer body, Sidebar) so native bars never reserve viewport width. For app-level scroll: `.lp-scrollbar-none` hides a bar on any element; add `lp-scroll-hide` to <html> to drop the page's native bar site-wide; or import `@leavepulse/ui/scrollbar` to skin native bars to the kit look.",
+    description: "Drawn overlay scrollbar, themed, that grows on hover.\n\n- `fade` softens the edges; `content-class` styles the scrollable content (gap, padding).\n- `floating` is for a region inside a card rather than against a wall: the bar keeps a gap from the edge and is rounded at both ends.\n- The kit uses it for its own scroll regions (Table, Modal/Drawer body, Sidebar), so native bars never reserve viewport width.\n- App-level scroll: `.lp-scrollbar-none` hides a bar on any element; `lp-scroll-hide` on <html> drops the page's native bar site-wide; importing `@leavepulse/ui/scrollbar` skins native bars to the kit look.",
     components: { LpScrollArea },
     template: `<div class="flex flex-wrap gap-6">
   <LpScrollArea fade class="h-40 w-72 rounded-card border border-line" content-class="flex flex-col gap-2 p-3">
@@ -520,7 +520,7 @@ export const basics: ComponentEntry[] = [
     id: "alert",
     name: "Alert",
     description:
-      "Inline callout with info/success/warning/danger variants, an auto icon (overridable), and an optional title. The difference between them that you cannot see is what a screen reader does: only `danger` interrupts it (role=\"alert\"), the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it. An alert that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does. A `class` is merged into the variant's own, so `p-3` or `rounded-control` replaces the default rather than racing it.",
+      "Inline callout with info, success, warning and danger variants, an automatic icon (overridable) and an optional title.\n\n- Screen readers: the difference you cannot see. Only `danger` interrupts the reader (role=\"alert\"); the rest are read when the reader reaches them, so a page that opens with an info banner does not shout it.\n- Late alerts: one that appears later, like \"Settings saved\" below, takes `live=\"polite\"` to be announced once the reader is free; `live=\"assertive\"` interrupts, `false` stays quiet. The line under each example spells out what the reader does.\n- Styling: a `class` is merged into the variant's own, so `p-3` or `rounded-control` replaces the default rather than racing it.",
     components: { LpAlert, LpButton, LpShift },
     state: () => {
       const s = reactive({ saved: false, collecting: false, collected: false })

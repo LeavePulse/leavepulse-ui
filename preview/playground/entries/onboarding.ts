@@ -27,7 +27,7 @@ export const onboarding: ComponentEntry[] = [
     id: "tour",
     name: "Tour",
     description:
-      "A guided walk over the real interface. Each step lights its target through the scrim and explains it in a card beside it; arrow keys and Enter step through, Escape closes. A target is a `v-hint` id, a selector or an element, and a step whose target is not on the page is skipped, so a tour built from the hinted controls only ever shows what this user can see. A `try` step waits for the user to press the control themselves (with an optional \"do it for me\"), and `enter` can open what the target lives in, registering its undo with `onLeave` (this step) or `onEnd` (the rest of the tour) so the page is left as it was found. On a phone the card becomes a sheet at the bottom.",
+      "A guided walk over the real interface: each step lights its target through the scrim and explains it in a card beside it.\n\n- Keyboard: arrow keys and Enter step through, Escape closes.\n- Targets: a `v-hint` id, a selector or an element; a step whose target is not on the page is skipped, so a tour built from the hinted controls only ever shows what this user can see.\n- `try` steps wait for the user to press the control themselves (with an optional \"do it for me\").\n- `enter` can open what the target lives in, registering its undo with `onLeave` (this step) or `onEnd` (the rest of the tour), so the page is left as it was found.\n- On a phone the card becomes a sheet at the bottom.",
     components: { LpTour, LpButton, LpContextMenu, LpChart, LpIcon, LpKeys },
     state: () =>
       reactive({
