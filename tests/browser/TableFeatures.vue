@@ -174,6 +174,9 @@ const token = ref<TableSelectionToken | null>(null)
       <template #cell-act><button type="button">Act</button></template>
       <template #cell-block="{ row }"><div class="block-cell"><div>top {{ row.name }}</div><div>bottom</div></div></template>
     </LpTable>
+    <LpTable v-else-if="part === 'expand-list'" :columns="layoutColumns" :rows="base" row-key="id" layout="list" expandable aria-label="Expand list">
+      <template #expanded="{ row }"><div class="detail">detail {{ row.name }}</div></template>
+    </LpTable>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable

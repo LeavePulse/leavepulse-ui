@@ -523,7 +523,7 @@ const labelSet = useLabels<TableLabels>(
     noMatches: "No rows match the filters",
     resetFilters: "Reset filters",
     rowCount: "{shown} of {total}",
-    rowsTotal: "{total} rows",
+    rowsTotal: "Rows: {total}",
     selectedCount: "{count} selected",
     clearSelection: "Clear selection",
     pageSelected: "All {count} on this page are selected.",
@@ -2413,6 +2413,20 @@ usePaletteCommands(() => {
               </div>
             </slot>
           </div>
+          <!-- The table's chevron, in a line and a card too: without it an
+               expandable row drew its detail panel but nothing opened it. -->
+          <button
+            v-if="expansionOn && canExpand(entry.row)"
+            type="button"
+            class="inline-grid size-6 shrink-0 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            :class="activeLayout === 'cards' ? 'absolute right-2 bottom-2' : ''"
+            :aria-expanded="expandedKeys.has(keyFor(entry.row, entry.index))"
+            :aria-label="expandedKeys.has(keyFor(entry.row, entry.index)) ? text.collapseRow : text.expandRow"
+            @click.stop="toggleExpanded(keyFor(entry.row, entry.index))"
+            @pointerdown.stop
+          >
+            <LpIcon name="lucide:chevron-right" :size="14" class="transition-transform duration-fast motion-reduce:transition-none" :class="expandedKeys.has(keyFor(entry.row, entry.index)) ? 'rotate-90' : ''" />
+          </button>
         </div>
       </template>
     </TransitionGroup>

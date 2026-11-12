@@ -287,3 +287,12 @@ test("a list line names the figures it is told to, leaves out what it is told to
   const block = (await line("beta").locator(".block-cell").boundingBox())!
   expect(block.x).toBeGreaterThanOrEqual(box.x)
 })
+
+test("an expandable row opens its detail from a list line too", async ({ page }) => {
+  await page.goto(open("expand-list"))
+  await expect(page.locator(".detail")).toHaveCount(0)
+  const toggle = page.locator(".lp-item").first().getByRole("button", { name: "Expand row" })
+  await toggle.click()
+  await expect(page.locator(".detail")).toHaveText("detail alpha")
+  await expect(page.locator(".lp-item").first().getByRole("button", { name: "Collapse row" })).toHaveAttribute("aria-expanded", "true")
+})
