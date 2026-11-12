@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { afterEach, expect, test } from "bun:test"
 import {
   clampRect,
   dockAt,
@@ -10,6 +10,16 @@ import {
 } from "../src/composables/windowing"
 
 const view = { width: 1000, height: 800 }
+
+// Two tests stand a window in; it goes with them, or every later file that
+// tells the server from the browser by `typeof window` reads as a browser.
+const g = globalThis as { window?: unknown }
+const hadWindow = "window" in g
+const savedWindow = g.window
+afterEach(() => {
+  if (hadWindow) g.window = savedWindow
+  else delete g.window
+})
 const bounds = { minWidth: 200, minHeight: 100 }
 const rect = { x: 100, y: 100, width: 300, height: 200 }
 

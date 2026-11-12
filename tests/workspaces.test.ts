@@ -1,9 +1,19 @@
-import { beforeEach, expect, test } from "bun:test"
+import { afterAll, beforeEach, expect, test } from "bun:test"
 import { effectScope } from "vue"
 import { browserStorage } from "../src/composables/usePersisted"
 import { useWorkspaces } from "../src/layout/useWorkspaces"
 
 const memory = new Map<string, string>()
+// The stand-in window must not outlive this file: a module that tells the
+// server from the browser by `typeof window` would read every later file as a
+// browser, and the order bun runs files in differs between machines.
+const g = globalThis as { window?: unknown }
+const hadWindow = "window" in g
+const savedWindow = g.window
+afterAll(() => {
+  if (hadWindow) g.window = savedWindow
+  else delete g.window
+})
 beforeEach(() => {
   memory.clear()
   ;(globalThis as { window?: unknown }).window = {
