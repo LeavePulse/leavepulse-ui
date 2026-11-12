@@ -248,3 +248,59 @@ test.describe("fingertip targets", () => {
     expect(await row.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(40)
   })
 })
+
+// Fingers moved in steps, as the screen reports them.
+async function gesture(page: import("@playwright/test").Page, from: { x: number; y: number }[], to: { x: number; y: number }[], steps = 8) {
+  const cdp = await page.context().newCDPSession(page)
+  const at = (t: number) => from.map((p, i) => ({ x: p.x + (to[i].x - p.x) * t, y: p.y + (to[i].y - p.y) * t, id: i }))
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(0) })
+  for (let s = 1; s <= steps; s++) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(s / steps) })
+    await page.waitForTimeout(16)
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+  await cdp.detach()
+}
+
+test.describe("touch gestures", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "touches are sent through Chromium's DevTools protocol")
+
+  test("the lightbox zooms with two fingers and pages with a swipe", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await page.getByRole("button", { name: "Open lightbox" }).click()
+    const dialog = page.getByRole("dialog")
+    await expect(dialog.getByText("1 / 2")).toBeVisible()
+    await gesture(page, [{ x: 300, y: 420 }], [{ x: 80, y: 425 }])
+    await expect(dialog.getByText("2 / 2")).toBeVisible()
+    await gesture(page, [{ x: 80, y: 420 }], [{ x: 300, y: 425 }])
+    await expect(dialog.getByText("1 / 2")).toBeVisible()
+    await settled(dialog.getByRole("img").first())
+    // Fingers parting sideways zoom in; they do not also turn the page.
+    await gesture(page, [{ x: 175, y: 420 }, { x: 215, y: 420 }], [{ x: 95, y: 420 }, { x: 295, y: 420 }])
+    await expect(dialog.getByText(/^\s*\d+%\s*$/)).toBeVisible()
+    await expect(dialog.getByText("1 / 2")).toBeVisible()
+  })
+})
+
+test.describe("touch gestures on the page", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "touches are sent through Chromium's DevTools protocol")
+
+  test("the image editor zooms with two fingers instead of the page", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const canvas = page.getByRole("application")
+    await canvas.evaluate((el) => el.scrollIntoView({ block: "center" }))
+    await settled(canvas)
+    const box = (await canvas.boundingBox())!
+    const cx = box.x + box.width / 2
+    const cy = box.y + box.height / 2
+    await gesture(page, [{ x: cx - 20, y: cy }, { x: cx + 20, y: cy }], [{ x: cx - 90, y: cy }, { x: cx + 90, y: cy }])
+    await expect(page.getByRole("region", { name: "Editor" }).getByRole("button", { name: "Reset" })).toBeVisible()
+    // Zoomed, a finger dragging over the picture moves the picture, not the page.
+    const picture = canvas.locator("img")
+    const before = [await page.evaluate(() => scrollY), await picture.evaluate((el) => el.getAttribute("style"))]
+    await gesture(page, [{ x: cx, y: cy + 40 }], [{ x: cx, y: cy - 40 }])
+    const after = [await page.evaluate(() => scrollY), await picture.evaluate((el) => el.getAttribute("style"))]
+    expect(after[0]).toBe(before[0])
+    expect(after[1]).not.toBe(before[1])
+  })
+})

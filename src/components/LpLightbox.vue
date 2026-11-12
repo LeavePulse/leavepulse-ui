@@ -364,8 +364,18 @@ function rotate() {
 // Swipe to page through, but only while the image is at fit scale — once zoomed
 // a horizontal drag is a pan, and stealing it would make the image unreachable.
 let swipeStart: { x: number; y: number } | null = null
+// Fingers on the stage. A second one makes the gesture a pinch, and a pinch
+// whose fingers part sideways is not a swipe: it zoomed and then paged away
+// from what it zoomed into.
+const fingers = new Set<number>()
 
 function onPointerDown(e: PointerEvent) {
+  fingers.add(e.pointerId)
+  if (fingers.size > 1) {
+    swipeStart = null
+    if (!isVideo.value) zoom.onPointerDown(e)
+    return
+  }
   if (isVideo.value) {
     // A drag on the player's bar is a seek or a volume change, never a page.
     swipeStart = (e.target as Element).closest?.("[data-lp-player-controls]") ? null : { x: e.clientX, y: e.clientY }
@@ -375,7 +385,14 @@ function onPointerDown(e: PointerEvent) {
   swipeStart = zoom.zoomed.value ? null : { x: e.clientX, y: e.clientY }
 }
 
+function onPointerCancel(e: PointerEvent) {
+  fingers.delete(e.pointerId)
+  swipeStart = null
+  if (!isVideo.value) zoom.onPointerUp(e)
+}
+
 function onPointerUp(e: PointerEvent) {
+  fingers.delete(e.pointerId)
   if (!isVideo.value) zoom.onPointerUp(e)
   if (!swipeStart) return
   const dx = e.clientX - swipeStart.x
@@ -599,13 +616,13 @@ const guardOutside = useOutsideGuard()
         <!-- Stage -->
         <div
           ref="viewport"
-          class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+          class="relative flex min-h-0 flex-1 touch-none items-center justify-center overflow-hidden"
           :class="isPanning ? 'cursor-grabbing' : isZoomed ? 'cursor-grab' : ''"
           @wheel="onStageWheel"
           @pointerdown="onPointerDown"
           @pointermove="zoom.onPointerMove"
           @pointerup="onPointerUp"
-          @pointercancel="zoom.onPointerUp"
+          @pointercancel="onPointerCancel"
           @dblclick="onDoubleClick"
           @click="onViewportClick"
         >
