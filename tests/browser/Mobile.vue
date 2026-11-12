@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import type { DateRange } from "../../src"
-import { LpAutocomplete, LpButton, LpCheckbox, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSegmented, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
+import { LpAlert, LpAutocomplete, LpBadge, LpButton, LpCard, LpCheckbox, LpCodeBlock, LpColorPicker, LpConfirmHost, LpContextMenu, LpDataList, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpEmptyState, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSection, LpSegmented, LpStat, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, confirm, useToast } from "../../src"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -22,6 +22,9 @@ const many = Array.from({ length: 30 }, (_, i) => ({ value: `o${i + 1}`, label: 
 const manyPicked = ref("o1")
 const lightbox = ref(false)
 const tipClicks = ref(0)
+const long = "3f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c"
+const wordy = ref(false)
+const wordyDrawer = ref(false)
 const ticked = ref(false)
 const on = ref(false)
 const choice = ref("a")
@@ -45,6 +48,22 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       <LpCodeBlock v-model="code" :locked="false" lang="ts" />
       <LpSelect v-model="manyPicked" searchable aria-label="Many" :options="many" />
       <LpSelect v-model="picked" searchable aria-label="Searchable" :options="[{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]" />
+    </section>
+    <section aria-label="Words" class="flex flex-col gap-3">
+      <LpAlert :title="long">{{ long }}</LpAlert>
+      <LpSection :title="long" :description="long"><p>Body</p></LpSection>
+      <LpDataList :items="[{ label: long, value: long, copyable: true }]" />
+      <LpStat :label="long" :value="long" />
+      <LpBadge>{{ long }}</LpBadge>
+      <LpCard>{{ long }}</LpCard>
+      <LpButton @click="toast.info(long)">Long toast</LpButton>
+      <LpButton @click="wordy = true">Long modal</LpButton>
+      <LpModal v-model:open="wordy" :title="long" :description="long"><p>{{ long }}</p></LpModal>
+      <LpEmptyState :title="long" :description="long" />
+      <LpButton @click="confirm({ title: long, description: long })">Long confirm</LpButton>
+      <LpConfirmHost />
+      <LpButton @click="wordyDrawer = true">Long drawer</LpButton>
+      <LpDrawer v-model:open="wordyDrawer" :title="long" :description="long"><p>{{ long }}</p></LpDrawer>
     </section>
     <section aria-label="Targets" class="flex flex-col items-start gap-6">
       <LpCheckbox v-model="ticked" label="Tick" />

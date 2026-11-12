@@ -136,7 +136,7 @@ test.describe("notched phone", () => {
     await page.keyboard.press("Escape")
     await expect(page.getByRole("dialog")).toHaveCount(0)
 
-    await page.getByRole("button", { name: "Toast" }).click()
+    await page.getByRole("button", { name: "Toast", exact: true }).click()
     await clearOfInsets(page, page.locator("[data-lp-toasts] li").first(), portrait)
   })
 
@@ -302,5 +302,31 @@ test.describe("touch gestures on the page", () => {
     const after = [await page.evaluate(() => scrollY), await picture.evaluate((el) => el.getAttribute("style"))]
     expect(after[0]).toBe(before[0])
     expect(after[1]).not.toBe(before[1])
+  })
+})
+
+test.describe("unbroken text", () => {
+  test.use({ viewport: { width: 360, height: 740 } })
+
+  // A phone zooms a page out when its content is wider than the screen, so
+  // the layout viewport growing past the screen is the failure.
+  const pageWidth = (page: import("@playwright/test").Page) => page.evaluate(() => document.documentElement.scrollWidth)
+
+  test("a hash or an address with no break in it wraps instead of widening a phone page", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await expect.poll(() => pageWidth(page)).toBe(360)
+    for (const opener of ["Long toast", "Long modal", "Long confirm", "Long drawer"]) {
+      await page.getByRole("button", { name: opener }).click()
+      await page.waitForTimeout(400)
+      expect([opener, await pageWidth(page)]).toEqual([opener, 360])
+      const dialog = page.locator("[role=dialog], [role=alertdialog]")
+      if (await dialog.count()) {
+        await settled(dialog.last())
+        const box = await settledBox(dialog.last())
+        expect([opener, box.x >= 0 && box.x + box.width <= 360.5]).toEqual([opener, true])
+        await page.keyboard.press("Escape")
+        await expect(dialog).toHaveCount(0)
+      }
+    }
   })
 })

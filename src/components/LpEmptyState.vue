@@ -43,7 +43,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
     >
       <LpIcon :name="icon" :size="compact ? 16 : 22" />
     </div>
-    <div class="flex flex-col gap-1">
+    <div class="flex max-w-full flex-col gap-1 [overflow-wrap:anywhere]">
       <p class="font-semibold text-ink" :class="compact ? 'text-sm' : ''">{{ title }}</p>
       <!-- The slot is for a line a string cannot carry: a command, a link. -->
       <p v-if="description || $slots.description" class="max-w-sm text-sm text-muted">

@@ -174,7 +174,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
            the same as a live server row elsewhere on the page. -->
       <LpStatus v-if="online" state="online" size="sm" hide-label />
       <LpIcon v-if="icon" :name="icon" :size="14" class="text-muted" />
-      <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+      <span class="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted [overflow-wrap:anywhere]">
         <Transition v-bind="FADE">
           <LpSkeleton v-if="loading && !label" class="inline-block h-[0.8em] w-20 align-middle" />
           <span v-else>{{ label }}</span>

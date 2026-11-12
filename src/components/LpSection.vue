@@ -112,12 +112,15 @@ const classes = computed(() =>
          line of their own even when they would have fitted beside the title.
          With it the column takes the space that is left and shrinks first.
 
-         `break-words` covers the title AND the description in one place. Both
-         routinely carry something with no spaces in it (a hostname, a URL, a
-         container id), and an unbreakable run pushes straight out through the
-         side of whatever card the section sits in. min-w-0 lets the column
-         shrink; only this lets the text inside it give way. -->
-    <div class="min-w-0 flex-1 break-words">
+         `overflow-wrap: anywhere` covers the title AND the description in one
+         place. Both routinely carry something with no spaces in it (a
+         hostname, a URL, a container id), and an unbreakable run pushes
+         straight out through the side of whatever card the section sits in.
+         min-w-0 lets the column shrink; only this lets the text inside it give
+         way. `break-words` was not enough: the title is an item of a flex row,
+         and break-word leaves its minimum width at the whole run, so a hash
+         in a title widened a phone page until the browser zoomed it out. -->
+    <div class="min-w-0 flex-1 [overflow-wrap:anywhere]">
       <div class="flex flex-wrap items-center gap-2">
         <LpIcon v-if="icon" :name="icon" :size="16" class="shrink-0 text-muted" />
         <component :is="as" :class="classes.title()">

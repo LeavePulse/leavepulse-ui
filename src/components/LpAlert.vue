@@ -120,7 +120,7 @@ const messageKey = () => [props.variant, props.title ?? "", slotText(slots.defau
         />
       </Transition>
     </span>
-    <LpSwap :swap-key="messageKey()" class="min-w-0 flex-1">
+    <LpSwap :swap-key="messageKey()" class="min-w-0 flex-1 [overflow-wrap:anywhere]">
       <p v-if="title" class="font-semibold text-ink">{{ title }}</p>
       <div :class="['text-muted-strong', title ? 'mt-0.5' : '']">
         <slot />

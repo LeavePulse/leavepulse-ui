@@ -125,7 +125,7 @@ const pad = computed(() => (props.size === "sm" ? "py-1.5 text-xs" : "py-2.5 tex
         class="group/row grid items-baseline"
         :class="[ROW[layout], pad, divided && i > 0 ? 'border-t border-line' : '']"
       >
-        <dt class="flex min-w-0 items-center gap-1 text-muted">
+        <dt class="flex min-w-0 items-center gap-1 text-muted [overflow-wrap:anywhere]">
           <slot :name="`label-${keyOf(item)}`" :item="item">
             <slot name="label" :item="item">{{ item.label }}</slot>
           </slot>
