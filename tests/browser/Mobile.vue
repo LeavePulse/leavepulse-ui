@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import type { DateRange } from "../../src"
-import { LpAlert, LpAutocomplete, LpBadge, LpButton, LpCard, LpCheckbox, LpCodeBlock, LpColorPicker, LpConfirmHost, LpContextMenu, LpDataList, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpEmptyState, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSection, LpSegmented, LpStat, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, confirm, useToast } from "../../src"
+import { LpAlert, LpAutocomplete, LpBadge, LpButton, LpCard, LpCheckbox, LpCodeBlock, LpColorPicker, LpConfirmHost, LpContextMenu, LpDataList, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpEmptyState, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSection, LpSegmented, LpSlider, LpStat, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, confirm, useToast } from "../../src"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -28,6 +28,7 @@ const wordyDrawer = ref(false)
 const ticked = ref(false)
 const on = ref(false)
 const choice = ref("a")
+const level = ref(0)
 const segment = ref("a")
 const pixel = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="3000"><rect width="4000" height="3000" fill="gray"/></svg>')
 const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" }]
@@ -71,6 +72,8 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       <LpRadioGroup v-model="choice" aria-label="Choice" :options="[{ value: 'a', label: 'First' }, { value: 'b', label: 'Second' }]" />
       <LpSegmented v-model="segment" size="sm" aria-label="Segments" :options="[{ value: 'a', label: 'One' }, { value: 'b', label: 'Two' }]" />
       <LpButton size="xs" square aria-label="Tiny">+</LpButton>
+      <div class="w-full" data-test-slider><LpSlider v-model="level" aria-label="Level" :min="0" :max="100" /></div>
+      <output aria-label="Level value">{{ level }}</output>
     </section>
     <section aria-label="Editor">
       <LpImageEditor :file="pixel" aspect="square" />

@@ -240,6 +240,15 @@ test.describe("fingertip targets", () => {
     expect((await reach(segment)).slice(0, 2)).toEqual([true, true])
   })
 
+  test("a slider takes a tap that lands just above its thin track", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const root = page.locator("[data-test-slider] [data-orientation]").first()
+    await root.evaluate((el) => el.scrollIntoView({ block: "center" }))
+    const box = (await root.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width * 0.9, box.y + box.height / 2 - 17)
+    await expect(page.getByLabel("Level value")).not.toHaveText("0")
+  })
+
   test("menu rows are a thumb tall on a touch screen", async ({ page }) => {
     await page.goto("/tests/browser/?scenario=mobile")
     await page.getByRole("button", { name: "Open menu" }).click()

@@ -64,7 +64,7 @@ function onCommit(v: number[] | undefined) {
 const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, disabled: props.disabled }))
 
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
+  `lp-tap relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
 const { dragging, onPointerDown } = useSliderDrag()
 
 const thumbClass =

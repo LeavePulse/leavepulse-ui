@@ -51,7 +51,7 @@ const { field, wrapper, ownAttrs } = useOwnField(() => ({ error: props.error, di
 
 // A slider is full-width by default; putting one in a toolbar means constraining it, and a fixed h-5 has to yield to a denser row.
 const { class: rootClass, attrs: rest } = useMergedAttrs(
-  `relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
+  `lp-tap relative flex h-5 w-full touch-none select-none items-center data-[disabled]:opacity-55 ${SLIDER_GLIDE}`, () => ownAttrs())
 const { dragging, onPointerDown } = useSliderDrag()
 
 usePaletteControl({ disabled: () => field.value.disabled })
