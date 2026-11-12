@@ -58,3 +58,11 @@ test("with the player focused, the arrows seek instead of paging", async ({ page
   await expect(region).toBeVisible()
   await expect.poll(async () => Number(await seek(page).getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(1)
 })
+
+test("an image that fails as thumbnail falls back to its source; one that fails outright leaves the grid", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=media-video")
+  const fallback = page.getByRole("button", { name: /Thumb gone/ }).locator("img")
+  await expect(fallback).toHaveAttribute("src", /avatar-sample.*\?full$/)
+  await expect(page.getByRole("button", { name: /Gone for good/ })).toHaveCount(0)
+  await expect(page.getByTestId("broken")).toHaveText("Gone for good")
+})

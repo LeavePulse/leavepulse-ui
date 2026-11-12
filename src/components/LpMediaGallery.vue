@@ -115,7 +115,7 @@ function fill(template: string, n: number, total = 0): string {
  */
 function menuTitle(item: LightboxItem, i: number): string {
   if (isHidden(item)) return text.value.spoiler
-  return item.title || fill(text.value.image, i + 1, props.items.length)
+  return item.title || fill(text.value.image, i + 1, shown.value.length)
 }
 
 const emit = defineEmits<{
@@ -123,6 +123,8 @@ const emit = defineEmits<{
   (e: "select", item: LightboxItem, index: number): void
   /** A spoiler was uncovered. */
   (e: "reveal", item: LightboxItem): void
+  /** An image failed to load from both its thumbnail and its source and left the grid. */
+  (e: "broken", item: LightboxItem): void
   (e: "update:open", value: boolean): void
 }>()
 
@@ -142,12 +144,39 @@ watch(open, (value, was) => {
   if (!value && was) emit("update:open", false)
 })
 
+/*
+ * Images that failed to load. A thumbnail that fails falls back to the full
+ * source once; when that fails too the image leaves the grid and the lightbox
+ * and `broken` says so. A cell of grey with a broken-picture glyph tells the
+ * viewer nothing they can act on, and paging the lightbox onto it is worse.
+ * Keyed by `src`, like `revealed`, so a reordered set keeps the right ones out.
+ */
+const fellBack = ref(new Set<string>())
+const broken = ref(new Set<string>())
+const shown = computed(() =>
+  broken.value.size ? props.items.filter((item) => !broken.value.has(item.src)) : props.items,
+)
+
+function thumbOf(item: LightboxItem): string {
+  return item.thumb && !fellBack.value.has(item.src) ? item.thumb : item.src
+}
+
+function onImageError(item: LightboxItem) {
+  if (item.thumb && item.thumb !== item.src && !fellBack.value.has(item.src)) {
+    fellBack.value = new Set(fellBack.value).add(item.src)
+    return
+  }
+  if (broken.value.has(item.src)) return
+  broken.value = new Set(broken.value).add(item.src)
+  emit("broken", item)
+}
+
 // `max` counts what is SHOWN, so the badge reads "+N more" rather than "N
 // total". A set of 7 capped at 4 shows 4 cells, the last one badged +3.
 const visible = computed(() =>
-  props.max && props.items.length > props.max ? props.items.slice(0, props.max) : props.items,
+  props.max && shown.value.length > props.max ? shown.value.slice(0, props.max) : shown.value,
 )
-const hiddenCount = computed(() => Math.max(props.items.length - visible.value.length, 0))
+const hiddenCount = computed(() => Math.max(shown.value.length - visible.value.length, 0))
 
 /*
  * Column classes are written out rather than interpolated. Tailwind scans
@@ -231,11 +260,11 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
 )
 
 function activate(i: number) {
-  const item = props.items[i]
+  const item = shown.value[i]
   if (!item) return
   // `select` reports the position in the caller's own array, which is the one
   // they can do anything with — the lightbox's filtered index is internal.
-  emit("select", item, i)
+  emit("select", item, props.items.indexOf(item))
   if (!props.openable) return
   // Covered images are not in the lightbox's list, so the index has to be
   // translated into it.
@@ -285,17 +314,20 @@ function reveal(item: LightboxItem) {
  * pass through untouched, so opening the one you just uncovered still lands on
  * it.
  */
-const openItems = computed(() => props.items.filter((item) => !isHidden(item)))
+const openItems = computed(() => shown.value.filter((item) => !isHidden(item)))
 
 /** Index within `openItems` of the grid item at `i`, or -1 when it is covered. */
 function openIndexOf(i: number): number {
-  const item = props.items[i]
+  const item = shown.value[i]
   return item ? openItems.value.indexOf(item) : -1
 }
 
 defineExpose({
   /** Open the lightbox at an index — for a "view all" button outside the grid. */
-  openAt: (i: number) => activate(i),
+  openAt: (i: number) => {
+    const item = props.items[i]
+    if (item) activate(shown.value.indexOf(item))
+  },
   /** Uncover every spoiler in the set. */
   revealAll: () => {
     const next = new Set(revealed.value)
@@ -306,7 +338,7 @@ defineExpose({
 </script>
 
 <template>
-  <div v-if="!items.length">
+  <div v-if="!shown.length">
     <slot name="empty" />
   </div>
 
@@ -316,7 +348,7 @@ defineExpose({
       :key="item.src + i"
       :items="itemMenu?.(item, i) ?? []"
       :title="menuTitle(item, i)"
-      :title-image="isHidden(item) ? undefined : isVideoItem(item) ? item.poster ?? item.thumb : item.thumb || item.src"
+      :title-image="isHidden(item) ? undefined : isVideoItem(item) ? item.poster ?? item.thumb : thumbOf(item)"
       :subtitle="isHidden(item) ? undefined : item.description"
     >
     <button
@@ -370,10 +402,11 @@ defineExpose({
         />
         <img
           v-else
-          :src="item.thumb || item.src"
+          :src="thumbOf(item)"
           :alt="isHidden(item) ? '' : item.title || ''"
           loading="lazy"
           decoding="async"
+          @error="onImageError(item)"
           class="size-full object-cover transition-transform duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           :class="[
             isHidden(item)
