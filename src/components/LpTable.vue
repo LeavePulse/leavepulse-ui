@@ -1473,7 +1473,12 @@ const activeLayout = computed<TableLayout>(() =>
     ? "list"
     : chosenLayout.value,
 )
-const layoutChoices = computed(() => (props.layouts && props.layouts.length > 1 ? props.layouts : []))
+// While the width forces a list the switch would change nothing on screen, so
+// it steps aside until there is room for the choice again.
+const forcedList = computed(() => chosenLayout.value === "table" && activeLayout.value === "list")
+const layoutChoices = computed(() =>
+  props.layouts && props.layouts.length > 1 && !forcedList.value ? props.layouts : [],
+)
 const LAYOUT_ICONS: Record<TableLayout, string> = {
   table: "lucide:table-2",
   cards: "lucide:layout-grid",

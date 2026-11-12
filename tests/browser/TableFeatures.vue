@@ -141,7 +141,7 @@ const token = ref<TableSelectionToken | null>(null)
       <output aria-label="Picked">{{ layoutPicks.join(",") }}</output>
     </template>
     <div v-else-if="part === 'narrow'" style="width: 360px">
-      <LpTable :columns="layoutColumns" :rows="base" row-key="id" :layout-below="480" aria-label="Narrow" />
+      <LpTable :columns="layoutColumns" :rows="base" row-key="id" :layout-below="480" :layouts="['table', 'cards']" aria-label="Narrow" />
     </div>
     <template v-else-if="part === 'hold-list'">
       <LpTable v-model:selected="layoutPicks" :columns="layoutColumns" :rows="base" row-key="id" layout="list" selectable="hold" aria-label="Hold list" />

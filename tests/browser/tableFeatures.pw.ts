@@ -205,6 +205,8 @@ test("a table narrower than layoutBelow is drawn as a list", async ({ page }) =>
   await expect(page.locator("table")).toHaveCount(0)
   await expect(page.locator(".lp-item")).toHaveCount(3)
   await expect(page.locator(".lp-item").first()).toContainText("alpha")
+  // The switch would change nothing while the width forces a list.
+  await expect(page.getByRole("group", { name: "View" })).toHaveCount(0)
 })
 
 test("every header reads in the same case, sortable or not", async ({ page }) => {
