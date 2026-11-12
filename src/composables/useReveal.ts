@@ -69,9 +69,12 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
   const { threshold = 0.25, rootMargin = "0px" } = options
 
   const el = ref<Element | null>(null)
-  // SSR has no viewport to intersect with, and no animation runs there either;
-  // the client takes over on hydration and gates it properly then.
-  const revealed = ref(typeof window === "undefined")
+  // The same starting value on the server and on the hydrating client, or every
+  // component with an entrance hydrated with a mismatch (the server said
+  // revealed, the client said waiting). Only an explicit `immediate` starts
+  // revealed; the observer, and reduced motion, decide on the client once
+  // mounted, the way useMediaQuery does.
+  const revealed = ref(!!toValue(options.immediate))
 
   let observer: IntersectionObserver | null = null
 
@@ -88,7 +91,7 @@ export function useReveal(options: UseRevealOptions = {}): UseReveal {
   watch(
     [el, () => toValue(options.immediate)],
     ([node, immediate]) => {
-      if (revealed.value) return
+      if (revealed.value || typeof window === "undefined") return
       if (immediate || prefersReducedMotion()) {
         reveal()
         return
