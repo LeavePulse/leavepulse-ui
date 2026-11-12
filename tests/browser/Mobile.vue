@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue"
+import type { DateRange } from "../../src"
 import { LpAutocomplete, LpButton, LpCheckbox, LpCodeBlock, LpColorPicker, LpContextMenu, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSegmented, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, useToast } from "../../src"
 
 const tags = ref(["alpha"])
@@ -13,7 +14,7 @@ const modal = ref(false)
 const drawer = ref(false)
 const bottom = ref(false)
 const date = ref<string>()
-const range = ref<{ start?: string; end?: string }>()
+const range = ref<DateRange>()
 const colour = ref("#3366ff")
 const menu = [{ label: "Rename", onSelect: () => {} }, { label: "A rather long action label that will not fit on a narrow phone screen", onSelect: () => {} }, { label: "Delete", onSelect: () => {} }]
 const toast = useToast()

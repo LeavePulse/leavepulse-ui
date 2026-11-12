@@ -230,7 +230,7 @@ test.describe("fingertip targets", () => {
       page.getByRole("button", { name: "Remove alpha" }),
     ]
     for (const control of controls) {
-      const size = async () => control.evaluate((el) => [el.offsetWidth, el.offsetHeight])
+      const size = async () => control.evaluate((el) => [(el as HTMLElement).offsetWidth, (el as HTMLElement).offsetHeight])
       const before = await size()
       expect(await reach(control), await control.evaluate((el) => el.outerHTML.slice(0, 80))).toEqual([true, true, true, true])
       expect(await size()).toEqual(before)
