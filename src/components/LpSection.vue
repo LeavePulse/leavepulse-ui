@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /*
- * A section heading: a title, an optional line under it, and actions on the
- * right.
+ * A section heading with no default slot: a title, an optional line under
+ * it and actions on the right; the section's content goes after it, not
+ * inside.
  *
  *   <LpSection title="Recent invoices">
  *     <template #actions><LpButton size="sm">Export</LpButton></template>

@@ -312,7 +312,7 @@ from the comment that opens the component.
 - `LpPopover`: A floating panel anchored to a trigger, for content that is more than a tip.
 - `LpRelativeTime`: A date said the way people say it ("3 min ago", "in 2 h"), kept true as time passes, with the exact date one hover away.
 - `LpScrollArea`: Drawn overlay scrollbar (reka ScrollArea).
-- `LpSection`: A section heading: a title, an optional line under it, and actions on the right.
+- `LpSection`: A section heading with no default slot: a title, an optional line under it and actions on the right; the section's content goes after it, not inside.
 - `LpSkeleton`: Loading placeholder, in two shapes.
 - `LpStatus`: What state something is in, as a light and a word: a server online, a bot starting, a region degraded.
 - `LpTooltip`: Tooltip for controls whose meaning is not written on them — an icon button, a truncated value, a disabled action that owes an explanation.
