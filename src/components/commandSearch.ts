@@ -3,6 +3,8 @@ export interface SearchableCommand {
   description?: string
   keywords?: string[]
   group?: string
+  hidden?: boolean
+  revealOn?: string[]
 }
 
 export interface CommandSearchTerms {
@@ -50,9 +52,29 @@ function nearWord(term: string, label: string): boolean {
     .some((word) => withinOne(term, word) || (word.length > term.length && withinOne(term, word.slice(0, term.length))))
 }
 
+function wordStarts(text: string, term: string): boolean {
+  return text.split(/[^\p{L}\p{N}]+/u).some((word) => word.startsWith(term))
+}
+
+/*
+ * A hidden command is there for whoever names it, not for whoever types a word
+ * it happens to contain. Every term has to start a word of its label or of a
+ * keyword (or of `revealOn`, which then replaces both): "пт" no longer digs a
+ * settings key out of "Транскрипты", and "vacation" no longer spills every
+ * hidden variant of it. Descriptions, mid-word hits and near misses do not
+ * reveal; the visible list keeps all of those.
+ */
+function named(command: SearchableCommand, terms: CommandSearchTerms): boolean {
+  const words = command.revealOn
+    ? command.revealOn.map((word) => word.toLowerCase())
+    : [command.label.toLowerCase(), ...(command.keywords ?? []).map((keyword) => keyword.toLowerCase())]
+  return terms.include.length > 0 && terms.include.every((term) => words.some((text) => wordStarts(text, term)))
+}
+
 function score(command: SearchableCommand, terms: CommandSearchTerms): number {
+  if (command.hidden && !named(command, terms)) return 0
   const label = command.label.toLowerCase()
-  const keywords = (command.keywords ?? []).map((keyword) => keyword.toLowerCase())
+  const keywords = [...(command.keywords ?? []), ...(command.revealOn ?? [])].map((keyword) => keyword.toLowerCase())
   const description = command.description?.toLowerCase() ?? ""
   const group = command.group?.toLowerCase() ?? ""
   if (terms.exclude.some((term) => matches(command, term)) || terms.groups.some((term) => !group.includes(term))) return 0

@@ -64,3 +64,33 @@ test("highlight marks positive terms only, longest first, in any case", () => {
   expect(highlightParts("a b", ["a"])).toEqual([{ text: "a b", hit: false }])
   expect(highlightParts("", ["x"])).toEqual([])
 })
+
+const ids = (found: { id: string }[]) => found.map((c) => c.id)
+
+test("a hidden command surfaces only when the query names it", () => {
+  const hidden = [
+    { id: "transcripts", label: "Ticket transcripts", hidden: true, description: "Where closed tickets go" },
+    { id: "prune", label: "Prune members", hidden: true, keywords: ["cleanup"] },
+  ]
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("ript")))).toEqual([])
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("closed")))).toEqual([])
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("trans")))).toEqual(["transcripts"])
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("clean")))).toEqual(["prune"])
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("prune clean")))).toEqual(["prune"])
+  expect(ids(rankCommandItems(hidden, parseCommandQuery("prnue")))).toEqual([])
+})
+
+test("revealOn replaces the label for a hidden variant", () => {
+  const vacation = [
+    { id: "vacation", label: "Vacation…" },
+    { id: "sick", label: "Vacation: sick leave…", hidden: true, revealOn: ["sick", "ill"] },
+  ]
+  expect(ids(rankCommandItems(vacation, parseCommandQuery("vacation")))).toEqual(["vacation"])
+  expect(ids(rankCommandItems(vacation, parseCommandQuery("sick")))).toEqual(["sick"])
+  expect(ids(rankCommandItems(vacation, parseCommandQuery("ill")))).toEqual(["sick"])
+})
+
+test("visible commands still match inside words and descriptions", () => {
+  expect(ids(rankCommandItems(items, parseCommandQuery("chiv")))).toEqual(["archive"])
+  expect(ids(rankCommandItems(items, parseCommandQuery("saved")))).toEqual(["archive"])
+})

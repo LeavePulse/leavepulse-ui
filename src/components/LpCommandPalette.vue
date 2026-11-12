@@ -143,11 +143,19 @@ export interface Command {
   group?: string
   disabled?: boolean
   /**
-   * Hidden from the default (empty-query) list — only surfaces once the user
-   * types something it matches. For rarely-used or destructive actions (prune,
-   * decommission, …) that shouldn't clutter the palette but stay reachable.
+   * Hidden from the default (empty-query) list and surfaced only when the query
+   * names it: every typed word starts a word of its label or keywords. A word
+   * inside another word, the description or a near miss does not reveal it.
+   * For rarely-used or destructive actions (prune, decommission, …) that
+   * shouldn't clutter the palette but stay reachable.
    */
   hidden?: boolean
+  /**
+   * For a hidden command: the words that reveal it, instead of its label and
+   * keywords. A variant whose label repeats its parent's word ("Vacation: sick
+   * leave…") then stays out of a search for the parent and shows up for "sick".
+   */
+  revealOn?: string[]
   /**
    * Picking this opens a mode instead of closing: a nested list, either given
    * outright or fetched from the query typed inside it. This is what keeps a
@@ -902,8 +910,8 @@ const local = computed<{ items: Command[]; terms: string[] }>(() => {
   const filtered = query.value.trim()
     ? source.value.filter((c) => !c.fallback)
     : source.value.filter((c) => !c.hidden && !c.fallback)
-  // Empty query: show everything EXCEPT hidden commands (they only surface once
-  // typed). With a query, hidden commands rank like any other.
+  // Empty query: show everything EXCEPT hidden commands. With a query, a hidden
+  // command ranks only when the query names it (see commandSearch).
   if (!terms.include.length && !terms.exclude.length && !terms.groups.length) return { items: filtered, terms: [] }
   return searchCommandItems(filtered, terms)
 })
