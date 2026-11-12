@@ -76,6 +76,21 @@ const isBlock = computed(() => !slots.default)
   animation: lp-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/*
+ * A block to pulse has to be visible first. The pulse only animates opacity,
+ * so an item written as the docs above show it (a size, a radius, no colour)
+ * was transparent and the loading state was blank. The default sits in
+ * `@layer base`, as the kit's other defaults do (tokens.css, selection.css):
+ * an unlayered rule outranks every Tailwind utility whatever its specificity,
+ * so a consumer's own background (bg-surface-raised on a soft card) would
+ * have lost to it.
+ */
+@layer base {
+  .lp-skeleton-item {
+    background-color: var(--color-surface-soft);
+  }
+}
+
 /* Items nested anywhere inside a wrapper, at any depth. */
 .lp-skeleton .lp-skeleton-item {
   animation: lp-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
