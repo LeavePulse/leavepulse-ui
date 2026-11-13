@@ -24,6 +24,11 @@
  *
  * The mechanism — measure the natural size, pin it in pixels, tween — lives in
  * `useShift`, and LpModal drives its panel with the same composable.
+ *
+ * Whether a tween is holding the box (`resizing`) is read through a ref to the
+ * component (`defineExpose`), not from the slot: a slot prop is read by this
+ * component's render, which would render the whole content again at both ends
+ * of every tween. See docs/migrations/lpshift-resizing-slot.md.
  */
 import { isElement, isHTMLElement, nodeWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, onUpdated, watch } from "vue"
