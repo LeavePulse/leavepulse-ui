@@ -1,4 +1,5 @@
 import { onScopeDispose, readonly, ref, type Ref } from "vue"
+import { prefersReducedMotion } from "./easing"
 
 /*
  * A new build is out and every open tab should run it, without anyone losing
@@ -20,6 +21,10 @@ import { onScopeDispose, readonly, ref, type Ref } from "vue"
  * window scroll position, and anything the app already keeps in storage, such
  * as form drafts. After the reload `restored` is true for the app to say
  * "updated" if it wants to.
+ *
+ * A visible reload does not blink: the page fades out before it and fades back
+ * in after it, so the swap reads as one change rather than a flash of blank.
+ * Under reduced motion, and in a hidden tab, it simply reloads.
  */
 
 export interface AppUpdateOptions {
@@ -51,6 +56,8 @@ export interface AppUpdate {
 const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-state="open"][data-side]'
 const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "input"] as const
 const CARRY_MS = 60_000
+const FADE_OUT_MS = 220
+const FADE_IN_MS = 320
 
 interface Carried {
   href: string
@@ -94,6 +101,9 @@ export function useAppUpdate(options: AppUpdateOptions): AppUpdate {
   const carried = readCarried(key)
   if (carried && carried.href === location.href && Date.now() - carried.at < CARRY_MS) {
     restored.value = true
+    if (!prefersReducedMotion()) {
+      document.documentElement.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_IN_MS, easing: "cubic-bezier(0.2, 0, 0, 1)" })
+    }
     const top = carried.top
     const restore = () => window.scrollTo({ top, behavior: "instant" })
     requestAnimationFrame(() => requestAnimationFrame(restore))
@@ -106,7 +116,12 @@ export function useAppUpdate(options: AppUpdateOptions): AppUpdate {
     } catch {
       // Storage off: the reload still happens, only the scroll is lost.
     }
-    location.reload()
+    if (document.hidden || prefersReducedMotion()) {
+      location.reload()
+      return
+    }
+    const fade = document.documentElement.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_OUT_MS, easing: "ease-in", fill: "forwards" })
+    fade.finished.then(() => location.reload(), () => location.reload())
   }
 
   function safe(): boolean {
