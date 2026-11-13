@@ -494,7 +494,10 @@ const triggerProps = computed(() =>
   mergeProps(attrs, hold.handlers, triggerEvents, {
     "aria-label": props.label ? props.content : undefined,
     "aria-describedby": root.value?.open.value ? root.value.contentId : undefined,
-    "data-state": root.value?.stateAttribute.value ?? "closed",
+    // Its own attribute, not `data-state`: the trigger is the caller's element,
+    // and a switch, checkbox or tab already says its own state there. Written
+    // over it, a checked switch inside a tooltip was drawn unchecked.
+    "data-tooltip-state": root.value?.stateAttribute.value ?? "closed",
     "data-grace-area-trigger": "",
     class: props.touch === "hold" && !props.followCursor ? "[-webkit-touch-callout:none]" : undefined,
   }),

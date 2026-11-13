@@ -32,3 +32,14 @@ test("a hover card and a context menu share one button", async ({ page }) => {
   await button.click({ button: "right" })
   await expect(page.getByRole("menuitem", { name: "Copy" })).toBeVisible()
 })
+
+test("a switch inside a tooltip still says and shows its own state", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=trigger-nesting")
+  const toggle = page.getByRole("switch", { name: "Autopilot" })
+  await expect(toggle).toHaveAttribute("aria-checked", "true")
+  await expect(toggle).toHaveAttribute("data-state", "checked")
+  await toggle.hover()
+  await expect(page.locator("[data-reka-popper-content-wrapper]", { hasText: "Deploys on a new image" })).toBeVisible()
+  await expect(toggle).toHaveAttribute("data-tooltip-state", /open/)
+  await expect(toggle).toHaveAttribute("data-state", "checked")
+})

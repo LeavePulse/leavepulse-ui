@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { LpButton, LpContextMenu, LpHoverCard, LpPopover, LpTooltip } from "../../src"
+import { ref } from "vue"
+import { LpButton, LpContextMenu, LpHoverCard, LpPopover, LpSwitch, LpTooltip } from "../../src"
+
+const on = ref(true)
 
 const menu = [{ label: "Copy", onSelect: () => {} }]
 </script>
@@ -26,6 +29,9 @@ const menu = [{ label: "Copy", onSelect: () => {} }]
       </template>
       <p>Body of the hover card one</p>
     </LpPopover>
+    <LpTooltip content="Deploys on a new image">
+      <LpSwitch v-model="on" label="Autopilot" />
+    </LpTooltip>
     <LpHoverCard :open-delay="0">
       <template #trigger>
         <LpContextMenu :items="menu"><LpButton>Card over a menu</LpButton></LpContextMenu>
