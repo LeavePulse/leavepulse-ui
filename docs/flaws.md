@@ -117,3 +117,10 @@ entry is deleted, not ticked: the commit says what changed.
   notification when permission is granted plus a flashing tab title until the
   tab regains focus, nothing while it is focused. BotEco's panel has it as
   `lib/attention.ts` for a resumed quiz; any app with a live wait wants it.
+- **No windowed list outside LpTable** (`LpVirtualList`): only the `rowWindow`
+  maths is exported, and LpTable with `virtualRowHeight` is a paged table, not a
+  list with infinite load. BotEco's inbox (thousands of dialogs) builds its list on
+  `rowWindow` and draws skeleton rows for the unloaded tail by hand; a list
+  component with fixed row height, a `total`, a slot per row and an
+  "unloaded row" slot would cover it. LpSelect also renders every option (1000
+  account options open fine, but there is no windowing either).

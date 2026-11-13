@@ -272,6 +272,8 @@ export type { SortState, TableColumn, TableListMode, TablePage, TableQuery } fro
 export type { TableLabels } from "./components/LpTable.vue"
 export type { TableCellEdit, TableExportOptions, TableSelectionToken } from "./components/LpTable.vue"
 export type { ColumnPin, ColumnPreset, TableLayout } from "./components/tableFeatures"
+export { rowWindow } from "./components/tableFeatures"
+export type { RowWindow } from "./components/tableFeatures"
 export { compareValues } from "./components/tableSort"
 export { filterRows, showOnly, shownValues } from "./components/tableFilter"
 export type { TableFilters } from "./components/tableFilter"
