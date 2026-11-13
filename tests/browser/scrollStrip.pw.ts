@@ -95,3 +95,19 @@ test("tabs: a drag across the row scrolls it without picking a tab, a click pick
   await page.getByRole("tab", { name: "Section 4" }).click()
   await expect(page.getByTestId("tab")).toHaveText("t4")
 })
+
+async function inView(page: import("@playwright/test").Page, name: string) {
+  const frame = (await page.locator('[data-testid="tabs"] [data-lp-strip-row]').boundingBox())!
+  const tab = (await page.getByRole("tab", { name }).boundingBox())!
+  return tab.x >= frame.x - 1 && tab.x + tab.width <= frame.x + frame.width + 1
+}
+
+test("tabs: a tab picked before the first paint starts in view", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=scroll-strip&tab=t10")
+  await expect.poll(() => inView(page, "Section 10")).toBe(true)
+})
+
+test("tabs: a tab picked from outside is brought into view", async ({ page }) => {
+  await page.getByTestId("pick-last").click()
+  await expect.poll(() => inView(page, "Section 12")).toBe(true)
+})

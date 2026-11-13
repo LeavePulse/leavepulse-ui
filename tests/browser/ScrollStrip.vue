@@ -4,7 +4,7 @@ import { LpScrollStrip, LpTabs } from "../../src"
 
 const clicked = ref<string[]>([])
 const items = Array.from({ length: 24 }, (_, i) => `Branch ${i + 1}`)
-const tab = ref("t1")
+const tab = ref(new URLSearchParams(location.search).get("tab") ?? "t1")
 const tabs = Array.from({ length: 12 }, (_, i) => ({ value: `t${i + 1}`, label: `Section ${i + 1}` }))
 </script>
 
@@ -29,6 +29,7 @@ const tabs = Array.from({ length: 12 }, (_, i) => ({ value: `t${i + 1}`, label: 
       <LpTabs v-model="tab" :items="tabs" />
     </div>
     <p data-testid="tab">{{ tab }}</p>
+    <button type="button" data-testid="pick-last" @click="tab = 't12'">Pick last</button>
     <div class="h-[150vh]" />
   </div>
 </template>

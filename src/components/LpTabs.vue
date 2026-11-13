@@ -3,7 +3,8 @@ import { isHTMLElement } from "../composables/useView"
 import { usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
 import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { computed, nextTick, ref, useId, watch, type FunctionalComponent } from "vue"
+import { computed, nextTick, onMounted, ref, useId, watch, type FunctionalComponent } from "vue"
+import { useResizeObserver } from "../composables/useResizeObserver"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useStepHistory } from "../composables/useOverlayHistory"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
@@ -106,13 +107,20 @@ watch(
 // A row wider than its container scrolls sideways (a phone, a narrow card)
 // instead of wrapping each label onto two lines. LpScrollStrip lets a mouse
 // reach the tabs off to the side (wheel, drag, edge buttons), and the active
-// tab is brought into view whenever it changes, including from outside.
+// tab is brought into view whenever it changes, including from outside, and
+// also on mount and when the row resizes: a tab picked by the address before
+// the first paint, or left beyond the edge by a narrower window, would
+// otherwise sit off-screen with nothing saying which section is open. Those
+// two jump; only a change the person can follow eases.
 const strip = ref<InstanceType<typeof LpScrollStrip> | null>(null)
 const Passthrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 const list = ref<{ $el: HTMLElement } | null>(null)
-watch(current, () => {
-  void nextTick(() => strip.value?.reveal(list.value?.$el?.querySelector('[data-state="active"]')))
-})
+function revealActive(smooth: boolean) {
+  strip.value?.reveal(list.value?.$el?.querySelector('[data-state="active"]'), { smooth })
+}
+watch(current, () => void nextTick(() => revealActive(true)))
+onMounted(() => requestAnimationFrame(() => revealActive(false)))
+useResizeObserver(() => strip.value?.scroller, () => revealActive(false))
 
 /*
  * reka selects a tab on mousedown, so a press meant to drag the row would
