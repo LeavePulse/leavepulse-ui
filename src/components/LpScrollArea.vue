@@ -155,8 +155,12 @@ function onViewportScroll(event: Event) {
 // state has to track content size even where the fade is off.
 let edgeResize: ResizeObserver | undefined
 let edgeMutation: MutationObserver | undefined
+let edgeFrame = 0
+let edgeWindow: Window | undefined
 
 function stopEdgeWatch() {
+  if (edgeFrame) edgeWindow?.cancelAnimationFrame(edgeFrame)
+  edgeFrame = 0
   edgeResize?.disconnect()
   edgeMutation?.disconnect()
   edgeResize = undefined
@@ -187,6 +191,14 @@ watch(
     // Rows arriving after the first paint are the common case — a list waiting
     // on a query renders empty, and observing only the boxes that existed then
     // left the fade off until something else happened to trigger a measure.
+    //
+    // Measured in the next frame, not here: a mutation is reported straight
+    // after the render that made it, before the browser has laid anything out,
+    // so reading the sizes here laid out fifty fresh table rows inside the
+    // click that brought them. The resize observer, which reports after layout,
+    // usually measures first anyway; the frame covers a change that resized
+    // nothing it watches.
+    edgeWindow = win
     if (win.MutationObserver) {
       edgeMutation = new win.MutationObserver(() => {
         if (edgeResize) {
@@ -194,7 +206,12 @@ watch(
           edgeResize.observe(el)
           for (const child of Array.from(el.children)) edgeResize.observe(child)
         }
-        remeasure()
+        if (!edgeFrame) {
+          edgeFrame = win.requestAnimationFrame(() => {
+            edgeFrame = 0
+            remeasure()
+          })
+        }
       })
       edgeMutation.observe(el, { childList: true, subtree: true })
     }

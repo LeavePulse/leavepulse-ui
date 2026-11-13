@@ -75,8 +75,21 @@ function measure() {
   const height = Math.max(MIN_THUMB_PX, Math.round((track * view.clientHeight) / view.scrollHeight))
   thumb.value = { height, top: Math.round(((track - height) * view.scrollTop) / range) }
 }
+/*
+ * At most once a frame, and never in the middle of someone's render. A scroll
+ * or a resize of the window asks for the next frame. A change of the page's
+ * size is measured where the observer reports it, which is after the browser
+ * has laid the page out: the sizes are read for free there. Put off to the
+ * next frame instead, the read landed after whatever that frame had changed
+ * first (a list's rows starting their entrance) and laid the page out again
+ * for it, the cost of a whole table inside the frame that showed it.
+ */
 function measureSoon() {
   if (!frame && doc) frame = nodeWindow(doc).requestAnimationFrame(measure)
+}
+function measureLaidOut() {
+  if (frame && doc) nodeWindow(doc).cancelAnimationFrame(frame)
+  measure()
 }
 
 function onScroll() {
@@ -146,7 +159,7 @@ onMounted(() => {
   const win = nodeWindow(doc)
   win.addEventListener("scroll", onScroll, { passive: true })
   win.addEventListener("resize", measureSoon)
-  sizes = new win.ResizeObserver(measureSoon)
+  sizes = new win.ResizeObserver(measureLaidOut)
   sizes.observe(doc.body)
   if (host) sizes.observe(host)
   measure()
