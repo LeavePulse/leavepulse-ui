@@ -99,6 +99,7 @@ export const COMPONENT_NAMES = [
   "LpRollingText",
   "LpScramble",
   "LpScrollArea",
+  "LpScrollStrip",
   "LpSecretField",
   "LpSection",
   "LpSegmented",

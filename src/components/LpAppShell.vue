@@ -58,6 +58,7 @@ import { easingToken, durationToken, prefersReducedMotion } from "../composables
 import { useLabels } from "../composables/useLpConfig"
 import { useResizeObserver } from "../composables/useResizeObserver"
 import { useScrollMemory } from "../composables/scrollMemory"
+import { useScrollStrip } from "../composables/useScrollStrip"
 import { isHTMLElement, nodeWindow, useView, viewWindow } from "../composables/useView"
 import AppShellContextNav from "./AppShellContextNav.vue"
 import {
@@ -86,6 +87,11 @@ export type { SidebarItem, SidebarSection } from "./sidebar"
 
 /* Past this much scrolled the way back up is worth a button. */
 const BACK_TO_TOP_AFTER_PX = 600
+
+// The header actions scroll sideways on a narrow bar; a mouse reaches the ones
+// past the edge with the wheel or a drag, and the clipped edge fades.
+const headerActions = ref<{ $el: HTMLElement } | null>(null)
+const actionStrip = useScrollStrip(() => headerActions.value?.$el)
 
 const props = withDefaults(
   defineProps<{
@@ -753,10 +759,13 @@ const backToTopClass = computed(() =>
              actions now cap at two thirds of the bar and scroll within it, so
              the title keeps a third and every button stays reachable. -->
         <LpShift
+          ref="headerActions"
           axis="width"
           anchor="end"
           presence
-          class="ml-auto flex max-w-[66%] shrink items-center gap-2 overflow-x-auto lp-scrollbar-none md:max-w-none md:shrink-0 md:overflow-visible"
+          class="lp-strip-fade ml-auto flex max-w-[66%] shrink items-center gap-2 overflow-x-auto lp-scrollbar-none md:max-w-none md:shrink-0 md:overflow-visible"
+          :data-lp-more-start="actionStrip.overflowing.value && !actionStrip.atStart.value ? '' : undefined"
+          :data-lp-more-end="actionStrip.overflowing.value && !actionStrip.atEnd.value ? '' : undefined"
         >
           <slot name="header-actions" />
         </LpShift>

@@ -3,13 +3,13 @@ import { isHTMLElement } from "../composables/useView"
 import { usePaletteCommands, usePaletteScope } from "../composables/usePaletteCommands"
 import { Motion } from "motion-v"
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui"
-import { computed, nextTick, ref, useId, watch } from "vue"
+import { computed, nextTick, ref, useId, watch, type FunctionalComponent } from "vue"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useStepHistory } from "../composables/useOverlayHistory"
-import { prefersReducedMotion } from "../composables/easing"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpSkeleton from "./LpSkeleton.vue"
 import LpTabFace from "./LpTabFace.vue"
+import LpScrollStrip from "./LpScrollStrip.vue"
 import { BOTTOM_BAR, BOTTOM_ITEM, BOTTOM_MARKER, pickTab } from "./tabs"
 
 export interface TabItem {
@@ -104,21 +104,30 @@ watch(
 )
 
 // A row wider than its container scrolls sideways (a phone, a narrow card)
-// instead of wrapping each label onto two lines; the active tab is brought
-// into view whenever it changes, including from outside.
+// instead of wrapping each label onto two lines. LpScrollStrip lets a mouse
+// reach the tabs off to the side (wheel, drag, edge buttons), and the active
+// tab is brought into view whenever it changes, including from outside.
+const strip = ref<InstanceType<typeof LpScrollStrip> | null>(null)
+const Passthrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 const list = ref<{ $el: HTMLElement } | null>(null)
 watch(current, () => {
-  void nextTick(() => {
-    const row = list.value?.$el
-    const active = row?.querySelector<HTMLElement>('[data-state="active"]')
-    if (!row || !active || row.scrollWidth <= row.clientWidth) return
-    const start = active.offsetLeft - row.offsetLeft
-    const end = start + active.offsetWidth
-    if (start >= row.scrollLeft && end <= row.scrollLeft + row.clientWidth) return
-    const left = start < row.scrollLeft ? start : end - row.clientWidth
-    row.scrollTo({ left, behavior: prefersReducedMotion() ? "auto" : "smooth" })
-  })
+  void nextTick(() => strip.value?.reveal(list.value?.$el?.querySelector('[data-state="active"]')))
 })
+
+/*
+ * reka selects a tab on mousedown, so a press meant to drag the row would
+ * pick whichever tab it started on. Mouse picks wait for the click instead,
+ * which a drag swallows; the keyboard still selects as focus moves.
+ */
+function holdMousePick(event: MouseEvent) {
+  if (event.button !== 0 || event.ctrlKey || bottom.value) return
+  if (!isHTMLElement(event.target) || !event.target.closest('[role="tab"]')) return
+  event.stopPropagation()
+  event.preventDefault()
+}
+function clickPick(item: TabItem) {
+  if (!item.disabled && !bottom.value) select(item.value)
+}
 
 function show(value: string) {
   if (props.modelValue === undefined) current.value = value
@@ -195,18 +204,26 @@ usePaletteCommands(() => props.items.map(item => ({
     :model-value="current"
     @update:model-value="(v) => select(v as string)"
   >
+    <component
+      :is="bottom ? Passthrough : LpScrollStrip"
+      ref="strip"
+      v-bind="bottom ? {} : {
+        inline: !block,
+        class: variant === 'contained' ? 'rounded-control border border-line bg-surface-soft' : undefined,
+        contentClass: variant === 'contained' ? 'p-1' : undefined,
+      }"
+    >
     <TabsList
       ref="list"
       :aria-label="label"
       :class="bottom
         ? BOTTOM_BAR
         : [
-            'max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-            block ? 'flex w-full' : 'inline-flex',
-            variant === 'contained' ? 'rounded-control border border-line bg-surface-soft p-1' : '',
+            'flex w-max min-w-full gap-1',
             variant === 'underline' ? 'border-b border-line' : '',
           ]"
       @pointerleave="hovered = null"
+      @mousedown.capture="holdMousePick"
     >
       <!-- Passthrough when the tab has no menu, so it keeps the native one. -->
       <LpContextMenu
@@ -233,6 +250,7 @@ usePaletteCommands(() => props.items.map(item => ({
         ]"
         @pointerenter="hoverFollow && !item.disabled && (hovered = item.value)"
         @pointerup="releaseFocusAfterPointer"
+        @click="clickPick(item)"
       >
         <!-- Active marker: a bar under the tab in "underline", over it in
              "bottom", a filled pill otherwise. All slide between tabs via the
@@ -268,6 +286,7 @@ usePaletteCommands(() => props.items.map(item => ({
         </span>
       </template>
     </TabsList>
+    </component>
 
     <!-- Animated panels: only rendered if a per-item #panel slot is provided.
          The Motion wrapper layout-animates its height so switching to a taller

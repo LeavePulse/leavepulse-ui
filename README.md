@@ -9,7 +9,7 @@ JSON token sets), and a composable block-layout canvas.
 - [Install](#install) and [Usage](#usage)
 - [Configuration](#configuration): theme, labels and languages, icons, Nuxt, overlays and Back, prop check, WebKitGTK glass, scrollbars
 - [Components](#components): every component by group, with what it is for
-- [Guides](#guides): linked views, workspaces, forms, tables, clipboard, video, command palette
+- [Guides](#guides): linked views, workspaces, forms, tables, clipboard, video, gestures and sideways rows, command palette
 - [Develop](#develop) and [Releasing](#releasing)
 
 ## Install
@@ -289,7 +289,7 @@ from the comment that opens the component.
 
 <!-- catalogue:start -->
 
-142 components. The preview (`bun run dev`) shows each one live, with its props, events and slots.
+143 components. The preview (`bun run dev`) shows each one live, with its props, events and slots.
 
 <details>
 <summary><b>Basics</b> (24)</summary>
@@ -389,7 +389,7 @@ from the comment that opens the component.
 </details>
 
 <details>
-<summary><b>Navigation</b> (15)</summary>
+<summary><b>Navigation</b> (16)</summary>
 
 - `LpActionBar`: A bar that rises from the bottom of the window to ask for one decision, then leaves.
 - `LpBreadcrumbs`: Where the page sits in the app, as a trail of links.
@@ -402,6 +402,7 @@ from the comment that opens the component.
 - `LpPalettePreview`: The body of LpCommandPalette's `#preview` slot.
 - `LpPaletteStats`: A few figures in a palette preview, as tiles: mods and worlds in an instance, downloads and follows of a project, members online.
 - `LpPaletteSwatches`: A theme's colours as a strip of swatches on its own surface, for a palette preview of a theme picker: the row says the name, this shows what picking it would look like.
+- `LpScrollStrip`: A row that scrolls sideways and can be reached with any input: tabs, chips, branch pills, a filmstrip.
 - `LpSidebar`: App-shell side navigation.
 - `LpStepper`: The steps of a flow, with where the person is and which are done.
 - `LpTableOfContents`: On-this-page table of contents with scroll-spy.
@@ -620,6 +621,55 @@ if (await canTranscodeVideo()) {
 
 Re-encoding never raises the bitrate above the source's, and the sound is kept
 (AAC, or Opus where the browser has no AAC encoder).
+
+### Gestures and sideways rows
+
+Every drag, swipe, pinch and long press in the kit runs on one engine, so they
+draw the line in the same place: a press becomes a drag past the slop (8 px for
+a finger, 4 for a mouse), nothing is captured or prevented before that (a click
+on what is under it still lands), a drag swallows the click it ends with,
+velocity is read over the last 100 ms, and a pointer the browser takes back, a
+second finger or Escape ends it as `cancelled`.
+
+```ts
+import { useGesture, shouldDismiss } from "@leavepulse/ui"
+
+const card = ref<HTMLElement | null>(null)
+const x = ref(0)
+useGesture(card, {
+  axis: "x", // a press that starts vertical is let go, so the page scrolls
+  onDrag: ({ movement }) => (x.value = movement.x),
+  onDragEnd: ({ movement, velocity, cancelled }) => {
+    const away = !cancelled && shouldDismiss({ offset: movement.x, velocity: velocity.x, size: 320 })
+    x.value = away ? 400 : 0
+  },
+})
+```
+
+- `createGesture(options)` returns the handlers to bind yourself, for an element
+  that composes them with others. `onPinch`, `longPress`, `onTap` and `onSwipe`
+  sit beside the drag callbacks.
+- `pageAfterSwipe` and `rubberClamp` make "swipe between items", `glide` coasts
+  after a fling, and `createDragSession` makes the same decisions from touch
+  events where pointer events cannot be used (a pull from the screen edge must
+  stop the page scrolling mid-gesture).
+- An element dragged by finger needs `touch-action` that leaves it the gesture
+  (`touch-pan-y` for a sideways one inside a page that scrolls), or the browser
+  takes the touch and the drag ends cancelled.
+- Side drawers use it both ways: a pull from within `edgeSize` (72 px) of the
+  edge opens one, with the panel's edge under the finger; a swipe on the panel or
+  on the scrim closes it. Both complete past a share of the panel or on a flick
+  and spring back otherwise.
+
+`LpScrollStrip` is the row that scrolls sideways (tabs, chips, branch pills, a
+filmstrip) with its scrollbar hidden and still reachable with a mouse: a
+vertical wheel scrolls it while it can move that way and hands back to the page
+at either end, a mouse or pen drags it, the clipped edges fade, a hover shows
+previous and next buttons, and the focused item is scrolled into view within
+the row only. Touch keeps native scrolling and scroll snap. `useScrollStrip(el)`
+gives an existing scroller the same behaviour. LpTabs uses it for a row wider
+than its box; a mouse there picks a tab on click rather than on press, so a
+drag across the row does not pick the tab it started on.
 
 ### Contextual command palette
 

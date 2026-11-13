@@ -26,6 +26,8 @@ import {
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { useLabels } from "../composables/useLpConfig"
 import { useZoomPan } from "../composables/useZoomPan"
+import LpScrollStrip from "./LpScrollStrip.vue"
+import { createDragSession, slopFor, type DragSession } from "../composables/gesture"
 import { clickLink } from "./exportData"
 import { fileNameOf, isVideoItem, type LightboxItem } from "./lightbox"
 import LpCopyButton from "./LpCopyButton.vue"
@@ -177,7 +179,7 @@ const loading = ref(false)
 const failed = ref(false)
 const viewport = ref<HTMLElement | null>(null)
 const stageImage = ref<HTMLImageElement | null>(null)
-const stripEl = ref<HTMLElement | null>(null)
+const stripEl = ref<InstanceType<typeof LpScrollStrip> | null>(null)
 
 watch(viewport, (el) => zoom.setViewport(el))
 
@@ -277,8 +279,8 @@ function imageSettled(event: Event, ok: boolean) {
 }
 
 function scrollThumbIntoView() {
-  const el = stripEl.value?.querySelector<HTMLElement>(`[data-index="${current.value}"]`)
-  el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+  const el = stripEl.value?.scroller?.querySelector<HTMLElement>(`[data-index="${current.value}"]`)
+  stripEl.value?.reveal(el, { block: "center" })
 }
 
 function close() {
@@ -363,45 +365,54 @@ function rotate() {
 
 // Swipe to page through, but only while the image is at fit scale — once zoomed
 // a horizontal drag is a pan, and stealing it would make the image unreachable.
-let swipeStart: { x: number; y: number } | null = null
+// The kit's drag session decides what a swipe is (far enough, or a flick, and
+// mostly sideways), as for every other swipe in the kit.
+let swipe: DragSession | null = null
 // Fingers on the stage. A second one makes the gesture a pinch, and a pinch
 // whose fingers part sideways is not a swipe: it zoomed and then paged away
 // from what it zoomed into.
 const fingers = new Set<number>()
 
+function startSwipe(e: PointerEvent) {
+  swipe = createDragSession({ x: e.clientX, y: e.clientY }, e.timeStamp, { slop: slopFor(e.pointerType), axis: "x" })
+}
+
 function onPointerDown(e: PointerEvent) {
   fingers.add(e.pointerId)
   if (fingers.size > 1) {
-    swipeStart = null
+    swipe = null
     if (!isVideo.value) zoom.onPointerDown(e)
     return
   }
   if (isVideo.value) {
     // A drag on the player's bar is a seek or a volume change, never a page.
-    swipeStart = (e.target as Element).closest?.("[data-lp-player-controls]") ? null : { x: e.clientX, y: e.clientY }
+    if ((e.target as Element).closest?.("[data-lp-player-controls]")) swipe = null
+    else startSwipe(e)
     return
   }
   zoom.onPointerDown(e)
-  swipeStart = zoom.zoomed.value ? null : { x: e.clientX, y: e.clientY }
+  if (zoom.zoomed.value) swipe = null
+  else startSwipe(e)
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!isVideo.value) zoom.onPointerMove(e)
+  if (swipe?.move({ x: e.clientX, y: e.clientY }, e.timeStamp).phase === "rejected") swipe = null
 }
 
 function onPointerCancel(e: PointerEvent) {
   fingers.delete(e.pointerId)
-  swipeStart = null
+  swipe = null
   if (!isVideo.value) zoom.onPointerUp(e)
 }
 
 function onPointerUp(e: PointerEvent) {
   fingers.delete(e.pointerId)
   if (!isVideo.value) zoom.onPointerUp(e)
-  if (!swipeStart) return
-  const dx = e.clientX - swipeStart.x
-  const dy = e.clientY - swipeStart.y
-  swipeStart = null
-  // Mostly-horizontal and past a threshold, so a sloppy tap doesn't page.
-  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-    go(current.value + (dx < 0 ? 1 : -1))
-  }
+  const ended = swipe?.end({ x: e.clientX, y: e.clientY }, e.timeStamp, { axis: "x" })
+  swipe = null
+  if (ended?.swipe === "left") go(current.value + 1)
+  else if (ended?.swipe === "right") go(current.value - 1)
 }
 
 function onDoubleClick(e: MouseEvent) {
@@ -620,7 +631,7 @@ const guardOutside = useOutsideGuard()
           :class="isPanning ? 'cursor-grabbing' : isZoomed ? 'cursor-grab' : ''"
           @wheel="onStageWheel"
           @pointerdown="onPointerDown"
-          @pointermove="zoom.onPointerMove"
+          @pointermove="onPointerMove"
           @pointerup="onPointerUp"
           @pointercancel="onPointerCancel"
           @dblclick="onDoubleClick"
@@ -722,11 +733,12 @@ const guardOutside = useOutsideGuard()
             </div>
           </slot>
 
-          <div
+          <LpScrollStrip
             v-if="showStrip && total > 1"
             ref="stripEl"
-            class="lp-scrollbar-none flex justify-start gap-2 overflow-x-auto sm:justify-center"
+            :buttons="false"
           >
+            <div class="mx-auto flex w-max gap-2 p-1">
             <button
               v-for="(entry, i) in items"
               :key="entry.src + i"
@@ -754,7 +766,8 @@ const guardOutside = useOutsideGuard()
                 draggable="false"
               />
             </button>
-          </div>
+            </div>
+          </LpScrollStrip>
         </div>
       </DialogContent>
     </DialogPortal>

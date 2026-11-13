@@ -6,6 +6,7 @@
  */
 import { useLinkComponent } from "../composables/useLpConfig"
 import { resolveLink, type ResolvedLink } from "./link"
+import LpScrollStrip from "./LpScrollStrip.vue"
 import type { SidebarItem } from "./sidebar"
 
 const props = defineProps<{
@@ -25,7 +26,7 @@ function rowOf(item: SidebarItem): ResolvedLink {
 </script>
 
 <template>
-  <nav :aria-label="props.label" class="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-1.5 lp-scrollbar-none">
+  <LpScrollStrip as="nav" :aria-label="props.label" class="shrink-0 border-b border-line bg-surface" content-class="gap-1 px-4 py-1.5">
     <component
       :is="rowOf(item).is"
       v-for="item in items"
@@ -40,5 +41,5 @@ function rowOf(item: SidebarItem): ResolvedLink {
     >
       {{ item.label }}
     </component>
-  </nav>
+  </LpScrollStrip>
 </template>

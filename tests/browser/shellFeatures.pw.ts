@@ -222,7 +222,7 @@ test.describe("the shell's variables for a page's own sticky parts", () => {
     const row = page.getByRole("navigation", { name: "In this section" })
     await expect(row).toBeVisible()
     await scrollDoc(page, 1200)
-    await expect.poll(() => top(page, "[data-test-sticky]")).toBe(await row.evaluate((el) => Math.round(el.getBoundingClientRect().bottom)))
+    await expect.poll(() => top(page, "[data-test-sticky]")).toBe(await row.evaluate((el) => Math.round(el.closest("[data-lp-strip]")!.getBoundingClientRect().bottom)))
   })
 
   test("the foot of the window is kept clear of the bottom bar", async ({ page }) => {

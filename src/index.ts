@@ -216,6 +216,7 @@ export { default as LpRadioGroup } from "./components/LpRadioGroup.vue"
 export type { RadioOption } from "./components/LpRadioGroup.vue"
 export { default as LpRollingText } from "./components/LpRollingText.vue"
 export { default as LpScrollArea } from "./components/LpScrollArea.vue"
+export { default as LpScrollStrip } from "./components/LpScrollStrip.vue"
 export { default as LpPageScrollbar } from "./components/LpPageScrollbar.vue"
 export { default as LpSegmented } from "./components/LpSegmented.vue"
 export type { SegmentedOption } from "./components/LpSegmented.vue"
@@ -518,6 +519,8 @@ export {
   wheelPixels,
 } from "./composables/gesture"
 export type { DismissOptions, DragFrame, DragSession, DragSessionOptions, GestureAxis, GesturePoint, PageSwipeOptions, PinchFrame, SwipeOptions, VelocityTracker } from "./composables/gesture"
+export { useScrollStrip } from "./composables/useScrollStrip"
+export type { ScrollStrip, ScrollStripOptions } from "./composables/useScrollStrip"
 export { useToast } from "./composables/useToast"
 export type {
   ToastAction,

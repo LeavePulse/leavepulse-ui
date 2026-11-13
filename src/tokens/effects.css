@@ -149,3 +149,43 @@
     display: none;
   }
 }
+
+/*
+ * Edge fades for a sideways strip (LpScrollStrip, useScrollStrip): an edge
+ * with items beyond it fades out, an edge at the end of the row stays crisp.
+ * The widths are registered so a fade grows and leaves rather than switching;
+ * without @property it switches.
+ */
+@property --lp-strip-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --lp-strip-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.lp-strip-fade {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--lp-strip-fade-start), #000 calc(100% - var(--lp-strip-fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--lp-strip-fade-start), #000 calc(100% - var(--lp-strip-fade-end)), transparent 100%);
+  transition:
+    --lp-strip-fade-start var(--duration-fast) var(--ease-emphasized),
+    --lp-strip-fade-end var(--duration-fast) var(--ease-emphasized);
+}
+
+.lp-strip-fade[data-lp-more-start] {
+  --lp-strip-fade-start: var(--lp-strip-fade, 28px);
+}
+
+.lp-strip-fade[data-lp-more-end] {
+  --lp-strip-fade-end: var(--lp-strip-fade, 28px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-strip-fade {
+    transition: none;
+  }
+}

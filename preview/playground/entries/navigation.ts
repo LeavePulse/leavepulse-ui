@@ -26,6 +26,7 @@ import {
   LpTableOfContents,
   LpSidebar,
   LpTabs,
+  LpScrollStrip,
   contextMenuTip,
   hints,
   useGamepadNav,
@@ -43,7 +44,7 @@ export const navigation: ComponentEntry[] = [
     id: "tabs",
     name: "Tabs",
     description:
-      "Tabs with a sliding indicator and animated panels.\n\n- Variants: `variant=\"plain\"` drops the bar chrome for nav rows; `variant=\"bottom\"` is a phone's bottom navigation (equal-share tabs, icon over label, a sliding bar along the top edge, safe-area padding), where an item's `dot` flags a tab that wants a look and `label` names the tab list.\n- Overflow: a row wider than its container scrolls sideways and keeps the active tab in view (the narrow box below).\n- Hover: by default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab.\n- Items: an item can carry a `badge` count (rolls when it changes), be `disabled` (skipped by arrows and hover), and take a right-click `menu` headed by its label.\n- Without v-model the tabs pick the first enabled item when `items` arrive late or the current one disappears (the row with \"Reload items\").",
+      "Tabs with a sliding indicator and animated panels.\n\n- Variants: `variant=\"plain\"` drops the bar chrome for nav rows; `variant=\"bottom\"` is a phone's bottom navigation (equal-share tabs, icon over label, a sliding bar along the top edge, safe-area padding), where an item's `dot` flags a tab that wants a look and `label` names the tab list.\n- Overflow: a row wider than its container scrolls sideways (an LpScrollStrip: the wheel, a mouse drag and edge buttons reach the tabs past the edge, the clipped edges fade) and keeps the active tab in view (the narrow box below). A mouse picks a tab on click, so a drag across the row does not pick the tab it started on.\n- Hover: by default the marker glides under the hovered tab; `:hover-follow=\"false\"` (the row under the full-width one) pins it to the selected one for a dense header the pointer keeps crossing, and hover then only tints the tab.\n- Items: an item can carry a `badge` count (rolls when it changes), be `disabled` (skipped by arrows and hover), and take a right-click `menu` headed by its label.\n- Without v-model the tabs pick the first enabled item when `items` arrive late or the current one disappears (the row with \"Reload items\").",
     components: { LpTabs, LpButton, LpSkeleton },
     state: () => {
       const loaded = () => [
@@ -107,6 +108,33 @@ export const navigation: ComponentEntry[] = [
   </div>
 </div>`,
     thumbLoop: { every: 1600, frames: [{ tTab: "a", tNav: "inbox" }, { tTab: "b", tNav: "search" }, { tTab: "a", tNav: "settings" }, { tTab: "b", tNav: "home" }] }
+  },
+  {
+    id: "scroll-strip",
+    name: "Scroll strip",
+    description:
+      "A row that scrolls sideways and can be reached with any input: branch pills, chips, a filmstrip. LpTabs uses it for an overflowing tab row.\n\n- Wheel: a vertical wheel scrolls the row while it can still move that way; at either end the page scrolls on. A sideways wheel or touchpad stays the browser's.\n- Drag: a mouse or pen drags the row, coasting on release; a press that stays within a few pixels still clicks the item under it, and a drag does not.\n- Edges: an edge with items beyond it fades, and on a mouse a hover shows a previous or next button on that side (`buttons`: `auto`, `true`, `false`).\n- Keyboard: the focused item scrolls into view within the row only.\n- Touch keeps native scrolling and any scroll snap set through `content-class` (the second row snaps).\n- `useScrollStrip(el)` gives an existing scroller the same wheel, drag and focus behaviour, with `atStart`, `atEnd` and `overflowing` for fades of its own.",
+    components: { LpScrollStrip },
+    state: () => reactive({ picked: "main", branches: ["main", "release/0.93", "feature/gestures", "feature/scroll-strip", "fix/drawer-edge", "chore/deps", "docs/readme", "experiment/shader", "hotfix/login", "refactor/table"] }),
+    template: `<div class="flex w-full max-w-md flex-col gap-4">
+  <LpScrollStrip content-class="gap-2 py-1" aria-label="Branches">
+    <button
+      v-for="b in branches"
+      :key="b"
+      type="button"
+      class="shrink-0 rounded-pill border px-3 py-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      :class="picked === b ? 'border-brand/40 bg-brand/12 text-brand' : 'border-line text-muted hover:text-ink'"
+      @click="picked = b"
+    >{{ b }}</button>
+  </LpScrollStrip>
+  <LpScrollStrip content-class="snap-x snap-mandatory gap-3" :buttons="true">
+    <div v-for="n in 8" :key="n" class="grid h-24 w-40 shrink-0 snap-start place-items-center rounded-card border border-line bg-surface-soft text-sm text-muted">Card {{ n }}</div>
+  </LpScrollStrip>
+  <p class="text-sm text-muted">Picked: {{ picked }}</p>
+</div>`,
+    thumb: `<LpScrollStrip class="w-64" content-class="gap-2 py-1" :buttons="false">
+  <span v-for="b in branches" :key="b" class="shrink-0 rounded-pill border border-line px-3 py-1 text-sm text-muted">{{ b }}</span>
+</LpScrollStrip>`,
   },
   {
     id: "sidebar",

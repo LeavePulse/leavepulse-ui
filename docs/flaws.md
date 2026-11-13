@@ -74,6 +74,33 @@ entry is deleted, not ticked: the commit says what changed.
   `enterkeyhint` or `inputmode`. None of the kit has been tried on a real
   iPhone or Android.
 
+- **Two gestures are still the libraries', not the kit's.** Bottom and top
+  sheets (`LpDrawer` with `direction="bottom"`/`"top"`) drag to close and snap
+  through vaul, and toasts swipe away through reka's toast. Both decide
+  thresholds and velocity their own way, so a sheet and a side drawer do not
+  close alike. Moving sheets onto the gesture engine means doing snap points
+  ourselves (vaul's `--snap-point-height` maths); the toast needs its swipe
+  replaced while keeping reka's announcements and timers.
+- **The touch "hold, then drag" in `LpRangeCalendar` and `usePaintSelect` is
+  still two copies.** They share the engine's constants (`HOLD_TO_DRAG_MS`,
+  `TOUCH_SLOP`) but each keeps its own timer, slop check and non-passive
+  touchmove. A `holdToDrag` option on `useGesture` (hold, then capture and stop
+  the page scrolling) would cover both.
+- **A touch's pointer capture moved to another element was dropped a frame
+  later in Chromium** (seen on the drawer panel, whose `touch-action` is none
+  while the text under the finger is `pan-y`). `useGesture` therefore leaves a
+  touch on its implicit capture and only captures a mouse or pen. If a gesture
+  on a touch ever needs to follow the finger off its element, find out why.
+- **The header actions of `LpAppShell` scroll and fade but have no edge
+  buttons**: they are an `LpShift`, which animates its width, so they take
+  `useScrollStrip` directly rather than the `LpScrollStrip` frame.
+- **The scroll strip's wheel on a snapping row is the browser's smooth
+  `scrollBy`**, so quick notches there restart rather than add up as they do on
+  a row without snap; adding them up means choosing the snap point ourselves.
+- **WebKit was not run locally for the gesture and strip tests** (Playwright's
+  WebKit does not start on this machine); CI's nightly cross-browser run is the
+  first to see them there.
+
 ## Ideas
 
 - **A group order on `LpTable`.** Groups follow the first row of each after

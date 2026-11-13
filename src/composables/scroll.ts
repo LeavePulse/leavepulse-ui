@@ -45,6 +45,10 @@ export interface ScrollToElementOptions {
   behavior?: ScrollBehavior
   /** Room kept between the element and the scroller's edge. */
   margin?: number
+  /** Which way to scroll: vertical (default) or horizontal, for a strip. */
+  axis?: "y" | "x"
+  /** Scroll this element rather than the nearest scroller along `axis`. */
+  container?: HTMLElement | null
 }
 
 /** Scroll the nearest scroller, and only it, so that `el` is in view. */
@@ -55,21 +59,28 @@ export function scrollMarginTop(el: Element): number {
 
 export function scrollToElement(
   el: Element | null | undefined,
-  { block = "nearest", behavior = "auto", margin = 0 }: ScrollToElementOptions = {},
+  { block = "nearest", behavior = "auto", margin = 0, axis = "y", container }: ScrollToElementOptions = {},
 ): void {
   if (!el) return
   // The element's own document and window: inside an LpFrame they are the frame's.
   const doc = el.ownerDocument
   const win = doc.defaultView ?? window
-  const box = scrollParent(el) ?? (doc.scrollingElement as HTMLElement | null)
+  const box = container ?? scrollParent(el, { axis }) ?? (doc.scrollingElement as HTMLElement | null)
   if (!box) return
   const outer = box === doc.scrollingElement ? new DOMRect(0, 0, win.innerWidth, win.innerHeight) : box.getBoundingClientRect()
   const inner = el.getBoundingClientRect()
-  const top = inner.top - outer.top + box.scrollTop
-  let target = box.scrollTop
-  if (block === "start") target = top - margin
-  else if (block === "center") target = top - (box.clientHeight - inner.height) / 2
-  else if (inner.top < outer.top + margin) target = top - margin
-  else if (inner.bottom > outer.bottom - margin) target = top - box.clientHeight + inner.height + margin
-  if (target !== box.scrollTop) box.scrollTo({ top: target, behavior })
+  const x = axis === "x"
+  const from = x ? box.scrollLeft : box.scrollTop
+  const view = x ? box.clientWidth : box.clientHeight
+  const size = x ? inner.width : inner.height
+  const lo = x ? inner.left - outer.left : inner.top - outer.top
+  const hi = x ? inner.right - outer.right : inner.bottom - outer.bottom
+  const at = lo + from
+  let target = from
+  if (block === "start") target = at - margin
+  else if (block === "center") target = at - (view - size) / 2
+  else if (lo < margin) target = at - margin
+  else if (hi > -margin) target = at - view + size + margin
+  if (target === from) return
+  box.scrollTo(x ? { left: target, behavior } : { top: target, behavior })
 }

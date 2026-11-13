@@ -75,7 +75,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ dismiss: string; }> | undefined",
+    "type": "Partial<ActionBarLabels> | undefined",
     "required": false
    }
   ],
@@ -156,7 +156,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ busy: string; }> | undefined",
+    "type": "Partial<ActivityLineLabels> | undefined",
     "required": false
    }
   ],
@@ -434,7 +434,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ openMenu: string; skipToContent: string; backToTop: string; aside: string; contextNav: string; }> | undefined",
+    "type": "Partial<AppShellLabels> | undefined",
     "required": false,
     "description": "Text overrides: the burger's name and the skip link."
    },
@@ -980,7 +980,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ nav: string; more: string; }> | undefined",
+    "type": "Partial<BottomNavLabels> | undefined",
     "required": false
    }
   ],
@@ -1011,7 +1011,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ nav: string; }> | undefined",
+    "type": "Partial<BreadcrumbsLabels> | undefined",
     "required": false
    }
   ],
@@ -1132,7 +1132,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ group: string; }> | undefined",
+    "type": "Partial<ButtonLabels> | undefined",
     "required": false
    }
   ],
@@ -1753,7 +1753,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"unlock\" | \"lock\" | \"copy\" | \"copied\" | \"imports\" | \"details\" | \"lines\", string>> | undefined",
+    "type": "Partial<CodeBlockLabels> | undefined",
     "required": false
    }
   ],
@@ -2571,7 +2571,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ switch: string; title: string; }> | undefined",
+    "type": "Partial<ContextSwitcherLabels> | undefined",
     "required": false
    }
   ],
@@ -3339,8 +3339,8 @@
     "name": "edgeSize",
     "type": "number | undefined",
     "required": false,
-    "default": "44",
-    "description": "Distance (px) from the edge within which a touch can start a pull."
+    "default": "72",
+    "description": "Distance (px) from the edge within which a touch can start a pull. Wide\nenough to start a thumb's width in, clear of the system's back gesture\nalong the very edge."
    },
    {
     "name": "edgeOpenThreshold",
@@ -3403,7 +3403,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ close: string; }> | undefined",
+    "type": "Partial<DrawerLabels> | undefined",
     "required": false
    }
   ],
@@ -3566,7 +3566,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ orLink: string; placeholder: string; done: string; keys: string; invalid: string; }> | undefined",
+    "type": "Partial<DropzoneLabels> | undefined",
     "required": false
    },
    {
@@ -4452,7 +4452,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ badge: string; }> | undefined",
+    "type": "Partial<HintExampleLabels> | undefined",
     "required": false
    }
   ],
@@ -4486,7 +4486,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ gotIt: string; badge: string; }> | undefined",
+    "type": "Partial<HintLayerLabels> | undefined",
     "required": false
    }
   ],
@@ -4507,7 +4507,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ tourTitle: string; tourText: string; assignedTitle: string; assignedText: string; newsTitle: string; show: string; notNow: string; never: string; gotIt: string; noThanks: string; }> | undefined",
+    "type": "Partial<HintsLabels> | undefined",
     "required": false
    }
   ],
@@ -4731,7 +4731,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"zoomIn\" | \"zoomOut\" | \"reset\" | \"failed\" | \"rotateLeft\" | \"rotateRight\" | \"canvas\" | \"cors\", string>> | undefined",
+    "type": "Partial<ImageEditorLabels> | undefined",
     "required": false,
     "default": "{}",
     "description": "Labels for the toolbar. Defaulted in English rather than left blank: an\nicon button with no accessible name is announced as \"button\", and the\nkit cannot reach the consumer's translations. Apps with i18n pass their\nown strings."
@@ -4945,7 +4945,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ clear: string; }> | undefined",
+    "type": "Partial<InputLabels> | undefined",
     "required": false
    },
    {
@@ -5080,7 +5080,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ close: string; empty: string; resize: string; region: string; }> | undefined",
+    "type": "Partial<InspectorLabels> | undefined",
     "required": false
    },
    {
@@ -6040,7 +6040,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ gallery: string; image: string; spoiler: string; showSpoiler: string; showMore: string; }> | undefined",
+    "type": "Partial<MediaGalleryLabels> | undefined",
     "required": false
    }
   ],
@@ -6055,6 +6055,10 @@
    },
    {
     "name": "reveal",
+    "type": "[item: LightboxItem]"
+   },
+   {
+    "name": "broken",
     "type": "[item: LightboxItem]"
    }
   ],
@@ -6169,7 +6173,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ close: string; }> | undefined",
+    "type": "Partial<ModalLabels> | undefined",
     "required": false
    }
   ],
@@ -7006,7 +7010,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"nav\" | \"previous\" | \"next\", string>> | undefined",
+    "type": "Partial<PaginationLabels> | undefined",
     "required": false
    }
   ],
@@ -8187,7 +8191,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ add: string; remove: string; empty: string; }> | undefined",
+    "type": "Partial<RepeaterLabels> | undefined",
     "required": false
    },
    {
@@ -8455,6 +8459,65 @@
     "type": "[event: Event]"
    }
   ],
+  "slots": [
+   {
+    "name": "default",
+    "type": "{}"
+   }
+  ]
+ },
+ "LpScrollStrip": {
+  "props": [
+   {
+    "name": "contentClass",
+    "type": "unknown",
+    "required": false,
+    "description": "Classes for the scrolling row (layout, gap, padding, snap)."
+   },
+   {
+    "name": "fade",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Fade the edges that have items beyond them."
+   },
+   {
+    "name": "buttons",
+    "type": "boolean | \"auto\" | undefined",
+    "required": false,
+    "default": "\"auto\"",
+    "description": "Previous/next buttons: `auto` shows them on hover where the pointer is fine (a mouse), true on any device, false never."
+   },
+   {
+    "name": "wheel",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Map a vertical wheel to sideways scrolling while the row can move."
+   },
+   {
+    "name": "drag",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "Drag to scroll with a mouse or pen."
+   },
+   {
+    "name": "as",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"div\"",
+    "description": "The row element's tag."
+   },
+   {
+    "name": "inline",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "false",
+    "description": "Size to the content up to the parent's width (inline-flex), rather than fill the line."
+   }
+  ],
+  "events": [],
   "slots": [
    {
     "name": "default",
@@ -9225,7 +9288,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ nav: string; search: string; pinned: string; pin: string; unpin: string; expand: string; compact: string; expandRail: string; resize: string; }> | undefined",
+    "type": "Partial<SidebarLabels> | undefined",
     "required": false,
     "description": "Text overrides: `nav` names the landmark, `search` the filter field."
    },
@@ -9841,7 +9904,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"flat\" | \"loading\" | \"empty\" | \"up\" | \"down\" | \"latest\", string>> | undefined",
+    "type": "Partial<SparklineLabels> | undefined",
     "required": false
    }
   ],
@@ -10586,6 +10649,45 @@
     "required": false,
     "default": "6",
     "description": "Rows drawn beyond each edge of the view."
+   },
+   {
+    "name": "layout",
+    "type": "TableLayout | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "How the rows are drawn (v-model:layout): `table`, `cards` or `list`. Left\nunset the table keeps the choice itself, remembered with `persist`."
+   },
+   {
+    "name": "layouts",
+    "type": "readonly TableLayout[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The layouts the user can switch between, offered as a switch in the bar\nabove the rows. One layout, or none given, means no switch."
+   },
+   {
+    "name": "layoutBelow",
+    "type": "number | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Below this width in px (the table's own, not the window's) a `table`\nlayout is drawn as a `list`: a phone gets one line per row instead of a\ntable that loses its columns to `hideBelow` or scrolls sideways."
+   },
+   {
+    "name": "variant",
+    "type": "\"plain\" | \"framed\" | undefined",
+    "required": false,
+    "default": "\"framed\"",
+    "description": "`framed` (default) draws the rows on a surface with a border; `plain`\nleaves the frame out, for a table that already sits in a card or a\nsection of its own.",
+    "choices": [
+     "plain",
+     "framed"
+    ]
+   },
+   {
+    "name": "cardWidth",
+    "type": "string | undefined",
+    "required": false,
+    "default": "\"16rem\"",
+    "description": "The narrowest a card may get in the `cards` layout; the grid fits as many as fit."
    }
   ],
   "events": [
@@ -10641,9 +10743,17 @@
    {
     "name": "rowClick",
     "type": "[T]"
+   },
+   {
+    "name": "update:layout",
+    "type": "[TableLayout]"
    }
   ],
   "slots": [
+   {
+    "name": "toolbar",
+    "type": "{}"
+   },
    {
     "name": "bulk",
     "type": "{ selected: RowKey[]; allMatching: boolean; clear: () => void; }"
@@ -10655,6 +10765,14 @@
    {
     "name": "expanded",
     "type": "{ row: T; close: () => void; }"
+   },
+   {
+    "name": "card",
+    "type": "{ row: T; selected: boolean; toggle: () => void; openMenu: (event: Event) => void; }"
+   },
+   {
+    "name": "line",
+    "type": "{ row: T; selected: boolean; toggle: () => void; openMenu: (event: Event) => void; }"
    }
   ]
  },
@@ -10706,7 +10824,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ title: string; }> | undefined",
+    "type": "Partial<TableOfContentsLabels> | undefined",
     "required": false
    },
    {
@@ -11290,7 +11408,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ trigger: string; system: string; studio: string; openStudio: string; }> | undefined",
+    "type": "Partial<ThemeSwitcherLabels> | undefined",
     "required": false,
     "description": "Text overrides. `trigger` may contain `{name}`."
    },
@@ -11457,7 +11575,7 @@
   "props": [
    {
     "name": "labels",
-    "type": "Partial<{ dismiss: string; copy: string; copied: string; }> | undefined",
+    "type": "Partial<ToasterLabels> | undefined",
     "required": false
    }
   ],
@@ -11518,6 +11636,17 @@
     "type": "boolean | undefined",
     "required": false,
     "description": "Suppress the tip. For a trigger whose tip only applies to part of it — a\nchart wrapper where the pointer may be over a mark or over empty canvas —\nso an empty panel never opens over the gaps.\n\nThis also FORCES CLOSED a tip that is already showing. reka's own\n`disabled` does not: it stops managing the tooltip where it stands, so one\nthat was open when the flag flipped stayed on screen for good — outliving\nthe pointer, letting a second chart open its own beside it, and surviving\na scroll that should have dismissed it."
+   },
+   {
+    "name": "touch",
+    "type": "\"none\" | \"hold\" | undefined",
+    "required": false,
+    "default": "\"hold\"",
+    "description": "Touch has no hover, and a tap is the control's own. With `hold` a\npress-and-hold shows the tip (and that press does not also press the\ncontrol); the next touch anywhere, or Escape, hides it. `none` leaves\ntouch to the trigger. A followed tip (`followCursor`) never holds: its\ntrigger is a chart or canvas with its own touch reading.",
+    "choices": [
+     "none",
+     "hold"
+    ]
    }
   ],
   "events": [],
@@ -11830,7 +11959,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ next: string; back: string; done: string; close: string; progress: string; perform: string; tryIt: string; example: string; }> | undefined",
+    "type": "Partial<TourLabels> | undefined",
     "required": false
    },
    {
@@ -12062,7 +12191,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"loading\" | \"uptime\" | UptimeStatus, string>> | undefined",
+    "type": "Partial<UptimeBarLabels> | undefined",
     "required": false,
     "description": "Status names, for the tooltip and screen readers."
    },
@@ -12204,7 +12333,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"cancel\" | \"failed\" | \"quality\" | \"fit\" | \"original\" | \"p1080\" | \"p720\" | \"p480\" | \"estimate\" | \"same\" | \"probing\" | \"shrink\" | \"skip\" | \"encoding\" | \"unsupported\" | \"bigger\", string>> | undefined",
+    "type": "Partial<VideoCompressLabels> | undefined",
     "required": false,
     "default": "{}"
    },
@@ -12315,7 +12444,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"back\" | \"failed\" | \"speed\" | \"play\" | \"unsupported\" | \"player\" | \"pause\" | \"replay\" | \"mute\" | \"unmute\" | \"volume\" | \"normalSpeed\" | \"fullscreen\" | \"exitFullscreen\" | \"pip\" | \"exitPip\" | \"captions\" | \"seek\" | \"forward\" | \"rewind\" | \"fastForward\" | \"menuAt\" | \"copyTime\" | \"copyFrame\" | \"copiedTime\" | \"copiedFrame\" | \"copyFailed\", string>> | undefined",
+    "type": "Partial<VideoPlayerLabels> | undefined",
     "required": false,
     "default": "{}"
    }
@@ -12420,7 +12549,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<Record<\"length\" | \"zoomIn\" | \"zoomOut\" | \"region\" | \"end\" | \"start\" | \"left\" | \"failed\" | \"position\" | \"play\" | \"timeline\" | \"overview\" | \"unsupported\" | \"pause\" | \"mute\" | \"unmute\" | \"volume\" | \"menuAt\" | \"copyTime\" | \"copyFrame\" | \"copiedTime\" | \"copiedFrame\" | \"copyFailed\" | \"stepBack\" | \"stepForward\" | \"zoomFit\" | \"regionHint\" | \"regionClear\" | \"invalidTime\" | \"setStart\" | \"setEnd\" | \"goStart\" | \"goEnd\" | \"zoomHere\", string>> | undefined",
+    "type": "Partial<VideoTrimLabels> | undefined",
     "required": false,
     "default": "{}"
    }
@@ -12586,7 +12715,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ close: string; move: string; }> | undefined",
+    "type": "Partial<WindowLabels> | undefined",
     "required": false
    },
    {
@@ -12630,7 +12759,7 @@
    },
    {
     "name": "labels",
-    "type": "Partial<{ menu: string; create: string; duplicate: string; rename: string; remove: string; name: string; save: string; cancel: string; required: string; }> | undefined",
+    "type": "Partial<WorkspaceSwitcherLabels> | undefined",
     "required": false
    }
   ],
