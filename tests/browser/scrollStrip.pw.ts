@@ -111,3 +111,9 @@ test("tabs: a tab picked from outside is brought into view", async ({ page }) =>
   await page.getByTestId("pick-last").click()
   await expect.poll(() => inView(page, "Section 12")).toBe(true)
 })
+
+test("tabs: a picked tab whose row appears later with the data still lands in view", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=scroll-strip&tab=t10&late")
+  await expect(page.getByRole("tab", { name: "Section 10" })).toBeVisible()
+  await expect.poll(() => inView(page, "Section 10")).toBe(true)
+})

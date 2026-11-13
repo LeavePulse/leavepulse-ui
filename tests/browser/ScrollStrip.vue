@@ -5,7 +5,10 @@ import { LpScrollStrip, LpTabs } from "../../src"
 const clicked = ref<string[]>([])
 const items = Array.from({ length: 24 }, (_, i) => `Branch ${i + 1}`)
 const tab = ref(new URLSearchParams(location.search).get("tab") ?? "t1")
-const tabs = Array.from({ length: 12 }, (_, i) => ({ value: `t${i + 1}`, label: `Section ${i + 1}` }))
+const allTabs = Array.from({ length: 12 }, (_, i) => ({ value: `t${i + 1}`, label: `Section ${i + 1}` }))
+const late = new URLSearchParams(location.search).has("late")
+const tabs = ref(late ? [] : allTabs)
+if (late) setTimeout(() => { tabs.value = allTabs }, 600)
 </script>
 
 <template>
