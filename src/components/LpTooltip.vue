@@ -23,6 +23,15 @@
  * alone could not guarantee. reka opens the tip on keyboard focus as well as
  * hover and closes it on Escape, satisfying WCAG 1.4.13.
  *
+ * Until it is first wanted only the trigger is rendered: the reka tooltip (its
+ * provider, root, popper and portal) is stood up on the first pointer over the
+ * trigger, the first focus on it or a touch hold, and stays from then on. A
+ * table row carries two or three tips, nearly all of them never hovered, and
+ * fifty rows of full tooltips were most of the cost of showing the rows. The
+ * trigger's element is the same one before and after, so a ref to it, its
+ * focus and its hover survive the switch; the label is on it from the start,
+ * and the description arrives with the tip, as it always did.
+ *
  * Do NOT wrap the `#trigger` of LpDropdownMenu, LpPopover or LpContextMenu:
  * those bind their handlers to the slot's direct child, so a wrapper swallows
  * them and the control stops opening. Put `aria-label` on the trigger instead.
@@ -30,13 +39,28 @@
 import { clamp } from "../composables/clamp"
 import {
   injectTooltipProviderContext,
+  injectTooltipRootContext,
+  Slot,
   TooltipContent,
   TooltipPortal,
   TooltipProvider,
   TooltipRoot,
   TooltipTrigger,
 } from "reka-ui"
-import { computed, mergeProps, onBeforeUnmount, ref, useAttrs, watch, type FunctionalComponent } from "vue"
+import {
+  computed,
+  defineComponent,
+  mergeProps,
+  onBeforeUnmount,
+  onMounted,
+  onUpdated,
+  ref,
+  shallowRef,
+  useAttrs,
+  watch,
+  type ComponentPublicInstance,
+  type FunctionalComponent,
+} from "vue"
 import {
   springSettled,
   springStep,
@@ -263,6 +287,7 @@ const hold = useTouchHold({
   enabled: () => props.touch === "hold" && !props.followCursor && !props.disabled,
   delay: () => HOLD_MS,
   onHold: () => {
+    armed.value = true
     heldOpen.value = true
     wanted.value = true
     open.value = true
@@ -354,11 +379,132 @@ const guardOutside = useOutsideGuard()
 defineOptions({ inheritAttrs: false })
 // The caller's own listeners on the trigger run beside the hold's, not instead of them.
 const attrs = useAttrs()
-const triggerAttrs = computed(() => mergeProps(attrs, hold.handlers))
+
+/*
+ * The tip is mounted on demand (see the header). The trigger is drawn by this
+ * component itself rather than by reka's TooltipTrigger, so it is the same
+ * element before and after: TooltipTrigger needs the root around it, and
+ * putting the root in later would have rebuilt the trigger under the pointer
+ * or the focus. What TooltipTrigger does with its events is done here instead,
+ * through the root's own context once it exists; reka's TooltipTrigger is
+ * still mounted with the tip, as the anchor it is placed against.
+ */
+const armed = ref(false)
+type RootContext = ReturnType<typeof injectTooltipRootContext>
+type ProviderContext = ReturnType<typeof injectTooltipProviderContext>
+const root = shallowRef<RootContext | null>(null)
+let provider: ProviderContext | null = null
+
+const triggerRef = ref<ComponentPublicInstance | null>(null)
+const triggerEl = shallowRef<HTMLElement | undefined>()
+function readTrigger() {
+  const el = triggerRef.value?.$el as Node | null | undefined
+  const next = el && el.nodeType === 1 ? (el as HTMLElement) : undefined
+  if (next === triggerEl.value) return
+  triggerEl.value = next
+  root.value?.onTriggerChange(next)
+}
+onMounted(readTrigger)
+onUpdated(readTrigger)
+
+/* What happened before the tip existed, replayed once it does. */
+let hovering = false
+let focusedBy: HTMLElement | null = null
+let pointerDown = false
+let pointerMoveOpened = false
+
+const live = () => (root.value && !root.value.disabled.value ? root.value : null)
+
+function enter() {
+  const tip = live()
+  if (!tip || pointerMoveOpened || provider?.isPointerInTransitRef.value) return
+  tip.onTriggerEnter()
+  pointerMoveOpened = true
+}
+
+function focusOpen(target: HTMLElement) {
+  const tip = live()
+  if (!tip || pointerDown) return
+  if (tip.ignoreNonKeyboardFocus.value && !target.matches?.(":focus-visible")) return
+  tip.onOpen()
+}
+
+const triggerEvents = {
+  onPointerenter(event: PointerEvent) {
+    if (event.pointerType === "touch") return
+    hovering = true
+    armed.value = true
+  },
+  onPointermove(event: PointerEvent) {
+    onPointerMove(event)
+    if (event.pointerType === "touch") return
+    hovering = true
+    armed.value = true
+    enter()
+  },
+  onPointerleave() {
+    hovering = false
+    const tip = live()
+    if (!tip) return
+    tip.onTriggerLeave()
+    pointerMoveOpened = false
+  },
+  onPointerdown(event: PointerEvent) {
+    const tip = live()
+    if (tip?.open.value && !tip.disableClosingTrigger.value) tip.onClose()
+    pointerDown = true
+    const doc = (event.currentTarget as Node | null)?.ownerDocument ?? document
+    doc.addEventListener("pointerup", () => setTimeout(() => (pointerDown = false), 1), { once: true })
+  },
+  onFocus(event: FocusEvent) {
+    focusedBy = event.currentTarget as HTMLElement
+    armed.value = true
+    focusOpen(focusedBy)
+  },
+  onBlur() {
+    focusedBy = null
+    live()?.onClose()
+  },
+  onClick() {
+    const tip = live()
+    if (tip && !tip.disableClosingTrigger.value) tip.onClose()
+  },
+}
+
+/* Hands the root's context out and replays what the tip was armed by. */
+const RootBridge = defineComponent({
+  setup() {
+    root.value = injectTooltipRootContext()
+    provider = injectTooltipProviderContext()
+    onMounted(() => {
+      // After reka's TooltipTrigger, which reports the element it renders (none).
+      root.value?.onTriggerChange(triggerEl.value)
+      if (hovering) enter()
+      if (focusedBy && focusedBy.ownerDocument.activeElement === focusedBy) focusOpen(focusedBy)
+    })
+    onBeforeUnmount(() => {
+      root.value = null
+      provider = null
+    })
+    return () => null
+  },
+})
+
+const triggerProps = computed(() =>
+  mergeProps(attrs, hold.handlers, triggerEvents, {
+    "aria-label": props.label ? props.content : undefined,
+    "aria-describedby": root.value?.open.value ? root.value.contentId : undefined,
+    "data-state": root.value?.stateAttribute.value ?? "closed",
+    "data-grace-area-trigger": "",
+    class: props.touch === "hold" && !props.followCursor ? "[-webkit-touch-callout:none]" : undefined,
+  }),
+)
 </script>
 
 <template>
-  <component :is="shared ? PassThrough : TooltipProvider" v-bind="shared ? {} : { delayDuration: delay ?? 200 }">
+  <!-- The caller's own element, with the trigger's props merged onto it. -->
+  <Slot ref="triggerRef" v-bind="triggerProps"><slot /></Slot>
+  <component v-if="armed" :is="shared ? PassThrough : TooltipProvider" v-bind="shared ? {} : { delayDuration: delay ?? 200 }">
     <!--
       `disable-closing-trigger` in follow mode: reka dismisses a tip when its
       trigger is clicked, which is right for a button (the tip explained the
@@ -373,17 +519,10 @@ const triggerAttrs = computed(() => mergeProps(attrs, hold.handlers))
       :disable-closing-trigger="followCursor"
       @update:open="onOpenChange"
     >
-      <!-- `as-child` merges these onto the caller's own element, so the label
-           lands on the real button rather than on a wrapper. -->
-      <TooltipTrigger
-        as-child
-        v-bind="triggerAttrs"
-        :aria-label="label ? content : undefined"
-        :class="touch === 'hold' && !followCursor ? '[-webkit-touch-callout:none]' : undefined"
-        @pointermove="onPointerMove"
-      >
-        <slot />
-      </TooltipTrigger>
+      <!-- Renders nothing: the anchor the tip is placed against, and the id
+           the trigger's aria-describedby points at. -->
+      <TooltipTrigger as-child :reference="triggerEl" />
+      <RootBridge />
       <TooltipPortal :to="portalTo">
         <TooltipContent
           @interact-outside="guardOutside"
