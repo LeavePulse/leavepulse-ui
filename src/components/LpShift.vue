@@ -26,7 +26,7 @@
  * `useShift`, and LpModal drives its panel with the same composable.
  */
 import { isElement, isHTMLElement, nodeWindow } from "../composables/useView"
-import { computed, onBeforeUnmount, watch } from "vue"
+import { computed, onBeforeUnmount, onUpdated, watch } from "vue"
 import { prefersReducedMotion } from "../composables/easing"
 import { useShift, type ShiftAxis } from "../composables/useShift"
 
@@ -289,6 +289,48 @@ onBeforeUnmount(() => {
   clearTimeout(rememberTimer)
 })
 
+/*
+ * The tween's classes go onto the box from here, not from the template. A
+ * render that read `tweening` or `resizing` would run again at the start and
+ * the end of every tween, and the slot runs inside that render: the whole
+ * content re-rendered twice per resize for two classes on one element. A
+ * table's sixty rows were each rendered again, and TransitionGroup measured
+ * every one of them again, for nothing in the rows having changed.
+ *
+ * Applied after every render too: a class bound by the parent replaces the
+ * element's whole class attribute when it changes, and these are put back.
+ */
+const shiftClasses = computed(() => {
+  const on = [
+    tweening.value && !props.disabled
+      ? `${transitionClass.value} duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none`
+      : "",
+    resizing.value ? "overflow-hidden" : "",
+    // While the box holds a width its content has outgrown, a flex row would
+    // squeeze its children to fit (a button's keys folding into a column)
+    // instead of letting the easing edge clip them.
+    resizing.value && props.axis !== "height" ? "[&>*]:shrink-0" : "",
+    resizing.value && props.anchor === "end" ? "justify-end" : "",
+  ]
+  return on.join(" ").split(" ").filter(Boolean)
+})
+let applied: readonly string[] = []
+function applyShiftClasses() {
+  const box = el.value
+  if (!box) return
+  const next = shiftClasses.value
+  for (const name of applied) if (!next.includes(name)) box.classList.remove(name)
+  for (const name of next) box.classList.add(name)
+  applied = next
+}
+watch(shiftClasses, applyShiftClasses, { flush: "post" })
+onUpdated(() => {
+  // The parent's class binding may have rewritten the attribute: what was
+  // applied is gone from the element, so all of it goes back on.
+  applied = []
+  applyShiftClasses()
+})
+
 defineExpose({ resizing })
 </script>
 
@@ -297,21 +339,9 @@ defineExpose({ resizing })
        smaller than the content it already holds, and without the clip that
        content spills past the easing edge. Dropped once settled, so nothing
        that legitimately overflows — a dropdown, a focus ring — is clipped at
-       rest. -->
-  <div
-    ref="el"
-    :class="[
-      tweening && !disabled
-        ? `${transitionClass} duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none`
-        : '',
-      resizing ? 'overflow-hidden' : '',
-      // While the box holds a width its content has outgrown, a flex row would
-      // squeeze its children to fit (a button's keys folding into a column)
-      // instead of letting the easing edge clip them.
-      resizing && axis !== 'height' ? '[&>*]:shrink-0' : '',
-      resizing && anchor === 'end' ? 'justify-end' : '',
-    ]"
-  >
-    <slot :resizing="resizing" />
+       rest. The classes are put on in script (`applyShiftClasses`), so a
+       tween starting or ending never renders the content again. -->
+  <div ref="el">
+    <slot />
   </div>
 </template>

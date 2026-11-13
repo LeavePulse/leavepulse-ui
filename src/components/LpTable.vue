@@ -1736,6 +1736,17 @@ const motionIds = computed(() => (headerless.value ? allEntries.value : viewEntr
 let shownIds: readonly string[] = []
 const bigSwap = computed(() => rowChanges(shownIds, motionIds.value) > ROW_MOTION_LIMIT)
 let settleFlip = false
+/*
+ * Whether the rows carry their own enter, leave and move transitions, read by
+ * the templates through these two computeds and never as `animating` itself:
+ * the motion window closing flips `animating` 600 ms after every change, and
+ * a template reading it re-renders the whole table for it. TransitionGroup then
+ * measures every row again (it records positions on each render), sixty forced
+ * reads for a switch that, after a big swap, was off already. A computed whose
+ * value does not change does not re-render anything.
+ */
+const rowMotion = computed(() => animating.value && !props.virtualRowHeight && !bigSwap.value)
+const cardMotion = computed(() => animating.value && !bigSwap.value)
 watch(
   motionIds,
   (ids) => {
@@ -2131,7 +2142,7 @@ usePaletteCommands(() => {
       <TransitionGroup
         tag="tbody"
         name="lp-row"
-        :css="animating && !virtualRowHeight && !bigSwap"
+        :css="rowMotion"
         :move-class="bigSwap ? 'lp-row-still' : undefined"
         :class="busy && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
         :aria-busy="busy || undefined"
@@ -2296,7 +2307,7 @@ usePaletteCommands(() => {
       :key="activeLayout"
       tag="div"
       name="lp-row"
-      :css="animating && !bigSwap"
+      :css="cardMotion"
       :move-class="bigSwap ? 'lp-row-still' : undefined"
       v-bind="scrollAttrs"
       class="min-h-0 transition-opacity"
