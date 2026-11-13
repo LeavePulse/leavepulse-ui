@@ -116,6 +116,7 @@ const strip = ref<InstanceType<typeof LpScrollStrip> | null>(null)
 const Passthrough: FunctionalComponent = (_, { slots }) => slots.default?.()
 const list = ref<{ $el: HTMLElement } | null>(null)
 function revealActive(smooth: boolean) {
+  if (bottom.value) return
   strip.value?.reveal(list.value?.$el?.querySelector('[data-state="active"]'), { smooth })
 }
 watch(current, () => void nextTick(() => revealActive(true)))
