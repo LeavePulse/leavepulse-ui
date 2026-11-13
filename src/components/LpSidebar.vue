@@ -8,7 +8,7 @@
  * v-model. Each item can route via href (rendered as <a>) or just emit select.
  *
  * Phones: set `responsive` and the rail hides below the `mobileBreakpoint` and
- * is replaced by a swipeable LpDrawer (vaul-vue gives drag-to-close for free).
+ * is replaced by a swipeable LpDrawer (pulled in from the edge, swiped shut).
  * The host owns the burger button and binds v-model:open; selecting an item
  * auto-closes the drawer. With `responsive` off the component renders exactly
  * the static <nav> it always has — existing call sites are unaffected.
@@ -659,7 +659,7 @@ const searchField = computed(() => ({
     </div>
   </nav>
 
-  <!-- Mobile: same nav inside a swipeable drawer (drag-to-close via vaul). -->
+  <!-- Mobile: same nav inside a swipeable drawer (LpDrawer's edge pull and swipe to close). -->
   <LpDrawer
     v-if="responsive"
     :open="open"

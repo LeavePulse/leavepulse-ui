@@ -24,6 +24,7 @@ export type RangeChange = { via: "pick" | "drag" | "keyboard" }
  * "keyboard"), so a popover around the calendar can stay open while the user
  * fine-tunes instead of closing on the first nudge.
  */
+import { HOLD_TO_DRAG_MS, TOUCH_SLOP } from "../composables/gesture"
 import { type DateValue, getLocalTimeZone, today } from "@internationalized/date"
 import {
   type DateRange as RekaRange,
@@ -119,12 +120,10 @@ const root = ref<HTMLElement | null>(null)
  * Press-and-drag, the way a phone selects text. A press on either end of the
  * range drags that end; a press anywhere else starts a new range that follows
  * the pointer. A mouse or pen drags at once. A finger has to hold still for
- * HOLD_MS first, so an ordinary swipe still scrolls the page; after that the
+ * HOLD_TO_DRAG_MS first, so an ordinary swipe still scrolls the page; after that the
  * page stops scrolling and the finger selects. A press that never moves stays
  * an ordinary click for reka.
  */
-const HOLD_MS = 320
-const SLOP_PX = 8
 
 /** The day the range pivots around while the pointer moves. */
 let anchor: string | null = null
@@ -183,14 +182,14 @@ function onPointerDown(e: PointerEvent) {
     dragging.value = true
     draft.value = toReka({ start: day, end: day })
     navigator.vibrate?.(8)
-  }, HOLD_MS)
+  }, HOLD_TO_DRAG_MS)
 }
 
 function onPointerMove(e: PointerEvent) {
   if (anchor === null || e.pointerId !== pointerId) return
   if (!armed) {
     // Moved before the hold landed: that is a scroll, not a selection.
-    if (Math.hypot(e.clientX - startX, e.clientY - startY) > SLOP_PX) reset()
+    if (Math.hypot(e.clientX - startX, e.clientY - startY) > TOUCH_SLOP) reset()
     return
   }
   const day = cellAt(e.clientX, e.clientY)?.dataset.value

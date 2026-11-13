@@ -1,4 +1,5 @@
 import { clamp } from "./clamp"
+import { distance, pinchFrame } from "./gesture"
 import { computed, ref, toValue, type ComputedRef, type CSSProperties, type MaybeRefOrGetter, type Ref } from "vue"
 
 /*
@@ -130,15 +131,11 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
     zoomAbout(scale.value * (e.deltaY < 0 ? step : 1 / step), point.x, point.y)
   }
 
-  function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
-    return Math.hypot(a.x - b.x, a.y - b.y)
-  }
-
   function onPointerDown(e: PointerEvent) {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()]
+      const [a, b] = [...pointers.values()] as [{ x: number; y: number }, { x: number; y: number }]
       pinchStartDistance = distance(a, b)
       pinchStartScale = scale.value
       panning.value = false
@@ -159,10 +156,10 @@ export function useZoomPan(options: UseZoomPanOptions = {}): UseZoomPan {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (pointers.size === 2 && pinchStartDistance > 0) {
-      const [a, b] = [...pointers.values()]
-      const mid = { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }
-      const point = relative(mid)
-      zoomAbout(pinchStartScale * (distance(a, b) / pinchStartDistance), point.x, point.y)
+      const [a, b] = [...pointers.values()] as [{ x: number; y: number }, { x: number; y: number }]
+      const pinch = pinchFrame(a, b, pinchStartDistance)
+      const point = relative({ clientX: pinch.origin.x, clientY: pinch.origin.y })
+      zoomAbout(pinchStartScale * pinch.scale, point.x, point.y)
       return
     }
 

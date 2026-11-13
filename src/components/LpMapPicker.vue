@@ -22,7 +22,9 @@ export default { inheritAttrs: false }
  */
 import { clamp } from "../composables/clamp"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { prefersReducedMotion } from "../composables/easing"
+import { createDragSession, slopFor, type DragSession } from "../composables/gesture"
+import { glide, type Glide } from "../composables/useGesture"
+import { nodeWindow } from "../composables/realm"
 import { type LatLon, OSM_TILES, type TileSource, project, tileUrl, unproject } from "./address"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
@@ -306,88 +308,44 @@ function toLatLon(at: { x: number; y: number }): LatLon {
 }
 
 const panning = ref(false)
-// A drag is a pan, not a pick — track whether the pointer actually travelled so
-// releasing after a drag doesn't also drop the pin.
-let moved = false
-let last = { x: 0, y: 0 }
-// Pointer velocity in px/ms, smoothed so one jittery frame at the end of a
-// flick doesn't decide where the map coasts to.
-let velocity = { x: 0, y: 0 }
-let lastMove = 0
-let glideFrame: number | undefined
+// A drag is a pan, not a pick: a press that never leaves the slop drops the
+// pin on release, one that does pans. The kit's drag session makes that call
+// and measures the speed at release, and glide coasts on from it.
+let session: DragSession | null = null
+let coast: Glide | null = null
 
 function stopGlide() {
-  if (glideFrame !== undefined) cancelAnimationFrame(glideFrame)
-  glideFrame = undefined
-  velocity = { x: 0, y: 0 }
+  coast?.stop()
+  coast = null
 }
 
 function onPointerDown(e: PointerEvent) {
   if (props.disabled || e.button !== 0 || zooming.value) return
   stopGlide()
   panning.value = true
-  moved = false
-  last = { x: e.clientX, y: e.clientY }
-  lastMove = performance.now()
+  session = createDragSession({ x: e.clientX, y: e.clientY }, e.timeStamp, { slop: slopFor(e.pointerType) })
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (!panning.value) return
-  const dx = e.clientX - last.x
-  const dy = e.clientY - last.y
-  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true
-
-  const now = performance.now()
-  const dt = now - lastMove
-  if (dt > 0) {
-    velocity = {
-      x: velocity.x * 0.7 + (dx / dt) * 0.3,
-      y: velocity.y * 0.7 + (dy / dt) * 0.3,
-    }
-  }
-  lastMove = now
-  last = { x: e.clientX, y: e.clientY }
-  panBy(-dx, -dy)
+  if (!panning.value || !session) return
+  const frame = session.move({ x: e.clientX, y: e.clientY }, e.timeStamp)
+  if (frame.phase !== "drag") return
+  panBy(-(frame.first ? frame.movement.x : frame.delta.x), -(frame.first ? frame.movement.y : frame.delta.y))
 }
 
 function onPointerUp(e: PointerEvent) {
-  if (!panning.value) return
+  if (!panning.value || !session) return
   panning.value = false
   ;(e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId)
-  if (!moved && !props.disabled) {
-    emit("update:modelValue", toLatLon(viewportPoint(e)))
+  const end = session.end({ x: e.clientX, y: e.clientY }, e.timeStamp)
+  session = null
+  if (end.phase !== "drag") {
+    if (!props.disabled && e.type !== "pointercancel") emit("update:modelValue", toLatLon(viewportPoint(e)))
     return
   }
-  // Nothing to coast from if the pointer was resting when it lifted.
-  if (performance.now() - lastMove > 90) velocity = { x: 0, y: 0 }
-  glide()
-}
-
-/*
- * Momentum: keep panning after release and bleed the speed off exponentially,
- * so letting go of a flick drifts to a stop instead of stopping dead. Time-based
- * rather than per-frame, which keeps the feel identical at 60 and 144 Hz.
- */
-function glide() {
-  if (prefersReducedMotion() || Math.hypot(velocity.x, velocity.y) < 0.05) {
-    velocity = { x: 0, y: 0 }
-    return
-  }
-  let previous = performance.now()
-  const step = (now: number) => {
-    const dt = Math.min(now - previous, 32)
-    previous = now
-    const friction = Math.exp(-dt / 240)
-    velocity = { x: velocity.x * friction, y: velocity.y * friction }
-    panBy(-velocity.x * dt, -velocity.y * dt)
-    if (Math.hypot(velocity.x, velocity.y) > 0.015) {
-      glideFrame = requestAnimationFrame(step)
-    } else {
-      stopGlide()
-    }
-  }
-  glideFrame = requestAnimationFrame(step)
+  if (e.type === "pointercancel") return
+  coast = glide(end.velocity, (dx, dy) => panBy(-dx, -dy), { win: nodeWindow(e.currentTarget as Node) })
 }
 
 function panBy(dx: number, dy: number) {

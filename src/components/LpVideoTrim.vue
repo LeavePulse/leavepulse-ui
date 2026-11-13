@@ -29,6 +29,7 @@ export default { inheritAttrs: false }
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import { startPointerDrag } from "../composables/pointerDrag"
+import { createGesture } from "../composables/useGesture"
 import { isHTMLElement, nodeWindow } from "../composables/realm"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"
@@ -367,8 +368,6 @@ const markDigits = computed(() => tickStep(span.value, trackWidth.value) < 1)
 
 /* ---------- timeline pointers ---------- */
 
-const pointers = new Map<number, number>()
-let pinch: { distance: number; anchor: number } | null = null
 const pinching = ref(false)
 let edgeFrame = 0
 let lastX = 0
@@ -420,48 +419,41 @@ function edgeScroll() {
   })
 }
 
-function onTrackDown(event: PointerEvent) {
-  if (off.value || (event.pointerType === "mouse" && event.button !== 0)) return
-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
-  pointers.set(event.pointerId, event.clientX)
-  if (pointers.size === 2) {
+/* The track on the kit's gesture engine: a press scrubs at once, a drag keeps scrubbing, two fingers zoom about where they started. */
+let pinchDistance = 0
+let pinchAnchor = 0
+const track = createGesture({
+  threshold: 0,
+  onPress(event) {
+    if (off.value || (event.pointerType === "mouse" && event.button !== 0)) return false
+    event.preventDefault()
+    trackEl.value?.querySelector<HTMLElement>("[data-lp-playhead]")?.focus({ preventScroll: true })
+    pause()
+    scrubbing.value = true
+    lastX = event.clientX
+    seek(timeAt(event.clientX))
+  },
+  onDrag({ point }) {
+    if (!scrubbing.value) return
+    lastX = point.x
+    seek(timeAt(point.x))
+    edgeScroll()
+  },
+  onDragEnd: () => (scrubbing.value = false),
+  onTap: () => (scrubbing.value = false),
+  onPinchStart(pinch) {
     scrubbing.value = false
-    const [a, b] = [...pointers.values()] as [number, number]
-    pinch = { distance: Math.max(8, Math.abs(a - b)), anchor: timeAt((a + b) / 2) }
     pinching.value = true
-    return
-  }
-  if (pointers.size > 2) return
-  event.preventDefault()
-  trackEl.value?.querySelector<HTMLElement>("[data-lp-playhead]")?.focus({ preventScroll: true })
-  pause()
-  scrubbing.value = true
-  lastX = event.clientX
-  seek(timeAt(event.clientX))
-}
-function onTrackMove(event: PointerEvent) {
-  if (!pointers.has(event.pointerId)) return
-  pointers.set(event.pointerId, event.clientX)
-  if (pinch && pointers.size === 2) {
-    const [a, b] = [...pointers.values()] as [number, number]
-    const distance = Math.max(8, Math.abs(a - b))
-    zoomBy(distance / pinch.distance, pinch.anchor)
-    pinch.distance = distance
-    return
-  }
-  if (!scrubbing.value) return
-  lastX = event.clientX
-  seek(timeAt(event.clientX))
-  edgeScroll()
-}
-function onTrackUp(event: PointerEvent) {
-  pointers.delete(event.pointerId)
-  if (pointers.size < 2) {
-    pinch = null
-    pinching.value = false
-  }
-  if (!pointers.size) scrubbing.value = false
-}
+    pinchDistance = pinch.distance
+    pinchAnchor = timeAt(pinch.origin.x)
+  },
+  onPinch(pinch) {
+    zoomBy(pinch.distance / Math.max(8, pinchDistance), pinchAnchor)
+    pinchDistance = pinch.distance
+  },
+  onPinchEnd: () => (pinching.value = false),
+})
+onBeforeUnmount(track.dispose)
 
 /* The overview: press or drag to centre the view there. */
 function onOverviewDown(event: PointerEvent) {
@@ -948,10 +940,7 @@ const widestLeft = computed(() => leftOf(widestClipTime(limits.value.maxClip), w
         :class="off ? 'opacity-60' : 'cursor-text'"
         :aria-label="text.timeline"
         role="group"
-        @pointerdown="onTrackDown"
-        @pointermove="onTrackMove"
-        @pointerup="onTrackUp"
-        @pointercancel="onTrackUp"
+        v-bind="track.handlers"
       >
         <div class="absolute inset-0 overflow-hidden rounded-control">
           <TransitionGroup v-bind="FADE">

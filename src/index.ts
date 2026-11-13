@@ -496,6 +496,28 @@ export { useTilt } from "./composables/useTilt"
 export type { UseTilt, UseTiltOptions } from "./composables/useTilt"
 export { useZoomPan } from "./composables/useZoomPan"
 export type { UseZoomPan, UseZoomPanOptions } from "./composables/useZoomPan"
+export { createGesture, glide, useGesture } from "./composables/useGesture"
+export type { Gesture, GestureEnd, GestureOptions, GesturePinch, GestureState, Glide } from "./composables/useGesture"
+export {
+  createDragSession,
+  createVelocityTracker,
+  FLICK_VELOCITY,
+  HOLD_TO_DRAG_MS,
+  LONG_PRESS_MS,
+  lockAxis,
+  MOUSE_SLOP,
+  momentumDistance,
+  pageAfterSwipe,
+  pinchFrame,
+  rubberBand,
+  rubberClamp,
+  shouldDismiss,
+  slopFor,
+  swipeDirection,
+  TOUCH_SLOP,
+  wheelPixels,
+} from "./composables/gesture"
+export type { DismissOptions, DragFrame, DragSession, DragSessionOptions, GestureAxis, GesturePoint, PageSwipeOptions, PinchFrame, SwipeOptions, VelocityTracker } from "./composables/gesture"
 export { useToast } from "./composables/useToast"
 export type {
   ToastAction,

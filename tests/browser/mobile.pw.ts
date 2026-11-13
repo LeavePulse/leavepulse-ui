@@ -291,6 +291,59 @@ test.describe("touch gestures", () => {
   })
 })
 
+test.describe("side drawer swipes", () => {
+  test.skip(({ browserName }) => browserName !== "chromium", "touches are sent through Chromium's DevTools protocol")
+  const state = (page: import("@playwright/test").Page) => page.getByTestId("edge-state")
+  const panel = (page: import("@playwright/test").Page) => page.getByRole("dialog", { name: "Edge drawer" })
+  // A height where a finger near the left edge lands on the page, not on a field.
+  const quiet = (page: import("@playwright/test").Page) =>
+    page.evaluate(() => {
+      for (let y = 120; y < innerHeight - 60; y += 10) {
+        const hit = [40, 150].flatMap((x) => [-24, 0, 24].map((dy) => document.elementFromPoint(x, y + dy)))
+        if (hit.every((el) => el && !el.closest("input, textarea, select, button, a, [contenteditable], [role=slider], [role=application]"))) return y
+      }
+      return 400
+    })
+
+  test("a pull from near the edge follows the finger and opens past the threshold", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const y = await quiet(page)
+    await gesture(page, [{ x: 40, y }], [{ x: 300, y: y + 5 }])
+    await expect(state(page)).toHaveText("open")
+    await expect(panel(page)).toBeVisible()
+  })
+
+  test("a short slow pull springs back, and a vertical start stays a scroll", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const y = await quiet(page)
+    await gesture(page, [{ x: 30, y }], [{ x: 70, y }], 20)
+    await page.waitForTimeout(300)
+    await expect(state(page)).toHaveText("closed")
+    await gesture(page, [{ x: 30, y: y + 100 }], [{ x: 120, y: y - 200 }])
+    await page.waitForTimeout(300)
+    await expect(state(page)).toHaveText("closed")
+  })
+
+  test("a swipe on the panel or on the scrim closes it, a nudge does not", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const y = await quiet(page)
+    await gesture(page, [{ x: 40, y }], [{ x: 300, y: y + 5 }])
+    await expect(state(page)).toHaveText("open")
+    await page.waitForTimeout(500)
+    await gesture(page, [{ x: 200, y }], [{ x: 185, y }], 20)
+    await page.waitForTimeout(600)
+    await expect(state(page)).toHaveText("open")
+    await gesture(page, [{ x: 250, y }], [{ x: 40, y: y + 5 }])
+    await expect(state(page)).toHaveText("closed")
+    await expect(panel(page)).toHaveCount(0)
+    await gesture(page, [{ x: 40, y }], [{ x: 300, y: y + 5 }])
+    await expect(state(page)).toHaveText("open")
+    await page.waitForTimeout(500)
+    await gesture(page, [{ x: 380, y }], [{ x: 150, y: y + 5 }])
+    await expect(state(page)).toHaveText("closed")
+  })
+})
+
 test.describe("touch gestures on the page", () => {
   test.skip(({ browserName }) => browserName !== "chromium", "touches are sent through Chromium's DevTools protocol")
 

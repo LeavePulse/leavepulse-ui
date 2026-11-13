@@ -18,8 +18,17 @@ import {
 } from "../../../src"
 import videoBackdropSample from "../../assets/video-backdrop-sample.webm"
 import { type ComponentEntry } from "./shared"
+import GestureDemo from "../GestureDemo.vue"
 
 export const motion: ComponentEntry[] = [
+  {
+    id: "gestures",
+    name: "Gestures",
+    description:
+      "One gesture engine behind every drag, swipe, pinch and long press in the kit: `useGesture(el, options)` binds it to an element, `createGesture(options)` returns handlers to bind yourself.\n\n- Drag: a press becomes a drag past the slop (8 px for a finger, 4 for a mouse); until then nothing is captured or prevented, so a click on what is under it still lands, and a drag swallows the click it ends with.\n- Axis: `axis: \"x\"` lets a press that starts vertical go, so the page scrolls; `\"lock\"` commits to the first axis taken.\n- Release: `onDragEnd` gets velocity (px/ms over the last 100 ms) and the swipe it made; `cancelled` is set when the browser or a second finger took the pointer, or on Escape.\n- Pinch: two fingers report scale and origin; `longPress` fires after a still hold and swallows the click after it.\n- Helpers: `shouldDismiss` (swipe to dismiss, the card above), `pageAfterSwipe` and `rubberClamp` (swipe between items, the slides), `glide` (momentum), `createDragSession` (the same decision fed from touch events, as the drawer's edge pull does).\n- Used by LpDrawer's edge pull and swipe to close, LpLightbox, LpMapPicker, LpVideoTrim, LpScrollStrip and the touch hold of LpTooltip and LpHoverCard.",
+    components: { GestureDemo },
+    template: `<GestureDemo />`,
+  },
   {
     id: "swap",
     name: "Swap",

@@ -1,3 +1,4 @@
+import { HOLD_TO_DRAG_MS, TOUCH_SLOP } from "./gesture"
 import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
 import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
 import { scrollParent } from "./scroll"
@@ -13,7 +14,7 @@ import { nodeWindow } from "./useView"
  *
  * Items are found in the DOM by `data-paint-key`, in document order, so the
  * run follows what the user sees (sorted, filtered, collapsed groups skipped).
- * A mouse or pen paints at once. A finger holds still for HOLD_MS first, so a
+ * A mouse or pen paints at once. A finger holds still for HOLD_TO_DRAG_MS first, so a
  * swipe through the list still scrolls it.
  *
  * The press itself ticks the first item, so the click the browser sends after
@@ -40,8 +41,6 @@ export interface UsePaintSelectOptions<K> {
   help?: MaybeRefOrGetter<HotkeyHelp | undefined>
 }
 
-const HOLD_MS = 320
-const SLOP_PX = 8
 const EDGE_PX = 40
 const SCROLL_STEP = 14
 
@@ -154,13 +153,13 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
         pending = null
         begin(key, x, y)
         navigator.vibrate?.(8)
-      }, behaviour.hold ?? HOLD_MS),
+      }, behaviour.hold ?? HOLD_TO_DRAG_MS),
     }
   }
 
   function onMove(event: PointerEvent) {
     if (pending && event.pointerId === pending.pointerId) {
-      if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) > SLOP_PX) cancelPending()
+      if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) > TOUCH_SLOP) cancelPending()
       return
     }
     if (!stroke) return

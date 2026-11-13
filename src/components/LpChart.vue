@@ -24,6 +24,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { easeTravel } from "../composables/easing"
 import { usePrefersReducedMotion } from "../composables/useReducedMotion"
 import { startPointerDrag } from "../composables/pointerDrag"
+import { MOUSE_SLOP } from "../composables/gesture"
 import { nodeWindow } from "../composables/useView"
 import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
@@ -976,7 +977,6 @@ const crosshair = computed(() => (active.value >= 0 ? active.value : peerSlot.va
 watch(active, (slot) => publish(slot >= 0 ? (labels.value[slot] ?? null) : null))
 
 /* Past this many px a press on the plot is a selection, not a click. */
-const SELECT_SLOP = 4
 let swallowClick = false
 const selection = ref<{ from: number; to: number } | null>(null)
 
@@ -988,7 +988,7 @@ const onPointerDown = (e: PointerEvent) => {
   startPointerDrag(e, {
     move(ev) {
       const x = offset(ev)
-      if (Math.abs(x - pressedAt) > SELECT_SLOP) selection.value = { from: pressedAt, to: x }
+      if (Math.abs(x - pressedAt) > MOUSE_SLOP) selection.value = { from: pressedAt, to: x }
     },
     end(completed) {
       const picked = selection.value

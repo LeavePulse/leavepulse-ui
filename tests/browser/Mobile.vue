@@ -25,6 +25,7 @@ const tipClicks = ref(0)
 const long = "3f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c"
 const wordy = ref(false)
 const wordyDrawer = ref(false)
+const edgeDrawer = ref(false)
 const ticked = ref(false)
 const on = ref(false)
 const choice = ref("a")
@@ -90,6 +91,8 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       </LpModal>
       <LpButton @click="drawer = true">Open drawer</LpButton>
       <LpDrawer v-model:open="drawer" title="Side drawer" size="lg"><p v-for="n in 40" :key="n">Row {{ n }}</p></LpDrawer>
+      <LpDrawer v-model:open="edgeDrawer" side="left" edge-open title="Edge drawer"><p v-for="n in 30" :key="n">Link {{ n }}</p></LpDrawer>
+      <p data-testid="edge-state">{{ edgeDrawer ? "open" : "closed" }}</p>
       <LpButton @click="bottom = true">Open sheet</LpButton>
       <LpDrawer v-model:open="bottom" direction="bottom" title="Bottom sheet"><LpInput label="Sheet field" /></LpDrawer>
       <LpPopover aria-label="Wide popover" panel-class="w-96">

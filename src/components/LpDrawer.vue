@@ -20,7 +20,8 @@ export type DrawerLabels = {
  * primitive — same base as the rest of the kit, so accessibility and the token
  * theming carry over). Over the old reka-Dialog version this adds drag-to-
  * dismiss with inertia, snap points, a draggable handle and an optional
- * scale-background effect. Slot/prop surface stays backwards compatible: `side`
+ * scale-background effect. Side drawers swipe on the kit's gesture engine
+ * instead (see the edge pull below); vaul drags sheets. Slot/prop surface stays backwards compatible: `side`
  * still works (mapped onto `direction`), plus `size`/`width`/title/footer.
  *
  * scale-background note: the effect scales the page behind the drawer, so the
@@ -50,6 +51,8 @@ import LpIcon from "./LpIcon.vue"
 import LpScrollArea from "./LpScrollArea.vue"
 import { anyModalOpen, useModalLayer } from "./modalDepth"
 import { startPointerDrag } from "../composables/pointerDrag"
+import { createDragSession, rubberBand, shouldDismiss, TOUCH_SLOP, type DragSession } from "../composables/gesture"
+import { createGesture, type GestureEnd, type GestureState } from "../composables/useGesture"
 import { isElement, nodeWindow, useOutsideGuard, usePortalTarget, useView, viewDocument, viewWindow } from "../composables/useView"
 
 type Direction = "top" | "bottom" | "left" | "right"
@@ -104,7 +107,11 @@ const props = withDefaults(
      * does), so a wide touch screen with the rail visible doesn't pull it too.
      */
     edgeBreakpoint?: "sm" | "md" | "lg" | "xl"
-    /** Distance (px) from the edge within which a touch can start a pull. */
+    /**
+     * Distance (px) from the edge within which a touch can start a pull. Wide
+     * enough to start a thumb's width in, clear of the system's back gesture
+     * along the very edge.
+     */
     edgeSize?: number
     /** Fraction (0–1) of the panel width the pull must reach to open on release. */
     edgeOpenThreshold?: number
@@ -155,7 +162,7 @@ const props = withDefaults(
     size: "sm",
     dismissible: true,
     noDragControls: true,
-    edgeSize: 44,
+    edgeSize: 72,
     edgeOpenThreshold: 0.3,
     minSize: "22rem",
     maxSize: "96vw",
@@ -345,22 +352,29 @@ const vNoDragControls = {
   updated: tagNoDrag,
 }
 
-// ── Edge-drag-to-open (Discord-style) ──────────────────────────────────────
-// vaul only drags an *already-open* drawer, so the pull-from-edge gesture is
-// ours. It is detected on the document rather than on an overlay strip: a strip
-// covering the screen edge swallowed every tap there, and the app burger lives
-// exactly in that corner. A touch near the edge is only a candidate; it becomes
-// a pull once the finger travels inward past EDGE_SLOP and mostly sideways, so a
-// tap still reaches the control under it and a vertical scroll stays a scroll.
-// While pulling, a preview of the real panel content follows the finger; on
-// release we open if the pull passed the threshold or was a quick flick, then
-// hand off to the real drawer without a second slide.
-const EDGE_SLOP = 10
-const FLICK_SPEED = 0.45
+// ── Side drawers: pulled open from the edge, swiped shut ───────────────────
+// One gesture model for both ways, on the kit's drag session (gesture.ts): a
+// press becomes a pull once it travels past the slop and mostly sideways, a
+// vertical start is a scroll and is let go, the panel's edge follows the
+// finger 1:1, and a release completes when it is past `edgeOpenThreshold` /
+// `closeThreshold` of the panel or was a flick (shouldDismiss), otherwise it
+// springs back. A cancelled touch (the system took it) never completes.
+//
+// Opening is watched on the document with touch events rather than on an
+// overlay strip: a strip over the screen edge swallowed every tap there, and
+// only a non-passive touchmove can stop the page scrolling mid-gesture. The
+// zone reaches `edgeSize` in from the edge, so a pull can start a thumb's
+// width in, clear of the system's own back gesture at the very edge. While
+// pulling, a preview of the real panel content follows the finger, then hands
+// off to the real drawer without a second slide.
+//
+// Closing is useGesture on the panel and the scrim (touch and pen; a mouse
+// closes with the scrim, Escape or the button). vaul's own drag is off for
+// side drawers, so there is one behaviour, not two.
 const BREAKPOINT_PX = { sm: 640, md: 768, lg: 1024, xl: 1280 } as const
 // Controls whose own drag must win over the pull, plus explicit opt-outs.
 const EDGE_IGNORE =
-  "input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-vaul-no-drag], [data-lp-no-edge-pull]"
+  "input, textarea, select, [contenteditable=''], [contenteditable='true'], div[data-vaul-no-drag], [data-lp-no-edge-pull]"
 
 // 0 (closed) … 1 (fully pulled in). Drives the preview transform + scrim.
 const peek = ref(0)
@@ -377,7 +391,10 @@ const skipOpenSlide = ref(false)
 watch(
   () => props.open,
   (open) => {
-    if (open) return
+    if (open) {
+      shut.value = 0
+      return
+    }
     skipOpenSlide.value = false
     // Closing mid-resize removes the grip, which takes its capture events along.
     endResize?.()
@@ -403,22 +420,22 @@ function edgeEnabled(): boolean {
   return bp === null || edgeWindow().innerWidth < bp
 }
 
-let track: { id: number; x: number; y: number; t: number; lastX: number; lastT: number; speed: number } | null = null
+let track: { id: number; session: DragSession } | null = null
 const owner = Symbol("edge-pull")
 
 // A horizontally scrollable ancestor that can still move the way the finger
-// pulls (a carousel, a wide table) keeps the gesture: the pull only claims
-// what nothing under the finger wants.
-function scrollsWithPull(target: EventTarget | null): boolean {
+// goes (a carousel, a wide table) keeps the gesture: the pull only claims
+// what nothing under the finger wants. `towardOpen` is the opening direction.
+function scrollsWithPull(target: EventTarget | null, towardOpen: boolean): boolean {
   let el = isElement(target) ? target : null
-  const pullsRight = dir.value === "left"
+  const right = (dir.value === "left") === towardOpen
   const body = el?.ownerDocument.body
   while (el && el !== body) {
     if (el.closest(EDGE_IGNORE) === el) return true
     if (el.scrollWidth > el.clientWidth) {
       const overflow = nodeWindow(el).getComputedStyle(el).overflowX
       if (overflow === "auto" || overflow === "scroll") {
-        if (pullsRight ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth) return true
+        if (right ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth) return true
       }
     }
     el = el.parentElement
@@ -426,31 +443,32 @@ function scrollsWithPull(target: EventTarget | null): boolean {
   return false
 }
 
+/** Px from the drawer's edge of the screen, inward. */
 function inward(x: number): number {
   return dir.value === "right" ? edgeWindow().innerWidth - x : x
 }
+/** A movement or velocity along x, positive toward opening. */
+const opening = (x: number) => (dir.value === "right" ? -x : x)
 
 function onTouchStart(e: TouchEvent) {
   if (track) dropTrack()
   if (e.touches.length !== 1 || !edgeEnabled() || anyModalOpen() || edgeOwner.value) return
-  const t = e.touches[0]
-  if (inward(t.clientX) > props.edgeSize || scrollsWithPull(e.target)) return
-  track = { id: t.identifier, x: t.clientX, y: t.clientY, t: e.timeStamp, lastX: t.clientX, lastT: e.timeStamp, speed: 0 }
+  const t = e.touches[0]!
+  if (inward(t.clientX) > props.edgeSize || scrollsWithPull(e.target, true)) return
+  track = { id: t.identifier, session: createDragSession({ x: t.clientX, y: t.clientY }, e.timeStamp, { slop: TOUCH_SLOP, axis: "x" }) }
 }
 
 function onTouchMove(e: TouchEvent) {
   if (!track) return
   const t = Array.from(e.changedTouches).find((x) => x.identifier === track!.id)
   if (!t) return
-  const sign = dir.value === "right" ? -1 : 1
-  const dx = (t.clientX - track.x) * sign
-  const dy = t.clientY - track.y
-  if (!peeking.value) {
-    if (Math.abs(dy) > EDGE_SLOP && Math.abs(dy) > Math.abs(dx)) {
-      track = null
-      return
-    }
-    if (dx < EDGE_SLOP || Math.abs(dx) < Math.abs(dy)) return
+  const frame = track.session.move({ x: t.clientX, y: t.clientY }, e.timeStamp)
+  if (frame.phase === "rejected" || (frame.first && opening(frame.movement.x) <= 0)) {
+    dropTrack()
+    return
+  }
+  if (frame.phase !== "drag") return
+  if (frame.first) {
     if (edgeOwner.value && edgeOwner.value !== owner) {
       track = null
       return
@@ -459,10 +477,6 @@ function onTouchMove(e: TouchEvent) {
     peeking.value = true
   }
   if (e.cancelable) e.preventDefault()
-  const dt = e.timeStamp - track.lastT
-  if (dt > 0) track.speed = (((t.clientX - track.lastX) * sign) / dt) * 0.6 + track.speed * 0.4
-  track.lastX = t.clientX
-  track.lastT = e.timeStamp
   peek.value = clamp(inward(t.clientX) / panelPx(), 0, 1)
 }
 
@@ -480,12 +494,15 @@ function cancelPull() {
   peek.value = 0
 }
 
-function settle() {
-  const flick = track !== null && track.speed > FLICK_SPEED && peek.value > 0.05
+function settle(e: TouchEvent) {
+  const t = track && Array.from(e.changedTouches).find((x) => x.identifier === track!.id)
+  const end = track && t ? track.session.end({ x: t.clientX, y: t.clientY }, e.timeStamp) : null
   dropTrack()
   if (!peeking.value) return
   peeking.value = false
-  if (peek.value >= props.edgeOpenThreshold || flick) {
+  const size = panelPx()
+  const opens = !!end && shouldDismiss({ offset: peek.value * size, velocity: opening(end.velocity.x), size, ratio: props.edgeOpenThreshold })
+  if (opens) {
     peek.value = 1
     handingOff.value = true
     skipOpenSlide.value = true
@@ -505,6 +522,52 @@ function settle() {
   }
 }
 
+// How far the open panel has been swiped toward closing, in px (negative is a
+// pull the other way, which only gives a little). Drives the panel and scrim.
+const shut = ref(0)
+const shutting = ref(false)
+const closeSwipe = {
+  pointerTypes: ["touch", "pen"] as const,
+  axis: "x" as const,
+  ignore: EDGE_IGNORE,
+  enabled: () => !!props.open && isHorizontal.value && props.dismissible && !guarded.value && !handingOff.value,
+  onPress: (e: PointerEvent) => !scrollsWithPull(e.target, false),
+  onDragStart: () => (shutting.value = true),
+  onDrag: ({ movement }: GestureState) => {
+    const toward = -opening(movement.x)
+    shut.value = toward >= 0 ? toward : rubberBand(toward, panelPx(), 0.2)
+  },
+  onDragEnd: ({ velocity, cancelled }: GestureEnd) => {
+    shutting.value = false
+    const size = panelPx()
+    if (!cancelled && shouldDismiss({ offset: shut.value, velocity: -opening(velocity.x), size, ratio: props.closeThreshold ?? 0.25 })) {
+      emit("update:open", false)
+      return
+    }
+    shut.value = 0
+  },
+}
+// Bound as attributes: they fall through to the panel and scrim elements,
+// which reka renders through a presence wrapper with no element of its own.
+const panelSwipe = createGesture(closeSwipe)
+const scrimSwipe = createGesture(closeSwipe)
+onBeforeUnmount(() => {
+  panelSwipe.dispose()
+  scrimSwipe.dispose()
+})
+
+// The panel and scrim during a swipe: the panel's edge stays under the finger
+// and the scrim lightens with it. On release vaul's own transition springs it
+// back, and its close keyframes run from wherever the finger left it.
+const shutStyle = computed(() => {
+  if (!shut.value && !shutting.value) return undefined
+  const px = dir.value === "right" ? shut.value : -shut.value
+  return { transform: `translate3d(${px}px, 0, 0)`, transition: shutting.value ? "none" : undefined }
+})
+const scrimStyle = computed(() => {
+  if (!shut.value && !shutting.value) return undefined
+  return { opacity: clamp(1 - shut.value / Math.max(1, panelPx()), 0, 1), transition: shutting.value ? "none" : "opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1)" }
+})
 const timers: number[] = []
 onBeforeUnmount(() => {
   for (const id of timers) window.clearTimeout(id)
@@ -513,7 +576,7 @@ onBeforeUnmount(() => {
 
 function onTouchEnd(e: TouchEvent) {
   if (track && !Array.from(e.changedTouches).some((x) => x.identifier === track!.id)) return
-  settle()
+  settle(e)
 }
 
 if (typeof document !== "undefined") {
@@ -522,16 +585,18 @@ if (typeof document !== "undefined") {
     (on, _, onCleanup) => {
       if (!on) return
       const doc = viewDocument(view.value)
-      const passive = { passive: true }
+      // Capture phase, so a control that stops its own touches still lets the
+      // pull see where the finger went.
+      const passive = { passive: true, capture: true }
       doc.addEventListener("touchstart", onTouchStart, passive)
-      doc.addEventListener("touchmove", onTouchMove, { passive: false })
+      doc.addEventListener("touchmove", onTouchMove, { passive: false, capture: true })
       doc.addEventListener("touchend", onTouchEnd, passive)
       doc.addEventListener("touchcancel", cancelPull, passive)
       onCleanup(() => {
-        doc.removeEventListener("touchstart", onTouchStart)
-        doc.removeEventListener("touchmove", onTouchMove)
-        doc.removeEventListener("touchend", onTouchEnd)
-        doc.removeEventListener("touchcancel", cancelPull)
+        doc.removeEventListener("touchstart", onTouchStart, true)
+        doc.removeEventListener("touchmove", onTouchMove, true)
+        doc.removeEventListener("touchend", onTouchEnd, true)
+        doc.removeEventListener("touchcancel", cancelPull, true)
         cancelPull()
       })
     },
@@ -592,25 +657,26 @@ const guardOutside = useOutsideGuard()
     :direction="dir"
     :dismissible="dismissible && !guarded"
     :snap-points="snapPoints"
-    :handle-only="handleOnly"
+    :handle-only="handleOnly || isHorizontal"
     :should-scale-background="scaleBackground"
     :close-threshold="closeThreshold"
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <DrawerPortal :to="portalTo">
       <DrawerOverlay
-        :style="{ zIndex: layer.scrim }"
+        v-bind="scrimSwipe.handlers"
+        :style="[{ zIndex: layer.scrim }, scrimStyle]"
         @click="guarded && requestClose()"
-        class="lp-scrim fixed inset-0 z-(--z-overlay) data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
+        class="lp-scrim fixed inset-0 z-(--z-overlay) touch-none data-[state=open]:animate-[fade-in_150ms_ease] data-[state=closed]:animate-[fade-out_130ms_ease]"
         :class="{ 'lp-scrim--light': frosted, 'lp-scrim--nested': layer.nested, 'lp-scrim--covered': layer.covered }"
       />
       <DrawerContent
         @interact-outside="guardOutside"
         @escape-key-down="guardOutside"
         ref="contentRef"
-        v-bind="description ? {} : { 'aria-describedby': undefined }"
+        v-bind="{ ...(description ? {} : { 'aria-describedby': undefined }), ...panelSwipe.handlers }"
         :class="contentClass"
-        :style="[sizeStyle, { zIndex: layer.panel }]"
+        :style="[sizeStyle, { zIndex: layer.panel }, shutStyle]"
         :data-vaul-animate="handingOff || skipOpenSlide ? 'false' : undefined"
         @keydown.escape="guardEscape"
       >
@@ -676,6 +742,7 @@ const guardOutside = useOutsideGuard()
         <div
           v-no-drag-controls="noDragControls"
           class="flex min-h-0 min-w-0 flex-1 flex-col [-webkit-user-select:text]! [user-select:text]!"
+          :class="isHorizontal ? '[&_[data-reka-scroll-area-viewport]]:touch-pan-y' : undefined"
           :data-vaul-no-drag="noDragContent ? '' : undefined"
         >
           <!-- min-w-0 on the body + scroll content so a wide child (e.g. a log
