@@ -56,7 +56,7 @@ const props = withDefaults(
     previewDelay?: number
     labels: { pinned: string; pin: string; unpin: string; expand: string }
   }>(),
-  { skeletonRows: 6, skeletonHeader: true, collapsedKeys: () => [], hoverFollow: false, pinned: () => [], previewDelay: 900 },
+  { skeletonRows: 6, skeletonHeader: false, collapsedKeys: () => [], hoverFollow: false, pinned: () => [], previewDelay: 900 },
 )
 
 const emit = defineEmits<{
@@ -212,6 +212,8 @@ function activate(item: SidebarItem) {
 }
 
 // The nav fills the remaining height with a fixed gap between groups; a short sidebar needs both under the consumer's control.
+const SKELETON_WIDTHS = ["55%", "70%", "45%", "62%", "50%", "68%"]
+
 const { class: rootClass, attrs: rest } = useMergedAttrs(
   "flex min-h-0 flex-1 flex-col gap-4",
 )
@@ -222,7 +224,7 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
        LpSkeleton wrapper so it pulses in phase with every other placeholder
        on the page and stops under reduced motion. -->
   <LpSkeleton v-if="loading"
-    :class="rootClass"
+    :class="[rootClass, 'overflow-hidden']"
     v-bind="rest">
     <div v-if="skeletonHeader" class="flex items-center gap-3 px-1">
       <div class="lp-skeleton-item size-10 shrink-0 rounded-pill bg-surface-soft" />
@@ -231,12 +233,20 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <div class="lp-skeleton-item h-3 w-16 rounded-small bg-surface-soft/60" />
       </div>
     </div>
-    <div class="space-y-1">
-      <div
-        v-for="n in skeletonRows"
-        :key="n"
-        class="lp-skeleton-item h-9 rounded-control bg-surface-soft"
-      />
+    <!-- Rows in the shape of the items they stand in for: an icon and a label
+         of uneven width at the item's own height and padding, with a section
+         label after the first three. A run of full-width bars read as a list
+         of buttons, not as navigation. -->
+    <div class="flex flex-col gap-1">
+      <template v-for="n in skeletonRows" :key="n">
+        <div v-if="n === 4" class="px-3 pb-1 pt-3">
+          <div class="lp-skeleton-item h-2.5 w-20 rounded-small bg-surface-soft/60" />
+        </div>
+        <div class="flex h-9 items-center gap-3 px-3">
+          <div class="lp-skeleton-item size-4 shrink-0 rounded-small bg-surface-soft" />
+          <div class="lp-skeleton-item h-3 rounded-small bg-surface-soft" :style="{ width: SKELETON_WIDTHS[(n - 1) % SKELETON_WIDTHS.length] }" />
+        </div>
+      </template>
     </div>
   </LpSkeleton>
 

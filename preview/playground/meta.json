@@ -9315,7 +9315,7 @@
     "name": "skeletonHeader",
     "type": "boolean | undefined",
     "required": false,
-    "default": "true",
+    "default": "false",
     "description": "Render the user/header skeleton row too (paired with a #header avatar)."
    },
    {
@@ -9548,7 +9548,7 @@
     "name": "skeletonHeader",
     "type": "boolean | undefined",
     "required": false,
-    "default": "true"
+    "default": "false"
    },
    {
     "name": "collapsedKeys",

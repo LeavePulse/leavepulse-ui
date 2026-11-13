@@ -185,7 +185,7 @@ export const navigation: ComponentEntry[] = [
           },
         ],
       }),
-    template: `<div class="flex flex-col gap-3">
+    template: `<div class="flex w-full flex-col gap-3">
   <div class="flex items-center gap-4">
     <label class="flex items-center gap-2 text-xs text-muted">
       <LpSwitch v-model="loading" /> Loading
@@ -194,7 +194,8 @@ export const navigation: ComponentEntry[] = [
       <LpIcon name="lucide:menu" :size="16" /> Open drawer (mobile)
     </LpButton>
   </div>
-  <div class="h-[28rem] w-64 overflow-hidden rounded-card border border-line">
+  <!-- An app frame: the rail along the left edge, the page it drives beside it. -->
+  <div class="flex h-[28rem] w-full overflow-hidden rounded-card border border-line bg-surface">
     <LpSidebar
       v-model="active"
       v-model:open="open"
@@ -231,14 +232,22 @@ export const navigation: ComponentEntry[] = [
         </LpButton>
       </template>
     </LpSidebar>
+    <div class="flex min-w-0 flex-1 flex-col gap-4 p-6">
+      <p class="text-lg font-semibold capitalize text-ink">{{ active }}</p>
+      <div class="grid grid-cols-3 gap-3">
+        <div v-for="n in 3" :key="n" class="h-20 rounded-card border border-line bg-surface-soft" />
+      </div>
+      <div class="flex-1 rounded-card border border-line bg-surface-soft" />
+    </div>
   </div>
 
   <!-- variant="panel": the same nav inside a page, boxed on all four sides and
        rounded, sitting next to the content it drives. -->
-  <div class="flex h-64 gap-4">
+  <div class="flex w-full flex-col gap-4 sm:flex-row">
     <LpSidebar v-model="section" variant="panel" width="14rem" :sections="pageSections" hover-follow class="shrink-0" />
-    <div class="flex-1 rounded-card border border-line bg-surface-soft p-4 text-sm text-muted">
-      Settings for <span class="text-ink">{{ section }}</span>
+    <div class="flex min-h-48 flex-1 flex-col gap-3 rounded-card border border-line bg-surface-soft p-5">
+      <p class="text-base font-semibold capitalize text-ink">{{ section }}</p>
+      <p class="text-sm text-muted">Settings for this section sit here, next to the nav that picks them.</p>
     </div>
   </div>
 </div>`,

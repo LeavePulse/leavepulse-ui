@@ -185,7 +185,7 @@ const props = withDefaults(
   }>(),
   {
     skeletonRows: 6,
-    skeletonHeader: true,
+    skeletonHeader: false,
     responsive: false,
     mobileBreakpoint: "md",
     divider: true,
