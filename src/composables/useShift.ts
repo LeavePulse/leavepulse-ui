@@ -63,6 +63,33 @@ export interface UseShift {
   retune: () => void
 }
 
+interface FirstRead {
+  read: () => void
+  write: () => void
+}
+const firstReads = new Map<Window, Set<FirstRead>>()
+
+/*
+ * Runs in the next frame, every read of every box mounted meanwhile before any
+ * write: one layout for all of them, however many there are.
+ */
+function firstRead(win: Window, pass: FirstRead): () => void {
+  let queue = firstReads.get(win)
+  if (!queue) {
+    const batch = new Set<FirstRead>()
+    queue = batch
+    firstReads.set(win, batch)
+    win.requestAnimationFrame(() => {
+      firstReads.delete(win)
+      for (const p of batch) p.read()
+      for (const p of batch) p.write()
+    })
+  }
+  queue.add(pass)
+  const batch = queue
+  return () => batch.delete(pass)
+}
+
 /** Kept in step with the `duration-fast` token the transition utilities use. */
 const TWEEN_MS = 160
 
@@ -83,7 +110,7 @@ export function useShift(
 
   let ro: ResizeObserver | undefined
   let mo: MutationObserver | undefined
-  let raf = 0
+  let cancelFirstRead: (() => void) | undefined
   let settleTimer: ReturnType<typeof setTimeout> | undefined
   /** Where the box last settled, so a retune has a size to ease FROM. */
   let lastHeight = 0
@@ -259,7 +286,8 @@ export function useShift(
     mo?.disconnect()
     ro = undefined
     mo = undefined
-    cancelAnimationFrame(raf)
+    cancelFirstRead?.()
+    cancelFirstRead = undefined
     clearTimeout(settleTimer)
     tweening.value = false
     resizing.value = false
@@ -277,21 +305,23 @@ export function useShift(
       teardown()
       if (!enabled || !node) return
 
-      lastHeight = node.offsetHeight
-      lastWidth = node.offsetWidth
-      laidOut = node.getClientRects().length > 0
       scrollHost = node
       node.addEventListener("scroll", rememberScroll, { capture: true, passive: true })
-      if (wantsHeight()) node.style.height = `${lastHeight}px`
-      if (wantsWidth()) node.style.width = `${lastWidth}px`
-      // A box must not animate in from its pre-content size, so the transition
-      // only arms once that first pin has painted. The pin is dropped in the
-      // same frame: it exists to give the first `retune` something to start
-      // from, and holding it would cap the box at its opening size.
-      raf = requestAnimationFrame(() => {
-        tweening.value = true
-        if (wantsHeight()) node.style.height = ""
-        if (wantsWidth()) node.style.width = ""
+      // The size a first `retune` eases from, read in the next frame together
+      // with every other box mounted in this render, and the transition armed
+      // then: a box must not animate in from its pre-content size. Read here,
+      // at mount, each box forced a layout of its own: fifty badges arriving
+      // in a table's rows laid the page out fifty times inside one click.
+      // Until the read, a retune finds no size to ease from and lets the box
+      // take its own, which is what a box that has just appeared should do.
+      cancelFirstRead = firstRead(nodeWindow(node), {
+        read: () => {
+          if (inFlight) return
+          lastHeight = node.offsetHeight
+          lastWidth = node.offsetWidth
+          laidOut = node.getClientRects().length > 0
+        },
+        write: () => (tweening.value = true),
       })
 
       // Two triggers, since either can move the size alone: the resize observer
