@@ -39,6 +39,7 @@ import {
   orderPinned,
   pinOffsets,
   presetHidden,
+  rowChanges,
   rowWindow,
   sortByKeys,
   type ColumnPin,
@@ -48,6 +49,7 @@ import {
 import { devWarn } from "../composables/devWarn"
 import { startPointerDrag } from "../composables/pointerDrag"
 import { isHTMLElement, nodeWindow } from "../composables/useView"
+import { prefersReducedMotion } from "../composables/easing"
 import LpButton from "./LpButton.vue"
 import { downloadFile, fileStem, toCsv, type CsvOptions } from "./exportData"
 import {
@@ -1708,6 +1710,47 @@ const roving = useRovingFocus(rovingItems, {
   },
 })
 
+/*
+ * A change that brings in, takes out or reorders many rows at once — a filter
+ * lifted from ten rows back to sixty, a page of new rows, a sort of a long
+ * list — is not animated row by row. Each row eased on its own reads as noise
+ * at that size, and following them is costly: TransitionGroup measures every
+ * row before and after (a forced layout of all the new rows inside the click),
+ * then sets an enter or move transition on each. The rows land at once and the
+ * body eases in as one instead, a single opacity animation on the compositor.
+ * A few rows leaving, arriving or moving (a filter that hides some, a row
+ * deleted) keep their own motion, which is what lets the eye follow them.
+ *
+ * Counted by rowChanges: the rows that arrive, leave or change their order;
+ * the ones that only slide aside to close a gap do not count.
+ */
+const ROW_MOTION_LIMIT = 12
+const rowsEl = shallowRef<HTMLElement | null>(null)
+function setRowsEl(el: unknown) {
+  const node = (el as { $el?: HTMLElement } | null)?.$el ?? null
+  rowsEl.value = node
+  roving.setContainer(node)
+}
+const motionIds = computed(() => (headerless.value ? allEntries.value : viewEntries.value).map((entry) => entry.id))
+/* The rows on screen, written after each render: what the next change is measured against. */
+let shownIds: readonly string[] = []
+const bigSwap = computed(() => rowChanges(shownIds, motionIds.value) > ROW_MOTION_LIMIT)
+let settleFlip = false
+watch(
+  motionIds,
+  (ids) => {
+    const eased = bigSwap.value && shownIds.length > 0 && ids.length > 0
+    shownIds = ids
+    const body = rowsEl.value
+    if (!eased || !body || props.virtualRowHeight || prefersReducedMotion(nodeWindow(body))) return
+    // Two names for one animation: switching between them restarts it without
+    // the reflow that taking a class off and putting it back would need.
+    settleFlip = !settleFlip
+    body.dataset.lpSettle = settleFlip ? "a" : "b"
+  },
+  { flush: "post", immediate: true },
+)
+
 function onRowKeydown(event: KeyboardEvent) {
   // Space ticks rather than activates when the table is selectable — the
   // standard split for a multi-select list.
@@ -2088,10 +2131,11 @@ usePaletteCommands(() => {
       <TransitionGroup
         tag="tbody"
         name="lp-row"
-        :css="animating && !virtualRowHeight"
+        :css="animating && !virtualRowHeight && !bigSwap"
+        :move-class="bigSwap ? 'lp-row-still' : undefined"
         :class="busy && displayRows.length ? 'opacity-60 transition-opacity' : 'transition-opacity'"
         :aria-busy="busy || undefined"
-        :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
+        :ref="setRowsEl"
       >
         <!-- The first page on its way: rows in the shape of the columns rather
              than a spinner in an empty box, so the table already has its height
@@ -2252,7 +2296,8 @@ usePaletteCommands(() => {
       :key="activeLayout"
       tag="div"
       name="lp-row"
-      :css="animating"
+      :css="animating && !bigSwap"
+      :move-class="bigSwap ? 'lp-row-still' : undefined"
       v-bind="scrollAttrs"
       class="min-h-0 transition-opacity"
       :class="[
@@ -2263,7 +2308,7 @@ usePaletteCommands(() => {
       ]"
       :style="activeLayout === 'cards' ? { gridTemplateColumns: `repeat(auto-fill, minmax(min(${cardWidth}, 100%), 1fr))` } : undefined"
       :aria-busy="busy || undefined"
-      :ref="(el: unknown) => roving.setContainer((el as { $el?: HTMLElement })?.$el ?? null)"
+      :ref="setRowsEl"
     >
       <template v-if="displayRows.length === 0 && busy">
         <div
@@ -2501,6 +2546,30 @@ usePaletteCommands(() => {
   transition: transform var(--duration-medium) var(--ease-emphasized);
 }
 
+/*
+ * A change too big to animate row by row (see ROW_MOTION_LIMIT): the rows
+ * land at once and the body comes up from half-faded as one. `lp-row-still`
+ * is the move class then, and has no transition on purpose: TransitionGroup
+ * checks the move class for one before it measures the rows, and skips the
+ * measuring when there is none.
+ */
+[data-lp-settle="a"] {
+  animation: lp-rows-settle-a var(--duration-fast) var(--ease-emphasized);
+}
+[data-lp-settle="b"] {
+  animation: lp-rows-settle-b var(--duration-fast) var(--ease-emphasized);
+}
+@keyframes lp-rows-settle-a {
+  from {
+    opacity: 0.4;
+  }
+}
+@keyframes lp-rows-settle-b {
+  from {
+    opacity: 0.4;
+  }
+}
+
 .lp-row-enter-from,
 .lp-row-leave-to {
   opacity: 0;
@@ -2623,6 +2692,9 @@ tr:hover .lp-tick-cue,
   .lp-row-move,
   .lp-tick {
     transition: none;
+  }
+  [data-lp-settle] {
+    animation: none;
   }
 }
 </style>

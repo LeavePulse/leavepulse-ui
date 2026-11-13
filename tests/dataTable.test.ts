@@ -8,6 +8,7 @@ import {
   orderPinned,
   pinOffsets,
   presetHidden,
+  rowChanges,
   rowWindow,
   sortByKeys,
 } from "../src/components/tableFeatures"
@@ -112,4 +113,20 @@ test("a preset hides the rest, but never what must stay or every column", () => 
   const columns = [{ key: "a" }, { key: "b" }, { key: "c", alwaysVisible: true }]
   expect([...presetHidden({ columns: ["a"] }, columns)]).toEqual(["b"])
   expect(presetHidden({ columns: ["gone"] }, [{ key: "a" }]).size).toBe(0)
+})
+
+test("a change counts the rows that arrive, leave or change their order, not the ones sliding aside", () => {
+  const ids = (n: number, from = 0) => Array.from({ length: n }, (_, i) => String(from + i))
+  // One row out of sixty: the rows below close the gap, which is not a change of their own.
+  expect(rowChanges(ids(60), ids(60).filter((id) => id !== "7"))).toBe(1)
+  // Ten rows growing back to sixty: fifty arrive, the ten keep their order.
+  const ten = ids(60).filter((id) => Number(id) % 6 === 0)
+  expect(rowChanges(ten, ids(60))).toBe(50)
+  expect(rowChanges(ids(60), ten)).toBe(50)
+  // A sort that reverses sixty rows picks up all but one of them.
+  expect(rowChanges(ids(60), ids(60).reverse())).toBe(59)
+  // One row moved to the top.
+  expect(rowChanges(["a", "b", "c", "d"], ["d", "a", "b", "c"])).toBe(1)
+  expect(rowChanges([], ids(3))).toBe(3)
+  expect(rowChanges(ids(3), ids(3))).toBe(0)
 })

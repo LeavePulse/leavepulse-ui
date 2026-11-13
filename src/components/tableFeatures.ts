@@ -157,3 +157,39 @@ export function presetHidden(
  * - `list`: one compact line per row with no header, for narrow places.
  */
 export type TableLayout = "table" | "cards" | "list"
+
+/*
+ * How many rows a change of the shown list moves on screen: the ones that
+ * arrive, the ones that leave, and the ones that change their order among the
+ * rows that stay. Rows that only slide up or down to close a gap or make room
+ * are not counted; they move with the others and say nothing new.
+ *
+ * The order changes are the survivors outside the longest run that kept its
+ * order (a longest increasing subsequence of their old positions), which is the
+ * fewest rows that had to be picked up and put elsewhere.
+ */
+export function rowChanges(before: readonly string[], after: readonly string[]): number {
+  const old = new Map<string, number>()
+  before.forEach((id, i) => old.set(id, i))
+  let entered = 0
+  const kept: number[] = []
+  for (const id of after) {
+    const at = old.get(id)
+    if (at === undefined) entered++
+    else kept.push(at)
+  }
+  const left = before.length - kept.length
+  // Patience sorting: tails[k] is the smallest end of an increasing run of k + 1.
+  const tails: number[] = []
+  for (const at of kept) {
+    let lo = 0
+    let hi = tails.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (tails[mid]! < at) lo = mid + 1
+      else hi = mid
+    }
+    tails[lo] = at
+  }
+  return entered + left + (kept.length - tails.length)
+}
