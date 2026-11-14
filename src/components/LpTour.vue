@@ -256,6 +256,11 @@ function glideTo(el: Element | null) {
   glide = window.setTimeout(() => (gliding.value = false), durationToken("duration-medium", undefined, doc()) + 40)
 }
 
+// What the shown step points at, kept to find it again: a list that re-renders
+// replaces the element, and a card anchored to the old one would hang over
+// nothing (or nowhere) with the page dimmed under it.
+let shownRaw: TourStep["target"] = undefined
+
 function measure() {
   viewport.value = { width: win().innerWidth, height: win().innerHeight }
   const el = target.value
@@ -263,7 +268,11 @@ function measure() {
     box.value = null
     return
   }
-  if (!el.isConnected) return
+  if (!el.isConnected) {
+    const again = resolve(shownRaw)
+    glideTo(again && again.getClientRects().length ? again : null)
+    return
+  }
   const r = el.getBoundingClientRect()
   const prev = box.value
   if (!prev || prev.x !== r.x || prev.y !== r.y || prev.width !== r.width || prev.height !== r.height) {
@@ -302,6 +311,7 @@ async function show(): Promise<void> {
   }
   const el = current.enter || sampled.value ? await waitFor(raw, mine) : resolve(raw)
   if (mine !== token) return
+  shownRaw = raw
   if (!el || !el.getClientRects().length) return skip()
   await settled(el)
   if (mine !== token) return

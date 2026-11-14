@@ -40,7 +40,12 @@ export function atScrollEnd(el: Element | null | undefined, slack = 2): boolean 
 }
 
 export interface ScrollToElementOptions {
-  /** `nearest` scrolls only when the element is out of view. */
+  /**
+   * `nearest` scrolls only when the element is out of view. An element taller
+   * than the scroller is brought in by its start whatever the block: centring
+   * or meeting its far edge would show its middle or end, and a list that
+   * loads more at its end would start loading.
+   */
   block?: "nearest" | "center" | "start"
   behavior?: ScrollBehavior
   /** Room kept between the element and the scroller's edge. */
@@ -76,8 +81,10 @@ export function scrollToElement(
   const lo = x ? inner.left - outer.left : inner.top - outer.top
   const hi = x ? inner.right - outer.right : inner.bottom - outer.bottom
   const at = lo + from
+  const fits = size + 2 * margin <= view
   let target = from
   if (block === "start") target = at - margin
+  else if (!fits) target = lo < margin || lo > view - margin || block === "center" ? at - margin : from
   else if (block === "center") target = at - (view - size) / 2
   else if (lo < margin) target = at - margin
   else if (hi > -margin) target = at - view + size + margin
