@@ -30,6 +30,13 @@ import { nodeWindow } from "./useView"
  * from, on a zone `canDrop` refuses or outside every zone is no drop: the copy
  * glides back. Escape cancels.
  *
+ * Order: a zone with `data-drop-sort` (`="x"` for a row) keeps its items in
+ * order. The kit works out the gap under the pointer, draws a line there, lets
+ * an item move within its own zone, and reports the drop with
+ * `{ before }`: the item it lands in front of, or `null` for the end.
+ * Zones nest: when the inner zone under the pointer refuses the item (a
+ * category over a list of channels), the zone around it is asked next.
+ *
  * A drop that the page shows by the next tick (move the item in local state,
  * then save) animates: the item flies in from where it was let go and the
  * items it pushed aside slide to their new places.
@@ -51,21 +58,35 @@ export interface UseDragDropOptions<I, Z> {
   zone?: (raw: string) => Z | undefined
   /** Whether this item may land in this zone; a refused zone is not highlighted. */
   canDrop?: (item: I, zone: Z) => boolean
-  /** The item landed in a zone other than the one it came from. */
-  onDrop: (item: I, zone: Z, from: Z | undefined) => void
+  /**
+   * The item landed. `before` is the item it lands in front of in a sorted zone
+   * (`data-drop-sort`), `null` for the end or for a zone without order.
+   */
+  onDrop: (item: I, zone: Z, from: Z | undefined, place: DropPlace<I>) => void
+}
+
+export interface DropPlace<I> {
+  before: I | null
 }
 
 const NO_DRAG = "button, a, input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-no-drag]"
 
+interface Spot {
+  zone: HTMLElement
+  before: HTMLElement | null
+}
+
 interface Drag<I, Z> {
   key: string
+  next: string | null
   item: I
   from: Z | undefined
   source: HTMLElement
   ghost: HTMLElement
   dx: number
   dy: number
-  over: HTMLElement | null
+  over: Spot | null
+  line: HTMLElement
 }
 
 export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<I, Z>) {
@@ -78,16 +99,68 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
   const dragging = ref<I | null>(null) as Ref<I | null>
   const over = ref<Z | null>(null) as Ref<Z | null>
 
-  function zoneOf(el: Element | null): HTMLElement | null {
+  function zoneOf(el: Element | null | undefined): HTMLElement | null {
     const zone = el?.closest<HTMLElement>("[data-drop-zone]") ?? null
     return zone && options.root.value?.contains(zone) ? zone : null
   }
 
-  function accepts(zoneEl: HTMLElement | null): Z | undefined {
-    if (!zoneEl || !drag) return undefined
-    const zone = toZone(zoneEl.dataset.dropZone ?? "")
-    if (zone === undefined || zone === drag.from) return undefined
+  // The items that belong to a zone itself, not to a zone nested in it.
+  function itemsOf(zone: HTMLElement): HTMLElement[] {
+    return [...zone.querySelectorAll<HTMLElement>("[data-drag-key]")].filter((el) => zoneOf(el.parentElement) === zone)
+  }
+
+  function spotIn(zone: HTMLElement, x: number, y: number): Spot {
+    if (!("dropSort" in zone.dataset) || !drag) return { zone, before: null }
+    const across = zone.dataset.dropSort === "x"
+    const before = itemsOf(zone).find((el) => {
+      if (el === drag?.source) return false
+      const box = el.getBoundingClientRect()
+      return across ? x < box.left + box.width / 2 : y < box.top + box.height / 2
+    })
+    return { zone, before: before ?? null }
+  }
+
+  function accepts(spot: Spot): Z | undefined {
+    if (!drag) return undefined
+    const zone = toZone(spot.zone.dataset.dropZone ?? "")
+    if (zone === undefined) return undefined
+    if (zone === drag.from) {
+      if (!("dropSort" in spot.zone.dataset)) return undefined
+      if ((spot.before?.dataset.dragKey ?? null) === drag.next) return undefined
+    }
     return !options.canDrop || options.canDrop(drag.item, zone) ? zone : undefined
+  }
+
+  // The innermost zone under the pointer that takes the item: a channel list
+  // refuses a category, and the category list around it takes it instead.
+  function spotAt(x: number, y: number): Spot | null {
+    if (!drag) return null
+    let zone = zoneOf(drag.source.ownerDocument.elementFromPoint(x, y))
+    while (zone) {
+      const spot = spotIn(zone, x, y)
+      if (accepts(spot) !== undefined) return spot
+      zone = zoneOf(zone.parentElement)
+    }
+    return null
+  }
+
+  // Where a sorted zone will put the item: a line in the gap, drawn by the kit.
+  function mark(spot: Spot | null) {
+    if (!drag) return
+    const line = drag.line
+    if (!spot || !("dropSort" in spot.zone.dataset)) {
+      line.style.opacity = "0"
+      return
+    }
+    const across = spot.zone.dataset.dropSort === "x"
+    const rest = itemsOf(spot.zone).filter((el) => el !== drag?.source)
+    const at = spot.before ?? rest.at(-1) ?? null
+    const box = at?.getBoundingClientRect() ?? spot.zone.getBoundingClientRect()
+    const end = !spot.before && !!at
+    Object.assign(line.style, across
+      ? { left: `${(end ? box.right : box.left) - 2}px`, top: `${box.top}px`, width: "2px", height: `${box.height}px` }
+      : { left: `${box.left}px`, top: `${(end ? box.bottom : box.top) - 2}px`, width: `${box.width}px`, height: "2px" })
+    line.style.opacity = "1"
   }
 
   function begin(el: HTMLElement, x: number, y: number): boolean {
@@ -112,10 +185,24 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
       transform: "translate3d(0, 0, 0) scale(1.02)",
       transition: "none",
     })
-    el.ownerDocument.body.append(ghost)
-    const fromZone = zoneOf(el)
+    const line = el.ownerDocument.createElement("div")
+    line.setAttribute("aria-hidden", "true")
+    Object.assign(line.style, {
+      position: "fixed",
+      pointerEvents: "none",
+      zIndex: "var(--z-tooltip)",
+      borderRadius: "999px",
+      background: "var(--color-brand)",
+      opacity: "0",
+      transition: "opacity 120ms ease-out",
+    })
+    el.ownerDocument.body.append(line, ghost)
+    const fromZone = zoneOf(el.parentElement)
+    const siblings = fromZone ? itemsOf(fromZone) : []
     drag = {
       key: el.dataset.dragKey ?? "",
+      next: siblings[siblings.indexOf(el) + 1]?.dataset.dragKey ?? null,
+      line,
       item,
       from: fromZone ? toZone(fromZone.dataset.dropZone ?? "") : undefined,
       source: el,
@@ -135,30 +222,31 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     drag.ghost.style.left = `${x - drag.dx}px`
     drag.ghost.style.top = `${y - drag.dy}px`
     drag.ghost.style.width = `${drag.source.getBoundingClientRect().width}px`
-    const zoneEl = zoneOf(drag.source.ownerDocument.elementFromPoint(x, y))
-    const zone = accepts(zoneEl)
-    const target = zone === undefined ? null : zoneEl
-    if (target !== drag.over) {
-      drag.over?.removeAttribute("data-drop-over")
-      target?.setAttribute("data-drop-over", "")
-      drag.over = target
-      over.value = zone ?? null
+    const spot = spotAt(x, y)
+    if (spot?.zone !== drag.over?.zone) {
+      drag.over?.zone.removeAttribute("data-drop-over")
+      spot?.zone.setAttribute("data-drop-over", "")
+      over.value = spot ? (toZone(spot.zone.dataset.dropZone ?? "") ?? null) : null
     }
+    drag.over = spot
+    mark(spot)
   }
 
   function finish(drop: boolean) {
     const done = drag
     if (!done) return
     drag = null
-    done.over?.removeAttribute("data-drop-over")
+    done.line.remove()
+    done.over?.zone.removeAttribute("data-drop-over")
     done.source.removeAttribute("data-drag-source")
     dragging.value = null
     over.value = null
-    const zone = drop && done.over ? toZone(done.over.dataset.dropZone ?? "") : undefined
-    if (zone === undefined) return settle(done)
+    const zone = drop && done.over ? toZone(done.over.zone.dataset.dropZone ?? "") : undefined
+    if (zone === undefined || !done.over) return settle(done)
+    const ahead = done.over.before?.dataset.dragKey
     const before = boxes()
     const landing = done.ghost.getBoundingClientRect()
-    options.onDrop(done.item, zone, done.from)
+    options.onDrop(done.item, zone, done.from, { before: ahead === undefined ? null : (toItem(ahead) ?? null) })
     void nextTick(() => {
       done.ghost.remove()
       glide(before, done.key, landing)
@@ -223,7 +311,7 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     const el = target?.closest<HTMLElement>("[data-drag-key]")
     if (!el || !options.root.value?.contains(el)) return
     const control = target?.closest(NO_DRAG)
-    if (control && el.contains(control)) return
+    if (control && control !== el && el.contains(control)) return
     press.start(event, (x, y) => begin(el, x, y), { slop: MOUSE_SLOP })
   }
 

@@ -460,7 +460,7 @@ export { useMergedClass, useMergedAttrs, mergeClass } from "./composables/useMer
 export { anchorPattern, stripDisallowed, useInputFilter } from "./composables/useInputFilter"
 export { usePaintSelect } from "./composables/usePaintSelect"
 export { useDragDrop } from "./composables/useDragDrop"
-export type { UseDragDropOptions } from "./composables/useDragDrop"
+export type { DropPlace, UseDragDropOptions } from "./composables/useDragDrop"
 export type { UsePaintSelectOptions } from "./composables/usePaintSelect"
 export { LP_FIELD, fieldMessageId, provideField, useField, useFieldControl } from "./composables/useField"
 export { FIELD_NOTICE_MS, useFieldNotice } from "./composables/useFieldNotice"
