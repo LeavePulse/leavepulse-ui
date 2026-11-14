@@ -14,10 +14,13 @@ const root = ref<HTMLElement | null>(null)
 const { dragging, over } = useDragDrop({
   root,
   canDrop: (_item, zone) => !props.limit || zone === "Bench" || (places.value[zone]?.length ?? 0) < props.limit,
-  onDrop: (item, zone, from) => {
+  onDrop: (item, zone, from, { before }) => {
     const next = { ...places.value }
     if (from) next[from] = next[from]!.filter((name) => name !== item)
-    next[zone] = [...(next[zone] ?? []), item]
+    const rest = (next[zone] ?? []).filter((name) => name !== item)
+    const at = before === null ? rest.length : rest.indexOf(before)
+    rest.splice(at < 0 ? rest.length : at, 0, item)
+    next[zone] = rest
     places.value = next
   },
 })
