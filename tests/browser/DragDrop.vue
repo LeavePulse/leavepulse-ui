@@ -6,6 +6,13 @@ const root = ref<HTMLElement | null>(null)
 const places = ref<Record<string, string[]>>({ a: ["u1", "u2"], b: ["u3"], pool: [], locked: [] })
 const log = ref<string[]>([])
 const clicks = ref(0)
+const objectRoot = ref<HTMLElement | null>(null)
+const objectLog = ref<string[]>([])
+useDragDrop<string, { name: string }>({
+  root: objectRoot,
+  zone: (raw) => ({ name: raw }),
+  onDrop: (item, zone) => (objectLog.value = [...objectLog.value, `${item}>${zone.name}`]),
+})
 const lateRoot = ref<HTMLElement | null>(null)
 const ready = ref(false)
 const late = ref<Record<string, string[]>>({ x: ["l1"], y: [] })
@@ -53,6 +60,11 @@ const dnd = useDragDrop({
       <section v-for="(items, zone) in late" :key="zone" :data-drop-zone="zone" :data-testid="`late-${zone}`" class="min-h-24 rounded border p-2">
         <div v-for="u in items" :key="u" :data-drag-key="u" class="rounded border px-2 py-1">{{ u }}</div>
       </section>
+    </div>
+    <div ref="objectRoot" class="grid grid-cols-2 gap-4 p-6">
+      <section data-drop-zone="o1" data-testid="obj-o1" class="min-h-24 rounded border p-2"><div data-drag-key="ob1" class="rounded border px-2 py-1">ob1</div></section>
+      <section data-drop-zone="o2" data-testid="obj-o2" class="min-h-24 rounded border p-2" />
+      <p data-testid="obj-log">{{ objectLog.join(",") || "none" }}</p>
     </div>
   </div>
 </template>

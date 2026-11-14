@@ -123,3 +123,12 @@ test("under reduced motion the drop lands without animation", async ({ page }) =
   await drag(page, item(page, "u1"), page.getByTestId("zone-b"))
   expect(await item(page, "u1").evaluate((el) => el.getAnimations().length)).toBe(0)
 })
+
+test("zones mapped to objects still know the zone an item came from", async ({ page }) => {
+  await page.goto(URL)
+  await expect(page.getByTestId("late")).toBeVisible()
+  await drag(page, item(page, "ob1"), page.getByTestId("obj-o1"))
+  await expect(page.getByTestId("obj-log")).toHaveText("none")
+  await drag(page, item(page, "ob1"), page.getByTestId("obj-o2"))
+  await expect(page.getByTestId("obj-log")).toHaveText("ob1>o2")
+})

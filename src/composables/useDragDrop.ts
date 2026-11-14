@@ -81,6 +81,7 @@ interface Drag<I, Z> {
   next: string | null
   item: I
   from: Z | undefined
+  fromKey: string | null
   source: HTMLElement
   ghost: HTMLElement
   dx: number
@@ -124,7 +125,7 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     if (!drag) return undefined
     const zone = toZone(spot.zone.dataset.dropZone ?? "")
     if (zone === undefined) return undefined
-    if (zone === drag.from) {
+    if (spot.zone.dataset.dropZone === drag.fromKey) {
       if (!("dropSort" in spot.zone.dataset)) return undefined
       if ((spot.before?.dataset.dragKey ?? null) === drag.next) return undefined
     }
@@ -205,6 +206,7 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
       line,
       item,
       from: fromZone ? toZone(fromZone.dataset.dropZone ?? "") : undefined,
+      fromKey: fromZone?.dataset.dropZone ?? null,
       source: el,
       ghost,
       dx: x - box.left,
