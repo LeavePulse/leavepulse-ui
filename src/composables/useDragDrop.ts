@@ -1,7 +1,7 @@
-import { HOLD_TO_DRAG_MS, MOUSE_SLOP, TOUCH_SLOP } from "./gesture"
-import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
+import { MOUSE_SLOP } from "./gesture"
+import { nextTick, readonly, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
+import { useDragPress } from "./dragPress"
 import { durationToken, prefersReducedMotion } from "./easing"
-import { scrollParent } from "./scroll"
 import { nodeWindow } from "./useView"
 
 /*
@@ -30,6 +30,13 @@ import { nodeWindow } from "./useView"
  * from, on a zone `canDrop` refuses or outside every zone is no drop: the copy
  * glides back. Escape cancels.
  *
+ * A drop that the page shows by the next tick (move the item in local state,
+ * then save) animates: the item flies in from where it was let go and the
+ * items it pushed aside slide to their new places.
+ *
+ * `root` may render after the page mounts (a board behind a loader): the
+ * listeners follow it.
+ *
  * Dragging is a shortcut, never the only way: whatever a drop does should also
  * be reachable from a menu or a button, for the keyboard and screen readers.
  */
@@ -48,30 +55,17 @@ export interface UseDragDropOptions<I, Z> {
   onDrop: (item: I, zone: Z, from: Z | undefined) => void
 }
 
-const EDGE_PX = 48
-const SCROLL_STEP = 14
 const NO_DRAG = "button, a, input, textarea, select, [contenteditable=''], [contenteditable='true'], [data-no-drag]"
 
 interface Drag<I, Z> {
+  key: string
   item: I
   from: Z | undefined
   source: HTMLElement
   ghost: HTMLElement
   dx: number
   dy: number
-  x: number
-  y: number
   over: HTMLElement | null
-  scroller: HTMLElement | null
-}
-
-interface Pending {
-  el: HTMLElement
-  pointerId: number
-  x: number
-  y: number
-  touch: boolean
-  timer: ReturnType<typeof setTimeout> | null
 }
 
 export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<I, Z>) {
@@ -81,9 +75,6 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
   const hostWindow = (): Window => (options.root.value ? nodeWindow(options.root.value) : window)
 
   let drag: Drag<I, Z> | null = null
-  let pending: Pending | null = null
-  let swallowClick = false
-  let frame = 0
   const dragging = ref<I | null>(null) as Ref<I | null>
   const over = ref<Z | null>(null) as Ref<Z | null>
 
@@ -99,14 +90,9 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     return !options.canDrop || options.canDrop(drag.item, zone) ? zone : undefined
   }
 
-  function cancelPending() {
-    if (pending?.timer) clearTimeout(pending.timer)
-    pending = null
-  }
-
-  function begin(el: HTMLElement, x: number, y: number) {
+  function begin(el: HTMLElement, x: number, y: number): boolean {
     const item = toItem(el.dataset.dragKey ?? "")
-    if (item === undefined) return
+    if (item === undefined) return false
     const box = el.getBoundingClientRect()
     const ghost = el.cloneNode(true) as HTMLElement
     ghost.removeAttribute("data-drag-key")
@@ -129,32 +115,27 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     el.ownerDocument.body.append(ghost)
     const fromZone = zoneOf(el)
     drag = {
+      key: el.dataset.dragKey ?? "",
       item,
       from: fromZone ? toZone(fromZone.dataset.dropZone ?? "") : undefined,
       source: el,
       ghost,
       dx: x - box.left,
       dy: y - box.top,
-      x,
-      y,
       over: null,
-      scroller: scrollParent(options.root.value),
     }
     el.setAttribute("data-drag-source", "")
     dragging.value = item
-    hostWindow().getSelection()?.removeAllRanges()
-    if (options.root.value) options.root.value.style.userSelect = "none"
-    follow()
-    if (!frame) frame = requestAnimationFrame(tick)
+    follow(x, y)
+    return true
   }
 
-  function follow() {
+  function follow(x: number, y: number) {
     if (!drag) return
-    const box = drag.source.getBoundingClientRect()
-    drag.ghost.style.left = `${drag.x - drag.dx}px`
-    drag.ghost.style.top = `${drag.y - drag.dy}px`
-    drag.ghost.style.width = `${box.width}px`
-    const zoneEl = zoneOf(drag.source.ownerDocument.elementFromPoint(drag.x, drag.y))
+    drag.ghost.style.left = `${x - drag.dx}px`
+    drag.ghost.style.top = `${y - drag.dy}px`
+    drag.ghost.style.width = `${drag.source.getBoundingClientRect().width}px`
+    const zoneEl = zoneOf(drag.source.ownerDocument.elementFromPoint(x, y))
     const zone = accepts(zoneEl)
     const target = zone === undefined ? null : zoneEl
     if (target !== drag.over) {
@@ -165,40 +146,57 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     }
   }
 
-  function tick() {
-    frame = 0
-    if (!drag) return
-    const box = drag.scroller?.getBoundingClientRect() ?? { top: 0, bottom: hostWindow().innerHeight }
-    const delta = drag.y > box.bottom - EDGE_PX ? SCROLL_STEP : drag.y < box.top + EDGE_PX ? -SCROLL_STEP : 0
-    if (delta) {
-      if (drag.scroller) drag.scroller.scrollTop += delta
-      else hostWindow().scrollBy(0, delta)
-      follow()
-    }
-    frame = requestAnimationFrame(tick)
-  }
-
   function finish(drop: boolean) {
-    cancelPending()
     const done = drag
     if (!done) return
     drag = null
-    if (frame) cancelAnimationFrame(frame)
-    frame = 0
-    if (options.root.value) options.root.value.style.userSelect = ""
     done.over?.removeAttribute("data-drop-over")
     done.source.removeAttribute("data-drag-source")
     dragging.value = null
     over.value = null
-    swallowClick = true
-    setTimeout(() => (swallowClick = false), 0)
     const zone = drop && done.over ? toZone(done.over.dataset.dropZone ?? "") : undefined
-    if (zone !== undefined) {
+    if (zone === undefined) return settle(done)
+    const before = boxes()
+    const landing = done.ghost.getBoundingClientRect()
+    options.onDrop(done.item, zone, done.from)
+    void nextTick(() => {
       done.ghost.remove()
-      options.onDrop(done.item, zone, done.from)
-      return
+      glide(before, done.key, landing)
+    })
+  }
+
+  function items(): HTMLElement[] {
+    return [...(options.root.value?.querySelectorAll<HTMLElement>("[data-drag-key]") ?? [])]
+  }
+
+  function boxes(): Map<string, DOMRect> {
+    return new Map(items().map((el) => [el.dataset.dragKey ?? "", el.getBoundingClientRect()]))
+  }
+
+  // FLIP: every item the drop moved (the dropped one from where it was let go,
+  // its neighbours from where they stood) eases into its new place instead of
+  // jumping. Needs the page to show the drop by the next tick: move the item
+  // in local state first, then save.
+  function glide(before: Map<string, DOMRect>, dropped: string, landing: DOMRect) {
+    if (prefersReducedMotion(hostWindow())) return
+    const ms = durationToken("duration-medium", undefined, options.root.value?.ownerDocument)
+    for (const el of items()) {
+      const key = el.dataset.dragKey ?? ""
+      const from = key === dropped ? landing : before.get(key)
+      if (!from) continue
+      const now = el.getBoundingClientRect()
+      const dx = from.left - now.left
+      const dy = from.top - now.top
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+      el.style.transition = "none"
+      el.style.transform = `translate(${dx}px, ${dy}px)`
+      void el.offsetWidth
+      el.style.transition = `transform ${ms}ms var(--ease-emphasized)`
+      el.style.transform = ""
+      setTimeout(() => {
+        if (!el.style.transform) el.style.transition = ""
+      }, ms)
     }
-    settle(done)
   }
 
   // A drag that landed nowhere glides back to where the item still is.
@@ -217,115 +215,27 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     setTimeout(() => ghost.remove(), ms)
   }
 
+  const press = useDragPress({ root: options.root, move: follow, end: finish, escape: true })
+
   function onPointerDown(event: PointerEvent) {
-    if (!enabled() || event.button !== 0 || drag) return
+    if (!enabled()) return
     const target = event.target as Element | null
     const el = target?.closest<HTMLElement>("[data-drag-key]")
     if (!el || !options.root.value?.contains(el)) return
     const control = target?.closest(NO_DRAG)
     if (control && el.contains(control)) return
-    cancelPending()
-    const touch = event.pointerType === "touch"
-    pending = { el, pointerId: event.pointerId, x: event.clientX, y: event.clientY, touch, timer: null }
-    if (!touch) return
-    const { clientX: x, clientY: y } = event
-    pending.timer = setTimeout(() => {
-      if (!pending) return
-      const held = pending.el
-      pending = null
-      begin(held, x, y)
-      navigator.vibrate?.(8)
-    }, HOLD_TO_DRAG_MS)
+    press.start(event, (x, y) => begin(el, x, y), { slop: MOUSE_SLOP })
   }
 
-  function onMove(event: PointerEvent) {
-    if (pending && event.pointerId === pending.pointerId) {
-      const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y)
-      if (pending.touch) {
-        if (moved > TOUCH_SLOP) cancelPending()
-        return
-      }
-      if (moved <= MOUSE_SLOP) return
-      const { el, x, y } = pending
-      pending = null
-      begin(el, x, y)
-    }
-    if (!drag) return
-    drag.x = event.clientX
-    drag.y = event.clientY
-    follow()
-  }
-
-  function onUp() {
-    cancelPending()
-    finish(true)
-  }
-
-  function onCancel() {
-    cancelPending()
-    finish(false)
-  }
-
-  function onKey(event: KeyboardEvent) {
-    if (event.key !== "Escape" || !drag) return
-    event.preventDefault()
-    event.stopPropagation()
-    finish(false)
-  }
-
-  function onClickCapture(event: MouseEvent) {
-    if (!swallowClick) return
-    swallowClick = false
-    event.stopPropagation()
-    event.preventDefault()
-  }
-
-  // A long press is also how a finger asks for the context menu; once it has
-  // turned into a drag, that menu would open over it.
-  function onContextMenu(event: Event) {
-    if (!drag && !swallowClick) return
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
-  // A finger that has started dragging must not scroll the page under it.
-  function onTouchMove(event: TouchEvent) {
-    if (drag) event.preventDefault()
-  }
-
-  // The browser's own drag of a link or an image would take over the pointer.
-  function onNativeDrag(event: DragEvent) {
-    if (pending || drag) event.preventDefault()
-  }
-
-  let listening: Window | null = null
-  let rootEl: HTMLElement | null = null
-  onMounted(() => {
-    listening = hostWindow()
-    rootEl = options.root.value
-    rootEl?.addEventListener("pointerdown", onPointerDown)
-    rootEl?.addEventListener("touchmove", onTouchMove, { passive: false })
-    rootEl?.addEventListener("dragstart", onNativeDrag)
-    listening.addEventListener("pointermove", onMove)
-    listening.addEventListener("pointerup", onUp)
-    listening.addEventListener("pointercancel", onCancel)
-    listening.addEventListener("keydown", onKey, true)
-    listening.addEventListener("click", onClickCapture, true)
-    listening.addEventListener("contextmenu", onContextMenu, true)
-  })
-  onBeforeUnmount(() => {
-    finish(false)
-    swallowClick = false
-    rootEl?.removeEventListener("pointerdown", onPointerDown)
-    rootEl?.removeEventListener("touchmove", onTouchMove)
-    rootEl?.removeEventListener("dragstart", onNativeDrag)
-    listening?.removeEventListener("pointermove", onMove)
-    listening?.removeEventListener("pointerup", onUp)
-    listening?.removeEventListener("pointercancel", onCancel)
-    listening?.removeEventListener("keydown", onKey, true)
-    listening?.removeEventListener("click", onClickCapture, true)
-    listening?.removeEventListener("contextmenu", onContextMenu, true)
-  })
+  watch(
+    options.root,
+    (el, _, onCleanup) => {
+      if (!el) return
+      el.addEventListener("pointerdown", onPointerDown)
+      onCleanup(() => el.removeEventListener("pointerdown", onPointerDown))
+    },
+    { immediate: true, flush: "post" },
+  )
 
   return { dragging: readonly(dragging), over: readonly(over) }
 }

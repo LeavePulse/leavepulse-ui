@@ -100,3 +100,26 @@ test("a finger holds before dragging, and a quick swipe does not drag", async ({
   await touch("u1", 450)
   await expect(page.getByTestId("log")).toHaveText("u1:a>b")
 })
+
+test("a board that renders after mounting (behind a loader) still drags", async ({ page }) => {
+  await page.goto(URL)
+  await expect(page.getByTestId("late")).toBeVisible()
+  await drag(page, item(page, "l1"), page.getByTestId("late-y"))
+  await expect(page.getByTestId("late-y").locator("[data-drag-key='l1']")).toBeVisible()
+})
+
+test("a dropped item eases into its new place instead of jumping", async ({ page }) => {
+  await page.goto(URL)
+  await drag(page, item(page, "u1"), page.getByTestId("zone-b"), async () => {
+    await page.mouse.up()
+    await expect.poll(() => item(page, "u1").evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0)
+  })
+  await expect.poll(() => item(page, "u1").evaluate((el) => el.getAnimations().length)).toBe(0)
+})
+
+test("under reduced motion the drop lands without animation", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await page.goto(URL)
+  await drag(page, item(page, "u1"), page.getByTestId("zone-b"))
+  expect(await item(page, "u1").evaluate((el) => el.getAnimations().length)).toBe(0)
+})

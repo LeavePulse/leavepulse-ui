@@ -1,5 +1,6 @@
 import { reactive } from "vue"
 import {
+  LpAvatar,
   LpBadge,
   LpButton,
   LpCard,
@@ -19,7 +20,7 @@ import {
 import videoBackdropSample from "../../assets/video-backdrop-sample.webm"
 import { type ComponentEntry } from "./shared"
 import GestureDemo from "../GestureDemo.vue"
-import DragDropDemo from "../DragDropDemo.vue"
+import DragBoard from "../DragBoard.vue"
 
 export const motion: ComponentEntry[] = [
   {
@@ -34,9 +35,39 @@ export const motion: ComponentEntry[] = [
     id: "drag-drop",
     name: "Drag and drop",
     description:
-      "Moving things between places by dragging them: a player to another team, a card to another column, a row back to the pool. `useDragDrop({ root, onDrop })` reads the page: what can be picked up carries `data-drag-key`, where it can land carries `data-drop-zone`, and a drop arrives as `(item, zone, from)`.\n\n- A mouse or pen starts after a few pixels, so a click on the item stays a click; a finger holds still first (HOLD_TO_DRAG_MS), so a swipe through the list still scrolls and the long press does not open the context menu.\n- A copy of the item follows the pointer; the item gets `data-drag-source`, the zone under the pointer `data-drop-over`, for styling with `data-[drop-over]:` and `data-[drag-source]:`.\n- `canDrop(item, zone)` refuses a zone (the full team here), and a drop on the zone the item came from is no drop: the copy glides back. Escape cancels.\n- Near the edge of the scrolling box the page scrolls on its own; buttons, links and fields inside an item never start a drag.\n- Dragging is a shortcut: keep the same action in a menu or a button for the keyboard and screen readers.",
-    components: { DragDropDemo },
-    template: `<DragDropDemo />`,
+      "Moving things between places by dragging them: a player to another team, a card to another column, a row back to the pool. `useDragDrop({ root, onDrop })` reads the page: what can be picked up carries `data-drag-key`, where it can land carries `data-drop-zone`, and a drop arrives as `(item, zone, from)`.\n\n- A mouse or pen starts after a few pixels, so a click on the item stays a click; a finger holds still first (HOLD_TO_DRAG_MS), so a swipe through the list still scrolls and the long press does not open the context menu.\n- A copy of the item follows the pointer; the item gets `data-drag-source`, the zone under the pointer `data-drop-over`, for styling with `data-[drop-over]:` and `data-[drag-source]:`.\n- `canDrop(item, zone)` refuses a zone (the full team here), and a drop on the zone the item came from is no drop: the copy glides back. Escape cancels.\n- Near the edge of the scrolling box the page scrolls on its own; buttons, links and fields inside an item never start a drag.\n- A drop the page shows by the next tick (move the item in local state, then save) animates: the item flies in from where it was let go and the items it pushed aside slide over.\n- Dragging is a shortcut: keep the same action in a menu or a button for the keyboard and screen readers.",
+    components: { DragBoard, LpAvatar, LpBadge },
+    state: () =>
+      reactive({
+        teams: { Radiant: ["Ada", "Linus", "Grace"], Dire: ["Ken", "Barbara"], Bench: ["Alan", "Margaret"] } as Record<string, string[]>,
+      }),
+    template: `<DragBoard v-model="teams" :limit="3" v-slot="{ dragging, over }" class="flex w-[40rem] max-w-full flex-col gap-3">
+  <div class="grid gap-3 sm:grid-cols-3">
+    <section
+      v-for="(names, team) in teams"
+      :key="team"
+      :data-drop-zone="team"
+      class="flex min-h-44 flex-col gap-2 rounded-card border border-line p-3 transition-colors data-[drop-over]:border-brand data-[drop-over]:bg-brand-soft/40"
+    >
+      <p class="flex items-center justify-between text-sm font-medium text-ink">
+        {{ team }}
+        <LpBadge size="sm" :tone="team !== 'Bench' && names.length >= 3 ? 'success' : 'neutral'">
+          {{ team === 'Bench' ? names.length : names.length + '/3' }}
+        </LpBadge>
+      </p>
+      <div
+        v-for="name in names"
+        :key="name"
+        :data-drag-key="name"
+        class="flex cursor-grab items-center gap-2 rounded-control border border-line bg-surface px-2 py-1.5 text-sm text-ink data-[drag-source]:opacity-40"
+      >
+        <LpAvatar size="xs" :fallback="name.slice(0, 2)" />
+        {{ name }}
+      </div>
+    </section>
+  </div>
+  <p class="text-xs text-muted">Dragging: {{ dragging ?? "nothing" }} · over: {{ over ?? "no zone" }}. A full team refuses a drop; Escape cancels.</p>
+</DragBoard>`,
   },
   {
     id: "swap",

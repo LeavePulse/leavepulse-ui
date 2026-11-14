@@ -1,8 +1,6 @@
-import { HOLD_TO_DRAG_MS, TOUCH_SLOP } from "./gesture"
-import { onBeforeUnmount, onMounted, readonly, ref, toValue, type MaybeRefOrGetter, type Ref } from "vue"
+import { toValue, type MaybeRefOrGetter, type Ref } from "vue"
+import { useDragPress } from "./dragPress"
 import { useHotkeys, type HotkeyHelp } from "./useHotkeys"
-import { scrollParent } from "./scroll"
-import { nodeWindow } from "./useView"
 
 /*
  * Paint selection: press on one item's tick and sweep across the others, and
@@ -41,9 +39,6 @@ export interface UsePaintSelectOptions<K> {
   help?: MaybeRefOrGetter<HotkeyHelp | undefined>
 }
 
-const EDGE_PX = 40
-const SCROLL_STEP = 14
-
 interface Stroke<K> {
   keys: K[]
   anchor: number
@@ -51,18 +46,11 @@ interface Stroke<K> {
   before: Set<K>
   x: number
   y: number
-  scroller: HTMLElement | null
 }
 
 export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
   const resolve = options.resolve ?? ((raw: string) => raw as unknown as K)
   let stroke: Stroke<K> | null = null
-  let pending: { key: K; pointerId: number; x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null
-  let swallowClick = false
-  let frame = 0
-  /** True while a stroke is painting, for UI that reacts to it (a tick column revealing). */
-  const painting = ref(false)
-
   const enabled = () => toValue(options.enabled) ?? true
 
   function keysInView(): K[] {
@@ -75,9 +63,6 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     }
     return out
   }
-
-  // Inside an LpFrame the pointer's events stay in the frame's window.
-  const hostWindow = (): Window => (options.root.value ? nodeWindow(options.root.value) : window)
 
   function keyAt(x: number, y: number): K | undefined {
     const item = options.root.value?.ownerDocument.elementFromPoint(x, y)?.closest<HTMLElement>("[data-paint-key]")
@@ -100,104 +85,35 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     options.set([...next])
   }
 
-  function tick() {
-    frame = 0
-    if (!stroke) return
-    const box = stroke.scroller?.getBoundingClientRect() ?? { top: 0, bottom: hostWindow().innerHeight }
-    const delta = stroke.y > box.bottom - EDGE_PX ? SCROLL_STEP : stroke.y < box.top + EDGE_PX ? -SCROLL_STEP : 0
-    if (delta) {
-      if (stroke.scroller) stroke.scroller.scrollTop += delta
-      else hostWindow().scrollBy(0, delta)
+  const press = useDragPress({
+    root: options.root,
+    move: (x, y) => {
+      if (!stroke) return
+      stroke.x = x
+      stroke.y = y
       extend()
-    }
-    frame = requestAnimationFrame(tick)
-  }
-
-  function begin(key: K, x: number, y: number) {
-    const keys = keysInView()
-    const anchor = keys.indexOf(key)
-    if (anchor < 0) return
-    const before = new Set(options.selection())
-    stroke = { keys, anchor, paint: !before.has(key), before, x, y, scroller: scrollParent(options.root.value) }
-    painting.value = true
-    // A sweep over text would otherwise select it, and a hold that started
-    // before the stroke may already have.
-    hostWindow().getSelection()?.removeAllRanges()
-    if (options.root.value) options.root.value.style.userSelect = "none"
-    extend()
-    if (!frame) frame = requestAnimationFrame(tick)
-  }
-
-  function cancelPending() {
-    if (pending) clearTimeout(pending.timer)
-    pending = null
-  }
+    },
+    end: () => {
+      stroke = null
+    },
+  })
 
   /** Bind to `pointerdown` on the item's tick (or the whole item). */
   function onPointerDown(event: PointerEvent, key: K, behaviour: { hold?: number } = {}) {
-    if (!enabled() || event.button !== 0) return
-    cancelPending()
-    if (behaviour.hold === undefined && event.pointerType !== "touch") {
-      // Keeps the press from starting a text selection or moving focus mid-stroke.
-      event.preventDefault()
-      begin(key, event.clientX, event.clientY)
-      return
-    }
-    const { pointerId, clientX: x, clientY: y } = event
-    pending = {
-      key,
-      pointerId,
-      x,
-      y,
-      timer: setTimeout(() => {
-        pending = null
-        begin(key, x, y)
-        navigator.vibrate?.(8)
-      }, behaviour.hold ?? HOLD_TO_DRAG_MS),
-    }
-  }
-
-  function onMove(event: PointerEvent) {
-    if (pending && event.pointerId === pending.pointerId) {
-      if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) > TOUCH_SLOP) cancelPending()
-      return
-    }
-    if (!stroke) return
-    stroke.x = event.clientX
-    stroke.y = event.clientY
-    extend()
-  }
-
-  function onUp() {
-    cancelPending()
-    if (!stroke) return
-    stroke = null
-    painting.value = false
-    if (options.root.value) options.root.value.style.userSelect = ""
-    if (frame) cancelAnimationFrame(frame)
-    frame = 0
-    swallowClick = true
-    setTimeout(() => (swallowClick = false), 0)
-  }
-
-  function onClickCapture(event: MouseEvent) {
-    if (!swallowClick) return
-    swallowClick = false
-    event.stopPropagation()
-    event.preventDefault()
-  }
-
-  // A long press is also how a finger asks for the context menu; once it has
-  // turned into painting, that menu would open over the stroke.
-  function onContextMenu(event: Event) {
-    if (!stroke && !swallowClick) return
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
-  // A finger that has started painting must not scroll the page under it.
-  function onTouchMove(event: TouchEvent) {
-    if (stroke) event.preventDefault()
+    if (!enabled()) return
+    press.start(
+      event,
+      (x, y) => {
+        const keys = keysInView()
+        const anchor = keys.indexOf(key)
+        if (anchor < 0) return false
+        const before = new Set(options.selection())
+        stroke = { keys, anchor, paint: !before.has(key), before, x, y }
+        extend()
+        return true
+      },
+      { hold: behaviour.hold },
+    )
   }
 
   useHotkeys(
@@ -216,26 +132,6 @@ export function usePaintSelect<K = string>(options: UsePaintSelectOptions<K>) {
     { scope: options.root },
   )
 
-  let listening: Window | null = null
-  onMounted(() => {
-    listening = hostWindow()
-    listening.addEventListener("pointermove", onMove)
-    listening.addEventListener("pointerup", onUp)
-    listening.addEventListener("pointercancel", onUp)
-    listening.addEventListener("click", onClickCapture, true)
-    listening.addEventListener("contextmenu", onContextMenu, true)
-    options.root.value?.addEventListener("touchmove", onTouchMove, { passive: false })
-  })
-  onBeforeUnmount(() => {
-    onUp()
-    swallowClick = false
-    listening?.removeEventListener("pointermove", onMove)
-    listening?.removeEventListener("pointerup", onUp)
-    listening?.removeEventListener("pointercancel", onUp)
-    listening?.removeEventListener("click", onClickCapture, true)
-    listening?.removeEventListener("contextmenu", onContextMenu, true)
-    options.root.value?.removeEventListener("touchmove", onTouchMove)
-  })
-
-  return { onPointerDown, painting: readonly(painting) }
+  /** True while a stroke is painting, for UI that reacts to it (a tick column revealing). */
+  return { onPointerDown, painting: press.active }
 }

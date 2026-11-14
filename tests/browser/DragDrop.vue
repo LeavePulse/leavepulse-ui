@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { onMounted, ref } from "vue"
 import { useDragDrop } from "../../src"
 
 const root = ref<HTMLElement | null>(null)
 const places = ref<Record<string, string[]>>({ a: ["u1", "u2"], b: ["u3"], pool: [], locked: [] })
 const log = ref<string[]>([])
 const clicks = ref(0)
+const lateRoot = ref<HTMLElement | null>(null)
+const ready = ref(false)
+const late = ref<Record<string, string[]>>({ x: ["l1"], y: [] })
+onMounted(() => setTimeout(() => (ready.value = true), 150))
+useDragDrop({
+  root: lateRoot,
+  onDrop: (item, zone, from) => {
+    if (from) late.value[from] = late.value[from]!.filter((u) => u !== item)
+    late.value[zone] = [...late.value[zone]!, item]
+  },
+})
 
 const dnd = useDragDrop({
   root,
@@ -19,6 +30,7 @@ const dnd = useDragDrop({
 </script>
 
 <template>
+  <div>
   <main ref="root" class="grid grid-cols-4 gap-4 p-6">
     <section
       v-for="(items, zone) in places"
@@ -37,4 +49,10 @@ const dnd = useDragDrop({
     <p data-testid="clicks">{{ clicks }}</p>
     <p data-testid="state">{{ dnd.dragging.value ?? "idle" }}|{{ dnd.over.value ?? "-" }}</p>
   </main>
+    <div v-if="ready" ref="lateRoot" class="grid p-6 grid-cols-2 gap-4" data-testid="late">
+      <section v-for="(items, zone) in late" :key="zone" :data-drop-zone="zone" :data-testid="`late-${zone}`" class="min-h-24 rounded border p-2">
+        <div v-for="u in items" :key="u" :data-drag-key="u" class="rounded border px-2 py-1">{{ u }}</div>
+      </section>
+    </div>
+  </div>
 </template>
