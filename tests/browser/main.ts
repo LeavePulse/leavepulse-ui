@@ -7,6 +7,7 @@ import Contracts from "./Contracts.vue"
 import ChartToolkit from "./ChartToolkit.vue"
 import DataContracts from "./DataContracts.vue"
 import FileTreeFeatures from "./FileTreeFeatures.vue"
+import DragDrop from "./DragDrop.vue"
 import FieldErrors from "./FieldErrors.vue"
 import Fields from "./Fields.vue"
 import HotkeyFrame from "./HotkeyFrame.vue"
@@ -35,7 +36,7 @@ import ScrollStrip from "./ScrollStrip.vue"
 import TablePerf from "./TablePerf.vue"
 
 const scenario = new URLSearchParams(location.search).get("scenario")
-const SCENARIOS = { notifications: Notifications, "tour-target": TourTarget, "field-errors": FieldErrors, "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, skeleton: Skeleton, "autocomplete-blur": AutocompleteBlur, "video-trim": VideoTrim, "video-player": VideoPlayer, "media-video": MediaVideo, "app-update": AppUpdate, mobile: Mobile, "scroll-strip": ScrollStrip, "table-perf": TablePerf }
+const SCENARIOS = { notifications: Notifications, "drag-drop": DragDrop, "tour-target": TourTarget, "field-errors": FieldErrors, "trigger-nesting": TriggerNesting, "hotkey-frame": HotkeyFrame, "realm-sweep": RealmSweep, "linked-view": LinkedView, topology: TopologyContracts, "file-tree": FileTreeFeatures, table: TableFeatures, workspace: Workspace, "chart-toolkit": ChartToolkit, "log-tools": LogTools, data: DataContracts, fields: Fields, "shell-features": ShellFeatures, "shell-frame": ShellFrame, "shell-scroll": ShellScroll, "stat-fit": StatFit, "overlay-history": OverlayHistory, overlays: Overlays, "shift-tick": ShiftTick, skeleton: Skeleton, "autocomplete-blur": AutocompleteBlur, "video-trim": VideoTrim, "video-player": VideoPlayer, "media-video": MediaVideo, "app-update": AppUpdate, mobile: Mobile, "scroll-strip": ScrollStrip, "table-perf": TablePerf }
 // A kit component handed an attribute nothing under it takes fails the test
 // (the fixture fails on a console error), so a misspelt prop in a fixture and a
 // false report from the check itself both surface here.
