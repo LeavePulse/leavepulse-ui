@@ -2541,7 +2541,12 @@
     "description": "Do not count this element as \"has a right-click menu\" for hint tips: for\nmenus that only hold generic items (a whole table without row actions)."
    }
   ],
-  "events": [],
+  "events": [
+   {
+    "name": "update:open",
+    "type": "[open: boolean]"
+   }
+  ],
   "slots": [
    {
     "name": "default",
@@ -9134,7 +9139,7 @@
   "slots": [
    {
     "name": "default",
-    "type": "{ resizing: boolean; }"
+    "type": "{}"
    }
   ]
  },

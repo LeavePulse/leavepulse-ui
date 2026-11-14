@@ -19,6 +19,7 @@ import {
 import videoBackdropSample from "../../assets/video-backdrop-sample.webm"
 import { type ComponentEntry } from "./shared"
 import GestureDemo from "../GestureDemo.vue"
+import DragDropDemo from "../DragDropDemo.vue"
 
 export const motion: ComponentEntry[] = [
   {
@@ -28,6 +29,14 @@ export const motion: ComponentEntry[] = [
       "One gesture engine behind every drag, swipe, pinch and long press in the kit: `useGesture(el, options)` binds it to an element, `createGesture(options)` returns handlers to bind yourself.\n\n- Drag: a press becomes a drag past the slop (8 px for a finger, 4 for a mouse); until then nothing is captured or prevented, so a click on what is under it still lands, and a drag swallows the click it ends with.\n- Axis: `axis: \"x\"` lets a press that starts vertical go, so the page scrolls; `\"lock\"` commits to the first axis taken.\n- Release: `onDragEnd` gets velocity (px/ms over the last 100 ms) and the swipe it made; `cancelled` is set when the browser or a second finger took the pointer, or on Escape.\n- Pinch: two fingers report scale and origin; `longPress` fires after a still hold and swallows the click after it.\n- Helpers: `shouldDismiss` (swipe to dismiss, the card above), `pageAfterSwipe` and `rubberClamp` (swipe between items, the slides), `glide` (momentum), `createDragSession` (the same decision fed from touch events, as the drawer's edge pull does).\n- Used by LpDrawer's edge pull and swipe to close, LpLightbox, LpMapPicker, LpVideoTrim, LpScrollStrip and the touch hold of LpTooltip and LpHoverCard.",
     components: { GestureDemo },
     template: `<GestureDemo />`,
+  },
+  {
+    id: "drag-drop",
+    name: "Drag and drop",
+    description:
+      "Moving things between places by dragging them: a player to another team, a card to another column, a row back to the pool. `useDragDrop({ root, onDrop })` reads the page: what can be picked up carries `data-drag-key`, where it can land carries `data-drop-zone`, and a drop arrives as `(item, zone, from)`.\n\n- A mouse or pen starts after a few pixels, so a click on the item stays a click; a finger holds still first (HOLD_TO_DRAG_MS), so a swipe through the list still scrolls and the long press does not open the context menu.\n- A copy of the item follows the pointer; the item gets `data-drag-source`, the zone under the pointer `data-drop-over`, for styling with `data-[drop-over]:` and `data-[drag-source]:`.\n- `canDrop(item, zone)` refuses a zone (the full team here), and a drop on the zone the item came from is no drop: the copy glides back. Escape cancels.\n- Near the edge of the scrolling box the page scrolls on its own; buttons, links and fields inside an item never start a drag.\n- Dragging is a shortcut: keep the same action in a menu or a button for the keyboard and screen readers.",
+    components: { DragDropDemo },
+    template: `<DragDropDemo />`,
   },
   {
     id: "swap",
