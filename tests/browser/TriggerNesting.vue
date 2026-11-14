@@ -5,6 +5,8 @@ import { LpButton, LpContextMenu, LpHoverCard, LpPopover, LpSwitch, LpTooltip } 
 const on = ref(true)
 
 const menu = [{ label: "Copy", onSelect: () => {} }]
+const menuState = ref(false)
+const rowMenu = [{ label: "Row action", onSelect: () => {} }]
 </script>
 
 <!-- A popover's trigger around another kit trigger: the outer one's id, ARIA
@@ -38,5 +40,23 @@ const menu = [{ label: "Copy", onSelect: () => {} }]
       </template>
       <p>Card over the menu</p>
     </LpHoverCard>
+    <LpContextMenu :items="menu">
+      <LpHoverCard :open-delay="0">
+        <template #trigger><LpButton>Menu over a card</LpButton></template>
+        <p>Card under the menu</p>
+      </LpHoverCard>
+    </LpContextMenu>
+    <LpContextMenu :items="rowMenu">
+      <div class="flex gap-2 p-2">
+        <LpContextMenu :items="menu">
+          <LpHoverCard :open-delay="0">
+            <template #trigger><LpButton>Card in a menu row</LpButton></template>
+            <p>Card in the row</p>
+          </LpHoverCard>
+        </LpContextMenu>
+      </div>
+    </LpContextMenu>
+    <LpContextMenu :items="menu" @update:open="menuState = $event"><LpButton>Reports its state</LpButton></LpContextMenu>
+    <p data-testid="menu-state">{{ menuState ? "open" : "closed" }}</p>
   </main>
 </template>

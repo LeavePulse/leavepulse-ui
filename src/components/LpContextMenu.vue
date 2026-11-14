@@ -75,6 +75,10 @@ const props = withDefaults(defineProps<{
   noHint?: boolean
 }>(), { palette: undefined })
 
+// Whether the menu is open, for a caller that has to react to it: a hover
+// card on the same element closes while its menu is up.
+const emit = defineEmits<{ "update:open": [open: boolean] }>()
+
 // With no items the trigger is disabled, so the element keeps the browser's
 // native context menu. Lets callers wrap unconditionally and pass [] to opt out
 // per element. `always` overrides this so a late-populated menu is ready on the
@@ -128,6 +132,7 @@ function keepContextMenu(event: Event) {
 function opened(open: boolean) {
   if (open && !synthetic) hints.use(HINT_SIGNALS.contextMenu)
   synthetic = false
+  emit("update:open", open)
 }
 
 /*

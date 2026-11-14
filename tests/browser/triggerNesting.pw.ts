@@ -33,6 +33,33 @@ test("a hover card and a context menu share one button", async ({ page }) => {
   await expect(page.getByRole("menuitem", { name: "Copy" })).toBeVisible()
 })
 
+for (const [name, card] of [
+  ["Card over a menu", "Card over the menu"],
+  ["Menu over a card", "Card under the menu"],
+  ["Card in a menu row", "Card in the row"],
+] as const) {
+  test(`a right click swaps an open hover card for the context menu: ${name.toLowerCase()}`, async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=trigger-nesting")
+    const button = page.getByRole("button", { name, exact: true })
+    await button.hover()
+    await expect(page.getByText(card)).toBeVisible()
+    await button.click({ button: "right" })
+    await expect(page.getByRole("menuitem", { name: "Copy" })).toBeVisible()
+    await expect(page.getByText(card)).toBeHidden()
+  })
+}
+
+test("a context menu tells its caller when it opens and closes", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=trigger-nesting")
+  const state = page.getByTestId("menu-state")
+  await expect(state).toHaveText("closed")
+  await page.getByRole("button", { name: "Reports its state", exact: true }).click({ button: "right" })
+  await expect(page.getByRole("menuitem", { name: "Copy" })).toBeVisible()
+  await expect(state).toHaveText("open")
+  await page.keyboard.press("Escape")
+  await expect(state).toHaveText("closed")
+})
+
 test("a switch inside a tooltip still says and shows its own state", async ({ page }) => {
   await page.goto("/tests/browser/?scenario=trigger-nesting")
   const toggle = page.getByRole("switch", { name: "Autopilot" })

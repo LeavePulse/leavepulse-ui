@@ -126,9 +126,10 @@ const guardOutside = useOutsideGuard()
       v-for="spot in spots"
       :key="spot.id"
       type="button"
-      class="fixed z-(--z-popover) -translate-x-1/2 -translate-y-1/2 rounded-full p-1"
+      class="pointer-events-auto fixed z-(--z-popover) -translate-x-1/2 -translate-y-1/2 rounded-full p-1"
       :style="{ left: `${spot.x}px`, top: `${spot.y}px` }"
       :aria-label="`${labels.badge}: ${notes[spot.id]?.title ?? ''}`"
+      @pointerdown.stop
       @pointerenter="reveal(spot.id)"
       @focus="reveal(spot.id)"
       @click="reveal(spot.id)"
@@ -142,6 +143,7 @@ const guardOutside = useOutsideGuard()
       <PopoverAnchor v-if="anchor" :reference="anchor" />
       <PopoverPortal :to="portalTo">
         <PopoverContent
+          @pointerdown.stop
           @interact-outside="guardOutside"
           @escape-key-down="guardOutside"
           side="bottom"
