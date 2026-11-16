@@ -26,6 +26,10 @@
  *   (and that press does not also follow the link); a tap elsewhere closes it.
  *   `touch="none"` leaves touch alone, for triggers where a hold means
  *   something else (a drag handle, a context menu).
+ * - A card opened near the edge of the window gets only the room left on that
+ *   side. The card keeps its padding and the content scrolls inside it with the
+ *   kit's own bar (LpScrollArea), not the browser's. Lay the content out in the
+ *   slot, not in `panelClass`: the panel holds one scroll area.
  */
 import {
   HoverCardArrow,
@@ -38,7 +42,8 @@ import { computed, mergeProps, useAttrs, watch } from "vue"
 import { mergeClass } from "../composables/useMergedClass"
 import { useTouchHold } from "../composables/useTouchHold"
 import { useOutsideGuard, usePortalTarget } from "../composables/useView"
-import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"
+import { PANEL_FIT_FRAME, POPOVER_PANEL } from "./dropdown"
+import LpScrollArea from "./LpScrollArea.vue"
 
 const props = withDefaults(
   defineProps<{
@@ -82,7 +87,7 @@ const props = withDefaults(
 const open = defineModel<boolean>("open", { default: false })
 
 const panel = computed(() =>
-  mergeClass(POPOVER_PANEL, PANEL_FIT, "z-(--z-popover) w-72 rounded-card p-4 text-sm text-ink outline-none", props.panelClass),
+  mergeClass(POPOVER_PANEL, PANEL_FIT_FRAME, "z-(--z-popover) w-72 rounded-card p-4 text-sm text-ink outline-none", props.panelClass),
 )
 
 const portalTo = usePortalTarget()
@@ -130,7 +135,9 @@ const triggerAttrs = computed(() => mergeProps(attrs, hold.handlers))
         @pointer-down-outside="guardOutside"
         @escape-key-down="guardOutside"
       >
-        <slot :close="() => (open = false)" />
+        <LpScrollArea floating class="min-h-0">
+          <slot :close="() => (open = false)" />
+        </LpScrollArea>
         <HoverCardArrow v-if="arrow" :width="14" :height="7" class="fill-surface-raised" />
       </HoverCardContent>
     </HoverCardPortal>

@@ -55,6 +55,14 @@ export const POPOVER_PANEL = PANEL_SURFACE + " " + POPOVER_ANIM
 export const PANEL_FIT = "max-w-[calc(100vw-1rem)] max-h-(--reka-popper-available-height) overflow-y-auto"
 
 /**
+ * PANEL_FIT for a panel whose content scrolls inside an LpScrollArea rather than
+ * on the panel itself: the same bounds, but the panel clips and lays its single
+ * child out as a column, so the scroll area can shrink to the room left and draw
+ * the kit's own bar instead of the browser's.
+ */
+export const PANEL_FIT_FRAME = "max-w-[calc(100vw-1rem)] max-h-(--reka-popper-available-height) flex flex-col overflow-hidden"
+
+/**
  * A list row on a touch screen: 2.5rem tall instead of 2, so a thumb picks the
  * row it is on and not its neighbour. A mouse keeps the compact row.
  */
