@@ -158,7 +158,7 @@ export const patterns: ComponentEntry[] = [
     <LpSkeleton v-if="loading" class="space-y-3"><div class="lp-skeleton-item h-5 w-32 rounded-control" /><div class="lp-skeleton-item h-4 w-full rounded-control" /></LpSkeleton>
     <div v-else class="space-y-3"><h2 class="h-5 text-sm font-semibold">api-gateway</h2><p class="h-4 text-xs text-muted">Production · Frankfurt</p></div>
   </LpCard>
-  <div class="flex h-10 items-center justify-between gap-4"><LpLoader :active="loading" :delay="0" label="Fetching service" /><LpButton :loading="loading">Refresh service</LpButton></div>
+  <div class="flex h-10 items-center justify-between gap-4"><LpLoader :active="loading" :delay="0" label="Fetching service" /><LpButton class="ml-auto" :loading="loading">Refresh service</LpButton></div>
   <LpProgress :value="64" title="Downloading a known 100 MB file" tone="brand" label />
 </div>`,
     thumb: `<LpCard class="w-64 space-y-3"><LpSkeleton class="h-4 w-28" /><LpSkeleton class="h-3 w-full" /><LpProgress :value="64" tone="brand" /></LpCard>`,
