@@ -392,8 +392,8 @@ defineExpose({ editor })
 </script>
 
 <template>
-  <div class="lp-rich flex min-w-0 flex-col">
-    <div v-if="toolbar && editor && editable" class="sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b border-line bg-surface/90 px-2 py-1.5 backdrop-blur">
+  <div class="lp-rich flex min-w-0 flex-col rounded-[inherit]">
+    <div v-if="toolbar && editor && editable" class="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-[inherit] border-b border-line bg-surface/90 px-2 py-1.5 backdrop-blur">
       <LpTooltip :content="text.undo" label>
         <button type="button" :class="TOOL" :disabled="!editor.can().undo()" @click="editor.chain().focus().undo().run()"><LpIcon name="lucide:undo-2" /></button>
       </LpTooltip>
@@ -741,12 +741,9 @@ defineExpose({ editor })
 .lp-rich-doc .lp-live-syntax {
   display: inline-grid;
   grid-template-columns: 1fr;
-  vertical-align: bottom;
-  color: color-mix(in srgb, var(--color-muted) 75%, transparent);
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.85em;
-  font-weight: 400;
-  font-style: normal;
+  vertical-align: baseline;
+  color: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  font: inherit;
   text-decoration: none;
   user-select: none;
   animation: lp-live-syntax-in 180ms var(--ease-emphasized, ease);
