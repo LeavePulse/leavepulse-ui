@@ -40,6 +40,12 @@ export interface AppUpdateOptions {
   everyMs?: number
   /** sessionStorage key for the scroll position carried over the reload. */
   storageKey?: string
+  /**
+   * Fade the new page in after the reload. Off for an app whose own splash
+   * screen already fades in over the reload: fading the whole document as well
+   * dips that splash to nothing and back the moment the script starts.
+   */
+  fadeIn?: boolean
 }
 
 export interface AppUpdate {
@@ -101,7 +107,7 @@ export function useAppUpdate(options: AppUpdateOptions): AppUpdate {
   const carried = readCarried(key)
   if (carried && carried.href === location.href && Date.now() - carried.at < CARRY_MS) {
     restored.value = true
-    if (!prefersReducedMotion()) {
+    if (options.fadeIn !== false && !prefersReducedMotion()) {
       document.documentElement.animate([{ opacity: 0 }, { opacity: 1 }], { duration: FADE_IN_MS, easing: "cubic-bezier(0.2, 0, 0, 1)" })
     }
     const top = carried.top

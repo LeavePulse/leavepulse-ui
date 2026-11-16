@@ -32,3 +32,15 @@ test("the same build never reloads", async ({ page }) => {
   await page.waitForTimeout(6000)
   await expect(page.getByTestId("state")).toHaveText("fresh")
 })
+
+for (const [query, fade] of [["", "fading"], ["&nofade", "still"]] as const) {
+  test(`after the reload the page ${fade === "fading" ? "fades in" : "stays put for an app's own splash"}`, async ({ page }) => {
+    await page.goto(url + query)
+    await page.evaluate(() => {
+      ;(window as unknown as { __latest: string }).__latest = "build-2"
+    })
+    await page.getByRole("button", { name: "Check" }).click()
+    await expect(page.getByTestId("state")).toHaveText("restored", { timeout: 10000 })
+    await expect(page.getByTestId("fade")).toHaveText(fade)
+  })
+}

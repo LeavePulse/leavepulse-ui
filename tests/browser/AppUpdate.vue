@@ -10,12 +10,15 @@ const update = useAppUpdate({
   busy: () => Boolean(w.__busy),
   idleMs: 300,
   everyMs: 0,
+  fadeIn: !location.search.includes("nofade"),
 })
+const fading = document.documentElement.getAnimations().length > 0
 </script>
 
 <template>
   <div class="p-4">
     <output data-testid="state">{{ update.restored.value ? "restored" : "fresh" }}</output>
+    <output data-testid="fade">{{ fading ? "fading" : "still" }}</output>
     <button type="button" @click="update.check()">Check</button>
     <button type="button" @click="dialog = !dialog">Dialog</button>
     <div v-if="dialog" role="dialog" aria-label="Open dialog">Dialog body</div>
