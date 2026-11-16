@@ -45,9 +45,14 @@ watch(
 )
 
 const lead = computed(() => documented.value[0])
-const importLine = computed(() =>
-  documented.value.length ? `import { ${documented.value.slice(0, 4).join(", ")} } from "@leavepulse/ui"` : "",
-)
+const importLine = computed(() => {
+  const byModule = new Map<string, string[]>()
+  for (const name of documented.value.slice(0, 4)) {
+    const module = meta[name]?.module ?? "@leavepulse/ui"
+    byModule.set(module, [...(byModule.get(module) ?? []), name])
+  }
+  return [...byModule.entries()].map(([module, names]) => `import { ${names.join(", ")} } from "${module}"`).join("\n")
+})
 
 const tabs = computed(() => [
   { value: "example", label: "Example", icon: "lucide:play" },

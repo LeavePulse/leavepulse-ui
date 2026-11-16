@@ -8,7 +8,11 @@ import { fileURLToPath } from "node:url"
 import { createChecker } from "vue-component-meta"
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
-const dir = join(root, "src/components")
+// Each folder of Lp components and the package entry it is imported from.
+const sources = [
+  { dir: join(root, "src/components"), module: "@leavepulse/ui" },
+  { dir: join(root, "src/editor"), module: "@leavepulse/ui/editor" },
+]
 const checker = createChecker(join(root, "tsconfig.build.json"), {
   forceUseTs: true,
   printer: { newLine: 1 },
@@ -24,7 +28,8 @@ function choices(type) {
 }
 
 const out = {}
-for (const file of readdirSync(dir).filter((f) => /^Lp.*\.vue$/.test(f)).sort()) {
+const files = sources.flatMap(({ dir, module }) => readdirSync(dir).filter((f) => /^Lp.*\.vue$/.test(f)).map((file) => ({ dir, module, file })))
+for (const { dir, module, file } of files.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))) {
   const name = file.replace(/\.vue$/, "")
   let meta
   try {
@@ -34,6 +39,7 @@ for (const file of readdirSync(dir).filter((f) => /^Lp.*\.vue$/.test(f)).sort())
     continue
   }
   out[name] = {
+    ...(module === "@leavepulse/ui" ? {} : { module }),
     props: meta.props
       .filter((p) => !p.global)
       .map((p) => ({

@@ -492,6 +492,38 @@ from the comment that opens the component.
 
 ## Guides
 
+### Block editor
+
+`@leavepulse/ui/editor` is a separate entry: apps that never import it do not
+install its weight in their bundles, and its icons register with it.
+
+```vue
+<script setup lang="ts">
+import { LpRichEditor, defaultEditorPlugins, defineNodeBlock, useCollaboration } from "@leavepulse/ui/editor"
+
+const plugins = [
+  ...defaultEditorPlugins({ upload: (file) => api.upload(file) }),
+  defineNodeBlock({ name: "rule", component: RuleCard, attrs: { code: "" }, block: { label: "Rule", icon: "lucide:scale", group: "custom" } }),
+]
+const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: { id, name, color, avatar } })
+</script>
+
+<LpRichEditor :plugins="plugins" :collaboration="shared" @outline="toc = $event" />
+```
+
+- A plugin is one description: TipTap extensions plus the blocks, marks and
+  right-click actions the UI derives from them. The `/` menu, Insert, Turn into,
+  the toolbar, the selection bubble and the context menu all read that list.
+- Stock plugins: text and marks, Markdown in and out, live preview (the syntax
+  of what the cursor is in shows in place, as in Obsidian), checklists,
+  callouts, toggles, columns, tables and images (resized by their edges,
+  centred, to a side or floated with text around, captioned).
+- Without `collaboration` it is a v-model over TipTap JSON. With it the
+  document is a shared Yjs one over the standard y-websocket protocol, with
+  carets, presence and unsent edits kept in IndexedDB.
+- Labels: the `editor`, `editorBlocks` (block, mark, group and action names by
+  id), `editorCallout` and `editorImage` scopes; the Ukrainian pack covers them.
+
 ### Linked views
 
 A monitoring screen shares one selection, one stretch of time and one followed

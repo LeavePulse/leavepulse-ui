@@ -8297,6 +8297,63 @@
    }
   ]
  },
+ "LpRichEditor": {
+  "module": "@leavepulse/ui/editor",
+  "props": [
+   {
+    "name": "plugins",
+    "type": "EditorPlugin[] | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "Read once when the editor is created: what it can edit is fixed for its life."
+   },
+   {
+    "name": "modelValue",
+    "type": "JSONContent | null | undefined",
+    "required": false,
+    "default": "null"
+   },
+   {
+    "name": "collaboration",
+    "type": "Collaboration | undefined",
+    "required": false,
+    "default": "undefined"
+   },
+   {
+    "name": "editable",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "toolbar",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true"
+   },
+   {
+    "name": "labels",
+    "type": "Partial<RichEditorLabels> | undefined",
+    "required": false,
+    "default": "undefined"
+   }
+  ],
+  "events": [
+   {
+    "name": "update:modelValue",
+    "type": "[value: JSONContent]"
+   },
+   {
+    "name": "outline",
+    "type": "[headings: OutlineHeading[]]"
+   },
+   {
+    "name": "ready",
+    "type": "[editor: Editor]"
+   }
+  ],
+  "slots": []
+ },
  "LpRollingText": {
   "props": [
    {

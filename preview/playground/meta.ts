@@ -15,6 +15,8 @@ export type EventMeta = {
   description?: string
 }
 export interface ComponentMeta {
+  /** The package entry it is imported from, when not the main one. */
+  module?: string
   props: PropMeta[]
   events: EventMeta[]
   slots: EventMeta[]

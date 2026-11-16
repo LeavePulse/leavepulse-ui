@@ -24,8 +24,8 @@ export function namesInText(text) {
     .map(([, name]) => name)
 }
 
-/** Every "<prefix>:<name>" literal under the dirs, as prefix -> names. */
-export function refsInDirs(dirs) {
+/** Every "<prefix>:<name>" literal under the dirs, as prefix -> names. `skip` are paths left out. */
+export function refsInDirs(dirs, skip = []) {
   const refs = new Map()
   const walk = (dir) => {
     let entries
@@ -35,8 +35,8 @@ export function refsInDirs(dirs) {
       return
     }
     for (const entry of entries) {
-      if (SKIP.has(entry)) continue
       const path = join(dir, entry)
+      if (SKIP.has(entry) || skip.includes(path)) continue
       if (statSync(path).isDirectory()) walk(path)
       else if (SOURCE.test(entry)) {
         for (const [prefix, name] of refsInText(readFileSync(path, "utf8"))) {
@@ -51,8 +51,8 @@ export function refsInDirs(dirs) {
 }
 
 /** The lucide names under the dirs. */
-export function namesInDirs(dirs) {
-  return refsInDirs(dirs).get("lucide") ?? new Set()
+export function namesInDirs(dirs, skip = []) {
+  return refsInDirs(dirs, skip).get("lucide") ?? new Set()
 }
 
 export function subset(collection, names) {

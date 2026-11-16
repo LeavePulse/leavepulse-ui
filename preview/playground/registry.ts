@@ -1,5 +1,6 @@
 import { basics } from "./entries/basics"
 import { data } from "./entries/data"
+import { editor } from "./entries/editor"
 import { forms } from "./entries/forms"
 import { motion } from "./entries/motion"
 import { navigation } from "./entries/navigation"
@@ -34,6 +35,7 @@ export const sections: Section[] = [
   { id: "patterns", title: "Patterns", icon: "lucide:combine", lead: "Choose between similar components and try useful combinations with shared state.", entries: patterns },
   { id: "basics", title: "Basics", icon: "lucide:shapes", lead: "Buttons, cards, badges and the small pieces every screen is made of.", entries: [...basics, ...extra("Basics")] },
   { id: "forms", title: "Forms", icon: "lucide:text-cursor-input", lead: "Fields, pickers and uploads, each with its own validation and notices.", entries: [...forms, ...extra("Forms")] },
+  { id: "editor", title: "Editor", icon: "lucide:file-pen-line", lead: "A block editor built from plugins, alone or with others in one document.", entries: editor },
   { id: "data", title: "Data", icon: "lucide:chart-column", lead: "Charts, tables, stats and logs that load, empty and update without jumping.", entries: [...data, ...extra("Data")] },
   { id: "navigation", title: "Navigation", icon: "lucide:compass", lead: "Tabs, menus, the command palette and keyboard and gamepad movement.", entries: navigation },
   { id: "overlays", title: "Overlays and feedback", icon: "lucide:layers", lead: "Dialogs, drawers, toasts and the notification bell.", entries: [...overlays, ...extra("Overlays")] },

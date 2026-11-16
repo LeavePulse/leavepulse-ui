@@ -25,6 +25,9 @@ import type { ActionBarLabels } from "../components/LpActionBar.vue"
 import type { ActivityLineLabels } from "../components/LpActivityLine.vue"
 import type { AppShellLabels } from "../components/LpAppShell.vue"
 import type { AutocompleteLabels } from "../components/LpAutocomplete.vue"
+import type { CalloutLabels } from "../editor/callout"
+import type { ImageLabels } from "../editor/image"
+import type { RichEditorLabels } from "../editor/LpRichEditor.vue"
 import type { BadgeLabels } from "../components/LpBadge.vue"
 import type { BottomNavLabels } from "../components/LpBottomNav.vue"
 import type { BreadcrumbsLabels } from "../components/LpBreadcrumbs.vue"
@@ -165,6 +168,10 @@ export interface KitLabels {
   themeSwitcher: FullLabels<ThemeSwitcherLabels>
   time: FullLabels<TimeUnitLabels>
   toast: FullLabels<ToasterLabels>
+  editor: FullLabels<RichEditorLabels>
+  editorBlocks: Record<string, string>
+  editorCallout: FullLabels<CalloutLabels>
+  editorImage: FullLabels<ImageLabels>
   toc: FullLabels<TableOfContentsLabels>
   topology: FullLabels<TopologyLabels>
   tour: FullLabels<TourLabels>
@@ -634,6 +641,75 @@ export const uk: KitLabels = {
   },
   time: { d: "д", h: "год", m: "хв", s: "с" },
   toast: { dismiss: "Закрити", copy: "Копіювати повідомлення", copied: "Скопійовано" },
+  editor: {
+    placeholder: "Введіть / для блоків",
+    titlePlaceholder: "Без назви",
+    undo: "Скасувати",
+    redo: "Повторити",
+    turnInto: "Перетворити на",
+    insert: "Вставити",
+    noBlocks: "Такого блоку немає",
+    dragHandle: "Перетягніть, щоб перемістити",
+    addBlock: "Додати блок нижче",
+    connecting: "Підключення…",
+    connected: "Збережено",
+    offline: "Немає зв'язку, зміни збережено локально",
+    apply: "Застосувати",
+    removeLink: "Прибрати посилання",
+    cut: "Вирізати",
+    copy: "Копіювати",
+    paste: "Вставити",
+    pasteText: "Вставити як звичайний текст",
+    format: "Формат",
+    insertBelow: "Вставити нижче",
+    duplicate: "Дублювати блок",
+    deleteBlock: "Видалити блок",
+  },
+  editorBlocks: {
+    "group:text": "Текст",
+    "group:lists": "Списки",
+    "group:layout": "Розмітка",
+    "group:media": "Медіа",
+    paragraph: "Текст",
+    heading1: "Заголовок 1",
+    heading2: "Заголовок 2",
+    heading3: "Заголовок 3",
+    quote: "Цитата",
+    codeBlock: "Код",
+    divider: "Роздільник",
+    bulletList: "Маркований список",
+    orderedList: "Нумерований список",
+    taskList: "Список завдань",
+    table: "Таблиця",
+    toggle: "Розгортання",
+    callout: "Виноска",
+    image: "Зображення",
+    bold: "Жирний",
+    italic: "Курсив",
+    underline: "Підкреслений",
+    strike: "Закреслений",
+    code: "Код у рядку",
+    highlight: "Виділення",
+    link: "Посилання",
+    columns2: "2 колонки",
+    columns3: "3 колонки",
+    addRowAfter: "Додати рядок нижче",
+    addColumnAfter: "Додати стовпець праворуч",
+    toggleHeaderRow: "Рядок заголовків",
+    deleteRow: "Видалити рядок",
+    deleteColumn: "Видалити стовпець",
+    deleteTable: "Видалити таблицю",
+  },
+  editorCallout: { info: "Примітка", success: "Порада", warning: "Увага", danger: "Небезпека" },
+  editorImage: {
+    center: "По центру",
+    left: "Ліворуч",
+    right: "Праворуч",
+    wrapLeft: "Текст праворуч",
+    wrapRight: "Текст ліворуч",
+    caption: "Додати підпис",
+    resize: "Потягніть, щоб змінити розмір",
+  },
   toc: { title: "На цій сторінці" },
   topology: { search: "Знайти вузол", searchResults: "Знайдено: {n}", selected: "Вибрано: {n}", timeline: "Версія" },
   tour: {
