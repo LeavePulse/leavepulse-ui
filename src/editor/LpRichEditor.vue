@@ -441,7 +441,7 @@ defineExpose({ editor })
         >
           <span v-for="peer in peers" :key="peer.id" class="flex">
             <LpTooltip :content="peer.name">
-              <span class="rounded-full ring-2" :style="{ '--tw-ring-color': peer.color }">
+              <span class="flex rounded-full ring-2 ring-offset-1 ring-offset-surface" :style="{ '--tw-ring-color': peer.color }">
                 <LpAvatar :src="peer.avatar" :alt="peer.name" :identicon="peer.id" size="xs" />
               </span>
             </LpTooltip>
