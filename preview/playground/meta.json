@@ -3675,13 +3675,15 @@
    },
    {
     "name": "size",
-    "type": "\"md\" | \"sm\" | \"lg\" | undefined",
+    "type": "\"md\" | \"sm\" | \"lg\" | \"inherit\" | undefined",
     "required": false,
     "default": "\"md\"",
+    "description": "`inherit` takes the font of the text around it, for a page title or a heading.",
     "choices": [
      "md",
      "sm",
-     "lg"
+     "lg",
+     "inherit"
     ]
    },
    {

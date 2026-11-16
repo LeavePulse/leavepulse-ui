@@ -123,12 +123,13 @@ export const fieldsForms: ComponentEntry[] = [
     id: "editable",
     name: "Editable",
     description:
-      "Text edited where it stands: click, Enter or F2 to edit, Enter or leaving commits, Escape cancels. Saving is optimistic; a failed save reopens the field with what was typed and the error under it.",
+      "Text edited where it stands: click, Enter or F2 to edit, Enter or leaving commits, Escape cancels. Saving is optimistic; a failed save reopens the field with what was typed and the error under it. `size=\"inherit\"` takes the font around it, for a page title.",
     components: { LpEditable, LpBadge },
     state: () => {
       let calls = 0
       return reactive({
         name: "Survival — Frankfurt",
+        page: "Moderator handbook",
         motd: "Welcome! Be nice.\nNo griefing.",
         tag: "",
         save: async (value: string) => {
@@ -141,6 +142,7 @@ export const fieldsForms: ComponentEntry[] = [
       })
     },
     template: `<div class="flex w-96 flex-col gap-4">
+  <h2 class="text-2xl font-semibold tracking-tight"><LpEditable v-model="page" label="Page title" size="inherit" :save="save" /></h2>
   <div class="flex items-center gap-2">
     <LpEditable v-model="name" label="Server name" :save="save" :validate="validate" size="lg" class="font-semibold" required />
     <LpBadge tone="success" size="sm" dot>Online</LpBadge>

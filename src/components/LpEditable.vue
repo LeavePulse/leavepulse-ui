@@ -70,7 +70,8 @@ const props = withDefaults(
     disabled?: boolean
     /** Shown as text, never editable — for a viewer without the right to change it. */
     readonly?: boolean
-    size?: "sm" | "md" | "lg"
+    /** `inherit` takes the font of the text around it, for a page title or a heading. */
+    size?: "sm" | "md" | "lg" | "inherit"
     labels?: Partial<EditableLabels & { required: string }>
   }>(),
   { modelValue: "", trim: true, size: "md" },
@@ -200,7 +201,7 @@ watch(
   },
 )
 
-const PAD = { sm: "px-1.5 py-0.5 text-xs", md: "px-2 py-1 text-sm", lg: "px-2.5 py-1.5 text-base" } as const
+const PAD = { sm: "px-1.5 py-0.5 text-xs", md: "px-2 py-1 text-sm", lg: "px-2.5 py-1.5 text-base", inherit: "px-[0.2em] py-[0.05em]" } as const
 const spinnerSize = computed(() => (props.size === "sm" ? 11 : 13))
 const singleLineRoll = computed(() => !props.multiline && shown.value.length <= 60 && !!shown.value)
 

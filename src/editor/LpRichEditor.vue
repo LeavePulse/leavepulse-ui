@@ -409,11 +409,13 @@ defineExpose({ editor })
           leave-active-class="absolute transition duration-(--duration-fast) motion-reduce:transition-none"
           leave-to-class="opacity-0 scale-50"
         >
-          <LpTooltip v-for="peer in peers" :key="peer.id" :content="peer.name">
-            <span class="rounded-full ring-2" :style="{ '--tw-ring-color': peer.color }">
-              <LpAvatar :src="peer.avatar" :alt="peer.name" :identicon="peer.id" size="xs" />
-            </span>
-          </LpTooltip>
+          <span v-for="peer in peers" :key="peer.id" class="flex">
+            <LpTooltip :content="peer.name">
+              <span class="rounded-full ring-2" :style="{ '--tw-ring-color': peer.color }">
+                <LpAvatar :src="peer.avatar" :alt="peer.name" :identicon="peer.id" size="xs" />
+              </span>
+            </LpTooltip>
+          </span>
         </TransitionGroup>
         <span class="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
           <span class="size-1.5 rounded-full transition-colors" :class="status === 'connected' ? 'bg-action' : status === 'offline' ? 'bg-danger' : 'bg-accent'" />
