@@ -527,6 +527,9 @@ const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: 
   keeps an id and the app's `chip` component draws the current name.
   `commentsPlugin` anchors a thread id to selected text as a mark; the thread
   lives in the app (`create`, `open`), `removeComment` lifts the anchor.
+- A block's Vue view takes `NodeViewProps` and renders inside `NodeViewWrapper`
+  (and `NodeViewContent` for editable content); they and the `Editor` type come
+  from `@leavepulse/ui/editor`, so an app does not add TipTap itself.
 - Labels: the `editor`, `editorBlocks` (block, mark, group and action names by
   id), `editorCallout` and `editorImage` scopes; the Ukrainian pack covers them.
 
