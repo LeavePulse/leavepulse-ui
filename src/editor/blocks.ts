@@ -5,7 +5,7 @@
  * toolbar and the selection bubble show. Adding a block is one entry in one
  * plugin; nothing else in the editor has to learn about it.
  */
-import { mergeAttributes, Node, type AnyExtension, type ChainedCommands, type Editor, type JSONContent, type MarkdownRendererHelpers } from "@tiptap/core"
+import { mergeAttributes, Node, type AnyExtension, type ChainedCommands, type Editor, type JSONContent, type MarkdownRendererHelpers, type Range } from "@tiptap/core"
 import { VueNodeViewRenderer, type NodeViewProps } from "@tiptap/vue-3"
 import type { Component } from "vue"
 
@@ -50,6 +50,8 @@ export interface EditorMark {
   /** As LpKeys reads it: "Mod+B". */
   shortcut?: string
   toggle: (chain: ChainedCommands) => ChainedCommands
+  /** Runs instead of `toggle` when the mark needs more than a click (a comment asks for its thread). */
+  act?: (editor: Editor) => void
   active: (editor: Editor) => boolean
   input?: EditorMarkInput
 }
@@ -63,10 +65,39 @@ export interface EditorAction {
   run: (editor: Editor) => void
 }
 
+/** A row of a trigger's menu: a block for "/", a person or a channel for a mention. */
+export interface PickItem {
+  id: string
+  label: string
+  description?: string
+  icon?: string
+  image?: string
+  /** Section of the menu. */
+  group: string
+  groupLabel?: string
+  keywords?: string[]
+}
+
+/**
+ * A character that opens a menu at the cursor ("/", "@", "#"). The editor
+ * draws the menu; the trigger says what is in it and what picking does.
+ */
+export interface EditorTrigger {
+  id: string
+  char: string
+  items: (query: string, editor: Editor) => PickItem[] | Promise<PickItem[]>
+  /** The items are already matched to the query (a server search); otherwise the kit's command search ranks them. */
+  searched?: boolean
+  pick: (item: PickItem, editor: Editor, range: Range) => void
+  /** Wording when nothing matches. */
+  empty?: string
+}
+
 export interface EditorPlugin {
   id: string
   /** Right-click actions for where the cursor is now; an empty list adds nothing. */
   actions?: (editor: Editor) => EditorAction[]
+  triggers?: EditorTrigger[]
   extensions?: AnyExtension[] | ((context: EditorContext) => AnyExtension[])
   blocks?: EditorBlock[]
   marks?: EditorMark[]
@@ -74,6 +105,7 @@ export interface EditorPlugin {
 
 export interface ResolvedPlugins {
   actions: ((editor: Editor) => EditorAction[])[]
+  triggers: EditorTrigger[]
   extensions: AnyExtension[]
   blocks: EditorBlock[]
   marks: EditorMark[]
@@ -85,14 +117,16 @@ export function resolvePlugins(plugins: EditorPlugin[], context: EditorContext):
   const marks = new Map<string, EditorMark>()
   const extensions: AnyExtension[] = []
   const actions: ((editor: Editor) => EditorAction[])[] = []
+  const triggers = new Map<string, EditorTrigger>()
   for (const plugin of plugins) {
     if (plugin.actions) actions.push(plugin.actions)
+    for (const trigger of plugin.triggers ?? []) triggers.set(trigger.id, trigger)
     const own = typeof plugin.extensions === "function" ? plugin.extensions(context) : plugin.extensions
     extensions.push(...(own ?? []))
     for (const block of plugin.blocks ?? []) blocks.set(block.id, block)
     for (const mark of plugin.marks ?? []) marks.set(mark.id, mark)
   }
-  return { actions, extensions, blocks: [...blocks.values()], marks: [...marks.values()] }
+  return { actions, triggers: [...triggers.values()], extensions, blocks: [...blocks.values()], marks: [...marks.values()] }
 }
 
 type AttrValue = string | number | boolean | null

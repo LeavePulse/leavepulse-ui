@@ -1,44 +1,46 @@
 /*
- * The "/" trigger. It only reports what is being typed and where; the editor
- * renders the menu itself from its resolved blocks, so the list, its search
- * and its wording are the same as the insert menu's.
+ * A trigger character turned into editor state. It only reports what is
+ * typed after the character and where; the editor draws the menu from the
+ * trigger's items, so "/", "@" and "#" share one menu, its keys and its search.
  */
 import { Extension, type Range } from "@tiptap/core"
 import { PluginKey } from "@tiptap/pm/state"
 import Suggestion from "@tiptap/suggestion"
 
-export interface SlashState {
+export interface TriggerState {
+  trigger: string
   query: string
   range: Range
   rect: () => DOMRect | null
 }
 
-export interface SlashOptions {
-  onState: (state: SlashState | null) => void
+export interface TriggerOptions {
+  id: string
+  char: string
+  onState: (state: TriggerState | null) => void
   onKey: (event: KeyboardEvent) => boolean
 }
 
-export const SLASH_KEY = new PluginKey("lpSlash")
-
-export const SlashCommand = Extension.create<SlashOptions>({
-  name: "lpSlash",
+export const TriggerMenu = Extension.create<TriggerOptions>({
+  name: "lpTrigger",
   addOptions() {
-    return { onState: () => undefined, onKey: () => false }
+    return { id: "", char: "/", onState: () => undefined, onKey: () => false }
   },
   addProseMirrorPlugins() {
-    const { onState, onKey } = this.options
+    const { id, char, onState, onKey } = this.options
+    const report = (props: { query: string; range: Range; clientRect?: (() => DOMRect | null) | null }) =>
+      onState({ trigger: id, query: props.query, range: props.range, rect: () => props.clientRect?.() ?? null })
     return [
       Suggestion({
         editor: this.editor,
-        pluginKey: SLASH_KEY,
-        char: "/",
-        startOfLine: false,
+        pluginKey: new PluginKey(`lpTrigger:${id}`),
+        char,
         allowSpaces: false,
         allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
         items: () => [],
         render: () => ({
-          onStart: (props) => onState({ query: props.query, range: props.range, rect: () => props.clientRect?.() ?? null }),
-          onUpdate: (props) => onState({ query: props.query, range: props.range, rect: () => props.clientRect?.() ?? null }),
+          onStart: report,
+          onUpdate: report,
           onExit: () => onState(null),
           onKeyDown: ({ event }) => onKey(event),
         }),

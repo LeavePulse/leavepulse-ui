@@ -521,6 +521,12 @@ const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: 
 - Without `collaboration` it is a v-model over TipTap JSON. With it the
   document is a shared Yjs one over the standard y-websocket protocol, with
   carets, presence and unsent edits kept in IndexedDB.
+- A trigger (`triggers` on a plugin) is a character that opens the cursor menu
+  and what picking does: `/` is the stock one built from the blocks.
+  `mentionPlugin` adds `@` and `#` kinds with the app's own search; the chip
+  keeps an id and the app's `chip` component draws the current name.
+  `commentsPlugin` anchors a thread id to selected text as a mark; the thread
+  lives in the app (`create`, `open`), `removeComment` lifts the anchor.
 - Labels: the `editor`, `editorBlocks` (block, mark, group and action names by
   id), `editorCallout` and `editorImage` scopes; the Ukrainian pack covers them.
 

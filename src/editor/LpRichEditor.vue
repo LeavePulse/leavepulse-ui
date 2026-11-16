@@ -32,11 +32,11 @@ import LpTooltip from "../components/LpTooltip.vue"
 import { useLabels } from "../composables/useLpConfig"
 import { HeadingAnchors, outlineOf, type OutlineHeading } from "./anchors"
 import { defaultEditorPlugins } from "./basics"
-import { resolvePlugins, type EditorBlock, type EditorMark, type EditorPlugin } from "./blocks"
+import { resolvePlugins, type EditorBlock, type EditorMark, type EditorPlugin, type EditorTrigger, type PickItem } from "./blocks"
 import type { Collaboration as Shared } from "./collaboration"
-import EditorBlockMenu, { type BlockMenuItem } from "./EditorBlockMenu.vue"
+import EditorPickMenu from "./EditorPickMenu.vue"
 import { MARKDOWN_HINT } from "./markdown"
-import { SlashCommand, type SlashState } from "./slash"
+import { TriggerMenu, type TriggerState } from "./slash"
 
 /** Wording of the editor chrome. Block, mark and group names come from `editorBlocks`, keyed by id. */
 export type RichEditorLabels = {
@@ -127,12 +127,44 @@ const blockHint = (block: EditorBlock) => named.value[`${block.id}:hint`] ?? blo
 const markName = (mark: EditorMark) => named.value[mark.id] ?? mark.label
 const groupName = (group: string) => named.value[`group:${group}`] ?? group
 
-const slash = shallowRef<SlashState | null>(null)
+const slashTrigger: EditorTrigger = {
+  id: "slash",
+  char: "/",
+  items: () =>
+    resolved.blocks.filter(visible).map((block) => ({
+      id: block.id,
+      label: blockName(block),
+      description: blockHint(block),
+      icon: block.icon,
+      group: block.group,
+      groupLabel: groupName(block.group),
+      keywords: block.keywords,
+    })),
+  pick: (item, target, range) => {
+    const block = resolved.blocks.find((row) => row.id === item.id)
+    if (block) block.insert(target.chain().focus().deleteRange(range), target).run()
+  },
+}
+const triggers = [slashTrigger, ...resolved.triggers]
+
+const picking = shallowRef<TriggerState | null>(null)
+const pickItems = shallowRef<PickItem[]>([])
 const lastQuery = ref("")
-watch(slash, (state) => state && (lastQuery.value = state.query))
 let lastRect: DOMRect | null = null
-const menuRect = () => (lastRect = slash.value?.rect() ?? lastRect)
-const menu = ref<InstanceType<typeof EditorBlockMenu> | null>(null)
+const menuRect = () => (lastRect = picking.value?.rect() ?? lastRect)
+const menu = ref<InstanceType<typeof EditorPickMenu> | null>(null)
+const activeTrigger = computed(() => triggers.find((row) => row.id === picking.value?.trigger))
+let pickSeq = 0
+watch(picking, async (state) => {
+  if (!state) return
+  lastQuery.value = state.query
+  const trigger = triggers.find((row) => row.id === state.trigger)
+  const target = editor.value
+  if (!trigger || !target) return
+  const seq = ++pickSeq
+  const found = await trigger.items(state.query, target)
+  if (seq === pickSeq) pickItems.value = found
+})
 
 const collab = props.collaboration
 const editor = useEditor({
@@ -141,7 +173,14 @@ const editor = useEditor({
   extensions: [
     ...resolved.extensions,
     HeadingAnchors,
-    SlashCommand.configure({ onState: (state) => (slash.value = state), onKey: (event) => menu.value?.key(event) ?? false }),
+    ...triggers.map((trigger) =>
+      TriggerMenu.extend({ name: `lpTrigger_${trigger.id}` }).configure({
+        id: trigger.id,
+        char: trigger.char,
+        onState: (state) => (picking.value = state),
+        onKey: (event) => menu.value?.key(event) ?? false,
+      }),
+    ),
     ...(collab
       ? [
           Collaboration.configure({ document: collab.document }),
@@ -187,29 +226,16 @@ const visible = (block: EditorBlock) => !editor.value || !block.available || blo
 
 function run(block: EditorBlock) {
   const target = editor.value
-  if (!target) return
-  const range = slash.value?.range
-  const chain = target.chain().focus()
-  block.insert(range ? chain.deleteRange(range) : chain, target).run()
+  if (target) block.insert(target.chain().focus(), target).run()
 }
 
 function pick(id: string) {
-  const block = resolved.blocks.find((row) => row.id === id)
-  if (block) run(block)
-  slash.value = null
+  const target = editor.value
+  const state = picking.value
+  const item = pickItems.value.find((row) => row.id === id)
+  if (target && state && item) activeTrigger.value?.pick(item, target, state.range)
+  picking.value = null
 }
-
-const menuItems = computed<BlockMenuItem[]>(() =>
-  resolved.blocks.filter(visible).map((block) => ({
-    id: block.id,
-    label: blockName(block),
-    description: blockHint(block),
-    icon: block.icon,
-    group: block.group,
-    groupLabel: groupName(block.group),
-    keywords: block.keywords,
-  })),
-)
 
 const convertible = computed(() => resolved.blocks.filter((block) => block.convertible && visible(block)))
 const current = computed(() => {
@@ -246,6 +272,10 @@ const linkInput = ref<InstanceType<typeof LpInput> | null>(null)
 function toggleMark(mark: EditorMark) {
   const target = editor.value
   if (!target) return
+  if (mark.act) {
+    mark.act(target)
+    return
+  }
   if (mark.input && !mark.active(target)) {
     linking.value = mark
     linkValue.value = mark.input.read(target)
@@ -449,7 +479,16 @@ defineExpose({ editor })
       <EditorContent :editor="editor" class="lp-rich-body min-w-0 flex-1" @contextmenu.capture="buildMenu" />
     </LpContextMenu>
 
-    <EditorBlockMenu ref="menu" :open="!!slash" :items="menuItems" :query="slash?.query ?? lastQuery" :rect="menuRect" :empty="text.noBlocks" @pick="pick" />
+    <EditorPickMenu
+      ref="menu"
+      :open="!!picking"
+      :items="pickItems"
+      :query="picking?.query ?? lastQuery"
+      :searched="activeTrigger?.searched"
+      :rect="menuRect"
+      :empty="activeTrigger?.empty ?? text.noBlocks"
+      @pick="pick"
+    />
   </div>
 </template>
 
@@ -744,6 +783,19 @@ defineExpose({ editor })
   .lp-rich-doc div[data-type="details"].is-open div[data-type="detailsContent"] {
     animation: none;
   }
+}
+.lp-rich-doc .lp-comment {
+  border-bottom: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  background: var(--color-accent-soft);
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 160ms) ease;
+}
+.lp-rich-doc .lp-comment:hover,
+.lp-rich-doc .lp-comment[data-active] {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+.lp-rich-doc .lp-mention {
+  white-space: nowrap;
 }
 .lp-rich-doc .collaboration-carets__caret {
   position: relative;

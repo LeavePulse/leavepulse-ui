@@ -691,6 +691,7 @@ export const uk: KitLabels = {
     code: "Код у рядку",
     highlight: "Виділення",
     link: "Посилання",
+    comment: "Коментар",
     columns2: "2 колонки",
     columns3: "3 колонки",
     addRowAfter: "Додати рядок нижче",

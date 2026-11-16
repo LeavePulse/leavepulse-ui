@@ -1,33 +1,29 @@
 <script setup lang="ts">
 /*
- * The "/" menu: the editor's blocks, grouped and searched with the kit's
- * command search (so a query typed in the wrong keyboard layout still finds
- * them). Focus stays in the document; the editor forwards arrows and Enter.
+ * The menu a trigger opens at the cursor: blocks for "/", people and channels
+ * for a mention. Items are grouped and, unless the trigger searched them
+ * itself, ranked with the kit's command search (a query typed in the wrong
+ * keyboard layout still finds them). Focus stays in the document; the editor
+ * forwards arrows and Enter.
  */
 import { autoUpdate, computePosition, flip, offset, shift, size } from "@floating-ui/dom"
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import { parseCommandQuery, searchCommandItems } from "../components/commandSearch"
 import { POPOVER_PANEL } from "../components/dropdown"
+import LpAvatar from "../components/LpAvatar.vue"
 import LpIcon from "../components/LpIcon.vue"
 import { scrollToElement } from "../composables/scroll"
 import { usePortalTarget } from "../composables/useView"
 
-export interface BlockMenuItem {
-  id: string
-  label: string
-  description?: string
-  icon: string
-  group: string
-  groupLabel: string
-  keywords?: string[]
-}
+import type { PickItem } from "./blocks"
 
 const props = defineProps<{
-  items: BlockMenuItem[]
+  items: PickItem[]
   query: string
   rect: () => DOMRect | null
   empty: string
   open: boolean
+  searched?: boolean
 }>()
 const emit = defineEmits<{ (e: "pick", id: string): void }>()
 
@@ -35,11 +31,11 @@ const portalTo = usePortalTarget()
 const panel = ref<HTMLElement | null>(null)
 const index = ref(0)
 
-const found = computed(() => searchCommandItems(props.items, parseCommandQuery(props.query)).items)
+const found = computed(() => (props.searched ? props.items : searchCommandItems(props.items, parseCommandQuery(props.query)).items))
 const sections = computed(() => {
-  const out = new Map<string, { label: string; rows: { item: BlockMenuItem; at: number }[] }>()
+  const out = new Map<string, { label: string; rows: { item: PickItem; at: number }[] }>()
   found.value.forEach((item, at) => {
-    const section = out.get(item.group) ?? { label: item.groupLabel, rows: [] }
+    const section = out.get(item.group) ?? { label: item.groupLabel ?? item.group, rows: [] }
     section.rows.push({ item, at })
     out.set(item.group, section)
   })
@@ -89,7 +85,7 @@ watch(panel, (element) => {
 })
 onBeforeUnmount(() => stop?.())
 
-function order(item: BlockMenuItem) {
+function order(item: PickItem) {
   return ordered.value.indexOf(item)
 }
 </script>
@@ -113,8 +109,9 @@ function order(item: BlockMenuItem) {
           @mouseenter="index = order(row.item)"
           @click="emit('pick', row.item.id)"
         >
-          <span class="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-surface-raised">
-            <LpIcon :name="row.item.icon" class="size-4" />
+          <LpAvatar v-if="row.item.image" :src="row.item.image" :alt="row.item.label" size="sm" class="shrink-0" />
+          <span v-else class="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-surface-raised">
+            <LpIcon :name="row.item.icon ?? 'lucide:circle'" class="size-4" />
           </span>
           <span class="min-w-0">
             <span class="block truncate text-sm text-ink">{{ row.item.label }}</span>
