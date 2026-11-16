@@ -74,7 +74,12 @@ function resize(event: PointerEvent, side: -1 | 1) {
           @pointerdown.prevent.stop="resize($event, side)"
         />
       </template>
-      <figcaption v-if="editable || node.attrs.caption" class="mt-1.5 text-center text-sm text-muted" contenteditable="false">
+      <figcaption
+        v-if="editable || node.attrs.caption"
+        class="mt-1.5 text-center text-sm text-muted transition-opacity duration-(--duration-fast)"
+        :class="editable && !node.attrs.caption && !selected && 'opacity-0 group-hover/image:opacity-100 focus-within:opacity-100'"
+        contenteditable="false"
+      >
         <LpEditable
           v-if="editable"
           :model-value="node.attrs.caption ?? ''"

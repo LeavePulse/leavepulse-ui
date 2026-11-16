@@ -108,6 +108,7 @@ function liveMarkers(state: EditorState): Marker[] {
 interface LiveState {
   shown: Marker[]
   leaving: Marker[]
+  focused: boolean
 }
 
 const LIVE_KEY = new PluginKey<LiveState>("lpLivePreview")
@@ -116,22 +117,32 @@ const LiveSyntax = Extension.create({
   name: "lpLiveSyntax",
   addProseMirrorPlugins() {
     const editor = this.editor
-    const current = (state: EditorState) => (editor.isEditable ? liveMarkers(state) : [])
+    const current = (state: EditorState, focused: boolean) => (editor.isEditable && focused ? liveMarkers(state) : [])
+    const toggle = (view: { state: EditorState; dispatch: (tr: EditorState["tr"]) => void }, meta: "focus" | "blur") => {
+      view.dispatch(view.state.tr.setMeta(LIVE_KEY, meta).setMeta("addToHistory", false))
+      return false
+    }
     return [
       new Plugin<LiveState>({
         key: LIVE_KEY,
         state: {
-          init: (_, state) => ({ shown: current(state), leaving: [] }),
+          init: () => ({ shown: [], leaving: [], focused: false }),
           apply: (tr, old, _before, state) => {
-            const shown = current(state)
-            if (tr.getMeta(LIVE_KEY) === "settle") return { shown, leaving: [] }
+            const meta = tr.getMeta(LIVE_KEY)
+            const focused = meta === "focus" ? true : meta === "blur" ? false : old.focused
+            const shown = current(state, focused)
+            if (meta === "settle") return { shown, leaving: [], focused }
             const moved = (marker: Marker) => ({ ...marker, pos: tr.mapping.map(marker.pos, marker.side) })
             const gone = [...old.shown, ...old.leaving].map(moved).filter((marker) => !shown.some((next) => same(next, marker)))
-            if (!tr.docChanged && !tr.selectionSet && gone.length === old.leaving.length) return { shown, leaving: old.leaving }
-            return { shown, leaving: tr.docChanged ? [] : gone }
+            if (!tr.docChanged && !tr.selectionSet && !meta && gone.length === old.leaving.length) return { shown, leaving: old.leaving, focused }
+            return { shown, leaving: tr.docChanged ? [] : gone, focused }
           },
         },
         props: {
+          handleDOMEvents: {
+            focus: (view) => toggle(view, "focus"),
+            blur: (view) => toggle(view, "blur"),
+          },
           decorations: (state) => {
             const live = LIVE_KEY.getState(state)
             if (!live || (!live.shown.length && !live.leaving.length)) return DecorationSet.empty
