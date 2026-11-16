@@ -9,6 +9,7 @@ import { computed, nextTick, ref, watch } from "vue"
 import LpEditable from "../components/LpEditable.vue"
 import LpSegmented from "../components/LpSegmented.vue"
 import { durationToken, easingToken, prefersReducedMotion } from "../composables/easing"
+import { isHTMLElement } from "../composables/useView"
 import { startPointerDrag } from "../composables/pointerDrag"
 import { useLabels } from "../composables/useLpConfig"
 import { IMAGE_LAYOUTS, MIN_IMAGE_WIDTH, type ImageLabels, type ImageLayout } from "./image"
@@ -40,7 +41,7 @@ function moved(): HTMLElement[] {
   if (!wrapper) return []
   const out = [wrapper]
   let next = wrapper.nextElementSibling
-  while (next instanceof HTMLElement && out.length <= NEIGHBOURS) {
+  while (isHTMLElement(next) && out.length <= NEIGHBOURS) {
     out.push(next)
     next = next.nextElementSibling
   }
