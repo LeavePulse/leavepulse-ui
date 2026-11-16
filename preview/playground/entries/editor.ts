@@ -86,6 +86,15 @@ export const editor: ComponentEntry[] = [
       ]
       return state
     },
+    thumb: `<div class="w-64 overflow-hidden rounded-card border border-line bg-surface text-left">
+  <div class="flex items-center gap-1 border-b border-line px-2 py-1 text-muted"><span class="text-[10px]">¶ Text</span><span class="ml-2 text-[10px] font-bold">B</span><span class="text-[10px] italic">I</span><span class="text-[10px] underline">U</span></div>
+  <div class="px-3 py-2">
+    <p class="text-sm font-semibold text-ink"><span class="font-mono text-[10px] text-muted">## </span>{{ tTitle }}</p>
+    <p class="mt-1 text-[11px] text-muted-strong">Type <span class="rounded bg-surface-soft px-1 font-mono">/</span> for blocks, <b class="text-ink">select</b> to format.</p>
+    <div class="mt-1.5 rounded-md border border-accent/30 bg-accent-soft px-2 py-1 text-[10px] text-ink">Never mute without a reason.</div>
+  </div>
+</div>`,
+    thumbLoop: { every: 1800, frames: [{ tTitle: "Moderator handbook" }, { tTitle: "First shift" }, { tTitle: "Sanctions" }] },
     template: `<div class="flex w-full gap-6">
   <div class="min-w-0 flex-1 overflow-hidden rounded-card border border-line">
     <LpRichEditor v-model="doc" :plugins="plugins" @outline="outline = $event" />
@@ -106,6 +115,11 @@ export const editor: ComponentEntry[] = [
     description:
       "Two editors on one shared Yjs document, relayed in the page as a websocket room would. Type in either: the text merges, the other caret and selection show with a name, and the toolbar lists who is here.\n\nIn an app: `useCollaboration({ url, room, user })` joins a y-websocket or pycrdt-websocket room, keeps unsent edits in IndexedDB and reports the link state; pass the result as `collaboration`.",
     components: { CollabDemo },
+    thumb: `<div class="w-64 overflow-hidden rounded-card border border-line bg-surface px-3 py-2 text-left">
+  <div class="mb-1.5 flex items-center gap-1"><span class="size-3 rounded-full bg-brand"></span><span class="size-3 rounded-full bg-accent"></span><span class="ml-auto text-[10px] text-muted">● Saved</span></div>
+  <p class="text-[11px] text-ink">Ann writes here.<span class="relative mx-px inline-block h-3 border-l border-accent align-middle"><span class="absolute -top-3.5 left-0 rounded-sm bg-accent px-1 text-[8px] font-medium leading-tight text-[#0b1210]">Ben</span></span>{{ tTail }}</p>
+</div>`,
+    thumbLoop: { every: 1500, frames: [{ tTail: "" }, { tTail: " Ben" }, { tTail: " Ben adds a line." }] },
     template: `<CollabDemo class="w-full" />`,
   },
 ]
