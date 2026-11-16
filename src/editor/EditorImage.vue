@@ -5,9 +5,10 @@
  * running around it) and a caption edited where it stands.
  */
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/vue-3"
-import { computed, ref } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import LpEditable from "../components/LpEditable.vue"
 import LpSegmented from "../components/LpSegmented.vue"
+import { durationToken, easingToken, prefersReducedMotion } from "../composables/easing"
 import { startPointerDrag } from "../composables/pointerDrag"
 import { useLabels } from "../composables/useLpConfig"
 import { IMAGE_LAYOUTS, MIN_IMAGE_WIDTH, type ImageLabels, type ImageLayout } from "./image"
@@ -31,6 +32,42 @@ const editable = computed(() => props.editor.isEditable)
 const figure = ref<HTMLElement | null>(null)
 const draft = ref<number | null>(null)
 const width = computed(() => draft.value ?? (props.node.attrs.width as number | null))
+
+const NEIGHBOURS = 12
+
+function moved(): HTMLElement[] {
+  const wrapper = figure.value?.parentElement
+  if (!wrapper) return []
+  const out = [wrapper]
+  let next = wrapper.nextElementSibling
+  while (next instanceof HTMLElement && out.length <= NEIGHBOURS) {
+    out.push(next)
+    next = next.nextElementSibling
+  }
+  return out
+}
+
+watch(
+  () => props.node.attrs.align,
+  async () => {
+    const view = figure.value?.ownerDocument.defaultView
+    if (!view || prefersReducedMotion(view)) return
+    const before = new Map(moved().map((el) => [el, el.getBoundingClientRect()]))
+    await nextTick()
+    const scope = figure.value?.ownerDocument
+    const ms = durationToken("duration-medium", undefined, scope)
+    const easing = easingToken("ease-emphasized", undefined, scope)
+    for (const [el, from] of before) {
+      if (!el.isConnected) continue
+      const now = el.getBoundingClientRect()
+      const dx = from.left - now.left
+      const dy = from.top - now.top
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], { duration: ms, easing })
+    }
+  },
+  { flush: "pre" },
+)
 
 function resize(event: PointerEvent, side: -1 | 1) {
   const wrapper = figure.value?.parentElement
