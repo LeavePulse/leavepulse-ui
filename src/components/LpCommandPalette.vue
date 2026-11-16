@@ -1311,9 +1311,14 @@ function scrollSelectedIntoView() {
 
 const keyboardSelection = ref(false)
 
-function select(index: number, keyboard = false) {
+// A disabled row is a note, not a choice (an error, a summary above the
+// results): the highlight steps over it in the direction it was moving, so
+// Enter never lands on a row that does nothing. Only an all-disabled list keeps it.
+function select(index: number, keyboard = false, step: 1 | -1 = 1) {
   const len = flat.value.length
-  selectedIndex.value = len ? clamp(index, 0, len - 1) : 0
+  let next = len ? clamp(index, 0, len - 1) : 0
+  for (let tried = 0; tried < len && flat.value[next]?.disabled; tried++) next = (next + step + len) % len
+  selectedIndex.value = flat.value[next]?.disabled ? (len ? clamp(index, 0, len - 1) : 0) : next
   const row = flat.value[selectedIndex.value]
   selectedId.value = row ? rowId(row) : null
   if (keyboard) keyboardSelection.value = true
@@ -1325,10 +1330,10 @@ function moveDown() {
 }
 function moveUp() {
   const len = flat.value.length
-  if (len) select((selectedIndex.value - 1 + len) % len, true)
+  if (len) select((selectedIndex.value - 1 + len) % len, true, -1)
 }
 function movePage(direction: -1 | 1) {
-  select(selectedIndex.value + direction * 8, true)
+  select(selectedIndex.value + direction * 8, true, direction)
 }
 function onPaletteKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.target !== inputRef.value || promptCommand.value) return
@@ -1346,7 +1351,7 @@ function onPaletteKeydown(event: KeyboardEvent) {
   if (event.key === "ArrowDown") moveDown()
   else if (event.key === "ArrowUp") moveUp()
   else if (event.key === "Home") select(0, true)
-  else if (event.key === "End") select(flat.value.length - 1, true)
+  else if (event.key === "End") select(flat.value.length - 1, true, -1)
   else movePage(event.key === "PageDown" ? 1 : -1)
 }
 /*

@@ -5,7 +5,7 @@ import {
   LpButton, LpConfirmHost, LpDatePicker, LpDateRangePicker, LpDrawer,
   LpEditable, LpFormField, LpInput, LpPasswordInput, LpRepeater,
   LpSecretField, LpSelect, LpDataList, LpChart, LpFrame,
-  LpContextMenu, LpDropdownMenu, LpDropzone, LpPopover, LpSegmented, LpTable, useForm,
+  LpCommandPalette, LpContextMenu, LpDropdownMenu, LpDropzone, LpPopover, LpSegmented, LpTable, useForm,
   useTableFilterChoice, type DateRange, type TableFilters,
 } from "../../src"
 
@@ -23,6 +23,12 @@ const blurCount = ref(0)
 const chosen = ref("tcp")
 const open = ref(true)
 const saved = ref<unknown[]>([])
+const ran = ref("")
+const noteCommands = [
+  { id: "note", label: "Summary above the results", disabled: true },
+  { id: "first", label: "First action", onSelect: () => { ran.value = "first" } },
+  { id: "last", label: "Last action", onSelect: () => { ran.value = "last" } },
+]
 const form = reactive(useForm({
   initial: { date: undefined as string | undefined, range: undefined as DateRange | undefined },
   rules: {
@@ -63,7 +69,11 @@ const menuItems = [{ label: "Move to", children: [
 
 <template>
   <main class="mx-auto flex max-w-xl flex-col gap-4 p-6">
-    <CommandContextDemo v-if="scenario === 'context-palette'" testing :manual-commands="mode === 'override' ? [{ id: 'service/cpu', label: 'Custom processor action' }] : undefined" />
+    <template v-if="scenario === 'palette-note'">
+      <LpCommandPalette :open="true" :commands="noteCommands" />
+      <output aria-label="Ran">{{ ran }}</output>
+    </template>
+    <CommandContextDemo v-else-if="scenario === 'context-palette'" testing :manual-commands="mode === 'override' ? [{ id: 'service/cpu', label: 'Custom processor action' }] : undefined" />
     <template v-else-if="scenario === 'frame'">
       <button data-test-outside>Outside frame</button>
       <LpFrame :height="420" title="Frame interactions">

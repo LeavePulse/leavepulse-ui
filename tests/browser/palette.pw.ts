@@ -235,3 +235,26 @@ test("every option is named from its label and description, with or without a hi
   expect(names.length).toBeGreaterThan(5)
   expect(names.filter(n => !n.trim())).toEqual([])
 })
+
+test("the highlight steps over a disabled note row both ways", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=palette-note")
+  const input = page.getByRole("combobox").first()
+  await expect(input).toBeFocused()
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("first")
+})
+
+test("arrowing round the list never lands on the disabled note", async ({ page }) => {
+  await page.goto("/tests/browser/?scenario=palette-note")
+  const input = page.getByRole("combobox").first()
+  const active = () => page.evaluate(() => {
+    const id = document.querySelector("[role=combobox]")?.getAttribute("aria-activedescendant")
+    return id ? document.getElementById(id)?.textContent?.trim() ?? "" : ""
+  })
+  await input.press("ArrowUp")
+  expect(await active()).not.toContain("Summary")
+  await input.press("ArrowDown")
+  expect(await active()).toContain("First action")
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("first")
+})
