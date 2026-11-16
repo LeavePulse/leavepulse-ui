@@ -521,6 +521,8 @@ const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: 
 - Without `collaboration` it is a v-model over TipTap JSON. With it the
   document is a shared Yjs one over the standard y-websocket protocol, with
   carets, presence and unsent edits kept in IndexedDB.
+  The `#peer` slot (`{ peer }`) draws each present person in the toolbar, so
+  the app can show its own name for them and its own right-click menu.
 - A trigger (`triggers` on a plugin) is a character that opens the cursor menu
   and what picking does: `/` is the stock one built from the blocks.
   `mentionPlugin` adds `@` and `#` kinds with the app's own search; the chip

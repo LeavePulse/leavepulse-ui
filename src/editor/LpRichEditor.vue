@@ -440,11 +440,13 @@ defineExpose({ editor })
           leave-to-class="opacity-0 scale-50"
         >
           <span v-for="peer in peers" :key="peer.id" class="flex">
-            <LpTooltip :content="peer.name">
-              <span class="flex rounded-full ring-2 ring-offset-1 ring-offset-surface" :style="{ '--tw-ring-color': peer.color }">
-                <LpAvatar :src="peer.avatar" :alt="peer.name" :identicon="peer.id" size="xs" />
-              </span>
-            </LpTooltip>
+            <slot name="peer" :peer="peer">
+              <LpTooltip :content="peer.name">
+                <span class="flex rounded-full ring-2 ring-offset-1 ring-offset-surface" :style="{ '--tw-ring-color': peer.color }">
+                  <LpAvatar :src="peer.avatar" :alt="peer.name" :identicon="peer.id" size="xs" />
+                </span>
+              </LpTooltip>
+            </slot>
           </span>
         </TransitionGroup>
         <span class="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
