@@ -35,6 +35,19 @@ const loadLucide = loadOnce(() =>
   import("@iconify-json/lucide/icons.json").then((m) => (m.default ?? m) as IconifyJSON),
 )
 
+const lookCollections = new Set<string>()
+
+/**
+ * Register a look's icon collection once, synchronously and without bumping
+ * `iconsVersion`: LpIcon calls it while resolving a name and reads the icon
+ * straight after, so the first render (and a server render) already has it.
+ */
+export function ensureLookIcons(prefix: string, collection: IconifyJSON): void {
+  if (lookCollections.has(prefix)) return
+  lookCollections.add(prefix)
+  addCollection(collection)
+}
+
 /** Register a whole iconify collection (any prefix) for offline use. */
 export function registerIconCollection(collection: IconifyJSON): void {
   addCollection(collection)

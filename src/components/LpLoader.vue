@@ -37,6 +37,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { useLoadingGate } from "../composables/useLoadingGate"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import LoaderMark from "./LoaderMark.vue"
+import { useLook } from "../looks/look"
 import LpSwap from "./LpSwap.vue"
 import { toneLook, type ToneName } from "./tone"
 
@@ -89,7 +90,6 @@ const props = withDefaults(
     labels?: Partial<LoaderLabels>
   }>(),
   {
-    variant: "spinner",
     size: "md",
     tone: "current",
     active: true,
@@ -98,6 +98,10 @@ const props = withDefaults(
     track: false,
   },
 )
+
+/* The variant asked for, else the look's (the pixel look's grid), else a spinner. */
+const look = useLook()
+const variant = computed<LoaderVariant>(() => props.variant ?? look.value.loader ?? "spinner")
 
 const text = useLabels<LoaderLabels>("loader", { loading: "Loading…" }, () => props.labels)
 const shown = useLoadingGate(() => props.active, {
@@ -116,7 +120,7 @@ const wraps = computed(() => !!slots.default)
  */
 const { class: rootClass, attrs: rest } = useMergedAttrs(() => {
   const tone = props.tone === "current" ? "" : toneLook(props.tone).text
-  if (props.variant === "bar") {
+  if (variant.value === "bar") {
     return `flex w-full min-w-12 flex-col gap-1.5 ${tone}`
   }
   return `inline-flex items-center gap-2 align-middle ${tone}`

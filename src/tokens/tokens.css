@@ -847,3 +847,17 @@
  * app like the launcher). App-level resets live in the consumer (see the
  * preview's preview.css / a host's own base styles).
  */
+
+/*
+ * The stepped motion of a look (looks/look.ts): every kit easing becomes a
+ * few discrete steps, so transitions move frame by frame like a sprite instead
+ * of gliding. Durations stay; only the curve changes, so nothing is faster or
+ * slower than before. An attribute rather than a theme token because it is a
+ * property of the look, which an app may combine with any theme. `lpConfig`
+ * puts it on the document; a subtree can carry it on its own wrapper.
+ */
+[data-lp-motion="stepped"] {
+  --ease-emphasized: steps(4, end);
+  --ease-travel: steps(5, end);
+  --ease-settle: steps(4, end);
+}

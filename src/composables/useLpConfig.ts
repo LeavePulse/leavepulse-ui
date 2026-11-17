@@ -8,7 +8,9 @@ import {
   type ComputedRef,
   type InjectionKey,
   type MaybeRefOrGetter,
+  watchEffect,
 } from "vue"
+import type { Look } from "../looks/look"
 import { pseudoLocalize, type PseudoOptions } from "./pseudoLocale"
 
 /*
@@ -43,6 +45,8 @@ export interface LpConfig {
    * them (see `pseudoLocalize`).
    */
   pseudoLocale?: boolean | PseudoOptions
+  /** How things are drawn: icon set, motion, default variants. See `Look` (looks/look.ts). */
+  look?: Look
 }
 
 /**
@@ -69,7 +73,15 @@ export function lpConfig(config: MaybeRefOrGetter<LpConfig>) {
   return {
     install: (app: App) => {
       const outer = app.runWithContext(() => inject(LP_CONFIG, {}))
-      app.provide(LP_CONFIG, layered(outer, config))
+      const merged = layered(outer, config)
+      app.provide(LP_CONFIG, merged)
+      if (typeof document !== "undefined") {
+        watchEffect(() => {
+          const motion = merged().look?.motion
+          if (motion && motion !== "smooth") document.documentElement.dataset.lpMotion = motion
+          else delete document.documentElement.dataset.lpMotion
+        })
+      }
     },
   }
 }
@@ -93,6 +105,7 @@ export function mergeConfig(outer: LpConfig, inner: LpConfig): LpConfig {
     linkComponent: inner.linkComponent ?? outer.linkComponent,
     storage: inner.storage ?? outer.storage,
     pseudoLocale: inner.pseudoLocale ?? outer.pseudoLocale,
+    look: inner.look ?? outer.look,
     labels,
   }
 }

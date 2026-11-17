@@ -9,7 +9,9 @@ import {
   LpIcon,
   LpIdenticon,
   LpInput,
+  LpLoader,
   LpPagination,
+  LpProgress,
   LpSegmented,
   LpSelect,
   LpShaderBackdrop,
@@ -19,6 +21,8 @@ import {
   pseudoLocalize,
   SHADER_PRESETS,
 } from "../../../src"
+import { pixelLook } from "../../../src/look-pixel"
+import { ConfigScope } from "../demos"
 import type { ComponentEntry } from "./shared"
 
 // Overlays and look: components built from ideas seen in other kits, written from scratch.
@@ -197,6 +201,38 @@ export const looksMotion: ComponentEntry[] = [
   </LpCollapse>
 </div>`,
     thumbLoop: { every: 1600, frames: [{ tOpen: true }, { tOpen: false }] },
+  },
+  {
+    id: "look",
+    name: "Look",
+    description:
+      "How things are drawn, over any theme: an icon set, the motion's character and the variant a component takes when the app names none. `app.use(lpConfig({ look: pixelLook }))` (from `@leavepulse/ui/look-pixel`) draws lucide names with pixelarticons where a pair exists, moves in steps, and makes LpLoader a grid, LpProgress an ascii bar and LpShaderBackdrop a dithered field. The app's code does not change; an explicit prop still wins. `pixelTheme` from the same entry is the palette it was drawn against.",
+    components: { ConfigScope, LpButton, LpIcon, LpLoader, LpProgress, LpSegmented, LpShaderBackdrop, LpSwitch },
+    state: () => reactive({ look: "pixel", looks: [{ value: "default", label: "Default" }, { value: "pixel", label: "Pixel" }], pixelLook, value: 42, on: true }),
+    template: `<div class="flex w-[34rem] max-w-full flex-col gap-4">
+  <LpSegmented v-model="look" :options="looks" size="sm" />
+  <ConfigScope :look="look === 'pixel' ? pixelLook : undefined">
+    <div class="relative flex flex-col gap-4 overflow-hidden rounded-card border border-line p-5">
+      <LpShaderBackdrop />
+      <div class="relative flex flex-wrap items-center gap-3 text-xl text-ink">
+        <LpIcon name="lucide:check" /><LpIcon name="lucide:trash-2" /><LpIcon name="lucide:settings" /><LpIcon name="lucide:search" />
+        <LpIcon name="lucide:user" /><LpIcon name="lucide:bell" /><LpIcon name="lucide:folder" /><LpIcon name="lucide:git-branch" />
+        <LpIcon name="lucide:x" /><LpIcon name="lucide:refresh-cw" /><LpIcon name="lucide:house" /><LpIcon name="lucide:mail" />
+      </div>
+      <div class="relative flex items-center gap-4">
+        <LpLoader :delay="0" label="Indexing" />
+        <LpButton size="sm" @click="value = (value + 23) % 101"><LpIcon name="lucide:plus" class="size-4" />Add</LpButton>
+        <LpSwitch v-model="on" label="Live" />
+      </div>
+      <LpProgress class="relative" :value="value" title="Sync" caption />
+    </div>
+  </ConfigScope>
+</div>`,
+    thumb: `<ConfigScope :look="pixelLook"><div class="relative flex h-40 w-72 flex-col justify-end gap-3 overflow-hidden rounded-card border border-line p-3">
+  <LpShaderBackdrop />
+  <div class="relative flex gap-2 text-lg text-ink"><LpIcon name="lucide:check" /><LpIcon name="lucide:settings" /><LpIcon name="lucide:search" /><LpLoader :delay="0" /></div>
+  <LpProgress class="relative" :value="64" caption />
+</div></ConfigScope>`,
   },
   {
     id: "shader-backdrop",

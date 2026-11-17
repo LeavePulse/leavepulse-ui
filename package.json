@@ -26,6 +26,10 @@
       "types": "./dist/icons-all.d.ts",
       "import": "./dist/icons-all.js"
     },
+    "./look-pixel": {
+      "types": "./dist/look-pixel.d.ts",
+      "import": "./dist/look-pixel.js"
+    },
     "./editor": {
       "types": "./dist/editor/index.d.ts",
       "import": "./dist/editor/index.js"
@@ -61,7 +65,7 @@
   "scripts": {
     "dev": "vite",
     "gen:names": "node scripts/gen-component-names.mjs",
-    "build": "node scripts/gen-component-names.mjs && node scripts/gen-kit-icons.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
+    "build": "node scripts/gen-component-names.mjs && node scripts/gen-kit-icons.mjs && node scripts/gen-pixel-look.mjs && vue-tsc --noEmit -p tsconfig.build.json && vite build --config vite.lib.config.ts && vue-tsc --declaration --emitDeclarationOnly --noEmit false -p tsconfig.build.json --outDir dist",
     "dev:dist": "vite build --watch --config vite.lib.config.ts",
     "prepublishOnly": "npm run build",
     "typecheck": "vue-tsc --noEmit",
@@ -75,7 +79,7 @@
     "check:ssr": "node scripts/check-ssr.mjs",
     "check:size": "node scripts/check-size.mjs",
     "test:coverage": "bun test --coverage",
-    "gen:icons": "node scripts/gen-kit-icons.mjs",
+    "gen:icons": "node scripts/gen-kit-icons.mjs && node scripts/gen-pixel-look.mjs",
     "gen:meta": "node scripts/gen-preview-meta.mjs",
     "gen:readme": "node scripts/readme-catalogue.mjs"
   },
@@ -98,6 +102,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@iconify-json/lucide": "^1.2.112",
+    "@iconify-json/pixelarticons": "^1.2.10",
     "@iconify/vue": "^5.0.1",
     "@nuxt/kit": "^4.0.0",
     "@nuxt/schema": "^4.0.0",

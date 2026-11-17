@@ -26,8 +26,9 @@ function collectEntries() {
   const entries: Record<string, string> = {
     index: resolve("./src/index.ts"),
     "icons-all": resolve("./src/icons-all.ts"),
+    "look-pixel": resolve("./src/look-pixel.ts"),
   }
-  for (const dir of ["components", "composables", "layout", "theme", "editor"]) {
+  for (const dir of ["components", "composables", "layout", "theme", "editor", "looks"]) {
     for (const file of readdirSync(resolve(`./src/${dir}`))) {
       if (!/\.(vue|ts)$/.test(file) || file.endsWith(".d.ts")) continue
       entries[`${dir}/${file.replace(/\.ts$/, "")}`] = resolve(`./src/${dir}/${file}`)

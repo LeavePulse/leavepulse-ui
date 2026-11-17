@@ -154,6 +154,28 @@ In Nuxt the module does it for you: `icons: "scan"` (default) registers every
 `lucide:*` literal found in the app's source, so they are in the SSR markup;
 `"all"` registers the whole set, `"kit"` only the kit's own, or pass a list.
 
+### Looks
+
+A theme says what colour and shape things are; a look says what they are drawn
+with: an icon set, the character of the motion, and the variant a component
+takes when the app names none. Set one with the kit config, app-wide or for a
+subtree, and the app's code stays as it is:
+
+```ts
+import { lpConfig, useTheme } from "@leavepulse/ui"
+import { pixelLook, pixelTheme } from "@leavepulse/ui/look-pixel"
+
+app.use(lpConfig({ look: pixelLook }))  // pixel icons, stepped motion, grid loader, ascii progress, dithered backdrop
+useTheme().setTheme(pixelTheme)         // optional: the palette the look was drawn against
+```
+
+The pixel look draws a `lucide:*` name with its pixelarticons pair where one
+exists (about 490 names) and leaves the rest lucide; its icons ship in the
+`look-pixel` entry, so they reach only apps that import it. An explicit prop
+(`<LpLoader variant="dots">`) always beats the look. `lpConfig` puts the
+look's motion on the document as `data-lp-motion`; a subtree with its own look
+sets that attribute on its wrapper.
+
 ### Nuxt
 
 ```ts

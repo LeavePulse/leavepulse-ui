@@ -7,6 +7,7 @@ import {
   useHotkeys,
   useModalLayer,
   type LabelScope,
+  type Look,
 } from "../../src"
 import { href, navigate, parse } from "./router"
 
@@ -42,10 +43,11 @@ export const ConfigScope = defineComponent({
   name: "ConfigScope",
   props: {
     labels: { type: Object as PropType<Partial<Record<string, Partial<LabelScope>>>>, default: undefined },
+    look: { type: Object as PropType<Look>, default: undefined },
   },
   setup(props, { slots }) {
-    provideLpConfig(() => ({ labels: props.labels }))
-    return () => h("div", { class: "contents" }, slots.default?.())
+    provideLpConfig(() => ({ labels: props.labels, look: props.look }))
+    return () => h("div", { class: "contents", "data-lp-motion": props.look?.motion }, slots.default?.())
   },
 })
 

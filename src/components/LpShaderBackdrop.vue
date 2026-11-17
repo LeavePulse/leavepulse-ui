@@ -41,6 +41,7 @@ export default { inheritAttrs: false }
 import { clamp } from "../composables/clamp"
 import { nodeWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { useLook } from "../looks/look"
 import { parseColor } from "./color"
 import { approach, frameDue, FRAGMENT_HEADER, PRESETS, tooSlow, VERTEX_SHADER, type ShaderPreset, type Vec3 } from "./shaderBackdrop"
 import { isBrokenBackdropEngine } from "../theme/backdrop"
@@ -64,8 +65,12 @@ const props = withDefaults(
     /** Always show the CSS still, never start WebGL: for a low-power mode or a screenshot. */
     still?: boolean
   }>(),
-  { preset: "aurora", intensity: 0.7, speed: 1, fps: 30, paused: false, still: false },
+  { intensity: 0.7, speed: 1, fps: 30, paused: false, still: false },
 )
+
+/* The preset asked for, else the look's (the pixel look's dither), else aurora. */
+const look = useLook()
+const preset = computed<ShaderPreset>(() => props.preset ?? look.value.backdrop ?? "aurora")
 
 const emit = defineEmits<{
   /** WebGL could not be used (missing, too slow, context lost); the still is showing. Useful to log, not to act on. */
@@ -97,7 +102,7 @@ const animating = computed(() => !props.paused && inView.value)
  */
 const weakEngine = typeof navigator !== "undefined" && isBrokenBackdropEngine()
 
-const fallbackStyle = computed(() => ({ background: PRESETS[props.preset].fallback, opacity: Math.min(1, clamp01(props.intensity) * 1.15) }))
+const fallbackStyle = computed(() => ({ background: PRESETS[preset.value].fallback, opacity: Math.min(1, clamp01(props.intensity) * 1.15) }))
 
 function clamp01(n: number) {
   return clamp(n, 0, 1)
@@ -210,7 +215,7 @@ function sizeCanvas() {
   const el = canvas.value
   if (!el) return
   const dpr = Math.min(weakEngine ? 1 : 2, nodeWindow(el).devicePixelRatio || 1)
-  pixelRatio = dpr * PRESETS[props.preset].scale
+  pixelRatio = dpr * PRESETS[preset.value].scale
   const w = Math.max(1, Math.round(el.clientWidth * pixelRatio))
   const h = Math.max(1, Math.round(el.clientHeight * pixelRatio))
   if (el.width !== w || el.height !== h) {
@@ -271,7 +276,7 @@ function start() {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
   // One triangle that covers the whole viewport: cheaper than a quad, no seam.
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
-  if (!useProgram(props.preset)) {
+  if (!useProgram(preset.value)) {
     release()
     return giveUp("compile")
   }
@@ -384,7 +389,7 @@ watch(animating, sync)
  */
 let swapTimer = 0
 watch(
-  () => props.preset,
+  () => preset.value,
   (preset) => {
     if (!gl) return
     shown.value = false

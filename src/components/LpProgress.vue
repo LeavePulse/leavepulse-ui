@@ -19,6 +19,7 @@ export default { inheritAttrs: false }
 import { clamp } from "../composables/clamp"
 import { ProgressIndicator, ProgressRoot } from "reka-ui"
 import { computed } from "vue"
+import { useLook } from "../looks/look"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useRevealedValue } from "../composables/useRevealedValue"
 import LpNumberFlow from "./LpNumberFlow.vue"
@@ -91,7 +92,6 @@ const props = withDefaults(
     value: 0,
     max: 100,
     tone: "brand",
-    variant: "bar",
     size: 44,
     thickness: 4,
     cells: 20,
@@ -106,6 +106,10 @@ const props = withDefaults(
     duration: 900,
   },
 )
+
+/* The variant asked for, else the look's (the pixel look's ascii bar), else a bar. */
+const look = useLook()
+const variant = computed(() => props.variant ?? look.value.progress ?? "bar")
 
 /*
  * The arc and the counter are driven by ONE animated value rather than by two
@@ -204,9 +208,9 @@ const ascii = computed(() => {
  * or `w-40` on a titled one then replaces the default instead of racing it.
  */
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
-  props.variant === "ring"
+  variant.value === "ring"
     ? "relative inline-flex shrink-0 items-center justify-center"
-    : props.variant === "ascii"
+    : variant.value === "ascii"
       ? "inline-flex max-w-full items-center gap-2 font-mono text-xs"
     : props.title || captionText.value
       ? "flex w-full flex-col gap-1"

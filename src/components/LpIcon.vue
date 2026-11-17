@@ -14,7 +14,8 @@
  */
 import { computed, watchEffect } from "vue"
 import { Icon, getIcon } from "@iconify/vue"
-import { failedIcons, iconsVersion, requestIcon } from "../icons"
+import { ensureLookIcons, failedIcons, iconsVersion, requestIcon } from "../icons"
+import { useLook } from "../looks/look"
 
 const props = defineProps<{
   /** iconify name, e.g. "lucide:check". Bare names assume the lucide set. */
@@ -28,7 +29,21 @@ function resolve(name: string): string {
   return name.includes(":") ? name : `lucide:${name}`
 }
 
-const fullName = computed(() => resolve(props.name))
+const look = useLook()
+/*
+ * A look with its own icon set draws a lucide name with its pair from that set
+ * (the pixel look's pixelarticons). A name without a pair, or any other
+ * prefix, renders as written.
+ */
+const fullName = computed(() => {
+  const name = resolve(props.name)
+  const icons = look.value.icons
+  if (!icons || !name.startsWith("lucide:")) return name
+  const pair = icons.map[name.slice("lucide:".length)]
+  if (!pair) return name
+  ensureLookIcons(icons.prefix, icons.collection)
+  return `${icons.prefix}:${pair}`
+})
 const data = computed(() => {
   void iconsVersion.value
   const icon = getIcon(fullName.value)
