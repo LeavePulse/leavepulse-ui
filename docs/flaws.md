@@ -124,3 +124,9 @@ entry is deleted, not ticked: the commit says what changed.
   component with fixed row height, a `total`, a slot per row and an
   "unloaded row" slot would cover it. LpSelect also renders every option (1000
   account options open fine, but there is no windowing either).
+
+- **Palette browser tests flake on CI runners** (18.11.2026): `palette.pw.ts` "an edited value
+  invalidates an in-flight prompt validation" and "table rows reuse the original row actions"
+  each failed once on CI (element not found within 5 s) and pass locally every time, 8 of 8
+  repeats included. Both wait on a debounced async step; the slower runner misses the window.
+  A rerun passes. Worth making them wait on the state they assert instead of a fixed timeout.
