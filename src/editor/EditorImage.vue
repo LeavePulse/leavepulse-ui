@@ -27,6 +27,9 @@ const text = useLabels<ImageLabels>("editorImage", {
 })
 
 const layout = computed(() => IMAGE_LAYOUTS.find((row) => row.value === props.node.attrs.align) ?? IMAGE_LAYOUTS[0]!)
+const toolbarSide = computed(() =>
+  layout.value.value === "right" || layout.value.value === "wrapRight" ? "right-2" : layout.value.value === "center" ? "left-1/2 -translate-x-1/2" : "left-2",
+)
 const options = computed(() => IMAGE_LAYOUTS.map((row) => ({ value: row.value, icon: row.icon, ariaLabel: text.value[row.value] })))
 const editable = computed(() => props.editor.isEditable)
 
@@ -96,8 +99,8 @@ function resize(event: PointerEvent, side: -1 | 1) {
       <img :src="node.attrs.src" :alt="node.attrs.alt ?? ''" class="block w-full" :class="selected && editable && 'lp-image-selected'" draggable="false" />
       <template v-if="editable">
         <div
-          class="absolute left-2 top-2 opacity-0 transition-opacity duration-(--duration-fast) group-hover/image:opacity-100"
-          :class="selected && 'opacity-100'"
+          class="absolute top-2 opacity-0 transition-opacity duration-(--duration-fast) group-hover/image:opacity-100"
+          :class="[toolbarSide, selected && 'opacity-100']"
           contenteditable="false"
         >
           <LpSegmented :model-value="layout.value" :options="options" size="sm" :palette="false" @update:model-value="(value: string) => updateAttributes({ align: value as ImageLayout })" />

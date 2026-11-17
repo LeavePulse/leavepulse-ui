@@ -37,7 +37,7 @@ export const LIVE_BLOCKS: Record<string, (node: PmNode) => string> = {
 
 export const MARKDOWN_HINT = /^(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s|```|- \[[ x]\]\s)|\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|~~[^~]+~~/m
 
-interface Marker {
+export interface Marker {
   pos: number
   text: string
   side: -1 | 1
@@ -68,10 +68,11 @@ function quoteOf($pos: ResolvedPos): number | null {
   return null
 }
 
-function liveMarkers(state: EditorState): Marker[] {
+/** Syntax to show around the caret or a selection within one block: every marked run it touches. */
+export function liveMarkers(state: EditorState): Marker[] {
   const { selection } = state
-  if (!selection.empty) return []
   const $from = selection.$from
+  if (!selection.empty && !$from.sameParent(selection.$to)) return []
   const block = $from.parent
   if (!block.isTextblock) return []
   const start = $from.start()
@@ -81,7 +82,8 @@ function liveMarkers(state: EditorState): Marker[] {
   const quote = quoteOf($from)
   if (quote !== null && $from.index(quote) === 0 && $from.depth === quote + 1) found.push({ pos: start, text: LIVE_BLOCKS.blockquote!(block), side: -1 })
 
-  const cursor = $from.parentOffset
+  const first = $from.parentOffset
+  const last = selection.empty ? first : selection.$to.parentOffset
   const spans = new Map<string, { mark: Mark; from: number; to: number }>()
   const open: { mark: Mark; from: number; to: number }[] = []
   block.forEach((child, offset) => {
@@ -98,7 +100,7 @@ function liveMarkers(state: EditorState): Marker[] {
     }
   })
   for (const span of open) {
-    if (cursor < span.from || cursor > span.to) continue
+    if (last < span.from || first > span.to) continue
     const [before, after] = LIVE_MARKS[span.mark.type.name]!(span.mark)
     found.push({ pos: start + span.from, text: before, side: -1 }, { pos: start + span.to, text: after, side: 1 })
   }
@@ -109,6 +111,7 @@ interface LiveState {
   shown: Marker[]
   leaving: Marker[]
   focused: boolean
+  pressed: boolean
 }
 
 const LIVE_KEY = new PluginKey<LiveState>("lpLivePreview")
@@ -118,7 +121,7 @@ const LiveSyntax = Extension.create({
   addProseMirrorPlugins() {
     const editor = this.editor
     const current = (state: EditorState, focused: boolean) => (editor.isEditable && focused ? liveMarkers(state) : [])
-    const toggle = (view: { state: EditorState; dispatch: (tr: EditorState["tr"]) => void }, meta: "focus" | "blur") => {
+    const toggle = (view: { state: EditorState; dispatch: (tr: EditorState["tr"]) => void }, meta: "focus" | "blur" | "press" | "release") => {
       view.dispatch(view.state.tr.setMeta(LIVE_KEY, meta).setMeta("addToHistory", false))
       return false
     }
@@ -126,22 +129,33 @@ const LiveSyntax = Extension.create({
       new Plugin<LiveState>({
         key: LIVE_KEY,
         state: {
-          init: () => ({ shown: [], leaving: [], focused: false }),
+          init: () => ({ shown: [], leaving: [], focused: false, pressed: false }),
           apply: (tr, old, _before, state) => {
             const meta = tr.getMeta(LIVE_KEY)
             const focused = meta === "focus" ? true : meta === "blur" ? false : old.focused
-            const shown = current(state, focused)
-            if (meta === "settle") return { shown, leaving: [], focused }
+            const pressed = meta === "press" ? true : meta === "release" || meta === "blur" ? false : old.pressed
             const moved = (marker: Marker) => ({ ...marker, pos: tr.mapping.map(marker.pos, marker.side) })
+            if (pressed && !tr.docChanged) return { shown: old.shown.map(moved), leaving: old.leaving.map(moved), focused, pressed }
+            const shown = current(state, focused)
+            if (meta === "settle") return { shown, leaving: [], focused, pressed }
             const gone = [...old.shown, ...old.leaving].map(moved).filter((marker) => !shown.some((next) => same(next, marker)))
-            if (!tr.docChanged && !tr.selectionSet && !meta && gone.length === old.leaving.length) return { shown, leaving: old.leaving, focused }
-            return { shown, leaving: tr.docChanged ? [] : gone, focused }
+            if (!tr.docChanged && !tr.selectionSet && !meta && gone.length === old.leaving.length) return { shown, leaving: old.leaving, focused, pressed }
+            return { shown, leaving: tr.docChanged ? [] : gone, focused, pressed }
           },
         },
         props: {
           handleDOMEvents: {
             focus: (view) => toggle(view, "focus"),
             blur: (view) => toggle(view, "blur"),
+            mousedown: (view, event) => {
+              if (event.button !== 0) return false
+              const release = () => {
+                window.removeEventListener("mouseup", release, true)
+                if (!view.isDestroyed) toggle(view, "release")
+              }
+              window.addEventListener("mouseup", release, true)
+              return toggle(view, "press")
+            },
           },
           decorations: (state) => {
             const live = LIVE_KEY.getState(state)

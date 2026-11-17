@@ -515,12 +515,18 @@ const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: 
   right-click actions the UI derives from them. The `/` menu, Insert, Turn into,
   the toolbar, the selection bubble and the context menu all read that list.
 - Stock plugins: text and marks, Markdown in and out, live preview (the syntax
-  of what the cursor is in shows in place, as in Obsidian), checklists,
+  of what the cursor or a selection in one block touches shows in place, as
+  in Obsidian, and holds still while the mouse is pressed), a block handle
+  (`+` and drag) beside the line under the cursor, list items included, that
+  steps aside of a list marker and hides when its line scrolls under the
+  sticky toolbar, checklists,
   callouts, toggles, columns, tables and images (resized by their edges,
   centred, to a side or floated with text around, captioned).
 - Without `collaboration` it is a v-model over TipTap JSON. With it the
   document is a shared Yjs one over the standard y-websocket protocol, with
-  carets, presence and unsent edits kept in IndexedDB.
+  carets, presence and unsent edits kept in IndexedDB. Until the shared
+  document arrives (and no local copy filled it) a placeholder holds its
+  place, then the text grows in.
   The `#peer` slot (`{ peer }`) draws each present person in the toolbar, so
   the app can show its own name for them and its own right-click menu.
   Where websockets are blocked, `fallback: { pull, push }` keeps it working

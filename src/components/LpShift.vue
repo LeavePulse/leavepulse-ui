@@ -310,7 +310,7 @@ const shiftClasses = computed(() => {
     tweening.value && !props.disabled
       ? `${transitionClass.value} duration-fast ease-[var(--ease-emphasized)] motion-reduce:transition-none`
       : "",
-    resizing.value ? "overflow-hidden" : "",
+    resizing.value ? "overflow-clip" : "",
     // While the box holds a width its content has outgrown, a flex row would
     // squeeze its children to fit (a button's keys folding into a column)
     // instead of letting the easing edge clip them.
@@ -340,11 +340,14 @@ defineExpose({ resizing })
 </script>
 
 <template>
-  <!-- `overflow-hidden` only while a tween owns the size: the box is briefly
+  <!-- `overflow: clip` only while a tween owns the size: the box is briefly
        smaller than the content it already holds, and without the clip that
        content spills past the easing edge. Dropped once settled, so nothing
        that legitimately overflows — a dropdown, a focus ring — is clipped at
-       rest. The classes are put on in script (`applyShiftClasses`), so a
+       rest. `clip` rather than `hidden`: a hidden box is a scroll container,
+       whose baseline drops to its bottom edge, so a title eased inside a
+       baseline-aligned row grew by its descenders for the whole tween.
+       The classes are put on in script (`applyShiftClasses`), so a
        tween starting or ending never renders the content again. -->
   <div ref="el">
     <slot />

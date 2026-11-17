@@ -79,7 +79,7 @@ export const easingToken = (
  * theme that retunes the token.
  */
 export const durationToken = (
-  name: "duration-fast" | "duration-medium",
+  name: "duration-fast" | "duration-medium" | "duration-slow",
   fallback = 220,
   scope?: TokenScope,
 ): number => {

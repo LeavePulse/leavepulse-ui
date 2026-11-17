@@ -17,6 +17,7 @@ registerIconCollection(EDITOR_ICONS)
 import type { Editor, JSONContent } from "@tiptap/core"
 import Collaboration from "@tiptap/extension-collaboration"
 import CollaborationCaret from "@tiptap/extension-collaboration-caret"
+import { TextSelection } from "@tiptap/pm/state"
 import { DragHandle } from "@tiptap/extension-drag-handle-vue-3"
 import { EditorContent, useEditor } from "@tiptap/vue-3"
 import { BubbleMenu } from "@tiptap/vue-3/menus"
@@ -28,7 +29,10 @@ import LpDropdownMenu, { type MenuItem } from "../components/LpDropdownMenu.vue"
 import LpIcon from "../components/LpIcon.vue"
 import LpInput from "../components/LpInput.vue"
 import LpRollingText from "../components/LpRollingText.vue"
+import LpSkeleton from "../components/LpSkeleton.vue"
 import LpTooltip from "../components/LpTooltip.vue"
+import { durationToken, easingToken, prefersReducedMotion } from "../composables/easing"
+import { nodeWindow } from "../composables/realm"
 import { useLabels } from "../composables/useLpConfig"
 import { HeadingAnchors, outlineOf, type OutlineHeading } from "./anchors"
 import { defaultEditorPlugins } from "./basics"
@@ -169,6 +173,44 @@ watch(picking, async (state) => {
 })
 
 const collab = props.collaboration
+const empty = ref(true)
+// A shared document arrives after the editor is drawn: until it has (and no
+// local copy filled it) a placeholder holds the place, then the text grows in.
+const waiting = computed(() => !!collab && empty.value && !collab.synced.value)
+const bodyEl = shallowRef<HTMLElement | null>(null)
+watch(
+  waiting,
+  async (now, before) => {
+    const el = bodyEl.value
+    if (now || !before || !el) return
+    const view = el.ownerDocument.defaultView
+    const from = el.offsetHeight
+    await nextTick()
+    if (!view || prefersReducedMotion(view) || !el.isConnected) return
+    const to = el.offsetHeight
+    const base = durationToken("duration-slow", undefined, el.ownerDocument)
+    const easing = easingToken("ease-travel", undefined, el.ownerDocument)
+    const ms = (distance: number) => Math.min(600, base * (1 + distance / 1500))
+    el.style.overflow = "hidden"
+    el.lastElementChild?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms(to - from), easing })
+    // Images inside may still be loading, so the end is taken again once the
+    // first leg lands, and the box keeps easing until it holds all of it.
+    let height = from
+    let target = to
+    for (let leg = 0; leg < 4 && el.isConnected && target > height + 1; leg++) {
+      const grow = el.animate([{ maxHeight: `${height}px` }, { maxHeight: `${target}px` }], { duration: ms(target - height), easing })
+      try {
+        await grow.finished
+      } catch {
+        break
+      }
+      height = target
+      target = el.scrollHeight
+    }
+    el.style.overflow = ""
+  },
+  { flush: "pre" },
+)
 const editor = useEditor({
   editable: props.editable,
   content: collab ? undefined : (props.modelValue ?? undefined),
@@ -192,10 +234,12 @@ const editor = useEditor({
   ],
   editorProps: { attributes: { class: "lp-rich-doc" } },
   onCreate: ({ editor: created }) => {
+    empty.value = created.isEmpty
     emit("ready", created)
     publishOutline(created)
   },
   onUpdate: ({ editor: changed }) => {
+    empty.value = changed.isEmpty
     if (!collab) emit("update:modelValue", changed.getJSON())
     publishOutline(changed)
   },
@@ -298,9 +342,22 @@ function applyInput() {
 function addBelow(pos: number | null) {
   const target = editor.value
   if (!target || pos === null) return
-  const node = target.state.doc.nodeAt(pos)
+  const { doc, schema } = target.state
+  const node = doc.nodeAt(pos)
   const at = node ? pos + node.nodeSize : pos
-  target.chain().focus().insertContentAt(at, { type: "paragraph" }).setTextSelection(at + 1).insertContent("/").run()
+  const $pos = doc.resolve(pos)
+  const paragraph = schema.nodes.paragraph!
+  const sibling = node && !$pos.parent.canReplaceWith($pos.index() + 1, $pos.index() + 1, paragraph) ? node.type.createAndFill() : null
+  target
+    .chain()
+    .focus()
+    .insertContentAt(at, sibling ? sibling.toJSON() : { type: "paragraph" })
+    .command(({ tr }) => {
+      tr.setSelection(TextSelection.near(tr.doc.resolve(at + 1)))
+      return true
+    })
+    .insertContent("/")
+    .run()
 }
 
 function topBlock(target: Editor) {
@@ -378,8 +435,54 @@ function buildMenu(event: MouseEvent) {
 }
 
 const hovered = ref<number | null>(null)
-function onNodeChange({ pos }: { pos: number }) {
+const toolbarEl = shallowRef<HTMLElement | null>(null)
+const handleEl = shallowRef<HTMLElement | null>(null)
+
+// The block handle sits in the gutter beside the sticky toolbar, so a block
+// scrolled under the toolbar would leave its handle floating next to it.
+function guardHandle() {
+  const bar = toolbarEl.value
+  const wrapper = handleEl.value?.parentElement
+  if (!bar || !wrapper) return
+  const covered = wrapper.getBoundingClientRect().top < bar.getBoundingClientRect().bottom - 2
+  if (covered) wrapper.dataset.covered = ""
+  else delete wrapper.dataset.covered
+}
+let handleWatch: MutationObserver | undefined
+let scrollWindow: Window | undefined
+const onScroll = () => guardHandle()
+watch(handleEl, (el) => {
+  handleWatch?.disconnect()
+  handleWatch = undefined
+  scrollWindow?.removeEventListener("scroll", onScroll, { capture: true })
+  scrollWindow = undefined
+  const wrapper = el?.parentElement
+  if (!wrapper) return
+  const win = nodeWindow(wrapper)
+  handleWatch = new win.MutationObserver(guardHandle)
+  handleWatch.observe(wrapper, { attributes: true, attributeFilter: ["style"] })
+  win.addEventListener("scroll", onScroll, { capture: true, passive: true })
+  scrollWindow = win
+})
+onBeforeUnmount(() => {
+  handleWatch?.disconnect()
+  scrollWindow?.removeEventListener("scroll", onScroll, { capture: true })
+})
+const ITEMS = new Set(["listItem", "taskItem"])
+const WAIT_LINES = ["92%", "86%", "95%", "60%", "88%", "74%"]
+const NESTED = {
+  rules: [
+    {
+      id: "itemOverItsLine",
+      evaluate: ({ node, parent, isFirst }: { node: { type: { name: string } }; parent: { type: { name: string } } | null; isFirst: boolean }) =>
+        isFirst && node.type.name === "paragraph" && parent && ITEMS.has(parent.type.name) ? 1000 : 0,
+    },
+  ],
+}
+const hoveredItem = ref(false)
+function onNodeChange({ node, pos }: { node: { type: { name: string } } | null; pos: number }) {
   hovered.value = pos >= 0 ? pos : null
+  hoveredItem.value = !!node && ITEMS.has(node.type.name)
 }
 
 const peers = computed(() => collab?.peers.value ?? [])
@@ -395,7 +498,7 @@ defineExpose({ editor })
 
 <template>
   <div class="lp-rich flex min-w-0 flex-col rounded-[inherit]">
-    <div v-if="toolbar && editor && editable" class="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-[inherit] border-b border-line bg-surface/90 px-2 py-1.5 backdrop-blur">
+    <div v-if="toolbar && editor && editable" ref="toolbarEl" class="sticky top-0 z-20 flex flex-wrap items-center gap-1 rounded-t-[inherit] border-b border-line bg-surface/90 px-2 py-1.5 backdrop-blur">
       <LpTooltip :content="text.undo" label>
         <button type="button" :class="TOOL" :disabled="!editor.can().undo()" @click="editor.chain().focus().undo().run()"><LpIcon name="lucide:undo-2" /></button>
       </LpTooltip>
@@ -470,8 +573,8 @@ defineExpose({ editor })
       </div>
     </BubbleMenu>
 
-    <DragHandle v-if="editor && editable" :editor="editor" :on-node-change="onNodeChange">
-      <div class="flex items-center gap-0.5 pr-1">
+    <DragHandle v-if="editor && editable" :editor="editor" :nested="NESTED" :on-node-change="onNodeChange">
+      <div ref="handleEl" class="flex items-center gap-0.5 pr-1 transition-transform duration-(--duration-fast) ease-(--ease-emphasized)" :class="hoveredItem && '-translate-x-6'">
         <LpTooltip :content="text.addBlock" label>
           <button type="button" :class="HANDLE" @click="addBelow(hovered)"><LpIcon name="lucide:plus" /></button>
         </LpTooltip>
@@ -479,9 +582,17 @@ defineExpose({ editor })
       </div>
     </DragHandle>
 
-    <LpContextMenu v-if="editor" :items="contextItems" always no-hint :palette="false">
-      <EditorContent :editor="editor" class="lp-rich-body min-w-0 flex-1" @contextmenu.capture="buildMenu" />
-    </LpContextMenu>
+    <div ref="bodyEl" class="flex min-w-0 flex-1 flex-col">
+      <div v-if="waiting" class="flex flex-col gap-3 px-12 py-8" aria-hidden="true">
+        <LpSkeleton class="h-7 w-2/5" />
+        <LpSkeleton v-for="width in WAIT_LINES" :key="width" class="h-4" :style="{ width }" />
+      </div>
+      <div class="flex min-w-0 flex-1 flex-col" :class="waiting && 'hidden'">
+        <LpContextMenu v-if="editor" :items="contextItems" always no-hint :palette="false">
+          <EditorContent :editor="editor" class="lp-rich-body min-w-0 flex-1" @contextmenu.capture="buildMenu" />
+        </LpContextMenu>
+      </div>
+    </div>
 
     <EditorPickMenu
       ref="menu"
@@ -684,6 +795,13 @@ defineExpose({ editor })
   inset: 0;
   pointer-events: none;
   background: var(--color-brand-soft);
+}
+.lp-rich .drag-handle {
+  transition: opacity var(--duration-fast, 160ms) var(--ease-emphasized, ease);
+}
+.lp-rich .drag-handle[data-covered] {
+  opacity: 0;
+  pointer-events: none;
 }
 .lp-rich-doc .column-resize-handle {
   position: absolute;
