@@ -19,7 +19,10 @@ export default { inheritAttrs: false }
  *
  * Looks (`preset`, see shaderBackdrop.ts): `aurora` (flowing bands of light),
  * `silk` (folded sheen), `grain` (drifting colour under film grain), `dots`
- * (a dot grid with a travelling ripple). All are coloured from the theme's
+ * (a dot grid with a travelling ripple), `dither` (rolling hills in coarse
+ * pixels and ordered dither), `contours` (a topographic map of a breathing
+ * landscape), `drift` (banks of mist at three depths), `vortex` (a slow
+ * whirlpool of spiral arms). All are coloured from the theme's
  * tokens and follow a theme change, blending to the new colours.
  *
  * What makes it safe to drop in anywhere:

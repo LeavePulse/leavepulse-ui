@@ -61,7 +61,7 @@ export const data: ComponentEntry[] = [
     id: "progress",
     name: "Progress",
     description:
-      "One value as a bar or a ring — same data, same tones. `variant=\"ring\"` for KPI dials, where a percentage should read at a glance. A `class` lands on the outside of either and is merged, so `h-2.5` thickens a bare bar and `w-40` narrows a titled one.",
+      "One value as a bar, a ring or a monospace ascii bar — same data, same tones. `variant=\"ring\"` for KPI dials, where a percentage should read at a glance; `variant=\"ascii\"` for terminal-styled pages, filling in eighths of a cell so it still moves smoothly. A `class` lands on the outside of either and is merged, so `h-2.5` thickens a bare bar and `w-40` narrows a titled one.",
     components: { LpProgress, LpSlider, LpButton },
     state: () => reactive({ live: 35 }),
     template: `<div class="flex flex-col gap-8">
@@ -76,6 +76,7 @@ export const data: ComponentEntry[] = [
     </div>
     <LpProgress :value="live" tone="auto" title="Live" caption />
     <LpProgress :value="live" variant="ring" tone="auto" class="self-start" />
+    <LpProgress :value="live" variant="ascii" tone="auto" title="Build" caption />
   </div>
 
   <div class="flex w-80 flex-col gap-3">

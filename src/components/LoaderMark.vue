@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * The drawing inside LpLoader: one of the three indicators plus its text.
+ * The drawing inside LpLoader: one of the four indicators plus its text.
  * Internal — it exists so LpLoader can show the same mark on its own and as a
  * placeholder swapped with content without writing it out twice. Its root
  * takes the class and attributes LpLoader merged for it.
@@ -19,6 +19,8 @@ defineProps<{
 const SPINNER = { inline: "size-[1em]", sm: "size-3.5", md: "size-5", lg: "size-8" }
 const DOT = { inline: "size-[0.25em]", sm: "size-1.5", md: "size-2", lg: "size-2.5" }
 const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
+const CELL = { inline: "size-[0.3em]", sm: "size-1", md: "size-1.5", lg: "size-2" }
+const CELL_GAP = { inline: "gap-[0.08em]", sm: "gap-px", md: "gap-0.5", lg: "gap-[3px]" }
 </script>
 
 <template>
@@ -34,6 +36,15 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
         <circle v-if="track" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity="0.2" />
         <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
+      <span v-else-if="variant === 'grid'" class="grid shrink-0 grid-cols-3" :class="CELL_GAP[size]" aria-hidden="true">
+        <span
+          v-for="i in 9"
+          :key="i"
+          class="lp-loader-cell rounded-[1px] bg-current"
+          :class="CELL[size]"
+          :style="{ animationDelay: `${(((i - 1) % 3) + Math.floor((i - 1) / 3)) * 110}ms` }"
+        />
+      </span>
       <span v-else class="inline-flex shrink-0 items-center gap-[0.3em]" aria-hidden="true">
         <span
           v-for="i in 3"
@@ -70,6 +81,17 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
   40% { transform: scale(1); opacity: 1; }
 }
 
+/* The grid lights its cells along the diagonal, corner to corner, the
+   pixel-styled loader: each cell dims and brightens a beat after the one
+   before it, so the wave reads as a direction rather than a flicker. */
+.lp-loader-cell {
+  animation: lp-loader-cell 1.1s ease-in-out infinite both;
+}
+@keyframes lp-loader-cell {
+  0%, 70%, 100% { opacity: 0.2; }
+  35% { opacity: 1; }
+}
+
 /* The bar's run is the kit's sweep (.lp-sweep in tokens.css), the same one
    LpActivityLine draws: it enters past one edge and leaves past the other,
    so the bar never sits still and never looks full. */
@@ -77,11 +99,13 @@ const BAR = { inline: "h-[0.2em]", sm: "h-0.5", md: "h-[3px]", lg: "h-1" }
 @media (prefers-reduced-motion: reduce) {
   .lp-loader-spin,
   .lp-loader-dot,
+  .lp-loader-cell,
   .lp-loader-bar {
     animation: lp-loader-breathe 1.6s ease-in-out infinite;
     transform: none;
   }
-  .lp-loader-dot { opacity: 1; }
+  .lp-loader-dot,
+  .lp-loader-cell { opacity: 1; }
   @keyframes lp-loader-breathe {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }

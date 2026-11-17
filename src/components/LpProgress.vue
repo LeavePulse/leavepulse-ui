@@ -57,8 +57,14 @@ const props = withDefaults(
      * ("23 GB / 64 GB"), which a percentage alone cannot.
      */
     caption?: boolean | string
-    /** `bar` (default) fills horizontally; `ring` draws a dial. */
-    variant?: "bar" | "ring"
+    /**
+     * `bar` (default) fills horizontally; `ring` draws a dial; `ascii` prints
+     * the bar as monospace block characters, `████▌░░░`, for terminal-styled
+     * pages and logs where a drawn bar would look out of place.
+     */
+    variant?: "bar" | "ring" | "ascii"
+    /** Ascii only: how many character cells the bar is wide. */
+    cells?: number
     /** Ring only: outer diameter in px. */
     size?: number
     /** Ring only: stroke width in px. */
@@ -88,6 +94,7 @@ const props = withDefaults(
     variant: "bar",
     size: 44,
     thickness: 4,
+    cells: 20,
     animateOnMount: true,
     // A resource is comfortable well past half, uncomfortable in the last
     // fifth, and urgent in the last tenth — the thresholds a capacity gauge is
@@ -177,6 +184,21 @@ const dash = computed(() => {
 const BAR_TRACK = `${METER_TRACK} overflow-hidden`
 
 /*
+ * The ascii bar fills in eighths of a cell with the partial block glyphs, so it
+ * moves smoothly through the shared animated value instead of jumping a whole
+ * character at a time. Built from `pct`, the same number the other variants
+ * read, so it eases and reveals exactly like them.
+ */
+const EIGHTHS = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"]
+const ascii = computed(() => {
+  const cells = Math.max(1, Math.round(props.cells))
+  const eighths = Math.round((pct.value / 100) * cells * 8)
+  const full = Math.floor(eighths / 8)
+  const part = full < cells ? EIGHTHS[eighths % 8] : ""
+  return { fill: "█".repeat(full) + part, rest: "░".repeat(Math.max(0, cells - full - (part ? 1 : 0))) }
+})
+
+/*
  * The consumer's class lands on whichever element is the outside of the
  * progress: the ring, the header wrapper, or the bare bar. `h-2` on a bare bar
  * or `w-40` on a titled one then replaces the default instead of racing it.
@@ -184,6 +206,8 @@ const BAR_TRACK = `${METER_TRACK} overflow-hidden`
 const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
   props.variant === "ring"
     ? "relative inline-flex shrink-0 items-center justify-center"
+    : props.variant === "ascii"
+      ? "inline-flex max-w-full items-center gap-2 font-mono text-xs"
     : props.title || captionText.value
       ? "flex w-full flex-col gap-1"
       : BAR_TRACK,
@@ -241,6 +265,19 @@ const staticCaption = computed(() =>
         :style="{ '--lp-nf-spin': '90ms' }"
       />
     </span>
+  </ProgressRoot>
+
+  <ProgressRoot
+    v-else-if="variant === 'ascii'"
+    :ref="bindReveal"
+    :model-value="value"
+    :max="max"
+    :class="rootClass"
+    v-bind="rest"
+  >
+    <span v-if="title" class="text-muted">{{ title }}</span>
+    <span class="whitespace-pre leading-none" aria-hidden="true"><span class="text-muted">[</span><span class="transition-colors duration-medium" :style="{ color: paintedTone.color }">{{ ascii.fill }}</span><span class="text-muted/40">{{ ascii.rest }}</span><span class="text-muted">]</span></span>
+    <span v-if="captionText" class="tabular-nums text-muted-strong">{{ captionText }}</span>
   </ProgressRoot>
 
   <!-- Wrapped only when there is a header to carry. A bare bar stays the single

@@ -7,7 +7,8 @@ export default { inheritAttrs: false }
 
 <script setup lang="ts">
 /*
- * The kit's loading indicator: a spinner, three dots or an indeterminate bar.
+ * The kit's loading indicator: a spinner, three dots, an indeterminate bar or
+ * a 3×3 grid lit corner to corner (the pixel-styled one).
  *
  * Every component that waits used to draw its own (a lucide loader-circle
  * with `animate-spin`, toned by hand), so each one blinked on fast loads in
@@ -25,6 +26,7 @@ export default { inheritAttrs: false }
  *
  *   <LpLoader />                                   inline spinner
  *   <LpLoader variant="dots" label="Connecting" />
+ *   <LpLoader variant="grid" size="lg" />
  *   <LpLoader :active="loading"><Results /></LpLoader>   placeholder → content
  *
  * Determinate progress (a known fraction) is LpProgress; this is for waits
@@ -38,7 +40,7 @@ import LoaderMark from "./LoaderMark.vue"
 import LpSwap from "./LpSwap.vue"
 import { toneLook, type ToneName } from "./tone"
 
-export type LoaderVariant = "spinner" | "dots" | "bar"
+export type LoaderVariant = "spinner" | "dots" | "bar" | "grid"
 export type LoaderSize = "inline" | "sm" | "md" | "lg"
 /** `current` inherits the text colour around it; the rest are the kit's tones (tone.ts). */
 export type LoaderTone = "current" | ToneName

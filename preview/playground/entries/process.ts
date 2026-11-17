@@ -49,7 +49,7 @@ export const processBasics: ComponentEntry[] = [
     id: "loader",
     name: "Loader",
     description:
-      "The kit's loading indicator: spinner, dots or an indeterminate bar, in four sizes (`inline` follows the font) and the kit tones. It waits `delay` ms before appearing, so a fast load shows nothing, and stays `minVisible` ms once shown, so it never blinks. role=\"status\" with a polite label; under reduced motion it breathes instead of moving. With a default slot it is a placeholder that swaps to the content when `active` goes off.",
+      "The kit's loading indicator: spinner, dots, an indeterminate bar or a 3×3 grid lit corner to corner, in four sizes (`inline` follows the font) and the kit tones. It waits `delay` ms before appearing, so a fast load shows nothing, and stays `minVisible` ms once shown, so it never blinks. role=\"status\" with a polite label; under reduced motion it breathes instead of moving. With a default slot it is a placeholder that swaps to the content when `active` goes off.",
     components: { LpLoader, LpButton, LpSwitch, LpSegmented },
     state: () =>
       reactive({
@@ -77,6 +77,8 @@ export const processBasics: ComponentEntry[] = [
     <LpLoader size="lg" :tone="tone" />
     <LpLoader variant="dots" :tone="tone" />
     <LpLoader variant="dots" size="lg" :tone="tone" label="Connecting" />
+    <LpLoader variant="grid" :tone="tone" />
+    <LpLoader variant="grid" size="lg" :tone="tone" label="Indexing" />
     <span class="text-lg text-ink">Syncing <LpLoader size="inline" :delay="0" /></span>
   </div>
   <LpLoader variant="bar" :tone="tone" label="Fetching servers" />
@@ -99,6 +101,7 @@ export const processBasics: ComponentEntry[] = [
   <div class="flex items-center gap-6">
     <LpLoader :delay="0" tone="brand" size="lg" track />
     <LpLoader :delay="0" variant="dots" tone="action" size="lg" />
+    <LpLoader :delay="0" variant="grid" tone="brand" size="lg" />
   </div>
   <LpLoader :delay="0" variant="bar" tone="brand" label="Fetching servers" />
 </div>`,

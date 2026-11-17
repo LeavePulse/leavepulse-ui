@@ -19,7 +19,7 @@
  * looks are drawn at half resolution for the same reason.
  */
 
-export type ShaderPreset = "aurora" | "silk" | "grain" | "dots"
+export type ShaderPreset = "aurora" | "silk" | "grain" | "dots" | "dither" | "contours" | "drift" | "vortex"
 
 export interface PresetDef {
   /** Body of the fragment shader, after the shared header. */
@@ -174,6 +174,131 @@ void main() {
     fallback: [
       `radial-gradient(circle, ${mix("ink", 22)} 1.5px, transparent 2.2px) center / 22px 22px`,
       `radial-gradient(45% 45% at 50% 50%, ${mix("brand", 16)}, transparent 75%)`,
+    ].join(", "),
+  },
+  /*
+   * Rolling hills drawn in dots, the retro terminal look: a few layered
+   * ridges drift sideways, each crest lit and fading downward, and the shade
+   * is made of on/off dots thresholded by a 4×4 Bayer matrix rather than a
+   * smooth gradient. Bayer is built from fract arithmetic: GLSL ES 1.00 has
+   * neither integer bit operations nor dynamically indexed constant arrays.
+   * The cell index is reduced mod 2 before it is squared: in mediump a large
+   * index squared loses its fraction, and the top of the screen turned to noise.
+   */
+  dither: {
+    scale: 1,
+    fragment: `
+float bayer2(vec2 a) { a = mod(floor(a), 2.0); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
+float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+float ridge(float x, float base, float off, float sp) {
+  return base + 0.11 * sin(x * 1.5 + off + u_time * sp) + 0.05 * sin(x * 3.7 - off * 1.7 + u_time * sp * 1.6) + 0.015 * sin(x * 9.0 + off * 3.0);
+}
+void main() {
+  float cell = 4.0 * u_px;
+  vec2 c = floor(gl_FragCoord.xy / cell);
+  vec2 uv = (c + 0.5) * cell / u_res;
+  float x = uv.x * u_res.x / u_res.y;
+  float shade = 0.0;
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    float d = ridge(x, 0.72 - fi * 0.17, fi * 2.3, 0.05 + fi * 0.03) - uv.y;
+    float glow = d > 0.0 ? exp(-d * 16.0) : 0.0;
+    shade = max(shade, glow * (0.35 + fi * 0.15));
+  }
+  float on = step(bayer4(c) + 0.03125, shade * u_k);
+  vec2 f = fract(gl_FragCoord.xy / cell);
+  float dotMask = step(f.x, 0.55) * step(f.y, 0.55);
+  vec3 lit = mix(u_bg, mix(u_ink, u_brand, 0.2), 0.42);
+  gl_FragColor = vec4(mix(u_bg, lit, on * dotMask), 1.0);
+}`,
+    fallback: [
+      `radial-gradient(circle, ${mix("ink", 16)} 1px, transparent 1.4px) 0 0 / 4px 4px`,
+      `radial-gradient(120% 60% at 30% 110%, var(--color-surface) 40%, transparent 70%)`,
+    ].join(", "),
+  },
+
+  contours: {
+    scale: 1,
+    fragment: `
+float height(vec2 p) {
+  float t = u_time * 0.08;
+  return 0.5 * sin(p.x * 1.3 + t) * cos(p.y * 1.1 - t * 0.7)
+    + 0.3 * sin(p.x * 2.7 - p.y * 1.9 + t * 1.3)
+    + 0.2 * cos(length(p - vec2(0.6, -0.4)) * 3.1 - t * 1.6);
+}
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y * 3.0;
+  float e = 3.0 / u_res.y;
+  float h = height(p);
+  vec2 grad = vec2(height(p + vec2(e, 0.0)) - h, height(p + vec2(0.0, e)) - h) / e;
+  float steps = 9.0;
+  float v = h * steps;
+  float d = abs(fract(v + 0.5) - 0.5) / max(length(grad) * steps * e, 1e-4);
+  float major = step(4.5, mod(floor(v + 0.5), 5.0));
+  float line = 1.0 - smoothstep(0.6, 1.4 + major * 0.6, d);
+  vec3 tint = mix(u_ink, u_brand, smoothstep(-0.2, 0.8, h));
+  vec3 col = mix(u_bg, tint, line * (0.16 + major * 0.12) * u_k);
+  gl_FragColor = vec4(col, 1.0);
+}`,
+    fallback: [
+      `repeating-radial-gradient(circle at 35% 60%, transparent 0 22px, ${mix("ink", 14)} 22px 23px)`,
+      `repeating-radial-gradient(circle at 78% 30%, transparent 0 26px, ${mix("brand", 12)} 26px 27px)`,
+    ].join(", "),
+  },
+
+  /*
+   * Banks of mist drifting sideways at three depths: the far layer slow and
+   * faint, the near one faster and stronger, so the parallax reads as depth.
+   * Each bank is a soft horizontal ribbon whose edge is broken by a few sines.
+   */
+  drift: {
+    scale: 0.5,
+    fragment: `
+float bank(vec2 uv, float y, float sp, float seed) {
+  float x = uv.x * u_res.x / u_res.y;
+  float edge = y + 0.05 * sin(x * 3.1 + u_time * sp + seed) + 0.03 * sin(x * 7.7 - u_time * sp * 1.4 + seed * 2.0);
+  float body = exp(-pow((uv.y - edge) * 7.0, 2.0));
+  float puffs = 0.7 + 0.3 * sin(x * 4.3 - u_time * sp * 2.0 + seed * 5.0);
+  return body * puffs;
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  vec3 col = u_bg;
+  col = mix(col, u_ink, bank(uv, 0.7, 0.05, 1.0) * 0.14 * u_k);
+  col = mix(col, u_accent, bank(uv, 0.45, 0.09, 4.0) * 0.3 * u_k);
+  col = mix(col, u_brand, bank(uv, 0.2, 0.15, 9.0) * 0.42 * u_k);
+  gl_FragColor = vec4(col, 1.0);
+}`,
+    fallback: [
+      `radial-gradient(90% 18% at 40% 30%, ${mix("ink", 8)}, transparent 70%)`,
+      `radial-gradient(100% 20% at 65% 55%, ${mix("accent", 16)}, transparent 70%)`,
+      `radial-gradient(110% 22% at 35% 80%, ${mix("brand", 22)}, transparent 70%)`,
+    ].join(", "),
+  },
+
+  /*
+   * A slow whirlpool: logarithmic spiral arms turning around the middle,
+   * brand on the arms and accent between them, fading out toward the centre
+   * and the edges so content placed over it stays readable.
+   */
+  vortex: {
+    scale: 0.5,
+    fragment: `
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
+  float r = length(p) + 1e-4;
+  float a = atan(p.y, p.x);
+  float t = u_time * 0.35;
+  float arms = 0.5 + 0.5 * sin(a * 4.0 + log(r) * 6.0 - t * 2.0);
+  float fine = 0.5 + 0.5 * sin(a * 9.0 + log(r) * 11.0 - t * 3.1);
+  float fade = smoothstep(0.02, 0.18, r) * (1.0 - smoothstep(0.45, 0.95, r));
+  vec3 col = mix(u_bg, u_accent, (1.0 - arms) * 0.10 * fade * u_k);
+  col = mix(col, u_brand, pow(arms, 3.0) * (0.3 + 0.15 * fine) * fade * u_k);
+  gl_FragColor = vec4(col, 1.0);
+}`,
+    fallback: [
+      `conic-gradient(from 0deg at 50% 50%, ${mix("brand", 18)}, transparent 12%, ${mix("accent", 12)} 25%, transparent 37%, ${mix("brand", 18)} 50%, transparent 62%, ${mix("accent", 12)} 75%, transparent 87%, ${mix("brand", 18)})`,
+      `radial-gradient(circle at 50% 50%, var(--color-surface) 6%, transparent 45%)`,
     ].join(", "),
   },
 }

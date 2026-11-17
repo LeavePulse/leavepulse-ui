@@ -3,7 +3,7 @@ import { approach, frameDue, PRESET_NAMES, PRESETS, tooSlow } from "../src/compo
 
 describe("shader backdrop", () => {
   test("every look has a shader and a themed still", () => {
-    expect(PRESET_NAMES).toEqual(["aurora", "silk", "grain", "dots"])
+    expect(PRESET_NAMES).toEqual(["aurora", "silk", "grain", "dots", "dither", "contours", "drift", "vortex"])
     for (const name of PRESET_NAMES) {
       const def = PRESETS[name]
       expect(def.fragment).toContain("void main()")

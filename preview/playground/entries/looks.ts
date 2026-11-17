@@ -202,7 +202,7 @@ export const looksMotion: ComponentEntry[] = [
     id: "shader-backdrop",
     name: "ShaderBackdrop",
     description:
-      "A slowly moving background drawn with WebGL in the theme's colours: aurora, silk, grain or dots. A CSS still of the same look sits underneath and takes over where WebGL is missing, software-only or too slow (WebKitGTK), under reduced motion, or with `still`. Draws only while visible, caps its frame rate, blends to a new theme's colours, and frees its GL context on unmount.",
+      "A slowly moving background drawn with WebGL in the theme's colours: aurora, silk, grain, dots, dither, contours, drift or vortex. A CSS still of the same look sits underneath and takes over where WebGL is missing, software-only or too slow (WebKitGTK), under reduced motion, or with `still`. Draws only while visible, caps its frame rate, blends to a new theme's colours, and frees its GL context on unmount.",
     components: { LpShaderBackdrop, LpSegmented, LpSlider, LpSwitch },
     state: () => reactive({ presets: presetOptions, preset: "aurora", intensity: 0.7, speed: 1, paused: false, still: false, mode: "" }),
     template: `<div class="flex w-[34rem] max-w-full flex-col gap-4">

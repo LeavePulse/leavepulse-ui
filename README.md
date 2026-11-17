@@ -307,7 +307,7 @@ from the comment that opens the component.
 - `LpIcon`: Icon — wrapper over @iconify/vue.
 - `LpIdenticon`: A face for something that has no picture: a mirrored pixel pattern and a colour, both derived from `seed` (an id, a username, a key's fingerprint).
 - `LpLink`: A link that renders the app's router link for internal targets and a plain anchor for external ones.
-- `LpLoader`: The kit's loading indicator: a spinner, three dots or an indeterminate bar.
+- `LpLoader`: The kit's loading indicator: a spinner, three dots, an indeterminate bar or a 3×3 grid lit corner to corner (the pixel-styled one).
 - `LpMasonry`: Items of different heights packed into columns without the ragged gaps a grid leaves: memo cards, screenshots, mod tiles.
 - `LpPopover`: A floating panel anchored to a trigger, for content that is more than a tip.
 - `LpRelativeTime`: A date said the way people say it ("3 min ago", "in 2 h"), kept true as time passes, with the exact date one hover away.
