@@ -51,6 +51,7 @@ export type RichEditorLabels = {
   addBlock: string
   connecting: string
   connected: string
+  polling: string
   offline: string
   apply: string
   removeLink: string
@@ -97,6 +98,7 @@ const text = useLabels<RichEditorLabels>(
     addBlock: "Add a block below",
     connecting: "Connecting…",
     connected: "Saved",
+    polling: "Saved, no live link",
     offline: "Offline, changes are kept",
     apply: "Apply",
     removeLink: "Remove link",

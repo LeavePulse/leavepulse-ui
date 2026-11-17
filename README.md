@@ -523,6 +523,12 @@ const shared = useCollaboration({ url: "wss://host/docs", room: "doc-42", user: 
   carets, presence and unsent edits kept in IndexedDB.
   The `#peer` slot (`{ peer }`) draws each present person in the toolbar, so
   the app can show its own name for them and its own right-click menu.
+  Where websockets are blocked, `fallback: { pull, push }` keeps it working
+  over plain HTTP: after `after` ms (5000) without a websocket sync it pulls
+  the server's changes for the local state vector every `every` ms (3000) and
+  pushes local updates; the status reads "polling", presence is not shared,
+  and the websocket takes over again once it syncs. Leave `push` out for a
+  read-only viewer.
 - A trigger (`triggers` on a plugin) is a character that opens the cursor menu
   and what picking does: `/` is the stock one built from the blocks.
   `mentionPlugin` adds `@` and `#` kinds with the app's own search; the chip

@@ -653,6 +653,7 @@ export const uk: KitLabels = {
     addBlock: "Додати блок нижче",
     connecting: "Підключення…",
     connected: "Збережено",
+    polling: "Збережено, без живого зв'язку",
     offline: "Немає зв'язку, зміни збережено локально",
     apply: "Застосувати",
     removeLink: "Прибрати посилання",

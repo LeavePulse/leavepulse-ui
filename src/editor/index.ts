@@ -5,7 +5,7 @@ export type { EditorAction, EditorBlock, EditorContext, EditorMark, EditorMarkIn
 export { calloutPlugin, defaultEditorPlugins, imagePlugin, tablePlugin, taskListPlugin, textPlugin, togglePlugin } from "./basics"
 export type { DefaultPluginOptions, ImagePluginOptions, TextPluginOptions } from "./basics"
 export { collaboratorsOf, useCollaboration } from "./collaboration"
-export type { Collaboration, CollaborationOptions, CollaborationProvider, CollaborationStatus, Collaborator, CollaboratorIdentity } from "./collaboration"
+export type { Collaboration, CollaborationFallback, CollaborationOptions, CollaborationProvider, CollaborationStatus, Collaborator, CollaboratorIdentity } from "./collaboration"
 export type { OutlineHeading } from "./anchors"
 export { CALLOUT_TONES } from "./callout"
 export type { CalloutLabels, CalloutTone } from "./callout"
