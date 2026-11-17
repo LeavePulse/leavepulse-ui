@@ -36,7 +36,7 @@ import { nodeWindow } from "../composables/realm"
 import { useLabels } from "../composables/useLpConfig"
 import { HeadingAnchors, outlineOf, type OutlineHeading } from "./anchors"
 import { defaultEditorPlugins } from "./basics"
-import { resolvePlugins, type EditorBlock, type EditorMark, type EditorPlugin, type EditorTrigger, type PickItem } from "./blocks"
+import { resolvePlugins, type EditorBlock, type EditorMark, type EditorMenu, type EditorPlugin, type EditorTrigger, type PickItem } from "./blocks"
 import type { Collaboration as Shared } from "./collaboration"
 import EditorPickMenu from "./EditorPickMenu.vue"
 import { MARKDOWN_HINT } from "./markdown"
@@ -493,6 +493,20 @@ const TOOL =
   "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-strong transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:pointer-events-none disabled:opacity-40 data-[active]:bg-brand-soft data-[active]:text-brand [&_svg]:size-4"
 const HANDLE = "grid size-6 place-items-center rounded-md text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink [&_svg]:size-4"
 
+/* A plugin's toolbar menu as dropdown items: the value in force is ticked, a pick applies it to the selection. */
+function menuItems(menu: EditorMenu): MenuItem[] {
+  const target = editor.value
+  if (!target) return []
+  return menu.items(target).map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    swatch: item.swatch,
+    labelStyle: item.labelStyle,
+    selected: item.active(target),
+    onSelect: () => void item.apply(target.chain().focus()).run(),
+  }))
+}
+
 defineExpose({ editor })
 </script>
 
@@ -528,6 +542,16 @@ defineExpose({ editor })
       <LpTooltip v-for="mark in resolved.marks" :key="mark.id" :content="mark.shortcut ? `${markName(mark)} · ${mark.shortcut.replace('Mod', 'Ctrl')}` : markName(mark)" label>
         <button type="button" :class="TOOL" :data-active="mark.active(editor) || undefined" @click="toggleMark(mark)"><LpIcon :name="mark.icon" /></button>
       </LpTooltip>
+      <template v-if="resolved.menus.length">
+        <span class="mx-1 h-5 w-px bg-line" />
+        <LpDropdownMenu v-for="menu in resolved.menus" :key="menu.id" :items="menuItems(menu)" :title="menu.label" :palette="false">
+          <template #trigger>
+            <LpTooltip :content="menu.label" label>
+              <button type="button" :class="[TOOL, 'w-auto gap-0.5 px-1.5']" :aria-label="menu.label"><LpIcon :name="menu.icon" /><LpIcon name="lucide:chevron-down" class="size-3 text-muted" /></button>
+            </LpTooltip>
+          </template>
+        </LpDropdownMenu>
+      </template>
       <span class="mx-1 h-5 w-px bg-line" />
       <LpDropdownMenu :items="insertItems" :title="text.insert" :palette="false">
         <template #trigger>
@@ -565,6 +589,11 @@ defineExpose({ editor })
       <div :key="bubbleShown" :class="POPOVER_PANEL" class="flex items-center gap-0.5 p-1" data-state="open" data-side="top" @mousedown.prevent>
         <template v-if="!linking">
           <button v-for="mark in resolved.marks" :key="mark.id" type="button" :class="TOOL" :data-active="mark.active(editor) || undefined" :aria-label="markName(mark)" @click="toggleMark(mark)"><LpIcon :name="mark.icon" /></button>
+          <LpDropdownMenu v-for="menu in resolved.menus" :key="menu.id" :items="menuItems(menu)" :title="menu.label" :palette="false">
+            <template #trigger>
+              <button type="button" :class="TOOL" :aria-label="menu.label"><LpIcon :name="menu.icon" /></button>
+            </template>
+          </LpDropdownMenu>
         </template>
         <form v-else class="flex items-center gap-1" @submit.prevent="applyInput" @mousedown.stop>
           <LpInput ref="linkInput" v-model="linkValue" size="sm" class="w-56" :placeholder="linking.input?.placeholder" :palette="false" @keydown.esc.prevent="linking = null" />

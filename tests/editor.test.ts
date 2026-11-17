@@ -40,3 +40,21 @@ describe("outlineOf", () => {
     ])
   })
 })
+
+describe("styling plugin", async () => {
+  const { stylingPlugin } = await import("../src/editor/styling")
+
+  test("menus derive from the options, and the font menu needs fonts", () => {
+    expect(stylingPlugin().menus?.map((menu) => menu.id)).toEqual(["size", "color", "background", "align"])
+    const withFonts = stylingPlugin({ fonts: [{ name: "Caveat", family: "Caveat, cursive" }], labels: { font: "Шрифт" } })
+    expect(withFonts.menus?.[0]?.id).toBe("font")
+    expect(withFonts.menus?.[0]?.label).toBe("Шрифт")
+  })
+
+  test("default colours are theme tokens, so they follow the theme", () => {
+    const color = stylingPlugin().menus?.find((menu) => menu.id === "color")
+    const editor = { getAttributes: () => ({}), isActive: () => false } as never
+    const values = color?.items(editor).map((item) => item.swatch)
+    expect(values?.every((value) => value?.startsWith("var(--color-"))).toBe(true)
+  })
+})

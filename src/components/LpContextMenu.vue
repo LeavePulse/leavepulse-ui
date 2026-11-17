@@ -45,6 +45,16 @@ export interface ContextMenuItemDef {
    * are given.
    */
   selected?: boolean
+  /**
+   * A colour shown as a dot where the icon goes: a pick of a colour reads by
+   * its colour, not by its name. Any CSS colour, theme tokens included.
+   */
+  swatch?: string
+  /**
+   * Style on the label, so a choice can show itself: a font picker writes each
+   * font's name in that font. Kept to the label, the row stays the kit's row.
+   */
+  labelStyle?: Record<string, string>
 }
 
 const props = withDefaults(defineProps<{

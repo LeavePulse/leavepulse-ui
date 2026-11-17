@@ -75,6 +75,7 @@ const ITEM =
   "group/item flex cursor-pointer select-none items-center gap-2 rounded-inner px-2.5 py-1.5 text-sm outline-none transition-[background-color,color] duration-[var(--duration-fast)] data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-brand-soft " + TOUCH_ROW
 const ICON =
   "transition-transform duration-[var(--duration-fast)] ease-[var(--ease-emphasized)] group-data-[highlighted]/item:translate-x-0.5"
+const SWATCH = `size-[15px] shrink-0 rounded-full ring-1 ring-inset ring-ink/20 ${ICON}`
 </script>
 
 <template>
@@ -135,12 +136,14 @@ const ICON =
       @select="item.onSelect?.()"
     >
       <span class="flex items-center gap-2">
+        <span v-if="item.swatch && !item.selected" :class="SWATCH" :style="{ background: item.swatch }" />
         <LpIcon
+          v-else
           :name="item.selected ? 'lucide:check' : (item.icon ?? 'lucide:minus')"
           :size="15"
           :class="[ICON, item.selected || item.icon ? '' : 'opacity-25']"
         />
-        {{ item.label }}
+        <span :style="item.labelStyle">{{ item.label }}</span>
       </span>
       <MenuShortcut v-if="item.shortcut" :combo="item.shortcut" />
     </component>
@@ -153,8 +156,9 @@ const ICON =
       @select="item.onSelect?.()"
     >
       <span class="flex items-center gap-2">
-        <LpIcon v-if="item.icon" :name="item.icon" :size="15" :class="ICON" />
-        {{ item.label }}
+        <span v-if="item.swatch" :class="SWATCH" :style="{ background: item.swatch }" />
+        <LpIcon v-else-if="item.icon" :name="item.icon" :size="15" :class="ICON" />
+        <span :style="item.labelStyle">{{ item.label }}</span>
       </span>
       <MenuShortcut v-if="item.shortcut" :combo="item.shortcut" />
     </component>

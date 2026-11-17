@@ -56,6 +56,32 @@ export interface EditorMark {
   input?: EditorMarkInput
 }
 
+/** One choice in a toolbar menu: a font, a size, a colour. */
+export interface EditorMenuItem {
+  id: string
+  label: string
+  icon?: string
+  /** A colour shown as a dot in place of the icon. */
+  swatch?: string
+  /** Style on the label: a font's name written in that font. */
+  labelStyle?: Record<string, string>
+  active: (editor: Editor) => boolean
+  apply: (chain: ChainedCommands) => ChainedCommands
+}
+
+/**
+ * A dropdown on the toolbar and the selection bubble, for formatting that is
+ * a choice among several values rather than an on/off mark (font, size,
+ * colour, alignment). Items are built per editor so they can read what is
+ * in force where the cursor is.
+ */
+export interface EditorMenu {
+  id: string
+  label: string
+  icon: string
+  items: (editor: Editor) => EditorMenuItem[]
+}
+
 /** A right-click action a plugin offers where it applies (table rows while in a table). */
 export interface EditorAction {
   id: string
@@ -101,6 +127,7 @@ export interface EditorPlugin {
   extensions?: AnyExtension[] | ((context: EditorContext) => AnyExtension[])
   blocks?: EditorBlock[]
   marks?: EditorMark[]
+  menus?: EditorMenu[]
 }
 
 export interface ResolvedPlugins {
@@ -109,12 +136,14 @@ export interface ResolvedPlugins {
   extensions: AnyExtension[]
   blocks: EditorBlock[]
   marks: EditorMark[]
+  menus: EditorMenu[]
 }
 
 /** Folds plugins into one set; a later plugin's block or mark with the same id replaces the earlier one. */
 export function resolvePlugins(plugins: EditorPlugin[], context: EditorContext): ResolvedPlugins {
   const blocks = new Map<string, EditorBlock>()
   const marks = new Map<string, EditorMark>()
+  const menus = new Map<string, EditorMenu>()
   const extensions: AnyExtension[] = []
   const actions: ((editor: Editor) => EditorAction[])[] = []
   const triggers = new Map<string, EditorTrigger>()
@@ -125,8 +154,9 @@ export function resolvePlugins(plugins: EditorPlugin[], context: EditorContext):
     extensions.push(...(own ?? []))
     for (const block of plugin.blocks ?? []) blocks.set(block.id, block)
     for (const mark of plugin.marks ?? []) marks.set(mark.id, mark)
+    for (const menu of plugin.menus ?? []) menus.set(menu.id, menu)
   }
-  return { actions, triggers: [...triggers.values()], extensions, blocks: [...blocks.values()], marks: [...marks.values()] }
+  return { actions, triggers: [...triggers.values()], extensions, blocks: [...blocks.values()], marks: [...marks.values()], menus: [...menus.values()] }
 }
 
 type AttrValue = string | number | boolean | null
