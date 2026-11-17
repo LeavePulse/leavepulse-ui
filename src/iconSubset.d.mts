@@ -9,4 +9,3 @@ export function refsInText(text: string): [prefix: string, name: string][]
 export function refsInDirs(dirs: string[], skip?: string[]): Map<string, Set<string>>
 export function namesInText(text: string): string[]
 export function namesInDirs(dirs: string[], skip?: string[]): Set<string>
-export function subset(collection: IconCollection, names: Iterable<string>): IconCollection

@@ -176,6 +176,24 @@ exists (about 490 names) and leaves the rest lucide; its icons ship in the
 look's motion on the document as `data-lp-motion`; a subtree with its own look
 sets that attribute on its wrapper.
 
+A look of your own is a plain object; leave out what you don't change.
+`iconPairs` builds the icon table for any iconify set: names the set shares
+with lucide pair up, `synonyms` cover the rest, and `only` cuts the set down to
+the icons your app renders:
+
+```ts
+import { iconPairs, lpConfig, type Look } from "@leavepulse/ui"
+import phosphor from "@iconify-json/ph/icons.json"
+
+const mine: Look = {
+  name: "mine",
+  icons: iconPairs(phosphor, { synonyms: { "trash-2": "trash", settings: "gear" } }),
+  loader: "dots",
+  backdrop: "contours",
+}
+app.use(lpConfig({ look: mine }))
+```
+
 ### Nuxt
 
 ```ts

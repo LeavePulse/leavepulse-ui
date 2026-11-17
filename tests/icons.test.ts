@@ -2,7 +2,8 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { getIcon } from "@iconify/vue"
 import lucide from "@iconify-json/lucide/icons.json"
 import { failedIcons, loadOnce, registerIcons, requestIcon } from "../src/icons"
-import { namesInText, subset } from "../src/iconSubset.mjs"
+import { subset } from "../src/iconCut.mjs"
+import { namesInText } from "../src/iconSubset.mjs"
 
 const g = globalThis as Record<string, unknown>
 const collection = lucide as unknown as { icons: Record<string, unknown>; aliases: Record<string, { parent: string }> }

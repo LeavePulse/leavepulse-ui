@@ -35,7 +35,8 @@ import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { addComponent, addPlugin, addPluginTemplate, addTemplate, createResolver, defineNuxtModule } from "@nuxt/kit"
 import { COMPONENT_NAMES } from "./component-names"
-import { type IconCollection, refsInDirs, subset } from "./iconSubset.mjs"
+import { subset } from "./iconCut.mjs"
+import { type IconCollection, refsInDirs } from "./iconSubset.mjs"
 
 export interface LeavepulseUiOptions {
   /** Register the SSR theme plugin. Disable to wire theming yourself. */

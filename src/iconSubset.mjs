@@ -54,21 +54,3 @@ export function refsInDirs(dirs, skip = []) {
 export function namesInDirs(dirs, skip = []) {
   return refsInDirs(dirs, skip).get("lucide") ?? new Set()
 }
-
-export function subset(collection, names) {
-  const icons = {}
-  const aliases = {}
-  for (const name of [...names].sort()) {
-    if (collection.icons[name]) {
-      icons[name] = collection.icons[name]
-      continue
-    }
-    const alias = collection.aliases?.[name]
-    if (!alias) continue
-    aliases[name] = alias
-    if (collection.icons[alias.parent]) icons[alias.parent] = collection.icons[alias.parent]
-  }
-  const out = { prefix: collection.prefix, icons, width: collection.width, height: collection.height }
-  if (Object.keys(aliases).length) out.aliases = aliases
-  return out
-}
