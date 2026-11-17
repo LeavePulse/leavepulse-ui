@@ -868,6 +868,8 @@ defineExpose({ editor })
   font: inherit;
   text-decoration: none;
   user-select: none;
+}
+.lp-rich-doc .lp-live-syntax.lp-live-entering {
   animation: lp-live-syntax-in 180ms var(--ease-emphasized, ease);
 }
 .lp-rich-doc .lp-live-syntax > span {
@@ -897,7 +899,7 @@ defineExpose({ editor })
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lp-rich-doc .lp-live-syntax,
+  .lp-rich-doc .lp-live-syntax.lp-live-entering,
   .lp-rich-doc .lp-live-syntax.lp-live-leaving,
   .lp-rich-doc div[data-type="details"].is-open div[data-type="detailsContent"] {
     animation: none;

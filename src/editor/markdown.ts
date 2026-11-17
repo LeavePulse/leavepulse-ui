@@ -47,10 +47,10 @@ const LEAVE_MS = 180
 
 const same = (a: Marker, b: Marker) => a.pos === b.pos && a.text === b.text && a.side === b.side
 
-function widget(marker: Marker, leaving: boolean) {
+function widget(marker: Marker, phase: "enter" | "stay" | "leave") {
   const render = () => {
     const outer = document.createElement("span")
-    outer.className = leaving ? "lp-live-syntax lp-live-leaving" : "lp-live-syntax"
+    outer.className = phase === "leave" ? "lp-live-syntax lp-live-leaving" : phase === "enter" ? "lp-live-syntax lp-live-entering" : "lp-live-syntax"
     const inner = document.createElement("span")
     inner.textContent = marker.text
     outer.append(inner)
@@ -58,7 +58,7 @@ function widget(marker: Marker, leaving: boolean) {
   }
   return Decoration.widget(marker.pos, render, {
     side: marker.side,
-    key: `${leaving ? "out" : "in"}:${marker.side}:${marker.text}`,
+    key: `${phase === "leave" ? "out" : "in"}:${marker.side}:${marker.text}`,
     ignoreSelection: true,
   })
 }
@@ -109,6 +109,7 @@ export function liveMarkers(state: EditorState): Marker[] {
 
 interface LiveState {
   shown: Marker[]
+  entering: Marker[]
   leaving: Marker[]
   focused: boolean
   pressed: boolean
@@ -129,18 +130,20 @@ const LiveSyntax = Extension.create({
       new Plugin<LiveState>({
         key: LIVE_KEY,
         state: {
-          init: () => ({ shown: [], leaving: [], focused: false, pressed: false }),
+          init: () => ({ shown: [], entering: [], leaving: [], focused: false, pressed: false }),
           apply: (tr, old, _before, state) => {
             const meta = tr.getMeta(LIVE_KEY)
             const focused = meta === "focus" ? true : meta === "blur" ? false : old.focused
             const pressed = meta === "press" ? true : meta === "release" || meta === "blur" ? false : old.pressed
             const moved = (marker: Marker) => ({ ...marker, pos: tr.mapping.map(marker.pos, marker.side) })
-            if (pressed && !tr.docChanged) return { shown: old.shown.map(moved), leaving: old.leaving.map(moved), focused, pressed }
+            if (pressed && !tr.docChanged) return { shown: old.shown.map(moved), entering: old.entering.map(moved), leaving: old.leaving.map(moved), focused, pressed }
             const shown = current(state, focused)
-            if (meta === "settle") return { shown, leaving: [], focused, pressed }
-            const gone = [...old.shown, ...old.leaving].map(moved).filter((marker) => !shown.some((next) => same(next, marker)))
-            if (!tr.docChanged && !tr.selectionSet && !meta && gone.length === old.leaving.length) return { shown, leaving: old.leaving, focused, pressed }
-            return { shown, leaving: tr.docChanged ? [] : gone, focused, pressed }
+            const before = old.shown.map(moved)
+            const entering = shown.filter((marker) => !before.some((prev) => same(prev, marker)))
+            if (meta === "settle") return { shown, entering: [], leaving: [], focused, pressed }
+            const gone = [...before, ...old.leaving.map(moved)].filter((marker) => !shown.some((next) => same(next, marker)))
+            if (!tr.docChanged && !tr.selectionSet && !meta && gone.length === old.leaving.length) return { shown, entering, leaving: old.leaving, focused, pressed }
+            return { shown, entering, leaving: tr.docChanged ? [] : gone, focused, pressed }
           },
         },
         props: {
@@ -160,7 +163,8 @@ const LiveSyntax = Extension.create({
           decorations: (state) => {
             const live = LIVE_KEY.getState(state)
             if (!live || (!live.shown.length && !live.leaving.length)) return DecorationSet.empty
-            return DecorationSet.create(state.doc, [...live.leaving.map((marker) => widget(marker, true)), ...live.shown.map((marker) => widget(marker, false))])
+            const phase = (marker: Marker) => (live.entering.some((next) => same(next, marker)) ? "enter" : "stay")
+            return DecorationSet.create(state.doc, [...live.leaving.map((marker) => widget(marker, "leave")), ...live.shown.map((marker) => widget(marker, phase(marker)))])
           },
         },
         view: () => {
