@@ -26,10 +26,23 @@
  *
  * Consumers had already arrived at this and built it themselves; it belongs
  * here, where every app gets it.
+ *
+ * It does not show for its first moments. Most loads answer within a hundred
+ * milliseconds or so, and a placeholder that appears for two frames before the
+ * content replaces it reads as a flicker, not as loading: an app that blanked
+ * its data on every tab switch blinked a skeleton on every click. So the
+ * skeleton takes its space at once (nothing around it jumps) but stays
+ * transparent for `--lp-skeleton-delay`, then fades in; a fast answer replaces
+ * it before it was ever seen. `immediate` skips the wait, for a placeholder
+ * that is the state itself rather than a stand-in for a request in flight.
  */
 import { computed, useSlots } from "vue"
 
-defineProps<{ rounded?: "control" | "card" | "pill" }>()
+defineProps<{
+  rounded?: "control" | "card" | "pill"
+  /** Show at once instead of after the short wait that hides fast loads. */
+  immediate?: boolean
+}>()
 
 const slots = useSlots()
 
@@ -43,6 +56,7 @@ const isBlock = computed(() => !slots.default)
     aria-hidden="true"
     class="lp-skeleton"
     :class="[
+      immediate ? 'lp-skeleton-immediate' : '',
       // `rounded` describes the PLACEHOLDER's own shape, so it only applies to
       // the bare form. A wrapper is invisible, so rounding it would clip the
       // layout inside without anything being drawn to justify the corner.
@@ -91,6 +105,39 @@ const isBlock = computed(() => !slots.default)
   }
 }
 
+/*
+ * The wait before showing. It animates `filter`, not `opacity`: the pulse below
+ * owns `opacity`, and two animations of one property on the same element
+ * override each other, so the pulse would cancel the reveal on a bare block.
+ * The space is held throughout; only the drawing waits.
+ */
+.lp-skeleton {
+  animation: lp-skeleton-reveal var(--lp-skeleton-fade, 200ms) ease-out var(--lp-skeleton-delay, 250ms) both;
+}
+
+.lp-skeleton.lp-skeleton-item {
+  animation:
+    lp-skeleton-reveal var(--lp-skeleton-fade, 200ms) ease-out var(--lp-skeleton-delay, 250ms) both,
+    lp-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.lp-skeleton.lp-skeleton-immediate {
+  animation: none;
+}
+
+.lp-skeleton.lp-skeleton-item.lp-skeleton-immediate {
+  animation: lp-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes lp-skeleton-reveal {
+  from {
+    filter: opacity(0);
+  }
+  to {
+    filter: none;
+  }
+}
+
 /* Items nested anywhere inside a wrapper, at any depth. */
 .lp-skeleton .lp-skeleton-item {
   animation: lp-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -109,6 +156,18 @@ const isBlock = computed(() => !slots.default)
   .lp-skeleton .lp-skeleton-item {
     animation: none;
     opacity: 0.75;
+  }
+
+  /* No fade under reduced motion, but the wait stays: it is not motion, and
+     without it the flicker it exists to prevent comes back. */
+  .lp-skeleton,
+  .lp-skeleton.lp-skeleton-item {
+    animation: lp-skeleton-reveal 1ms linear var(--lp-skeleton-delay, 250ms) both;
+  }
+
+  .lp-skeleton.lp-skeleton-immediate,
+  .lp-skeleton.lp-skeleton-item.lp-skeleton-immediate {
+    animation: none;
   }
 }
 </style>
