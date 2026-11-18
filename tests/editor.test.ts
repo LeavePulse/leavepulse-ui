@@ -42,7 +42,7 @@ describe("outlineOf", () => {
 })
 
 describe("styling plugin", async () => {
-  const { stylingPlugin } = await import("../src/editor/styling")
+  const { editorColors, stylingPlugin } = await import("../src/editor/styling")
 
   test("menus derive from the options, and the font menu needs fonts", () => {
     expect(stylingPlugin().menus?.map((menu) => menu.id)).toEqual(["size", "color", "background", "align"])
@@ -51,11 +51,13 @@ describe("styling plugin", async () => {
     expect(withFonts.menus?.[0]?.label).toBe("Шрифт")
   })
 
-  test("default colours are theme tokens, so they follow the theme", () => {
+  test("every default colour keeps a theme variable, so it follows the theme", () => {
     const color = stylingPlugin().menus?.find((menu) => menu.id === "color")
     const editor = { getAttributes: () => ({}), isActive: () => false } as never
     const values = color?.items(editor).map((item) => item.swatch)
-    expect(values?.every((value) => value?.startsWith("var(--color-"))).toBe(true)
+    expect(values?.every((value) => value?.includes("var(--color-"))).toBe(true)
+    expect(editorColors().map((color) => color.key)).toEqual(["danger", "orange", "accent", "action", "brand", "purple", "pink", "muted"])
+    expect(editorColors({ brand: "Синий" }).find((color) => color.key === "brand")?.name).toBe("Синий")
   })
 
   test("colour menus end in a custom pick that reads only plain colours", () => {

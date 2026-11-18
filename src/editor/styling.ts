@@ -12,6 +12,7 @@
  */
 import type { Editor } from "@tiptap/core"
 import { BackgroundColor, Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style"
+import { parseColor } from "../components/color"
 import type { EditorMenu, EditorMenuItem, EditorPlugin } from "./blocks"
 
 export interface EditorFont {
@@ -50,14 +51,17 @@ export interface StylingLabels {
   action: string
   danger: string
   muted: string
+  orange: string
+  purple: string
+  pink: string
 }
 
 export interface StylingOptions {
   /** Fonts to offer; the menu is left out when there are none. */
   fonts?: EditorFont[]
-  /** Text colours; the theme's accents by default. */
+  /** Text colours; `editorColors()` by default. */
   colors?: EditorSwatch[]
-  /** Background colours; soft tints of the theme's accents by default. */
+  /** Background colours; the tints of `editorColors()` by default. */
   backgrounds?: EditorSwatch[]
   labels?: Partial<StylingLabels>
   /** Offer "Custom colour…" after the presets. A picked colour is stored exactly, not adapted to the theme. */
@@ -87,30 +91,50 @@ const LABELS: StylingLabels = {
   action: "Green",
   danger: "Red",
   muted: "Grey",
+  orange: "Orange",
+  purple: "Purple",
+  pink: "Pink",
 }
 
-const TOKENS = ["brand", "accent", "action", "danger", "muted"] as const
+export type EditorColorKey = "danger" | "orange" | "accent" | "action" | "brand" | "purple" | "pink" | "muted"
 
-const tint = (token: string) => `color-mix(in srgb, var(--color-${token}) 24%, transparent)`
-
-function themeColors(text: StylingLabels): EditorSwatch[] {
-  return TOKENS.map((token) => ({ name: text[token], value: `var(--color-${token})` }))
+/** One colour of the editor palette: its text value and the soft tint used to highlight with it. */
+export interface EditorColor {
+  key: EditorColorKey
+  name: string
+  text: string
+  background: string
 }
 
-function themeBackgrounds(text: StylingLabels): EditorSwatch[] {
-  return TOKENS.map((token) => ({ name: text[token], value: tint(token) }))
+const TOKENS = new Set<EditorColorKey>(["brand", "accent", "action", "danger", "muted"])
+const HUES: Partial<Record<EditorColorKey, string>> = { orange: "249, 115, 22", purple: "168, 85, 247", pink: "236, 72, 153" }
+const ORDER: EditorColorKey[] = ["danger", "orange", "accent", "action", "brand", "purple", "pink", "muted"]
+
+/*
+ * The palette the colour menus offer by default: the theme's five tokens, which
+ * follow the theme on their own, and three hues the tokens lack, mixed with the
+ * ink colour so they stay readable on dark and light pages alike. Every value
+ * keeps a var() inside, so the browser stores the style exactly as written and
+ * the menu can tell which swatch a piece of text carries. An app that maps
+ * outside colours onto the palette (an import) builds the same list with it.
+ */
+export function editorColors(names: Partial<Record<EditorColorKey, string>> = {}): EditorColor[] {
+  return ORDER.map((key) => {
+    const text = TOKENS.has(key) ? `var(--color-${key})` : `color-mix(in oklab, rgb(${HUES[key]}) 80%, var(--color-ink))`
+    return { key, name: names[key] ?? LABELS[key], text, background: `color-mix(in srgb, ${text} 24%, transparent)` }
+  })
 }
 
-const PLAIN = /^(#[0-9a-f]{3,8}|rgba?\([^()]*\)|hsla?\([^()]*\))$/i
-const plain = (value: string | undefined) => (value && PLAIN.test(value.trim()) ? value.trim() : null)
+const plain = (value: string | undefined) => (value && parseColor(value) ? value.trim() : null)
 
 const style = (editor: Editor) => editor.getAttributes("textStyle") as { fontFamily?: string; fontSize?: string; color?: string; backgroundColor?: string }
 
 export function stylingPlugin(options: StylingOptions = {}): EditorPlugin {
   const text = { ...LABELS, ...options.labels }
   const fonts = options.fonts ?? []
-  const colors = options.colors ?? themeColors(text)
-  const backgrounds = options.backgrounds ?? themeBackgrounds(text)
+  const palette = editorColors(text)
+  const colors = options.colors ?? palette.map((color) => ({ name: color.name, value: color.text }))
+  const backgrounds = options.backgrounds ?? palette.map((color) => ({ name: color.name, value: color.background }))
   const custom = options.custom ?? true
   const sizes = [
     { id: "small", label: text.small, value: "0.875em" },
