@@ -57,4 +57,15 @@ describe("styling plugin", async () => {
     const values = color?.items(editor).map((item) => item.swatch)
     expect(values?.every((value) => value?.startsWith("var(--color-"))).toBe(true)
   })
+
+  test("colour menus end in a custom pick that reads only plain colours", () => {
+    const menus = stylingPlugin().menus ?? []
+    const color = menus.find((menu) => menu.id === "color")
+    const read = (value: string | undefined) => color?.custom?.read({ getAttributes: () => ({ color: value }) } as never)
+    expect(read("rgb(16, 78, 179)")).toBe("rgb(16, 78, 179)")
+    expect(read("#ff00aa")).toBe("#ff00aa")
+    expect(read("var(--color-brand)")).toBeNull()
+    expect(menus.find((menu) => menu.id === "background")?.custom).toBeDefined()
+    expect(stylingPlugin({ custom: false }).menus?.some((menu) => menu.custom)).toBe(false)
+  })
 })

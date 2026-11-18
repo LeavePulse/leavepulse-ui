@@ -39,6 +39,7 @@ export interface StylingLabels {
   defaultColor: string
   background: string
   noBackground: string
+  custom: string
   align: string
   left: string
   center: string
@@ -59,6 +60,8 @@ export interface StylingOptions {
   /** Background colours; soft tints of the theme's accents by default. */
   backgrounds?: EditorSwatch[]
   labels?: Partial<StylingLabels>
+  /** Offer "Custom colour…" after the presets. A picked colour is stored exactly, not adapted to the theme. */
+  custom?: boolean
 }
 
 const LABELS: StylingLabels = {
@@ -73,6 +76,7 @@ const LABELS: StylingLabels = {
   defaultColor: "Default",
   background: "Background",
   noBackground: "None",
+  custom: "Custom colour…",
   align: "Alignment",
   left: "Left",
   center: "Centre",
@@ -97,6 +101,9 @@ function themeBackgrounds(text: StylingLabels): EditorSwatch[] {
   return TOKENS.map((token) => ({ name: text[token], value: tint(token) }))
 }
 
+const PLAIN = /^(#[0-9a-f]{3,8}|rgba?\([^()]*\)|hsla?\([^()]*\))$/i
+const plain = (value: string | undefined) => (value && PLAIN.test(value.trim()) ? value.trim() : null)
+
 const style = (editor: Editor) => editor.getAttributes("textStyle") as { fontFamily?: string; fontSize?: string; color?: string; backgroundColor?: string }
 
 export function stylingPlugin(options: StylingOptions = {}): EditorPlugin {
@@ -104,6 +111,7 @@ export function stylingPlugin(options: StylingOptions = {}): EditorPlugin {
   const fonts = options.fonts ?? []
   const colors = options.colors ?? themeColors(text)
   const backgrounds = options.backgrounds ?? themeBackgrounds(text)
+  const custom = options.custom ?? true
   const sizes = [
     { id: "small", label: text.small, value: "0.875em" },
     { id: "normal", label: text.normal, value: null },
@@ -161,6 +169,9 @@ export function stylingPlugin(options: StylingOptions = {}): EditorPlugin {
           apply: (chain) => chain.setColor(color.value),
         })),
       ],
+      custom: custom
+        ? { label: text.custom, read: (editor) => plain(style(editor).color), apply: (chain, value) => chain.setColor(value) }
+        : undefined,
     },
     {
       id: "background",
@@ -176,6 +187,9 @@ export function stylingPlugin(options: StylingOptions = {}): EditorPlugin {
           apply: (chain) => chain.setBackgroundColor(color.value),
         })),
       ],
+      custom: custom
+        ? { label: text.custom, read: (editor) => plain(style(editor).backgroundColor), apply: (chain, value) => chain.setBackgroundColor(value) }
+        : undefined,
     },
     {
       id: "align",

@@ -24,6 +24,7 @@ import { BubbleMenu } from "@tiptap/vue-3/menus"
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue"
 import { POPOVER_PANEL } from "../components/dropdown"
 import LpAvatar from "../components/LpAvatar.vue"
+import LpColorPicker from "../components/LpColorPicker.vue"
 import LpContextMenu from "../components/LpContextMenu.vue"
 import LpDropdownMenu, { type MenuItem } from "../components/LpDropdownMenu.vue"
 import LpIcon from "../components/LpIcon.vue"
@@ -493,11 +494,16 @@ const TOOL =
   "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-strong transition-colors hover:bg-ink/[0.06] hover:text-ink disabled:pointer-events-none disabled:opacity-40 data-[active]:bg-brand-soft data-[active]:text-brand [&_svg]:size-4"
 const HANDLE = "grid size-6 place-items-center rounded-md text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink [&_svg]:size-4"
 
-/* A plugin's toolbar menu as dropdown items: the value in force is ticked, a pick applies it to the selection. */
+/*
+ * A plugin's toolbar menu as dropdown items: the value in force is ticked, a
+ * pick applies it to the selection. A menu with `custom` ends in "pick any
+ * colour"; when the selection carries a colour none of the presets matches,
+ * that item is the ticked one and shows it.
+ */
 function menuItems(menu: EditorMenu): MenuItem[] {
   const target = editor.value
   if (!target) return []
-  return menu.items(target).map((item) => ({
+  const items: MenuItem[] = menu.items(target).map((item) => ({
     label: item.label,
     icon: item.icon,
     swatch: item.swatch,
@@ -505,7 +511,43 @@ function menuItems(menu: EditorMenu): MenuItem[] {
     selected: item.active(target),
     onSelect: () => void item.apply(target.chain().focus()).run(),
   }))
+  if (menu.custom) {
+    const own = items.some((item) => item.selected) ? null : menu.custom.read(target)
+    items.push({ label: menu.custom.label, icon: own ? undefined : "lucide:pipette", swatch: own ?? undefined, selected: Boolean(own), onSelect: () => openCustom(menu) })
+  }
+  return items
 }
+
+/*
+ * One picker serves every menu with a custom value. It sits in the toolbar,
+ * not the bubble: the bubble hides once focus leaves the text, and would take
+ * the picker with it. The colour lands on the selection as the picker moves,
+ * so the page is the preview; history groups the drag into one undo step.
+ */
+const customMenu = shallowRef<EditorMenu | null>(null)
+const customValue = ref("#3b82f6")
+const customPicker = ref<InstanceType<typeof LpColorPicker> | null>(null)
+const hasCustom = resolved.menus.some((menu) => menu.custom)
+let openedWith = ""
+
+function openCustom(menu: EditorMenu) {
+  const target = editor.value
+  if (!target || !menu.custom) return
+  customValue.value = menu.custom.read(target) ?? customValue.value
+  openedWith = customValue.value
+  customMenu.value = menu
+  setTimeout(() => {
+    if (customPicker.value) customPicker.value.open = true
+  }, 150)
+}
+
+watch(customValue, (value) => {
+  const target = editor.value
+  const menu = customMenu.value
+  if (value === openedWith) return
+  openedWith = ""
+  if (target && menu?.custom) menu.custom.apply(target.chain(), value).run()
+})
 
 defineExpose({ editor })
 </script>
@@ -551,6 +593,9 @@ defineExpose({ editor })
             </LpTooltip>
           </template>
         </LpDropdownMenu>
+        <span v-if="hasCustom" class="relative -ml-1 size-0 overflow-hidden" aria-hidden="true">
+          <LpColorPicker ref="customPicker" v-model="customValue" variant="swatch" :swatches="[]" recent recent-key="lp.editor.colour" :aria-label="customMenu?.custom?.label ?? ''" side="bottom" align="end" />
+        </span>
       </template>
       <span class="mx-1 h-5 w-px bg-line" />
       <LpDropdownMenu :items="insertItems" :title="text.insert" :palette="false">

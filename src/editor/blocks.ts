@@ -75,11 +75,21 @@ export interface EditorMenuItem {
  * colour, alignment). Items are built per editor so they can read what is
  * in force where the cursor is.
  */
+/** A free value beyond a menu's presets, picked with a colour picker. */
+export interface EditorMenuCustom {
+  label: string
+  /** The value on the selection, when it is one the picker can show; null otherwise. */
+  read: (editor: Editor) => string | null
+  apply: (chain: ChainedCommands, value: string) => ChainedCommands
+}
+
 export interface EditorMenu {
   id: string
   label: string
   icon: string
   items: (editor: Editor) => EditorMenuItem[]
+  /** Ends the menu with "pick any colour", applied live while the picker moves. */
+  custom?: EditorMenuCustom
 }
 
 /** A right-click action a plugin offers where it applies (table rows while in a table). */
