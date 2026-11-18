@@ -1,7 +1,7 @@
 export { default as LpRichEditor } from "./LpRichEditor.vue"
 export type { RichEditorLabels } from "./LpRichEditor.vue"
 export { defineNodeBlock, resolvePlugins } from "./blocks"
-export type { EditorAction, EditorBlock, EditorContext, EditorMark, EditorMarkInput, EditorMenu, EditorMenuItem, EditorPlugin, EditorTrigger, NodeBlockSpec, PickItem, ResolvedPlugins } from "./blocks"
+export type { EditorAction, EditorBlock, EditorContext, EditorMark, EditorMarkInput, EditorMenu, EditorMenuCustom, EditorMenuItem, EditorPlugin, EditorTrigger, NodeBlockSpec, PickItem, ResolvedPlugins } from "./blocks"
 export { calloutPlugin, defaultEditorPlugins, imagePlugin, tablePlugin, taskListPlugin, textPlugin, togglePlugin } from "./basics"
 export type { DefaultPluginOptions, ImagePluginOptions, TextPluginOptions } from "./basics"
 export { collaboratorsOf, useCollaboration } from "./collaboration"
