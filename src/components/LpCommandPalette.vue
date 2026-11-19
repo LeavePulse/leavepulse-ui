@@ -1636,7 +1636,7 @@ const guardOutside = useOutsideGuard()
         @escape-key-down="event => { guardOutside(event); if (!event.defaultPrevented) onEscape(event) }"
         @close-auto-focus="onCloseAutoFocus"
         ref="contentRef"
-        class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76vh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
+        class="lp-cmd-dialog fixed left-1/2 top-[12vh] flex max-h-[76dvh] -translate-x-1/2 flex-col overflow-hidden rounded-card border border-line shadow-panel outline-none data-[state=open]:animate-[pop-in_160ms_var(--ease-emphasized)] data-[state=closed]:animate-[pop-out_130ms_ease]"
         :class="[frosted ? (layer.nested ? 'lp-glass-overlay lp-glass-overlay--nested' : 'lp-glass-overlay') : 'bg-surface-raised', previewPane && 'lp-cmd-split']"
         :style="{ zIndex: layer.panel, ...viewport }"
         :data-pane="paneOpen ? 'open' : undefined"
@@ -1698,6 +1698,10 @@ const guardOutside = useOutsideGuard()
             :readonly="executing && !!promptCommand"
             @focus="editing = undefined"
             type="text"
+            enterkeyhint="go"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
             role="combobox"
             aria-autocomplete="list"
             :aria-label="inputName"
@@ -2013,7 +2017,7 @@ const guardOutside = useOutsideGuard()
   }
   .lp-cmd-dialog[data-pane="open"] {
     width: calc(var(--lp-cmd-list) + var(--lp-cmd-pane));
-    min-height: min(76vh, 36rem);
+    min-height: min(76dvh, 36rem);
   }
 }
 .lp-cmd-pane {

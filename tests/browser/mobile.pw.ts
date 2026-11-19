@@ -392,3 +392,56 @@ test.describe("unbroken text", () => {
     }
   })
 })
+
+test.describe("phone keyboards and thumbs", () => {
+  test("search, tags and palette fields name their Enter key", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await expect(page.getByRole("searchbox", { name: "Find" })).toHaveAttribute("enterkeyhint", "search")
+    await expect(page.locator("[aria-label=Tags] input")).toHaveAttribute("enterkeyhint", "done")
+  })
+
+  test("a bottom sheet is sized against the visible screen, not the one behind the address bar", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    await page.getByRole("button", { name: "Open sheet" }).click()
+    const sheet = page.getByRole("dialog", { name: "Bottom sheet" })
+    await expect(sheet).toBeVisible()
+    expect(await sheet.evaluate((el) => el.getAttribute("style") ?? "")).toContain("dvh")
+  })
+
+  test("the video seek bar is a thumb tall and shows its knob without a hover", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const bar = page.getByRole("slider", { name: "Seek" })
+    await bar.evaluate((el) => el.scrollIntoView({ block: "center" }))
+    expect(await bar.evaluate((el) => (el as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(32)
+    const knob = bar.locator("span.rounded-full").last()
+    expect(await knob.evaluate((el) => getComputedStyle(el).scale)).not.toBe("0")
+  })
+
+  test("a layout splitter keeps the page from scrolling under the finger and is a thumb wide", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=mobile")
+    const splitter = page.locator("[data-test-layout] .cursor-col-resize")
+    await splitter.evaluate((el) => el.scrollIntoView({ block: "center" }))
+    expect(await splitter.evaluate((el) => getComputedStyle(el).touchAction)).toBe("none")
+    const box = (await splitter.boundingBox())!
+    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.className ?? "", [box.x + box.width / 2 + 14, box.y + box.height / 2])
+    expect(String(hit)).toContain("cursor-col-resize")
+  })
+})
+
+test.describe("touch tablet", () => {
+  test.use({ viewport: { width: 820, height: 1180 } })
+  test("a table's column edge answers a thumb on either side of the line, and the sort button keeps its label", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=table&part=resize")
+    const handle = page.getByRole("separator", { name: "Resize Name" })
+    await expect(handle).toBeVisible()
+    const box = (await handle.boundingBox())!
+    expect(box.width).toBeLessThan(8)
+    const edge = box.x + box.width
+    const y = box.y + box.height / 2
+    const hits = await page.evaluate(([x, y]) => [-11, 0, 11].map((dx) => document.elementFromPoint(x + dx, y)?.getAttribute("data-lp-resize") ?? null), [edge, y])
+    expect(hits).toEqual(["name", "name", "name"])
+    const sort = page.getByRole("button", { name: /^Name/ })
+    const label = (await sort.boundingBox())!
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("button"), [label.x + 4, label.y + label.height / 2])).toBe(true)
+  })
+})

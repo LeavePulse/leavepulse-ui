@@ -50,8 +50,6 @@ entry is deleted, not ticked: the commit says what changed.
     and does not match edge labels, so a linkable `?q=` needs its own box.
   - Neighbour highlight cannot be cleared from outside and stays on a node
     that is no longer drawn.
-  - `minZoom` (fixed 0.3) and zoom on double click are not props; a wide
-    graph cannot be framed on a phone.
   - `layeredLayout` does not route long edges around nodes, and edge labels
     are placed without avoiding each other, so where edges bunch their
     labels overprint ("e wireguard e").
@@ -66,13 +64,9 @@ entry is deleted, not ticked: the commit says what changed.
   the rest, so the run goes green and a new failure stands out. On the
   0.88.0 run Firefox also failed "a fitted player in full screen fills the
   screen instead of going black" once; whether it repeats is unknown.
-- **The phone pass left open items.** LpTable's column-resize handle is 6px
-  wide, and a wider hit area would take taps from the header sort buttons.
-  LpDrawer's top and bottom size is `94vh`, where `dvh` is safer on iOS.
-  The LayoutCanvas splitter has no `touch-action`. LpVideoPlayer's seek bar
-  is 16px tall on touch. Search, tags and palette fields have no
-  `enterkeyhint` or `inputmode`. None of the kit has been tried on a real
-  iPhone or Android.
+- **The phone pass left open items.** LpTable's column filter funnel is 20px,
+  and a wider hit area would take taps from the header sort button beside it.
+  None of the kit has been tried on a real iPhone or Android.
 
 - **Two gestures are still the libraries', not the kit's.** Bottom and top
   sheets (`LpDrawer` with `direction="bottom"`/`"top"`) drag to close and snap

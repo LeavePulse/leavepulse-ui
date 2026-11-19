@@ -271,7 +271,7 @@ const sizeStyle = computed(() => {
     // fit once the window shrinks or the device turns.
     return { width: `min(${resizedPx.value}px, ${props.maxSize})` }
   }
-  const len = props.width ?? `min(${isHorizontal.value ? "94vw" : "94vh"}, ${SIZES[props.size]}rem)`
+  const len = props.width ?? `min(${isHorizontal.value ? "94vw" : "94dvh"}, ${SIZES[props.size]}rem)`
   return isHorizontal.value ? { width: len } : { height: len }
 })
 

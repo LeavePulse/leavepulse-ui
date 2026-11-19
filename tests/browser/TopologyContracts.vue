@@ -46,11 +46,11 @@ onMounted(() => ((window as unknown as { canvas: unknown }).canvas = canvas.valu
 </script>
 
 <template>
-  <main style="height: 640px; width: 1100px">
+  <main :style="mode === 'phone' ? 'height: 520px; width: 300px' : 'height: 640px; width: 1100px'">
     <LpTopologyCanvas
       ref="canvas"
-      :nodes="mode === 'frame' ? frameNodes : mode === 'status' ? statusNodes : nodes"
-      :edges="mode === 'frame' ? frameEdges : mode === 'status' ? [] : edges"
+      :nodes="mode === 'frame' ? frameNodes : mode === 'status' || mode === 'phone' ? statusNodes : nodes"
+      :edges="mode === 'frame' ? frameEdges : mode === 'status' || mode === 'phone' ? [] : edges"
       :auto-size-groups="mode === 'frame'"
       :detail="mode === 'simple' ? 'simple' : mode === 'overview' ? 'overview' : 'full'"
       :group-by="mode === 'overview' || mode === 'group' ? 'region' : undefined"
@@ -62,6 +62,9 @@ onMounted(() => ((window as unknown as { canvas: unknown }).canvas = canvas.valu
       :compare-to="mode === 'diff' ? earlier : undefined"
       :timeline="mode === 'timeline' ? history : undefined"
       :selectable="mode === 'select'"
+      :min-zoom="mode === 'phone' ? 0.05 : undefined"
+      :minimap="mode !== 'phone'"
+      :legend="mode !== 'phone'"
       :selection-actions="mode === 'select' ? [{ id: 'restart', label: 'Restart', icon: 'lucide:rotate-ccw' }] : undefined"
       @path-change="note"
       @selection-action="note"

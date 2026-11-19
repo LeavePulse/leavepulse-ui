@@ -132,7 +132,7 @@ const pad = computed(() => (props.size === "sm" ? "py-1.5 text-xs" : "py-2.5 tex
           <LpTooltip v-if="item.hint" :content="item.hint">
             <button
               type="button"
-              class="grid size-4 shrink-0 place-items-center rounded-full text-muted/80 outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="lp-tap grid size-4 shrink-0 place-items-center rounded-full text-muted/80 outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :aria-label="item.hint"
             >
               <LpIcon name="lucide:info" :size="12" />

@@ -705,10 +705,11 @@ const frameStyle = computed(() => {
         @pointerenter="overControls = true"
         @pointerleave="overControls = false; hover = null"
       >
-        <!-- Seek bar: a taller strip than it looks, so it is easy to catch; it thickens under the pointer. -->
+        <!-- Seek bar: a taller strip than it looks, so it is easy to catch; it thickens under the pointer.
+             A finger gets a thumb-tall strip, a thicker line and the knob in view, since nothing hovers. -->
         <div
           ref="barEl"
-          class="group/seek relative flex h-4 cursor-pointer touch-none items-center outline-none"
+          class="group/seek relative flex h-4 cursor-pointer touch-none items-center outline-none pointer-coarse:h-8"
           role="slider"
           tabindex="0"
           :aria-label="text.seek"
@@ -721,7 +722,7 @@ const frameStyle = computed(() => {
           @pointermove="onBarHover"
           @pointerleave="!scrubbing && (hover = null)"
         >
-          <div class="relative h-1 w-full overflow-hidden rounded-pill bg-white/25 transition-[height] duration-(--duration-fast) ease-(--ease-emphasized) group-hover/seek:h-1.5 group-focus-visible/seek:h-1.5 motion-reduce:transition-none">
+          <div class="relative h-1 w-full overflow-hidden rounded-pill bg-white/25 pointer-coarse:h-1.5 transition-[height] duration-(--duration-fast) ease-(--ease-emphasized) group-hover/seek:h-1.5 group-focus-visible/seek:h-1.5 motion-reduce:transition-none">
             <span v-for="(b, i) in buffered" :key="i" class="absolute inset-y-0 bg-white/35" :style="{ left: `${b[0] * 100}%`, width: `${(b[1] - b[0]) * 100}%` }" />
             <span
               v-if="hover !== null"
@@ -731,7 +732,7 @@ const frameStyle = computed(() => {
             <span class="absolute inset-y-0 left-0 bg-white" :style="{ width: pct(time) }" />
           </div>
           <span
-            class="pointer-events-none absolute top-1/2 size-3 -translate-1/2 scale-0 rounded-full bg-white shadow transition-transform duration-(--duration-fast) ease-(--ease-emphasized) group-hover/seek:scale-100 group-focus-visible/seek:scale-100 group-focus-visible/seek:ring-2 group-focus-visible/seek:ring-ring motion-reduce:transition-none"
+            class="pointer-events-none absolute top-1/2 size-3 -translate-1/2 scale-0 pointer-coarse:scale-100 rounded-full bg-white shadow transition-transform duration-(--duration-fast) ease-(--ease-emphasized) group-hover/seek:scale-100 group-focus-visible/seek:scale-100 group-focus-visible/seek:ring-2 group-focus-visible/seek:ring-ring motion-reduce:transition-none"
             :class="scrubbing ? 'scale-100' : ''"
             :style="{ left: pct(time) }"
           />

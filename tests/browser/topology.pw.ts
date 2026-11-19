@@ -171,3 +171,14 @@ test("a node's status picks its light and frame; only a lost one is dashed and f
   // The old up/down flag still reads as before.
   expect(legacy).toMatchObject({ dashed: true, faded: true })
 })
+
+test("a lower minZoom lets a wide graph be framed whole in a phone-sized canvas", async ({ page }) => {
+  await open(page, "phone")
+  const pane = (await page.locator(".vue-flow").boundingBox())!
+  for (const id of ["ok", "legacy"]) {
+    await expect.poll(async () => {
+      const box = (await node(page, id).boundingBox())!
+      return box.x >= pane.x - 0.5 && box.x + box.width <= pane.x + pane.width + 0.5
+    }).toBe(true)
+  }
+})
