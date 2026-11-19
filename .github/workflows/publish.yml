@@ -65,8 +65,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           parent="$(git rev-parse HEAD^)"
-          # `npm version` writes the version into package.json and
-          # package-lock.json; no other file, and no other line, may differ.
+          # `npm version` writes the version into package.json (.npmrc keeps it
+          # from writing a package-lock.json); no other file, and no other
+          # line, may differ.
           changed="$(git diff --name-only HEAD^ HEAD | grep -vxE 'package(-lock)?\.json' || true)"
           version_only=false
           if [ -z "$changed" ]; then
