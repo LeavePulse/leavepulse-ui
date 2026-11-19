@@ -11,7 +11,7 @@ import { useMenuPalette, type PaletteControlOptions } from "../composables/usePa
 import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from "reka-ui"
 import { computed } from "vue"
 import { hints } from "../composables/useHints"
-import { HINT_SIGNALS, noteContextTarget } from "../composables/useHintSystem"
+import { HINT_SIGNALS, noteContextTarget } from "../composables/hintSignals"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import MenuTitle from "./MenuTitle.vue"
 import { PANEL_FIT, POPOVER_PANEL } from "./dropdown"

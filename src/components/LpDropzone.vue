@@ -35,7 +35,7 @@ import { isElement, nodeWindow } from "../composables/realm"
  * clicks through, except the controls the zone itself puts there.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue"
-import { HINT_SIGNALS, noteDropzone } from "../composables/useHintSystem"
+import { HINT_SIGNALS, noteDropzone } from "../composables/hintSignals"
 import { hints } from "../composables/useHints"
 import { useLabels } from "../composables/useLpConfig"
 import { useMergedAttrs } from "../composables/useMergedClass"

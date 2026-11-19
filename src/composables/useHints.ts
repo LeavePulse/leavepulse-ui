@@ -1,4 +1,5 @@
 import { shallowReactive, type Directive } from "vue"
+import { setHintUseReporter } from "./hintSignals"
 
 /*
  * Which parts of the interface the user can see right now, and which ones they
@@ -198,3 +199,7 @@ export const hints = {
     for (const listener of listeners.used) listener(id, el ?? document.body)
   },
 }
+
+// Controls that only report usage (LpButton's hotkey) go through hintSignals,
+// so they need not import this module; their reports arrive here once it is loaded.
+setHintUseReporter((id) => hints.use(id))

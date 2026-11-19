@@ -1,15 +1,7 @@
 import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type HighlightPart, type SearchableCommand } from "./commandSearch"
 import type { Command, CommandImage } from "./commandPaletteTypes"
-import type { ContextMenuItemDef } from "./LpContextMenu.vue"
 
-/** The same action definitions serve a row menu and the command palette. */
-export function menuPaletteCommands(items: ContextMenuItemDef[], prefix: string): Command[] {
-  return items.map((item, index) => ({
-    id: `${prefix}/${index}`, label: item.label, icon: item.icon, disabled: item.disabled,
-    onSelect: item.onSelect, keepOpen: item.checked !== undefined,
-    children: item.children ? menuPaletteCommands(item.children, `${prefix}/${index}`) : undefined,
-  }))
-}
+export { menuPaletteCommands } from "./paletteMenu"
 
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so

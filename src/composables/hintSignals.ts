@@ -58,3 +58,21 @@ export const notedTargets = {
     lastHotkeyTarget && { el: lastHotkeyTarget.el.deref(), combo: lastHotkeyTarget.combo },
   dropzone: (): Element | undefined => lastDropzone?.deref(),
 }
+
+/*
+ * Where a control's report goes. Set by useHints when it loads: the only
+ * listeners a report can have (the hint system, an app's `hints.on`) come
+ * through that module, so until it is loaded nothing would hear the report,
+ * and a control that only reports does not have to carry it.
+ */
+let reporter: ((id: string) => void) | null = null
+
+/** `hints.use(id)` once useHints is loaded; nothing before that, when nothing can listen. */
+export function reportHintUse(id: string): void {
+  reporter?.(id)
+}
+
+/** Called by useHints as it loads. */
+export function setHintUseReporter(report: (id: string) => void): void {
+  reporter = report
+}
