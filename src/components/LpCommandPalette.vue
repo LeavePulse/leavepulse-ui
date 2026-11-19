@@ -39,18 +39,17 @@ import {
   DialogRoot,
   DialogTitle,
 } from "reka-ui"
-import { type Component, computed, h, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
+import { computed, h, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from "vue"
 import { mergePaletteCommands, suppressPaletteDiscovery, usePaletteScope } from "../composables/usePaletteCommands"
 import { useToast } from "../composables/useToast"
 import LpButton from "./LpButton.vue"
 import PalettePreviewBoundary from "./PalettePreviewBoundary.vue"
-import LpAvatar from "./LpAvatar.vue"
+import PaletteFooter from "./PaletteFooter.vue"
+import PalettePaneText from "./PalettePaneText.vue"
+import PaletteRow from "./PaletteRow.vue"
 import LpIcon from "./LpIcon.vue"
 import LpLoader from "./LpLoader.vue"
 import LpScrollArea from "./LpScrollArea.vue"
-import MenuShortcut from "./MenuShortcut.vue"
-import { staggerDelay } from "./reveal"
-import { usePersisted } from "../composables/usePersisted"
 import { useAsyncTask } from "../composables/useAsyncTask"
 import { useGlass } from "../composables/useGlass"
 import { useClipboard } from "../composables/useClipboard"
@@ -70,8 +69,6 @@ import {
 } from "./commandSearch"
 import {
   absoluteHref,
-  commandHasPreview,
-  commandKey,
   isSafeHref,
   moreRowId,
   PALETTE_MODES,
@@ -79,286 +76,18 @@ import {
   fallbackRows,
   matchModePrefix,
   modeChipLabel,
-  pushRecent,
-  readRecent,
-  recentKey,
-  recentVisible,
-  resolveRecentItems,
-  toRecentItem,
   type RecentEntry,
   type RecentItem,
-  settleFetched,
 } from "./commandPalette"
+import type { Command, CommandFetcher, PaletteLabels } from "./commandPaletteTypes"
+import { usePaletteFetch } from "./paletteFetch"
+import { usePaletteHistory } from "./paletteHistory"
+import { usePalettePane } from "./palettePane"
+import { usePaletteViewport } from "./paletteViewport"
 import { useOutsideGuard, usePortalTarget, useView, viewWindow } from "../composables/useView"
 
-/**
- * A picture in a row's icon slot: an avatar, a project logo, a world's
- * thumbnail. While it loads, and for good if it fails, the row shows
- * `fallback` (initials) or else `icon`, so a dead link never leaves a hole.
- */
-export interface CommandImage {
-  src?: string | null
-  alt?: string
-  /** Text shown while there is no picture, usually initials. */
-  fallback?: string
-  /** Icon shown while there is no picture; the command's `icon` when unset. */
-  icon?: string
-  /** circle for people, soft or square for things. Defaults to soft. */
-  shape?: "circle" | "soft" | "square"
-}
-
-export interface Command {
-  id: string
-  label: string
-  /** Second line under the label. */
-  description?: string
-  /**
-   * A passage of the matched text, wrapped over several lines (clamped by
-   * `excerptLines`) instead of truncated to one. For results a server found
-   * inside long text — a docs section, a ticket, a message — where the reason
-   * the row matched is the part worth reading before opening it.
-   */
-  excerpt?: string
-  /**
-   * Extra words to highlight besides the typed query. A server that matches
-   * word forms or typos knows which words actually matched; the query alone
-   * would leave those unmarked.
-   */
-  highlight?: string[]
-  icon?: string
-  /**
-   * A picture in place of the icon: a URL, or a `CommandImage` with a
-   * fallback. Sized like the icon and faded in once loaded; until then, and
-   * when it fails, the fallback (or `icon`) holds the slot.
-   */
-  image?: string | CommandImage
-  /**
-   * Right-aligned hint, written as LpKeys reads it: "Ctrl+P" (shown as ⌘P on
-   * an Apple keyboard), "G I" for a sequence.
-   */
-  shortcut?: string
-  /** Extra search terms not shown but matched against the query. */
-  keywords?: string[]
-  /** Section heading this command sits under. */
-  group?: string
-  disabled?: boolean
-  /**
-   * Hidden from the default (empty-query) list and surfaced only when the query
-   * names it: every typed word starts a word of its label or keywords. A word
-   * inside another word, the description or a near miss does not reveal it.
-   * For rarely-used or destructive actions (prune, decommission, …) that
-   * shouldn't clutter the palette but stay reachable.
-   */
-  hidden?: boolean
-  /**
-   * For a hidden command: the words that reveal it, instead of its label and
-   * keywords. A variant whose label repeats its parent's word ("Vacation: sick
-   * leave…") then stays out of a search for the parent and shows up for "sick".
-   */
-  revealOn?: string[]
-  /**
-   * Picking this opens a mode instead of closing: a nested list, either given
-   * outright or fetched from the query typed inside it. This is what keeps a
-   * palette from flattening "restart <service>" into one row per service —
-   * and what lets the second step search a list too big to enumerate.
-   *
-   * `onSelect` still runs when the mode opens, so a command can both act and
-   * drill in. A fetcher is called like `search` (see CommandFetcher): its
-   * abort signal may never reach the transport, and an answer that lands
-   * after the query moved on or the mode was left is discarded.
-   */
-  children?: Command[] | CommandFetcher
-  /** Placeholder while inside this command's mode. */
-  childPlaceholder?: string
-  /**
-   * The mode's name in the chip beside the box, when the row's label is a
-   * sentence: "Mods" for a row reading `Search mods for "{query}"`. Without
-   * it a `{query}` placeholder and its quotes are dropped from the label.
-   */
-  modeLabel?: string
-  /**
-   * Typed at the start of the box, enters this command's mode directly, and
-   * whatever follows the prefix becomes the query inside it: ">" for
-   * commands, "mr " for a mod search. Only for a command with `children`,
-   * matched against the list on screen (the root, or the open mode's own
-   * static children), longest prefix first, letters in any case. Entering
-   * this way does not run `onSelect`. The row shows the prefix as its hint
-   * when it has no `shortcut`.
-   */
-  prefix?: string
-  /**
-   * Opening this mode takes the query typed so far along, operators and
-   * all, so typing "sodium", arrowing to "Search mods" and pressing Enter
-   * opens the mod search already searching for sodium instead of starting
-   * it empty. Backspace out of the mode restores the query as it was.
-   */
-  carryQuery?: boolean
-  /**
-   * A "search somewhere else" row: listed only while words are typed, for
-   * any words (it is not matched against them), after local and fetched
-   * results: at the end of the list, or of its group when that group is
-   * already listed. `{query}` in the label becomes the
-   * typed words without the operators, `Search Modrinth for "{query}"`;
-   * `-word` and `in:group` still apply to the row's own label, keywords and
-   * group. Usually a mode with `carryQuery`, so picking it runs the search.
-   */
-  fallback?: boolean
-  /**
-   * Keep this out of the recent history. Picks are remembered wherever they
-   * are made, inside modes and among fetched results too; a pick that is a
-   * setting rather than a destination (a language, a zoom step) can opt out.
-   * Rows offered by Tab (`actions`) are never remembered.
-   */
-  remember?: boolean
-  /**
-   * A JSON-safe value stored with this command in the recent history and
-   * handed back to `resolveRecent`: what an app needs to rebuild a result
-   * that a search fetched (a project id, a hit), since the command's
-   * functions cannot be stored.
-   */
-  recentData?: unknown
-  /**
-   * Keep the palette open after this runs. For a command that toggles
-   * something the user may want to toggle again (a theme, a filter) without
-   * reopening and retyping.
-   */
-  keepOpen?: boolean
-  /**
-   * Where the command leads. The row renders as a real link, so Ctrl/⌘-click,
-   * Shift-click and middle-click open it the way the browser opens any link,
-   * and Ctrl/⌘+Enter opens it in a new tab from the keyboard. A plain pick
-   * still runs `onSelect` (a router push, say); without one it follows the
-   * link.
-   */
-  href?: string
-  /**
-   * Further things to do with this result besides opening it — copy its id,
-   * open it elsewhere, share it. Tab on the highlighted row lists them as a
-   * mode named after the row. A command with `href` gets "open in new tab"
-   * and "copy link" after its own.
-   */
-  actions?: Command[]
-  /**
-   * The whole text behind this result, for the preview pane (`previewPane`):
-   * the section a docs hit points into, the ticket body, the message. Line
-   * breaks are kept. Without it the pane shows the `excerpt`.
-   */
-  preview?: string
-  /**
-   * This row has nothing for the pane, even with a `#preview` slot: the pane
-   * folds away while it is highlighted instead of the slot having to draw a
-   * placeholder. For a whole class of rows, `hasPreview` says it once.
-   */
-  noPreview?: boolean
-  /** Render a live editor or other rich preview without an application-wide slot. */
-  previewComponent?: Component
-  /** Enter or click focuses the preview editor, including on narrow screens. */
-  editInPreview?: boolean
-  /** Runs after the dialog releases its focus trap (e.g. focus the original field). */
-  afterClose?: () => void
-  prompt?: CommandPrompt
-  /** Called only when execution succeeded, with its result. */
-  undo?: (result: unknown) => unknown | Promise<unknown>
-  onSelect?: () => unknown | Promise<unknown>
-}
-
-export interface CommandPrompt {
-  placeholder?: string
-  initial?: string
-  validate?: (value: string) => string | undefined | Promise<string | undefined>
-  submit: (value: string) => unknown | Promise<unknown>
-}
-
-/**
- * Commands fetched for a query: `search` at the root, a function `children`
- * inside a mode.
- *
- * `query` is the box's positive words only, in the case they were typed:
- * `sodium -forge in:mods` arrives as "sodium", because a server would treat
- * the operators as words to find. They come in `parsed` instead (a
- * PaletteQuery: `raw`, `text`, lowercased `include`, `exclude` and `groups`)
- * for a provider that can scope or exclude on its side; either way the
- * palette drops returned rows that match an exclusion or miss an `in:` scope.
- *
- * `signal` aborts when the query moves on, the mode is left or the palette
- * closes. It is a courtesy, not a guarantee: hand it to `fetch` and the
- * request is cancelled, but a transport that cannot be cancelled (a Tauri
- * `invoke`, a worker message, most SDKs) never sees it and runs to the end.
- * That is safe: an answer that lands after a newer request was made, or
- * after the palette closed, is discarded and never reaches the list, so a
- * fetcher does not need to check the signal itself. Checking it before an
- * expensive step is only a saving.
- *
- * A fetcher that gathers from sources of different speeds (a local index, a
- * database, a slow remote) can return an async iterable instead — an async
- * generator is the easy way — and yield as it goes, so the quick sources show
- * without waiting for the slow one. Each batch is the whole list so far and
- * replaces the one before; the last is the answer. The search keeps its
- * loading bar until the iterable ends, the highlight stays on the row it was
- * on as rows are added, and when the query moves on the signal aborts and the
- * iterable is closed (`return()`) — a generator parked in an `await` only
- * closes at its next `yield`, running its `finally` there, so pass the signal
- * on to what it awaits. A throw after some batches keeps them on screen, with
- * a line saying the rest could not be fetched:
- *
- *   async function* search(q, signal) {
- *     const local = index.find(q)
- *     yield local
- *     const remote = await api.search(q, { signal })
- *     yield [...local, ...remote]
- *   }
- */
-export type CommandFetcher = (
-  query: string,
-  signal: AbortSignal,
-  parsed: PaletteQuery,
-) => Command[] | Promise<Command[]> | AsyncIterable<Command[]>
-
-/** Footer hints and the mode chip, spelled out so an app can translate them. */
-export type PaletteLabels = Partial<Record<PaletteMode, string>> & {
-  navigate: string
-  pin?: string
-  unpin?: string
-  undo?: string
-  backToResults?: string
-  actionFailed?: string
-  submit?: string
-  running?: string
-  search?: string
-  pinned?: string
-  select: string
-  close: string
-  /** The close button that stands in for Esc on a touch screen. */
-  dismiss: string
-  /** Hint for leaving a mode, shown only while inside one. */
-  back: string
-  searching: string
-  /** Shown when `search` (or a fetching mode) threw. */
-  searchFailed: string
-  /** Shown under streamed results when the fetcher threw after some of them; defaults to "Some results could not be loaded." */
-  searchIncomplete?: string
-  retry: string
-  /** The row that unfolds a group cut by `groupLimit`; `{count}` is how many are hidden. */
-  showMore: string
-  /** Footer hint for Tab while the highlighted row has actions. */
-  actions: string
-  openInNewTab: string
-  copyLink: string
-  /** Toast after "copy link"; empty for none. */
-  linkCopied: string
-  /**
-   * @deprecated The pane now closes for a row with nothing to show, so this
-   * text is never displayed. Kept so existing `labels` objects still type-check.
-   */
-  noPreview?: string
-  /** Accessible name and description of the dialog, read by screen readers only. */
-  title?: string
-  description?: string
-  /** The key hint printed beside the box and in the footer. */
-  esc?: string
-  /** The Tab key's name in the footer hint for a row's actions. */
-  tab?: string
-}
+// The public types live in commandPaletteTypes.ts; re-exported so imports from the SFC keep working.
+export type { Command, CommandFetcher, CommandImage, CommandPrompt, PaletteLabels } from "./commandPaletteTypes"
 
 const props = withDefaults(
   defineProps<{
@@ -660,42 +389,8 @@ function actionsOf(c: Command | undefined): Command[] {
 
 const selectedActions = computed(() => actionsOf(flat.value[selectedIndex.value]))
 
-/*
- * On a phone the palette is a sheet over the whole screen, and the on-screen
- * keyboard takes the bottom of it without resizing the layout viewport: the
- * last rows would sit under the keys. The visible part is tracked instead and
- * handed to the CSS, so the list ends where the keyboard begins.
- */
-const viewport = ref<Record<string, string>>({})
-function trackViewport() {
-  const vv = typeof window === "undefined" ? undefined : window.visualViewport
-  // The whole visible rectangle, not only its height: a page wider than the
-  // phone is zoomed out to fit, and a fixed sheet then measures the wider
-  // layout instead of the screen the person is looking at.
-  viewport.value = vv
-    ? {
-        "--lp-cmd-vh": `${vv.height}px`,
-        "--lp-cmd-vw": `${vv.width}px`,
-        "--lp-cmd-vx": `${vv.offsetLeft}px`,
-        "--lp-cmd-vy": `${vv.offsetTop}px`,
-      }
-    : {}
-}
-watch(
-  () => props.open,
-  (open, _, onCleanup) => {
-    const vv = typeof window === "undefined" ? undefined : window.visualViewport
-    if (!open || !vv) return
-    trackViewport()
-    vv.addEventListener("resize", trackViewport)
-    vv.addEventListener("scroll", trackViewport)
-    onCleanup(() => {
-      vv.removeEventListener("resize", trackViewport)
-      vv.removeEventListener("scroll", trackViewport)
-    })
-  },
-  { immediate: true },
-)
+// The visible part of the screen while a phone's keyboard is up (see paletteViewport).
+const viewport = usePaletteViewport(() => props.open)
 
 /*
  * Tab is free for this: the rows are out of the tab order and the box is the
@@ -814,76 +509,17 @@ function back(): boolean {
 }
 
 // ── async results ────────────────────────────────────────────
-/*
- * One in-flight request, shared by `search` at the root and by a fetching
- * `children` inside a mode — they differ only in which function to call. The
- * debounce, the abort and the stale-response guard live in `useAsyncTask`,
- * which the table's `load` uses too.
- */
-const found = shallowRef<Command[]>([])
-const task = useAsyncTask<Command[]>()
-const searching = task.pending
-
-function fetcher(): CommandFetcher | null {
-  const current = mode.value
-  if (current) {
-    return typeof current.children === "function"
-      ? current.children
-      : null
-  }
-  return props.search ?? null
-}
-
-function cancel() {
-  task.cancel()
-}
-
-/*
- * A provider that threw used to leave the list as if it had answered "nothing
- * matches", which is a claim about the data the palette cannot make. A failure
- * says so and offers the same request again. Aborts never land here: the task
- * drops a superseded request before `fail` runs.
- */
-const failed = ref(false)
-/** The failure came after some batches had shown: those stay, the line says the rest is missing. */
-const incomplete = ref(false)
-
-function refresh(keepRows = false) {
-  cancel()
-  if (!keepRows) found.value = []
-  failed.value = false
-  incomplete.value = false
-  const run = fetcher()
-  if (!run) return
-  const parsed = parsePaletteQuery(query.value.trim())
-  const q = parsed.text
-  // A fetching mode runs on an empty query too: opening it should show the
-  // first page, not an empty screen waiting for a keystroke. Root search does
-  // not — ⌘K would fire a request at every open.
-  const inMode = mode.value !== null
-  if (!inMode && q.length < Math.max(1, props.minChars)) return
-  // A failing provider: the static commands still stand, with a line saying
-  // that the rest could not be fetched.
-  // Streamed batches go through `emit`, which drops them once this request
-  // is superseded; `streamed` tells a failure after them from one before.
-  let streamed = false
-  task.run(
-    (signal, emit) =>
-      settleFetched(run(q, signal, parsed), signal, (rows) => {
-        streamed = true
-        emit(rows)
-      }),
-    {
-      delay: props.debounce,
-      apply: (hits) => (found.value = hits),
-      fail: () => {
-        if (!streamed) found.value = []
-        incomplete.value = streamed
-        failed.value = true
-      },
-    },
-  )
-}
+const { found, searching, failed, incomplete, refresh, cancel, clear: clearFound } = usePaletteFetch({
+  fetcher: () => {
+    const current = mode.value
+    if (current) return typeof current.children === "function" ? current.children : null
+    return props.search ?? null
+  },
+  inMode: () => mode.value !== null,
+  query,
+  minChars: () => props.minChars,
+  debounce: () => props.debounce,
+})
 
 // ── filtering + scoring ──────────────────────────────────────
 /*
@@ -953,101 +589,26 @@ const fallbacks = computed<Command[]>(() =>
 /*
  * Recent picks, newest first, lifted out of the list they already belong to.
  * Only on the root's empty query: once someone types, or drills into a mode,
- * relevance is the better order and a duplicated row is just noise.
+ * relevance is the better order and a duplicated row is just noise. Pins sit
+ * above them. See paletteHistory.
  */
-const RECENT_KEEP = 20
-// Kept in the kit's storage (the app's own, or the browser's made safe), and
-// re-checked on the way in: a list written by an older version or by hand
-// passes through readRecent before the palette shows any of it.
-const storedRecent = usePersisted<unknown>(() => props.recentKey, [])
-const ownRecent = computed<RecentItem[]>({
-  get: () => readRecent(storedRecent.value),
-  set: (list) => (storedRecent.value = list),
+const { recentItems, pinnedItems, syntheticModes, inSyntheticMode, remember, isPinned, togglePin, rowId } = usePaletteHistory({
+  recent: () => props.recent,
+  recentKey: () => props.recentKey,
+  pinned: () => props.pinned,
+  pinnedKey: () => props.pinnedKey,
+  resolveRecent: () => props.resolveRecent,
+  recentLimit: () => props.recentLimit,
+  recentLabel: () => props.recentLabel,
+  pinnedHeading: () => pinnedHeading.value,
+  rootCommands,
+  mode,
+  query,
+  trail,
+  isMore: (c) => moreOf.has(c),
+  onRemember: (item, c) => emit("remember", item, c),
+  onPinned: (items) => emit("update:pinned", items),
 })
-
-/*
- * Where each recent row was found, so running it again remembers it under
- * the same path rather than as a root pick. Modes the palette makes up
- * itself (Tab's actions) are not destinations, and nothing picked in them
- * is remembered.
- */
-const recentPath = new WeakMap<Command, string[]>()
-const syntheticModes = new WeakSet<Command>()
-
-function pathOf(c: Command): string[] {
-  return recentPath.get(c) ?? trail.value.map((step) => step.id)
-}
-
-/* A root pick that is not a root command is something a search found. */
-function historyItem(c: Command): RecentItem {
-  const path = pathOf(c)
-  return toRecentItem(c, path, !path.length && !rootCommands.value.some((root) => root.id === c.id))
-}
-
-function remember(c: Command) {
-  if (c.remember === false || trail.value.some((step) => syntheticModes.has(step))) return
-  const item = historyItem(c)
-  emit("remember", item, c)
-  const key = props.recentKey
-  if (!key || props.recent) return
-  ownRecent.value = pushRecent(ownRecent.value, item, RECENT_KEEP)
-}
-const recentList = computed(() => props.recent ?? (props.recentKey ? ownRecent.value : []))
-
-function fromEntry(entry: RecentEntry): Command {
-  return { id: entry.id, label: entry.label, description: entry.description, icon: entry.icon, image: entry.image, href: entry.href }
-}
-
-/*
- * Shown while no words are typed: at an empty box, and under operators
- * alone, which filter them like any row ("-theme", "in:recent").
- */
-const recentItems = computed<Command[]>(() => {
-  if (mode.value || !recentList.value.length) return []
-  const terms = parseCommandQuery(query.value)
-  if (terms.include.length) return []
-  const found = resolveRecentItems(recentList.value, rootCommands.value, {
-    limit: Number.POSITIVE_INFINITY,
-    resolve: props.resolveRecent,
-    fromEntry,
-  })
-  const out: Command[] = []
-  for (const { command, path } of found) {
-    if (out.length >= props.recentLimit) break
-    if (out.includes(command) || !recentVisible(command, terms, props.recentLabel)) continue
-    recentPath.set(command, path)
-    out.push(command)
-  }
-  return out
-})
-
-const storedPinned = usePersisted<unknown>(() => props.pinnedKey ?? (props.recentKey ? `${props.recentKey}:pinned` : undefined), [])
-const pinList = computed(() => props.pinned ?? readRecent(storedPinned.value))
-const pinResolved = computed(() => resolveRecentItems(pinList.value, rootCommands.value, { limit: Infinity, resolve: props.resolveRecent, fromEntry }))
-const pinnedItems = computed(() => {
-  if (mode.value || parseCommandQuery(query.value).include.length) return []
-  return pinResolved.value.filter(({ command }) => recentVisible(command, parseCommandQuery(query.value), pinnedHeading.value)).map(({ command, path }) => { recentPath.set(command, path); return command })
-})
-function isPinned(command: Command) {
-  const key = commandKey(command.id, pathOf(command))
-  return pinList.value.some(item => recentKey(item) === key)
-}
-function togglePin(command: Command | undefined) {
-  if (!command || moreOf.has(command) || command.children || trail.value.some(step => syntheticModes.has(step))) return
-  const key = commandKey(command.id, pathOf(command))
-  const next = isPinned(command) ? pinList.value.filter(item => recentKey(item) !== key)
-    : pushRecent(pinList.value, historyItem(command), Infinity)
-  if (props.pinned === undefined) storedPinned.value = next
-  emit("update:pinned", next)
-}
-
-/*
- * A row's identity on screen. The same id can sit in one list twice, a root
- * command beside a recent pick from a mode, and they are different rows.
- */
-function rowId(c: Command): string {
-  return commandKey(c.id, recentPath.get(c))
-}
 
 // Group preserving first-seen order; ungrouped commands sit under "".
 // Recent first (it answers "the thing I always run"), then the matched list,
@@ -1135,106 +696,23 @@ const active = computed<Command | undefined>(() => {
   const c = flat.value[selectedIndex.value]
   return c && !moreOf.has(c) ? c : undefined
 })
-const canPin = computed(() => active.value && !active.value.children && !moreOf.has(active.value) && !trail.value.some(step => syntheticModes.has(step)))
-const previewRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
+const canPin = computed(() => active.value && !active.value.children && !moreOf.has(active.value) && !inSyntheticMode())
 
-/*
- * The pane opens only for a row that has something to show: an empty pane
- * beside a list of commands is a column of dead space. With the slot the app
- * decides what to show, so any highlighted row opens it.
- */
-const previewable = computed(() =>
-  (props.previewPane || !!editing.value) && commandHasPreview(active.value, { slot: !!slots.preview, hasPreview: props.hasPreview }),
-)
-
-/*
- * The row the pane shows. It follows the highlight while the highlight has a
- * preview, and lingers for a moment when it lands on a row without one:
- * arrowing through a list where every other row has a preview would
- * otherwise widen and narrow the dialog on every keystroke. Only when the
- * highlight stays on such rows does the pane fold.
- */
-const PANE_LINGER_MS = 160
-const paneCommand = shallowRef<Command | undefined>()
-let lingerTimer: ReturnType<typeof setTimeout> | undefined
-watch(
-  [() => editing.value ?? active.value, previewable],
-  ([command, show]) => {
-    clearTimeout(lingerTimer)
-    if (show) {
-      paneCommand.value = command
-      return
-    }
-    if (!paneCommand.value) return
-    lingerTimer = setTimeout(() => (paneCommand.value = undefined), PANE_LINGER_MS)
-  },
-  { immediate: true },
-)
-onBeforeUnmount(() => clearTimeout(lingerTimer))
-
-const paneOpen = computed(() => !promptCommand.value && (!!editing.value || (props.previewPane && !!paneCommand.value)))
+// The preview pane beside the list (see palettePane).
+const { previewRef, paneCommand, paneOpen, paneBody } = usePalettePane({
+  previewPane: () => props.previewPane,
+  hasPreview: () => props.hasPreview,
+  slot: () => !!slots.preview,
+  editing,
+  active,
+  prompting: () => !!promptCommand.value,
+})
 
 function paneHighlight(text: string): HighlightPart[] {
   return highlight(text, paneBody.value?.highlight)
 }
 const paneQuery = computed(() => parsePaletteQuery(query.value.trim()))
 
-// What the pane draws: the last row it showed, kept while the pane slides out
-// so it leaves with its content instead of emptying first. Immediate: the
-// first row is already highlighted when the palette opens, and the pane
-// opened beside it empty until the highlight moved.
-const paneBody = shallowRef<Command | undefined>()
-watch(
-  paneCommand,
-  (command) => {
-    if (command) paneBody.value = command
-  },
-  { immediate: true },
-)
-
-/*
- * The text in paragraphs, so they can arrive one after another. A blank line
- * separates them, as in the `preview` the consumer wrote.
- */
-const paragraphs = computed(() =>
-  (paneBody.value?.preview ?? paneBody.value?.excerpt ?? "")
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean),
-)
-
-/*
- * The row's description heads the pane only when it says something the body
- * does not: a command whose full text opens with its description (or is it)
- * would otherwise print the same sentences twice, once small and once large.
- */
-const paneDescription = computed(() => {
-  const description = paneBody.value?.description?.trim()
-  if (!description) return undefined
-  const body = paragraphs.value.join(" ")
-  return body.startsWith(description) ? undefined : description
-})
-
-/** Stagger between paragraphs (after the description), capped so a long section does not trickle in. */
-const paraDelay = (index: number) => `${staggerDelay(index + 1, 0, 45, 10)}ms`
-
-/*
- * A preview is opened for the match, so the pane lands on it: the first
- * highlighted word is brought into view, and a result without one starts
- * from the top rather than wherever the previous result was scrolled to.
- */
-watch(
-  () => paneCommand.value?.id,
-  async () => {
-    if (!paneOpen.value) return
-    await nextTick()
-    const viewport = previewRef.value?.viewportEl
-    if (!viewport) return
-    const mark = viewport.querySelector("mark")
-    if (mark) mark.scrollIntoView({ block: "center" })
-    else viewport.scrollTop = 0
-  },
-)
 // Rows ask for their index several times per render; a lookup keeps that O(1)
 // instead of a scan of the whole list per row.
 const flatIndex = computed(() => new Map(flat.value.map((c, i) => [c, i])))
@@ -1247,22 +725,6 @@ function flatIndexOf(c: Command): number {
 // words) for <mark> wrapping, without v-html. Exclusions are never marked.
 function highlight(value: string, extra: string[] = []): HighlightPart[] {
   return highlightParts(value, [...local.value.terms, ...extra])
-}
-
-// ── row picture ──────────────────────────────────────────────
-/*
- * A string is shorthand for the src. A picture with nothing to fall back on
- * borrows the command's icon, so a row that had an icon keeps one while the
- * picture loads or after it fails.
- */
-// The avatar's own radii are drawn for 36px and up; at the icon's size a card
-// radius rounds a square into a blob. Whole literals so Tailwind sees them.
-const IMAGE_RADIUS = { circle: "rounded-pill", soft: "rounded-[6px]", square: "rounded-[3px]" } as const
-
-function imageOf(c: Command): CommandImage | null {
-  if (!c.image) return null
-  const image = typeof c.image === "string" ? { src: c.image } : c.image
-  return { ...image, icon: image.icon ?? c.icon }
 }
 
 // ── selection + keyboard ─────────────────────────────────────
@@ -1583,9 +1045,7 @@ watch(
     trail.value = []
     trailState.value = []
     modeItems.value = []
-    found.value = []
-    failed.value = false
-    incomplete.value = false
+    clearFound()
     if (o) {
       await nextTick()
       // Closed again meanwhile: the box belongs to a dialog on its way out.
@@ -1759,100 +1219,22 @@ const guardOutside = useOutsideGuard()
                 >
                   {{ group.name }}
                 </div>
-                <!-- tabindex -1: the rows are reached with the arrows from the box,
-                     so Tab should not walk through every one of them. -->
-                <component
-                  :is="linkOf(c) ? 'a' : 'button'"
+                <PaletteRow
                   v-for="c in group.items"
                   :id="optionId(flatIndexOf(c))"
                   :key="rowId(c)"
-                  :href="c.disabled ? undefined : linkOf(c)"
-                  :type="linkOf(c) ? undefined : 'button'"
-                  role="option"
-                  tabindex="-1"
-                  :aria-label="c.description ? `${c.label} ${c.description}` : c.label"
-                  :aria-selected="flatIndexOf(c) === selectedIndex"
-                  :aria-disabled="c.disabled || undefined"
-                  :data-cmd-index="flatIndexOf(c)"
-                  :disabled="linkOf(c) ? undefined : c.disabled"
-                  class="lp-cmd-item flex w-full gap-3 rounded-inner px-2.5 py-2 text-left text-sm outline-none transition-colors duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45"
-                  :class="[
-                    c.excerpt ? 'items-start' : 'items-center',
-                    flatIndexOf(c) === selectedIndex
-                      ? 'bg-brand-soft text-brand'
-                      : moreOf.has(c)
-                        ? 'text-muted hover:bg-surface-soft/60'
-                        : 'text-ink hover:bg-surface-soft/60',
-                  ]"
+                  :command="c"
+                  :index="flatIndexOf(c)"
+                  :selected="flatIndexOf(c) === selectedIndex"
+                  :more="moreOf.has(c)"
+                  :href="linkOf(c)"
+                  :excerpt-lines="excerptLines"
+                  :highlight="highlight"
                   @click="onRowClick($event, c)"
                   @contextmenu="onRowContextMenu($event, c)"
                   @pointerenter="onPointerEnter(c)"
                   @pointerleave="onPointerLeave"
-                >
-                  <!-- Named from label and description, not from content: split
-                       into <mark> parts, a row's text was not always read as its
-                       name (BotEco's palette showed nameless options), and the
-                       shortcut or prefix kbd is not part of what the row is. -->
-                  <!-- A picture takes the icon's slot at the icon's footprint, with
-                       a negative margin so a 20px avatar does not make its row
-                       taller than its neighbours. -->
-                  <LpAvatar
-                    v-if="imageOf(c)"
-                    :src="imageOf(c)!.src ?? undefined"
-                    :alt="imageOf(c)!.alt ?? ''"
-                    :fallback="imageOf(c)!.fallback"
-                    :icon="imageOf(c)!.icon"
-                    :shape="imageOf(c)!.shape ?? 'soft'"
-                    :pixel-size="20"
-                    class="-my-0.5 -ml-0.5 shrink-0 text-[9px]"
-                    :class="IMAGE_RADIUS[imageOf(c)!.shape ?? 'soft']"
-                  />
-                  <LpIcon v-else-if="c.icon" :name="c.icon" :size="16" class="shrink-0" :class="{ 'mt-0.5': c.excerpt }" />
-                  <span class="min-w-0 flex-1">
-                    <span class="block truncate font-medium">
-                      <template v-for="(p, pi) in highlight(c.label, c.highlight)" :key="`l${pi}`">
-                        <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
-                        <template v-else>{{ p.text }}</template>
-                      </template>
-                    </span>
-                    <span v-if="c.description" class="mt-0.5 block truncate text-xs text-muted">
-                      <template v-for="(p, pi) in highlight(c.description, c.highlight)" :key="`d${pi}`">
-                        <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                        <template v-else>{{ p.text }}</template>
-                      </template>
-                    </span>
-                    <!-- Wraps rather than truncates: a passage cut to one line
-                         stops before the part that explains the match. Ink, not
-                         brand, on the active row: a paragraph in accent colour is
-                         hard to read. -->
-                    <span
-                      v-if="c.excerpt"
-                      class="lp-cmd-excerpt mt-1 block text-[13px] leading-snug text-ink/80"
-                      :style="{ '-webkit-line-clamp': excerptLines }"
-                    >
-                      <template v-for="(p, pi) in highlight(c.excerpt, c.highlight)" :key="`e${pi}`">
-                        <mark v-if="p.hit" class="rounded-xs bg-brand/20 text-ink">{{ p.text }}</mark>
-                        <template v-else>{{ p.text }}</template>
-                      </template>
-                    </span>
-                  </span>
-                  <!-- Keys mean nothing to a finger: hidden on a touch screen. -->
-                  <MenuShortcut v-if="c.shortcut" :combo="c.shortcut" class="[@media(hover:none)_and_(pointer:coarse)]:hidden" />
-                  <!-- The prefix that opens this mode from the box, so the
-                       shortcut is learned by seeing it rather than reading docs. -->
-                  <kbd
-                    v-else-if="c.prefix && c.children"
-                    class="shrink-0 rounded-small border border-line px-1.5 font-mono text-[11px] whitespace-pre text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden"
-                  >{{ c.prefix }}</kbd>
-                  <!-- Drills in rather than runs: worth saying before the click,
-                       since the two look identical otherwise. -->
-                  <LpIcon
-                    v-else-if="c.children"
-                    name="lucide:chevron-right"
-                    :size="14"
-                    class="shrink-0 text-muted"
-                  />
-                </component>
+                />
               </div>
             </div>
             <!-- Below what was found: the static matches are still worth
@@ -1890,37 +1272,7 @@ const guardOutside = useOutsideGuard()
                   <PalettePreviewBoundary>
                   <slot name="preview" :command="paneBody" :highlight="paneHighlight" :query="paneQuery">
                     <component v-if="paneBody.previewComponent" :is="paneBody.previewComponent" />
-                    <template v-else>
-                    <div class="lp-cmd-para flex items-center gap-2 text-ink">
-                      <LpAvatar
-                        v-if="imageOf(paneBody)"
-                        :src="imageOf(paneBody)!.src ?? undefined"
-                        :alt="imageOf(paneBody)!.alt ?? ''"
-                        :fallback="imageOf(paneBody)!.fallback"
-                        :icon="imageOf(paneBody)!.icon"
-                        :shape="imageOf(paneBody)!.shape ?? 'soft'"
-                        :pixel-size="28"
-                        class="shrink-0"
-                        :class="IMAGE_RADIUS[imageOf(paneBody)!.shape ?? 'soft']"
-                      />
-                      <LpIcon v-else-if="paneBody.icon" :name="paneBody.icon" :size="16" class="shrink-0 text-muted" />
-                      <h3 class="min-w-0 text-base font-semibold">{{ paneBody.label }}</h3>
-                    </div>
-                    <p v-if="paneDescription" class="lp-cmd-para mt-0.5 text-xs text-muted">
-                      {{ paneDescription }}
-                    </p>
-                    <p
-                      v-for="(para, i) in paragraphs"
-                      :key="i"
-                      class="lp-cmd-para mt-3 whitespace-pre-line text-sm leading-relaxed text-ink/90"
-                      :style="{ animationDelay: paraDelay(i) }"
-                    >
-                      <template v-for="(p, pi) in highlight(para, paneBody.highlight)" :key="`p${pi}`">
-                        <mark v-if="p.hit" class="rounded-xs bg-brand/25 text-ink">{{ p.text }}</mark>
-                        <template v-else>{{ p.text }}</template>
-                      </template>
-                    </p>
-                    </template>
+                    <PalettePaneText v-else :command="paneBody" :highlight="highlight" />
                   </slot>
                   </PalettePreviewBoundary>
                   <div v-if="actionsOf(paneBody).length" class="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
@@ -1932,57 +1284,17 @@ const guardOutside = useOutsideGuard()
           </Transition>
         </div>
 
-        <!-- Footer hints. Keyboard-only, so a touch screen without a keyboard
-             gets the row back for results. -->
-        <div
-          class="flex shrink-0 items-center gap-4 border-t border-line px-4 py-2.5 text-[11px] text-muted [@media(hover:none)_and_(pointer:coarse)]:hidden"
-        >
-          <span class="flex items-center gap-1">
-            <kbd class="rounded-small border border-line px-1 text-[10px]">↑</kbd>
-            <kbd class="rounded-small border border-line px-1 text-[10px]">↓</kbd>
-            {{ text.navigate }}
-          </span>
-          <span class="flex items-center gap-1">
-            <kbd class="rounded-small border border-line px-1 text-[10px]">↵</kbd>
-            {{ text.select }}
-          </span>
-          <!-- Only inside a mode: at the root Backspace just edits the query,
-               and advertising it there would be a lie. -->
-          <button
-            v-if="selectedActions.length && active"
-            type="button"
-            class="flex items-center gap-1 rounded-small outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            :class="showActionsKey && 'font-medium text-brand'"
-            :aria-label="text.actions"
-            @click="openActions(active)"
-          >
-            <kbd
-              class="rounded-small border px-1 text-[10px] transition-colors"
-              :class="showActionsKey ? 'border-brand' : 'border-line'"
-            >{{ text.tab }}</kbd>
-            {{ text.actions }}
-          </button>
-          <button
-            v-if="canPin && active && !promptCommand"
-            type="button"
-            class="flex items-center gap-1 rounded-small outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
-            :aria-label="isPinned(active) ? text.unpin : text.pin"
-            :aria-pressed="isPinned(active)"
-            @click="togglePin(active)"
-          >
-            <kbd class="rounded-small border border-line px-1 text-[10px]">Alt+P</kbd>
-            <LpIcon name="lucide:star" :size="11" :class="isPinned(active) && 'fill-current text-brand'" />
-            {{ isPinned(active) ? text.unpin : text.pin }}
-          </button>
-          <span v-if="trail.length" class="flex items-center gap-1">
-            <kbd class="rounded-small border border-line px-1 text-[10px]">⌫</kbd>
-            {{ text.back }}
-          </span>
-          <span class="ml-auto flex items-center gap-1">
-            <kbd class="rounded-small border border-line px-1 text-[10px]">{{ text.esc }}</kbd>
-            {{ text.close }}
-          </span>
-        </div>
+        <!-- Footer hints. -->
+        <PaletteFooter
+          :text="text"
+          :actions="!!(selectedActions.length && active)"
+          :lit-actions="showActionsKey"
+          :can-pin="!!(canPin && active && !promptCommand)"
+          :pinned="!!active && isPinned(active)"
+          :in-mode="trail.length > 0"
+          @actions="active && openActions(active)"
+          @pin="togglePin(active)"
+        />
       </DialogContent>
     </DialogPortal>
   </DialogRoot>
@@ -2060,33 +1372,11 @@ const guardOutside = useOutsideGuard()
   opacity: 0;
   transform: translateX(40%);
 }
-.lp-cmd-para {
-  --rise: 4px;
-  animation: rise-in 260ms ease-out both;
-}
 @media (prefers-reduced-motion: reduce) {
   .lp-cmd-split,
   .lp-cmd-pane-enter-active,
   .lp-cmd-pane-leave-active {
     transition: none;
-  }
-  .lp-cmd-para {
-    animation: none;
-  }
-}
-.lp-cmd-excerpt {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-/* Each result eases in; honours reduced motion. */
-.lp-cmd-item {
-  --rise: 3px;
-  animation: rise-in 140ms ease-out both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .lp-cmd-item {
-    animation: none;
   }
 }
 </style>
