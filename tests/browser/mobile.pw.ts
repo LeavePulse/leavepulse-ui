@@ -427,3 +427,21 @@ test.describe("phone keyboards and thumbs", () => {
     expect(String(hit)).toContain("cursor-col-resize")
   })
 })
+
+test.describe("touch tablet", () => {
+  test.use({ viewport: { width: 820, height: 1180 } })
+  test("a table's column edge answers a thumb on either side of the line, and the sort button keeps its label", async ({ page }) => {
+    await page.goto("/tests/browser/?scenario=table&part=resize")
+    const handle = page.getByRole("separator", { name: "Resize Name" })
+    await expect(handle).toBeVisible()
+    const box = (await handle.boundingBox())!
+    expect(box.width).toBeLessThan(8)
+    const edge = box.x + box.width
+    const y = box.y + box.height / 2
+    const hits = await page.evaluate(([x, y]) => [-11, 0, 11].map((dx) => document.elementFromPoint(x + dx, y)?.getAttribute("data-lp-resize") ?? null), [edge, y])
+    expect(hits).toEqual(["name", "name", "name"])
+    const sort = page.getByRole("button", { name: /^Name/ })
+    const label = (await sort.boundingBox())!
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("button"), [label.x + 4, label.y + label.height / 2])).toBe(true)
+  })
+})

@@ -64,10 +64,9 @@ entry is deleted, not ticked: the commit says what changed.
   the rest, so the run goes green and a new failure stands out. On the
   0.88.0 run Firefox also failed "a fitted player in full screen fills the
   screen instead of going black" once; whether it repeats is unknown.
-- **The phone pass left open items.** LpTable's column-resize handle is 6px
-  wide, and a wider hit area would take taps from the header sort buttons;
-  the column filter's funnel (20px) stays as small for the same reason. None
-  of the kit has been tried on a real iPhone or Android.
+- **The phone pass left open items.** LpTable's column filter funnel is 20px,
+  and a wider hit area would take taps from the header sort button beside it.
+  None of the kit has been tried on a real iPhone or Android.
 
 - **Two gestures are still the libraries', not the kit's.** Bottom and top
   sheets (`LpDrawer` with `direction="bottom"`/`"top"`) drag to close and snap
