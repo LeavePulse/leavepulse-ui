@@ -95,6 +95,19 @@ test("groups head their rows and collapse", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "alpha" })).toBeVisible()
 })
 
+test("a group order holds the groups while the rows sort inside them", async ({ page }) => {
+  await page.goto(open("group-order"))
+  const table = page.getByLabel("Ordered groups", { exact: true })
+  const heads = table.getByRole("button", { name: /^Collapse/ })
+  await expect(heads).toHaveText(["a (1)", "b (2)"])
+  await table.getByRole("button", { name: "Name", exact: true }).click()
+  await table.getByRole("button", { name: /^Name/ }).click()
+  await expect(table.locator("tbody tr td:first-child")).toHaveText(["a (1)", "beta", "b (2)", "gamma", "alpha"])
+  await expect(heads).toHaveText(["a (1)", "b (2)"])
+  const list = page.getByLabel("Ordered list", { exact: true })
+  await expect(list.getByRole("button", { name: /^Collapse/ })).toHaveText(["b (2)", "a (1)"])
+})
+
 test("a row opens its panel, and a row that cannot has no button", async ({ page }) => {
   await page.goto(open("expand"))
   await expect(page.getByRole("button", { name: "Expand row" })).toHaveCount(2)

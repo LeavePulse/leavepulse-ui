@@ -100,6 +100,10 @@ const token = ref<TableSelectionToken | null>(null)
     </template>
     <LpTable v-else-if="part === 'pin'" :columns="pinned" :rows="wideRows" row-key="id" aria-label="Pinned" />
     <LpTable v-else-if="part === 'group'" :columns="columns" :rows="base" row-key="id" group-by="site" aria-label="Grouped" />
+    <template v-else-if="part === 'group-order'">
+      <LpTable :columns="columns" :rows="base" row-key="id" group-by="site" :group-order="['a', 'b']" aria-label="Ordered groups" />
+      <LpTable :columns="columns" :rows="base" row-key="id" group-by="site" :group-order="(a, b) => String(b).localeCompare(String(a))" layout="list" aria-label="Ordered list" />
+    </template>
     <div v-else-if="part === 'shrink'">
       <button type="button" @click="shrinkFilters = { site: ['b'] }">Hide site b</button>
       <LpTable v-model:filters="shrinkFilters" :columns="filterColumns" :rows="base" row-key="id" aria-label="Shrinking" />

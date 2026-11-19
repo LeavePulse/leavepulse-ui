@@ -1009,6 +1009,52 @@ export const data: ComponentEntry[] = [
 </div>`,
   },
   {
+    id: "table-groups",
+    name: "Table · Groups",
+    description:
+      "Rows under a heading per value: `groupBy` is a column key or a function, `groupLabel` names a heading, and a heading folds its rows (v-model:collapsedGroups).\n\n- Groups follow the row order by default, so a sort reorders the sections too.\n- `groupOrder` holds them in place while the rows sort inside them: the values in order (groups not listed follow, as their rows come), or a compare on two values. Sort by CPU here and the sections stay Services, Data, Edge.\n- Grouping works in every layout: the second table is the same rows as a list.",
+    components: { LpTable, LpBadge },
+    state: () =>
+      reactive({
+        collapsed: [] as string[],
+        columns: [
+          { key: "name", label: "Server", sortable: true },
+          { key: "kind", label: "Kind", sortable: true },
+          { key: "state", label: "State" },
+          { key: "cpu", label: "CPU", align: "right", sortable: true },
+        ],
+        rows: [
+          { name: "edge-01", kind: "edge", state: "online", cpu: 22 },
+          { name: "api-01", kind: "service", state: "online", cpu: 64 },
+          { name: "pg-01", kind: "data", state: "degraded", cpu: 88 },
+          { name: "api-02", kind: "service", state: "offline", cpu: 0 },
+          { name: "redis-01", kind: "data", state: "online", cpu: 31 },
+          { name: "edge-02", kind: "edge", state: "online", cpu: 47 },
+        ],
+        kinds: { service: "Services", data: "Data", edge: "Edge" } as Record<string, string>,
+        tone: (state: string) => (state === "online" ? "success" : state === "degraded" ? "warning" : "danger"),
+      }),
+    template: `<div class="flex flex-col gap-6">
+  <LpTable
+    v-model:collapsed-groups="collapsed"
+    :columns="columns"
+    :rows="rows"
+    row-key="name"
+    group-by="kind"
+    :group-order="['service', 'data', 'edge']"
+    :group-label="(value) => kinds[value]"
+  >
+    <template #cell-state="{ value }"><LpBadge :tone="tone(value)" size="sm">{{ value }}</LpBadge></template>
+    <template #cell-cpu="{ value }"><span class="tabular-nums">{{ value }}%</span></template>
+  </LpTable>
+  <div class="max-w-sm">
+    <LpTable :columns="columns" :rows="rows" row-key="name" layout="list" group-by="kind" :group-order="['service', 'data', 'edge']" :group-label="(value) => kinds[value]">
+      <template #cell-state="{ value }"><LpBadge :tone="tone(value)" size="sm">{{ value }}</LpBadge></template>
+    </LpTable>
+  </div>
+</div>`,
+  },
+  {
     id: "pagination",
     name: "Pagination",
     description:

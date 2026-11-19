@@ -100,8 +100,19 @@ export interface RowGroup<Row> {
   rows: Row[]
 }
 
-/** Rows by group, in the order each group first appears, so a sort orders the groups too. */
-export function groupRows<Row>(rows: readonly Row[], valueOf: (row: Row) => unknown): RowGroup<Row>[] {
+/**
+ * The order groups stand in whatever the rows' order: the group values in the
+ * order they go, or a compare on two group values.
+ */
+export type GroupOrder = readonly unknown[] | ((a: unknown, b: unknown) => number)
+
+/**
+ * Rows by group, in the order each group first appears, so a sort orders the
+ * groups too. With `order` the groups keep that order instead while the rows
+ * sort inside them: listed values first, in the list's order (a value or its
+ * text matches), then the rest as they appear.
+ */
+export function groupRows<Row>(rows: readonly Row[], valueOf: (row: Row) => unknown, order?: GroupOrder): RowGroup<Row>[] {
   const groups = new Map<unknown, RowGroup<Row>>()
   for (const row of rows) {
     const value = valueOf(row)
@@ -109,7 +120,16 @@ export function groupRows<Row>(rows: readonly Row[], valueOf: (row: Row) => unkn
     if (group) group.rows.push(row)
     else groups.set(value, { value, id: String(value ?? ""), rows: [row] })
   }
-  return [...groups.values()]
+  const found = [...groups.values()]
+  if (!order) return found
+  if (typeof order === "function") return found.sort((a, b) => order(a.value, b.value))
+  const ids = order.map((value) => String(value ?? ""))
+  const rank = (group: RowGroup<Row>) => {
+    const at = order.indexOf(group.value)
+    const place = at >= 0 ? at : ids.indexOf(group.id)
+    return place >= 0 ? place : order.length
+  }
+  return found.sort((a, b) => rank(a) - rank(b))
 }
 
 export interface RowWindow {
