@@ -44,6 +44,7 @@ import {
   sortByKeys,
   type ColumnPin,
   type ColumnPreset,
+  type GroupOrder,
   type TableLayout,
 } from "./tableFeatures"
 import { devWarn } from "../composables/devWarn"
@@ -406,9 +407,16 @@ const props = withDefaults(
     /**
      * Group rows under a heading: a column key or a function. Client side, so
      * with `load` it groups the loaded page. Groups follow the row order, so
-     * sort by the same column to keep them put.
+     * sort by the same column to keep them put, or give `groupOrder`.
      */
     groupBy?: string | ((row: T) => unknown)
+    /**
+     * The order the groups stand in, whatever the sort: the group values in
+     * order (a value or its text matches; groups not listed follow, as their
+     * rows come), or a compare on two group values. Rows still sort inside
+     * their group.
+     */
+    groupOrder?: GroupOrder
     groupLabel?: (value: unknown, rows: T[]) => string
     /** Collapsed group ids, `String(value)` (v-model:collapsedGroups). */
     collapsedGroups?: string[]
@@ -483,6 +491,7 @@ const props = withDefaults(
     columnWidths: undefined,
     columnPreset: undefined,
     groupBy: undefined,
+    groupOrder: undefined,
     collapsedGroups: undefined,
     expanded: undefined,
     virtualRowHeight: undefined,
@@ -1630,7 +1639,7 @@ const allEntries = computed<ViewEntry[]>(() => {
     rows.forEach((row, index) => pushRow(row, index))
     return entries
   }
-  for (const group of groupRows(rows, groupValue)) {
+  for (const group of groupRows(rows, groupValue, props.groupOrder)) {
     const collapsed = collapsedSet.value.has(group.id)
     const name = props.groupLabel?.(group.value, group.rows) ?? group.id
     const label = text.value.groupCount.replace("{label}", name).replace("{count}", String(group.rows.length))
