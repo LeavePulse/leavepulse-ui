@@ -680,6 +680,32 @@ of a second bar of the page's above the table's.
 </LpTable>
 ```
 
+### Tables: cards, lists and groups
+
+The same rows and tools (sort, filters, selection, the row menu, export,
+grouping, the palette) draw three ways. `layout` (v-model) is `table`, `cards`
+or `list`; `layouts` offers a switch in the bar, remembered with `persist`;
+`layoutBelow` turns a table into a list while the table itself is narrower than
+that many px, so a phone gets one line per row. Cards and lines are built from
+the columns and their `#cell-*` slots (a column's `list` says how it reads in a
+line); `#card` and `#line` draw them yourself.
+
+`groupBy` puts rows under a heading per value. Groups follow the row order, so
+a sort reorders them; `groupOrder` holds them in place while the rows sort
+inside: the values in order, or a compare on two values.
+
+```vue
+<LpTable
+  :columns="columns"
+  :rows="servers"
+  :layouts="['table', 'cards', 'list']"
+  :layout-below="480"
+  group-by="kind"
+  :group-order="['service', 'data', 'edge']"
+  persist="servers"
+/>
+```
+
 ### Clipboard feedback
 
 `useClipboard().copy(text, { toast: true, errorToast: true })` says the kit's

@@ -95,6 +95,18 @@ test("groups keep the order their rows first appear in", () => {
   expect(groupRows([], () => 1)).toEqual([])
 })
 
+test("a group order keeps the groups put while the rows sort inside them", () => {
+  const rows = [{ s: "c", n: 1 }, { s: "a", n: 2 }, { s: "b", n: 3 }, { s: "c", n: 4 }, { s: "d", n: 5 }]
+  const listed = groupRows(rows, (row) => row.s, ["b", "c"])
+  expect(listed.map((g) => g.value)).toEqual(["b", "c", "a", "d"])
+  expect(listed[1]!.rows.map((r) => r.n)).toEqual([1, 4])
+  const byText = groupRows([{ k: 2 }, { k: 1 }, { k: null }], (row) => row.k, ["1", "2", ""])
+  expect(byText.map((g) => g.value)).toEqual([1, 2, null])
+  const compared = groupRows(rows, (row) => row.s, (a, b) => String(b).localeCompare(String(a)))
+  expect(compared.map((g) => g.value)).toEqual(["d", "c", "b", "a"])
+  expect(groupRows(rows, (row) => row.s, []).map((g) => g.value)).toEqual(["c", "a", "b", "d"])
+})
+
 test("the row window covers the viewport plus overscan and accounts for every row", () => {
   expect(rowWindow(0, 100, 10, 1000, 2)).toEqual({ start: 0, end: 12, before: 0, after: 9880 })
   const mid = rowWindow(500, 100, 10, 1000, 2)

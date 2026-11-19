@@ -5463,7 +5463,6 @@
     "name": "variant",
     "type": "LoaderVariant | undefined",
     "required": false,
-    "default": "\"spinner\"",
     "description": "`spinner` for a spot (a button, a row, a field); `dots` for something\nconversational (typing, connecting); `bar` for a region across its width\n(the top of a card or a page)."
    },
    {
@@ -7783,14 +7782,21 @@
    },
    {
     "name": "variant",
-    "type": "\"ring\" | \"bar\" | undefined",
+    "type": "\"ring\" | \"bar\" | \"ascii\" | undefined",
     "required": false,
-    "default": "\"bar\"",
-    "description": "`bar` (default) fills horizontally; `ring` draws a dial.",
+    "description": "`bar` (default) fills horizontally; `ring` draws a dial; `ascii` prints\nthe bar as monospace block characters, `████▌░░░`, for terminal-styled\npages and logs where a drawn bar would look out of place.",
     "choices": [
      "ring",
-     "bar"
+     "bar",
+     "ascii"
     ]
+   },
+   {
+    "name": "cells",
+    "type": "number | undefined",
+    "required": false,
+    "default": "20",
+    "description": "Ascii only: how many character cells the bar is wide."
    },
    {
     "name": "size",
@@ -8354,7 +8360,12 @@
     "type": "[editor: Editor]"
    }
   ],
-  "slots": []
+  "slots": [
+   {
+    "name": "peer",
+    "type": "{ peer: Collaborator; }"
+   }
+  ]
  },
  "LpRollingText": {
   "props": [
@@ -9106,8 +9117,7 @@
    {
     "name": "preset",
     "type": "ShaderPreset | undefined",
-    "required": false,
-    "default": "\"aurora\""
+    "required": false
    },
    {
     "name": "intensity",
@@ -9796,6 +9806,12 @@
      "card",
      "control"
     ]
+   },
+   {
+    "name": "immediate",
+    "type": "boolean | undefined",
+    "required": false,
+    "description": "Show at once instead of after the short wait that hides fast loads."
    }
   ],
   "events": [],
@@ -10673,7 +10689,14 @@
     "type": "string | ((row: T) => unknown) | undefined",
     "required": false,
     "default": "undefined",
-    "description": "Group rows under a heading: a column key or a function. Client side, so\nwith `load` it groups the loaded page. Groups follow the row order, so\nsort by the same column to keep them put."
+    "description": "Group rows under a heading: a column key or a function. Client side, so\nwith `load` it groups the loaded page. Groups follow the row order, so\nsort by the same column to keep them put, or give `groupOrder`."
+   },
+   {
+    "name": "groupOrder",
+    "type": "GroupOrder | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The order the groups stand in, whatever the sort: the group values in\norder (a value or its text matches; groups not listed follow, as their\nrows come), or a compare on two group values. Rows still sort inside\ntheir group."
    },
    {
     "name": "groupLabel",
@@ -11811,7 +11834,7 @@
    },
    {
     "name": "legendLabels",
-    "type": "Partial<Record<\"pending\" | \"network\" | \"structural\" | \"drift\", string>> | undefined",
+    "type": "Partial<Record<\"pending\" | \"drift\" | \"network\" | \"structural\", string>> | undefined",
     "required": false,
     "description": "Rename legend rows to match what this graph's edges actually mean."
    },
