@@ -1,15 +1,7 @@
 import { applyQueryFilters, parsePaletteQuery, type CommandSearchTerms, type HighlightPart, type SearchableCommand } from "./commandSearch"
-import type { Command } from "./LpCommandPalette.vue"
-import type { ContextMenuItemDef } from "./LpContextMenu.vue"
+import type { Command, CommandImage } from "./commandPaletteTypes"
 
-/** The same action definitions serve a row menu and the command palette. */
-export function menuPaletteCommands(items: ContextMenuItemDef[], prefix: string): Command[] {
-  return items.map((item, index) => ({
-    id: `${prefix}/${index}`, label: item.label, icon: item.icon, disabled: item.disabled,
-    onSelect: item.onSelect, keepOpen: item.checked !== undefined,
-    children: item.children ? menuPaletteCommands(item.children, `${prefix}/${index}`) : undefined,
-  }))
-}
+export { menuPaletteCommands } from "./paletteMenu"
 
 /*
  * The parts of LpCommandPalette that are plain logic, kept out of the SFC so
@@ -406,3 +398,18 @@ export async function settleFetched<T>(
     if (stop) signal.removeEventListener("abort", stop)
   }
 }
+
+/*
+ * A row's picture. A string is shorthand for the src. A picture with nothing
+ * to fall back on borrows the command's icon, so a row that had an icon keeps
+ * one while the picture loads or after it fails.
+ */
+export function imageOf(c: Pick<Command, "image" | "icon">): CommandImage | null {
+  if (!c.image) return null
+  const image = typeof c.image === "string" ? { src: c.image } : c.image
+  return { ...image, icon: image.icon ?? c.icon }
+}
+
+// The avatar's own radii are drawn for 36px and up; at the icon's size a card
+// radius rounds a square into a blob. Whole literals so Tailwind sees them.
+export const IMAGE_RADIUS = { circle: "rounded-pill", soft: "rounded-[6px]", square: "rounded-[3px]" } as const

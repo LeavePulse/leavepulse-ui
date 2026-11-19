@@ -1,7 +1,8 @@
 import { computed, getCurrentInstance, h, inject, onMounted, onUpdated, onScopeDispose, provide, ref, shallowReactive, shallowRef, toValue, useId, type Component, type Directive, type InjectionKey, type MaybeRefOrGetter } from "vue"
-import { menuPaletteCommands } from "../components/commandPalette"
+import { menuPaletteCommands } from "../components/paletteMenu"
 import type { Command } from "../components/LpCommandPalette.vue"
 import type { ContextMenuItemDef } from "../components/LpContextMenu.vue"
+import { setPaletteAction, type PaletteActionOptions } from "./paletteAction"
 import { provideField, useField } from "./useField"
 import { useLabels } from "./useLpConfig"
 
@@ -157,7 +158,7 @@ export const vPalette: Directive<HTMLElement, PaletteTargetOptions> = {
   unmounted(el) { targets.get(el)?.stop(); targets.delete(el) },
 }
 
-export function usePaletteAction(options: { label?: () => string | undefined; element: () => HTMLElement | null | undefined; disabled?: () => boolean }) {
+export function usePaletteAction(options: PaletteActionOptions) {
   const instance = getCurrentInstance()
   const scope = usePaletteScope()
   if (!instance || !scope || inject(BLOCKED, false)) return
@@ -176,6 +177,9 @@ export function usePaletteAction(options: { label?: () => string | undefined; el
     }]
   }, { automatic: true })
 }
+
+// Buttons register through paletteAction, so they need not import this module.
+setPaletteAction(usePaletteAction)
 
 export function usePaletteControl(options: {
   label?: () => string | undefined

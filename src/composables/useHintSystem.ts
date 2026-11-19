@@ -2,8 +2,18 @@ import { computed, inject, onBeforeUnmount, provide, reactive, shallowRef, watch
 import type { HintNote } from "../components/LpHintLayer.vue"
 import type { TourContext, TourStep } from "../components/LpTour.vue"
 import { anyModalOpen } from "../components/modalDepth"
+import { HINT_SIGNALS } from "./hintSignals"
+import { RANK, hintKey, localHintStorage, mergeHintRecord, type HintDelta, type HintRecord, type HintStorage } from "./hintRecords"
+import type { HintTip } from "./hintTips"
 import { isTextEntry } from "./textEntry"
 import { hints } from "./useHints"
+
+// The system's parts live beside it; re-exported so this stays the one import.
+export { HINT_SIGNALS, noteContextTarget, noteDropzone, noteHotkeyTarget } from "./hintSignals"
+export { hintKey, hintSummary, localHintStorage } from "./hintRecords"
+export type { HintDelta, HintLevel, HintRecord, HintStorage, HintSummary } from "./hintRecords"
+export { contextMenuTip, dropzoneTip, hotkeyTip, paletteTip } from "./hintTips"
+export type { HintTip } from "./hintTips"
 
 /*
  * Onboarding that does not nag: a first-visit tour offer, quiet "new" dots,
@@ -77,172 +87,6 @@ export interface HintNudge {
   text: string
 }
 
-/**
- * A better way to do something the user keeps doing the slow way: shown now
- * and then (at most `max` times, `nudgeAgain` apart) and never again once the
- * better way is used. `when` reads usage counters — kit components report
- * their own (see HINT_SIGNALS), and `hints.use(name)` adds any of the app's.
- */
-export interface HintTip {
-  id: string
-  title: string
-  text: string
-  keys?: string
-  max?: number
-  when: (count: (signal: string) => number) => boolean
-  /** What "show me" lights up on the current screen; without it the tip only informs. */
-  step?: () => TourStep | null
-}
-
-/** Usage the kit reports by itself. */
-export const HINT_SIGNALS = {
-  /** A context menu was opened (right click or long press). */
-  contextMenu: "lp.context-menu",
-  /** A "…" menu marked `rightClickToo` was opened: its items were one right click away. */
-  menuButton: "lp.menu-button",
-  /** A left click on something that also has a context menu. */
-  contextTarget: "lp.context-target",
-  /** The command palette was opened. */
-  palette: "lp.palette",
-  /** The current hint page changed: a navigation. */
-  navigate: "lp.navigate",
-  /** An item's actions were opened in the palette (Tab). */
-  paletteActions: "lp.palette-actions",
-  /** A button's `hotkey` was pressed instead of clicking it. */
-  hotkey: "lp.hotkey",
-  /** A button that has a `hotkey` was clicked with the pointer. */
-  hotkeyTarget: "lp.hotkey-target",
-  /** A dropzone's file dialog was used to pick a file. */
-  dropzoneBrowse: "lp.dropzone-browse",
-  /** Something was dropped or pasted onto a dropzone. */
-  dropzoneDirect: "lp.dropzone-direct",
-} as const
-
-let lastContextTarget: WeakRef<Element> | null = null
-
-/** The element a left click just landed on that also has a right-click menu (a table row rather than the table). */
-export function noteContextTarget(el: Element): void {
-  lastContextTarget = new WeakRef(el)
-}
-
-let lastHotkeyTarget: { el: WeakRef<Element>; combo: string } | null = null
-
-/** A button with a hotkey was just clicked with the pointer: what `hotkeyTip` shows. */
-export function noteHotkeyTarget(el: Element, combo: string): void {
-  lastHotkeyTarget = { el: new WeakRef(el), combo }
-}
-
-let lastDropzone: WeakRef<Element> | null = null
-
-/** A dropzone's file dialog was just used: what `dropzoneTip` shows. */
-export function noteDropzone(el: Element): void {
-  lastDropzone = new WeakRef(el)
-}
-
-const onScreen = (el: Element) => {
-  const box = el.getBoundingClientRect()
-  return el.isConnected && box.width > 0 && box.bottom > 0 && box.top < window.innerHeight
-}
-
-/*
- * What the tip lights up: the thing the user keeps clicking, while it is still
- * on screen; otherwise a row with a menu, then any menu target. Rows first,
- * because a page's first target in document order is usually chrome (a
- * sidebar account card), not the content the habit is about.
- */
-function rightClickTarget(): Element | null {
-  const last = lastContextTarget?.deref()
-  if (last && onScreen(last)) return last
-  const visible = (selector: string) => [...document.querySelectorAll(selector)].find(onScreen) ?? null
-  return visible("[data-lp-context-row]") ?? visible("main [data-lp-context-menu]") ?? visible("[data-lp-context-menu]")
-}
-
-/** Right click instead of the "…" button. */
-export function contextMenuTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
-  return {
-    id: "lp.tip.context-menu",
-    title: text.title ?? "Right-click works here",
-    text: text.text ?? "Rows and cards open their actions on right-click, even where no … button shows it.",
-    when: (count) =>
-      count(HINT_SIGNALS.contextMenu) === 0
-      && (count(HINT_SIGNALS.menuButton) >= 5 || count(HINT_SIGNALS.contextTarget) >= 25),
-    step: () => {
-      const target = rightClickTarget()
-      return target ? { target, title: text.title ?? "Right-click works here", text: text.stepText ?? "Right-click this to see what it can do.", try: true } : null
-    },
-  }
-}
-
-/** The palette instead of walking the menu. */
-export function paletteTip(keys = "Ctrl+K", text: Partial<Pick<HintTip, "title" | "text">> = {}): HintTip {
-  return {
-    id: "lp.tip.palette",
-    title: text.title ?? "Jump anywhere",
-    text: text.text ?? "Search pages, people and settings from anywhere instead of the menu.",
-    keys,
-    when: (count) => count(HINT_SIGNALS.navigate) >= 15 && count(HINT_SIGNALS.palette) === 0,
-  }
-}
-
-/** The button's key instead of the pointer. */
-export function hotkeyTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
-  const title = text.title ?? "There is a key for this"
-  return {
-    id: "lp.tip.hotkey",
-    title,
-    text: text.text ?? "Buttons you keep clicking have a keyboard shortcut; it is in the button's tooltip and in the key reference (F1).",
-    when: (count) => count(HINT_SIGNALS.hotkey) === 0 && count(HINT_SIGNALS.hotkeyTarget) >= 10,
-    step: () => {
-      const last = lastHotkeyTarget
-      const target = last?.el.deref()
-      return last && target && onScreen(target)
-        ? { target, title, text: text.stepText ?? "Next time, press this instead of clicking:", keys: last.combo }
-        : null
-    },
-  }
-}
-
-/** Dropping or pasting instead of the file dialog. */
-export function dropzoneTip(text: Partial<Pick<HintTip, "title" | "text"> & { stepText: string }> = {}): HintTip {
-  const title = text.title ?? "Drop or paste here"
-  return {
-    id: "lp.tip.dropzone",
-    title,
-    text: text.text ?? "Files can be dragged straight onto the upload area, and a screenshot pasted with Ctrl+V, without the file dialog.",
-    when: (count) => count(HINT_SIGNALS.dropzoneDirect) === 0 && count(HINT_SIGNALS.dropzoneBrowse) >= 4,
-    step: () => {
-      const target = lastDropzone?.deref()
-      return target && onScreen(target)
-        ? { target, title, text: text.stepText ?? "Drag a file onto this, or copy a picture and paste it while this is focused.", keys: "Ctrl+V" }
-        : null
-    },
-  }
-}
-
-export type HintLevel = "seen" | "explained" | "used"
-
-export interface HintRecord {
-  state: HintLevel
-  dismissed: boolean
-  count: number
-  assigned?: boolean
-  updatedAt: string
-}
-
-export interface HintDelta {
-  key: string
-  state?: HintLevel
-  dismissed?: boolean
-  add?: number
-}
-
-export interface HintStorage {
-  load(): Promise<Record<string, HintRecord>> | Record<string, HintRecord>
-  save(deltas: HintDelta[]): Promise<void> | void
-  /** Last chance on page hide (sendBeacon); falls back to `save`. */
-  saveOnLeave?(deltas: HintDelta[]): void
-}
-
 export interface HintTiming {
   settle: number
   offerAgain: number
@@ -272,7 +116,6 @@ export type HintOffer =
   | { kind: "nudge"; page: string; nudge: HintNudge }
   | { kind: "tip"; page: string; tip: HintTip; step: TourStep | null }
 
-const RANK: Record<HintLevel, number> = { seen: 0, explained: 1, used: 2 }
 const DAY = 24 * 3600 * 1000
 const DEFAULT_TIMING: HintTiming = {
   settle: 2500,
@@ -282,77 +125,6 @@ const DEFAULT_TIMING: HintTiming = {
   nudgeAgain: 7 * DAY,
   flush: 2000,
   newsWait: 8000,
-}
-
-/** Records in localStorage: for anonymous sessions and apps without a server. */
-export function localHintStorage(key = "lp-hints"): HintStorage {
-  const read = (): Record<string, HintRecord> => {
-    try {
-      return JSON.parse(localStorage.getItem(key) || "{}") as Record<string, HintRecord>
-    } catch {
-      return {}
-    }
-  }
-  return {
-    load: read,
-    save(deltas) {
-      const all = read()
-      for (const d of deltas) all[d.key] = merge(all[d.key], d)
-      try {
-        localStorage.setItem(key, JSON.stringify(all))
-      } catch {
-        return
-      }
-    },
-  }
-}
-
-function merge(record: HintRecord | undefined, delta: Omit<HintDelta, "key">): HintRecord {
-  const base = record ?? { state: "seen" as HintLevel, dismissed: false, count: 0, updatedAt: "" }
-  return {
-    ...base,
-    state: delta.state && RANK[delta.state] > RANK[base.state] ? delta.state : base.state,
-    dismissed: delta.dismissed ?? base.dismissed,
-    count: base.count + (delta.add ?? 0),
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-/** Record keys, for apps that read or assign records directly (a "who knows what" view). */
-export const hintKey = {
-  feature: (id: string, rev = 1) => `f:${id}:${rev}`,
-  page: (page: string) => `t:${page}`,
-  news: (id: string) => `c:${id}`,
-  nudge: (id: string) => `n:${id}`,
-}
-
-export interface HintSummary {
-  tour: "done" | "assigned" | "declined" | "offered" | "never"
-  offers: number
-  known: number
-  total: number
-  /** Titles of `required` features this person has not been shown. */
-  missing: string[]
-}
-
-/** What one person knows of a page, from their records: for a manager's view. */
-export function hintSummary(
-  records: Map<string, Pick<HintRecord, "state" | "dismissed" | "count" | "assigned">>,
-  features: Record<string, HintFeature>,
-  page: string,
-): HintSummary {
-  const own = Object.entries(features).filter(([, f]) => f.page === page)
-  const knows = (id: string, f: HintFeature) => RANK[records.get(hintKey.feature(id, f.rev))?.state ?? "seen"] >= RANK.explained
-  const tour = records.get(hintKey.page(page))
-  return {
-    tour: tour && RANK[tour.state] >= RANK.explained
-      ? "done"
-      : tour?.assigned ? "assigned" : tour?.dismissed ? "declined" : tour ? "offered" : "never",
-    offers: tour?.count ?? 0,
-    known: own.filter(([id, f]) => knows(id, f)).length,
-    total: own.length,
-    missing: own.filter(([id, f]) => f.required && !knows(id, f)).map(([, f]) => f.title),
-  }
 }
 
 function typing(): boolean {
@@ -430,7 +202,7 @@ export function createHintSystem(options: HintSystemOptions) {
   }
 
   function record(key: string, delta: Omit<HintDelta, "key">): void {
-    state.records.set(key, merge(state.records.get(key), delta))
+    state.records.set(key, mergeHintRecord(state.records.get(key), delta))
     const queued = pending.get(key)
     pending.set(key, {
       key,

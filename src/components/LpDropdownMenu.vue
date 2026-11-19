@@ -7,7 +7,7 @@ import { useMenuPalette, type PaletteControlOptions } from "../composables/usePa
  * items (`checked`) and shortcut hints appear in either.
  */
 import { hints } from "../composables/useHints"
-import { HINT_SIGNALS } from "../composables/useHintSystem"
+import { HINT_SIGNALS } from "../composables/hintSignals"
 import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from "reka-ui"
 import ContextMenuItems from "./ContextMenuItems.vue"
 import type { ContextMenuItemDef } from "./LpContextMenu.vue"

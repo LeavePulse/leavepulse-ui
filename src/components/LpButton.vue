@@ -11,11 +11,11 @@ export type ButtonLabels = {
 
 <script setup lang="ts">
 import { isElement, isHTMLElement } from "../composables/useView"
-import { usePaletteAction, type PaletteControlOptions } from "../composables/usePaletteCommands"
+import { useOptionalPaletteAction } from "../composables/paletteAction"
+import type { PaletteControlOptions } from "../composables/usePaletteCommands"
 import { tv, type VariantProps } from "tailwind-variants"
 import { computed, getCurrentInstance, onMounted, onUpdated, ref, useAttrs, type Component, type ComponentPublicInstance } from "vue"
-import { HINT_SIGNALS, noteHotkeyTarget } from "../composables/useHintSystem"
-import { hints } from "../composables/useHints"
+import { HINT_SIGNALS, noteHotkeyTarget, reportHintUse } from "../composables/hintSignals"
 import { appleModifierLabel, parseCombo, useAppleKeyboard, useHotkeys } from "../composables/useHotkeys"
 import { useLabels, useLinkComponent } from "../composables/useLpConfig"
 import { useToast } from "../composables/useToast"
@@ -237,9 +237,9 @@ const hotkeyTitle = computed(() => {
 
 function onClick(event: MouseEvent) {
   if (props.hotkey) {
-    if (viaKey) hints.use(HINT_SIGNALS.hotkey)
+    if (viaKey) reportHintUse(HINT_SIGNALS.hotkey)
     else if (event.detail > 0) {
-      hints.use(HINT_SIGNALS.hotkeyTarget)
+      reportHintUse(HINT_SIGNALS.hotkeyTarget)
       const el = rootEl()
       if (el) noteHotkeyTarget(el, props.hotkey)
     }
@@ -297,7 +297,8 @@ const { class: classes, attrs: rest } = useMergedAttrs(() =>
   }),
 )
 
-usePaletteAction({ label: () => typeof attrs["aria-label"] === "string" ? attrs["aria-label"] : undefined, element: () => rootEl(), disabled: () => props.disabled || busy.value })
+// Through paletteAction: a button registers in a palette scope without carrying the palette.
+useOptionalPaletteAction({ label: () => typeof attrs["aria-label"] === "string" ? attrs["aria-label"] : undefined, element: () => rootEl(), disabled: () => props.disabled || busy.value })
 </script>
 
 <template>

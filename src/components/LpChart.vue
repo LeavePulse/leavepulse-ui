@@ -17,69 +17,53 @@ export default { inheritAttrs: false }
  * hover per line.
  */
 import { clamp } from "../composables/clamp"
-import { Motion } from "motion-v"
 import { computed, nextTick, ref, shallowRef, useId, watch, onMounted } from "vue"
-import { useChartSync } from "../composables/useChartSync"
 import { useLabels } from "../composables/useLpConfig"
-import { easeTravel } from "../composables/easing"
 import { usePrefersReducedMotion } from "../composables/useReducedMotion"
-import { startPointerDrag } from "../composables/pointerDrag"
-import { MOUSE_SLOP } from "../composables/gesture"
-import { nodeWindow } from "../composables/useView"
-import { usePillTransition } from "../composables/usePillTransition"
 import { useReveal } from "../composables/useReveal"
-import { lerp, mixValues, resample, useTween } from "../composables/useTween"
 import {
   areaPath,
-  axisTicks,
-  barPath,
-  chartSummary,
-  markerIndex,
-  extent,
-  fitScale,
-  formatTick,
   linePath,
-  nearestIndex,
-  niceScale,
   normalise,
   plotHeight,
   plotWidth,
   pointCount,
   resolveLabels,
   xAt,
-  xLabelIndices,
   yAt,
-  type Box,
   type ChartAnnotation,
   type ChartBand,
   type ChartMarker,
   type ChartSeries,
   type ChartThreshold,
 } from "./chart"
+import { layoutBars } from "./chartBars"
+import { useChartMotion } from "./chartMotion"
+import { useChartScales } from "./chartScales"
+import ChartDataTable from "./ChartDataTable.vue"
+import { chartCsv, chartPng, type ChartExportOptions } from "./chartExport"
+import { useChartInteraction, type ChartPointEvent } from "./chartInteraction"
+import ChartLegend from "./ChartLegend.vue"
+import { useChartOverlays } from "./chartOverlays"
 import ChartRangeSelector from "./ChartRangeSelector.vue"
+import ChartSkeleton from "./ChartSkeleton.vue"
+import ChartTooltip from "./ChartTooltip.vue"
 import {
-  ZOOM_STEP,
   chartView,
   clampRange,
-  slotOf,
   sourceOf,
-  zoomRange,
   type ChartDownsample,
   type ChartRange,
 } from "./chartWindow"
-import { PANEL_SURFACE } from "./dropdown"
-import LegendSwatch from "./LegendSwatch.vue"
 import LpContextMenu, { type ContextMenuItemDef } from "./LpContextMenu.vue"
 import LpEmptyState from "./LpEmptyState.vue"
-import LpShift from "./LpShift.vue"
-import LpSkeleton from "./LpSkeleton.vue"
 import LpSwap from "./LpSwap.vue"
-import { sampleValues, skeletonHeights, skeletonWave } from "./chartSkeleton"
+import { sampleValues } from "./chartSkeleton"
 import HintSampleTag from "./HintSampleTag.vue"
 import { useSample } from "../composables/useSample"
 import { useMergedAttrs } from "../composables/useMergedClass"
 import { useResizeObserver } from "../composables/useResizeObserver"
-import { backgroundOf, downloadFile, fileStem, resolveCssColor, svgToPng, toCsv, type CsvOptions } from "./exportData"
+import { downloadFile, fileStem, type CsvOptions } from "./exportData"
 
 export interface ChartText {
   [key: string]: string
@@ -99,22 +83,9 @@ export interface ChartText {
   resetZoom: string
 }
 
-export interface ChartExportOptions {
-  /** File name without extension. Defaults to the title. */
-  filename?: string
-  /** Return the data without offering a download. */
-  download?: boolean
-}
-
-/** What was under the pointer when a point was clicked or right-clicked. */
-export interface ChartPointEvent {
-  index: number
-  label: string
-  /** Every series' value at this index, in `series` order (hidden included). */
-  values: (number | null)[]
-  /** The original event, for callers that need modifiers or coordinates. */
-  originalEvent: MouseEvent
-}
+// Types that live beside the code using them, re-exported so imports from the SFC keep working.
+export type { ChartExportOptions } from "./chartExport"
+export type { ChartPointEvent } from "./chartInteraction"
 
 const props = withDefaults(
   defineProps<{
@@ -395,130 +366,18 @@ watch(
   { immediate: true },
 )
 
-/*
- * How present each series is, 1 to 0, driven per frame rather than by CSS.
- *
- * A curve leaves by collapsing onto the baseline: every point travels to zero
- * together and the shape flattens into the axis before it fades. Moving the
- * whole layer down instead slides it past the axis as a picture of a chart —
- * the marks keep their shape on the way out, which reads as the plot being
- * dragged away rather than the readings going to nothing.
- *
- * It has to be JS: the collapse is a new `d` on every frame, and no browser
- * interpolates a path's `d` between two arbitrary shapes.
- */
-/* One duration for the series leaving and the axis it was measured against, so
-   the two read as a single change rather than two. 260ms sits in the 250-400ms
-   band a legend toggle wants: long enough to follow, short enough to feel like
-   a control responding. */
-const SETTLE_MS = 260
-
-/*
- * Every value the chart moves — presence, both axes, the gutters, the readings
- * themselves — travels on this one clock, so a change reads as one gesture
- * rather than as several things settling at their own pace. The curve is
- * `--ease-travel`'s: an ease-out covers most of a big rescale (800 down to 40)
- * in its first frames and then creeps, which looks like a snap with a slow
- * tail rather than a scale moving.
- */
-const settle = {
-  duration: SETTLE_MS,
-  ease: easeTravel,
-  enabled: () => props.animate && !rangeMoving,
-}
-
-/*
- * A series with no entry is fully present, NOT "0 because it is hidden".
- *
- * Falling back to the hidden flag raced the animation it was meant to start:
- * the computed that draws the curve and the watcher that animates it both run
- * on the same tick, and whichever order they land in, the fallback had already
- * reported the end state — so a series being hidden jumped to the floor while
- * one being shown eased up from it.
- */
-const presenceTargets = computed(
-  () => new Map(allSeries.value.map((s) => [s.id, hidden.value.has(s.id) ? 0 : 1])),
-)
-
-const presence = useTween(
-  () => presenceTargets.value,
-  (from, to, t) => new Map([...to].map(([id, v]) => [id, lerp(from.get(id) ?? v, v, t)])),
-  {
-    ...settle,
-    // `hidden` is replaced wholesale on every toggle, and the map is rebuilt on
-    // every data change; only a different set of levels is a change worth moving.
-    equal: (a, b) => a.size === b.size && [...b].every(([id, v]) => a.get(id) === v),
-  },
-)
-
-const presenceOf = (id: string) => presence.value.get(id) ?? 1
-
-/*
- * The readings as DRAWN: each series travelling from its last values to its
- * new ones, so a refresh moves the curve rather than replacing it.
- *
- * Matched by name, not by `id`: the id carries the series' position, and a
- * series dropped from the front would shift every other one onto a new id and
- * make them all look new. A series that arrives grows up out of the baseline;
- * one that is gone stays in the drawing, collapsing onto it, until the move
- * ends. The axis is on the same clock (`settle`), so each frame is a
- * consistent picture: readings partway, on a scale partway.
- *
- * Only what is drawn moves. Hover, the tooltip's figures, the legend and the
- * exports read the data as it now is.
- */
-type DrawnSeries = (typeof allSeries.value)[number] & {
-  key: string
-  /** 0 → 1 for a series arriving, 1 → 0 for one leaving; 1 otherwise. */
-  enter: number
-}
-
-const targetDrawn = computed<DrawnSeries[]>(() => {
-  const seen = new Map<string, number>()
-  return allSeries.value.map((s) => {
-    const n = seen.get(s.name) ?? 0
-    seen.set(s.name, n + 1)
-    return { ...s, key: `${s.name}#${n}`, enter: 1 }
-  })
-})
-
-const mixDrawn = (from: DrawnSeries[], to: DrawnSeries[], t: number): DrawnSeries[] => {
-  const before = new Map(from.map((s) => [s.key, s]))
-  const after = new Set(to.map((s) => s.key))
-  const out = to.map((s) => {
-    const was = before.get(s.key)
-    return was
-      ? { ...s, values: mixValues(was.values, s.values, t), enter: lerp(was.enter, 1, t) }
-      : { ...s, enter: t }
-  })
-  // Laid on the new x positions too, or a leaving curve drawn with the old
-  // point count would stop short of (or run past) the plot while it collapses.
-  const points = count.value
-  for (const s of from)
-    if (!after.has(s.key))
-      out.push({ ...s, values: resample(s.values, points), enter: s.enter * (1 - t) })
-  return out
-}
-
-const drawnSeries = useTween(() => targetDrawn.value, mixDrawn, {
-  ...settle,
-  /*
-   * Only a plot already on screen morphs. While the wipe is still to come, or
-   * while the placeholder stands in (no svg yet), the data that follows draws
-   * itself in on its own entrance — a morph from readings nobody saw would
-   * only muddy it.
-   */
-  enabled: () => props.animate && !rangeMoving && revealed.value && !!svgEl.value,
-})
-
-/** The drawn copy of each current series, by id, for marks built from `visible`. */
-const drawnById = computed(() => {
-  const out = new Map<string, DrawnSeries>()
-  for (const s of drawnSeries.value) if (!out.has(s.id)) out.set(s.id, s)
-  return out
-})
-
+// ── motion (see chartMotion) ───────────────────
+const svgEl = ref<SVGSVGElement | null>(null)
 const count = computed(() => pointCount(allSeries.value))
+const { settle, presenceOf, drawnSeries, drawnById } = useChartMotion({
+  animate: () => props.animate,
+  moving: () => rangeMoving,
+  onScreen: () => revealed.value && !!svgEl.value,
+  allSeries,
+  hidden,
+  count,
+})
+
 const labels = computed(() =>
   narrowed.value
     ? Array.from({ length: count.value }, (_, slot) => fullLabels.value[sourceOf(view.value, slot)] ?? "")
@@ -540,281 +399,20 @@ const plotState = computed(() => (props.loading ? "loading" : hasData.value ? "p
 
 // ── loading placeholder ─────────────────────────
 // As many bars as the chart will have, when that is already known (labels
-// usually are); a dozen otherwise.
-const skeletonBars = computed(() =>
-  skeletonHeights(Math.min(Math.max(count.value, props.labels?.length ?? 0) || 12, 24)),
-)
-// The line takes a few gentle swells whatever the point count: a curve through
-// two dozen pseudo-points reads as noise, not as "a line goes here".
-const skeletonPath = skeletonWave(skeletonHeights(8))
-const skeletonTicks = computed(() => Math.max(2, props.yTicks) + 1)
+// usually are); see ChartSkeleton.
+const skeletonPoints = computed(() => Math.max(count.value, props.labels?.length ?? 0))
 
-// Bars are read against a baseline, so their axis must contain zero.
-const zeroBased = computed(() => props.includeZero || props.type === "bar")
-
-/** Stacked bars are measured on their running totals, not on single values. */
-const stackTotals = computed(() => {
-  if (!(props.type === "bar" && props.stacked)) return null
-  const pos: number[] = []
-  const neg: number[] = []
-  for (let i = 0; i < count.value; i++) {
-    let p = 0
-    let n = 0
-    for (const s of visible.value) {
-      const v = s.values[i]
-      if (v == null) continue
-      if (v >= 0) p += v
-      else n += v
-    }
-    pos.push(p)
-    neg.push(n)
-  }
-  return { pos, neg }
+// ── axes and frame (see chartScales) ───────────
+const { hasRightAxis, scale, rightScale, fmtSeries, scaleOf, box, geo, geoOf, gridLines, xLabels } = useChartScales(props, {
+  allSeries,
+  visible,
+  count,
+  hasData,
+  labels,
+  width,
+  banded,
+  settle,
 })
-
-/*
- * Which axes EXIST is decided by the series as declared; only their ranges
- * follow what is visible.
- *
- * Hiding the one series on the right axis used to remove that axis outright:
- * its labels went, the gutter they reserved collapsed, the plot widened into
- * the space, and any remaining right-axis series jumped across to the left
- * scale — a toggle of one curve rearranging the whole frame. Keeping the axis
- * while it has a series assigned to it means hiding a curve changes the curve.
- */
-const declaredRight = computed(() => allSeries.value.filter((s) => s.axis === "right"))
-const declaredLeft = computed(() => allSeries.value.filter((s) => s.axis === "left"))
-
-const onRight = computed(() => visible.value.filter((s) => s.axis === "right"))
-const onLeft = computed(() => {
-  // A chart whose every series asked for the right axis still needs the left
-  // one to carry the grid, so treat that as "no split at all".
-  const left = visible.value.filter((s) => s.axis === "left")
-  return left.length || !declaredRight.value.length ? left : visible.value
-})
-const hasRightAxis = computed(
-  () => declaredRight.value.length > 0 && declaredLeft.value.length > 0,
-)
-
-/** A reference level must be on the plot, or it says nothing. */
-const withThresholds = (raw: { min: number; max: number }, axis: "left" | "right") => {
-  let { min, max } = raw
-  for (const t of props.thresholds) {
-    if ((t.axis ?? "left") !== axis) continue
-    for (const v of [t.value, t.to]) {
-      if (v == null || !Number.isFinite(v)) continue
-      min = Math.min(min, v)
-      max = Math.max(max, v)
-    }
-  }
-  return { min, max }
-}
-
-const scaleFor = (members: typeof visible.value) => {
-  const totals = stackTotals.value
-  const raw = totals
-    ? { min: Math.min(0, ...totals.neg), max: Math.max(0, ...totals.pos) }
-    : extent(members, zeroBased.value)
-  const wide = hasData.value ? withThresholds(raw, "left") : raw
-  return niceScale(wide.min, wide.max, props.yTicks)
-}
-
-const targetScale = computed(() =>
-  scaleFor(onLeft.value.length ? onLeft.value : declaredLeft.value),
-)
-
-/*
- * The axis animates by interpolating its own BOUNDS, not by transitioning the
- * elements drawn from them.
- *
- * Everything on the plot is positioned from min/max — the curves, the gridlines
- * and the tick labels — so moving the range moves all three as one gesture, and
- * the numbers arrive with the shape that made them change. Transitioning the
- * marks instead would need the axis to animate separately, and it cannot: `y1`
- * and `y2` on an SVG <line> never became CSS properties, so a gridline jumps
- * while the curve eases, which is the two-beat effect this avoids.
- */
-type Range = { min: number; max: number; step: number }
-
-const sameRange = (a: Range | null, b: Range | null) =>
-  a === b || (!!a && !!b && a.min === b.min && a.max === b.max && a.step === b.step)
-
-const mixRange = (from: Range, to: Range, t: number): Range => ({
-  min: lerp(from.min, to.min, t),
-  max: lerp(from.max, to.max, t),
-  /* The step stays the target's: it decides how many ticks there are, and a
-     travelling one would add and drop labels mid-move. */
-  step: to.step,
-})
-
-const scale = useTween(() => targetScale.value, mixRange, { ...settle, equal: sameRange })
-
-/*
- * The right axis reuses the LEFT axis's tick COUNT so both sets of labels land
- * on the same gridlines. Two independent tick runs would draw two interleaved
- * grids across one plot, which reads as noise rather than as two scales.
- */
-const targetRightScale = computed(() => {
-  if (!hasRightAxis.value) return null
-  /* With every right-hand series hidden there is nothing to measure, so the
-     axis holds the range it had — an axis that keeps its place while its curve
-     leaves, rather than collapsing to a degenerate 0..1 behind it. */
-  const members = onRight.value.length ? onRight.value : declaredRight.value
-  const raw = withThresholds(extent(members, zeroBased.value), "right")
-  /* Steps come from the TARGET left scale. Reading the animated one rebuilt this
-     axis from a fractional range every frame, so a right-hand series jittered
-     against a scale being redrawn underneath it. */
-  const steps = Math.max(
-    1,
-    axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step).length - 1,
-  )
-  return fitScale(raw.min, raw.max, steps)
-})
-
-// The right axis travels on the same clock as the left, or a series measured
-// against it arrives before the one beside it.
-const rightScale = useTween(
-  () => targetRightScale.value,
-  // An axis that appears or goes has no range to travel from or to.
-  (from, to, t) => (from && to ? mixRange(from, to, t) : to),
-  { ...settle, equal: sameRange },
-)
-
-const fmtWith = (v: number, unit?: string, f?: (n: number) => string): string =>
-  `${f ? f(v) : formatTick(v)}${unit ?? ""}`
-
-const fmt = (v: number): string => fmtWith(v, props.unit, props.formatValue)
-const fmtRight = (v: number): string =>
-  fmtWith(v, props.rightUnit ?? props.unit, props.formatRightValue ?? props.formatValue)
-
-/** A series is read against its own axis — in the ticks and in the tooltip. */
-const fmtSeries = (s: { axis: "left" | "right" }, v: number): string =>
-  s.axis === "right" && hasRightAxis.value ? fmtRight(v) : fmt(v)
-
-const scaleOf = (s: { axis: "left" | "right" }) =>
-  s.axis === "right" && rightScale.value ? rightScale.value : scale.value
-
-// ── layout ─────────────────────────────────────
-// Side padding tracks the widest tick label so long numbers never clip.
-/*
- * Labels come from the TARGET scale, never the one mid-flight.
- *
- * The animated bounds are fractional for most of their travel, so formatting
- * them printed "173.4" where "200" belongs — and since the gutter is measured
- * from the widest label, the whole plot breathed in and out for the length of
- * every transition. The numbers a tick can read are the ones it will settle on;
- * only where each sits is in motion.
- */
-const yLabels = computed(() =>
-  axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step).map(fmt),
-)
-
-const rightLabels = computed(() =>
-  targetRightScale.value
-    ? axisTicks(
-        targetRightScale.value.min,
-        targetRightScale.value.max,
-        targetRightScale.value.step,
-      ).map(fmtRight)
-    : [],
-)
-
-const gutter = (labels: string[]) => 12 + Math.max(...labels.map((l) => l.length), 1) * 7
-
-/*
- * The gutters ease to their new width instead of resizing on the frame the
- * labels change. Going from "800" to "30" narrows the left margin by a third of
- * an inch in one step, and because the plot is measured from it, every mark
- * shifted sideways while it was still travelling vertically — a diagonal slide
- * nothing in the data asked for.
- */
-const targetGutters = computed(() => ({
-  left: props.showYAxis ? gutter(yLabels.value) : 8,
-  right: props.showYAxis && rightLabels.value.length ? gutter(rightLabels.value) : 12,
-}))
-
-const gutters = useTween(
-  () => targetGutters.value,
-  (from, to, t) => ({ left: lerp(from.left, to.left, t), right: lerp(from.right, to.right, t) }),
-  { ...settle, equal: (a, b) => a.left === b.left && a.right === b.right },
-)
-
-const box = computed<Box>(() => ({
-  width: width.value,
-  height: props.height,
-  left: gutters.value.left,
-  right: gutters.value.right,
-  top: 10,
-  bottom: props.showXAxis ? 26 : 8,
-}))
-
-const geo = computed(() => ({
-  min: scale.value.min,
-  max: scale.value.max,
-  box: box.value,
-  count: count.value,
-  banded: banded.value,
-}))
-
-/** Geometry for one series — same box, but its own axis's min/max. */
-const geoOf = (s: { axis: "left" | "right" }) => ({ ...geo.value, ...scaleOf(s) })
-
-const gridLines = computed(() => {
-  // Ticks are the target's — they are the figures the axis will read — while
-  // the position each one takes comes from the scale as it currently stands.
-  const left = axisTicks(targetScale.value.min, targetScale.value.max, targetScale.value.step)
-  const right = targetRightScale.value
-    ? axisTicks(
-        targetRightScale.value.min,
-        targetRightScale.value.max,
-        targetRightScale.value.step,
-      )
-    : []
-  /*
-   * A tick sits at its FRACTION of the axis, not at its value on the scale
-   * currently in flight.
-   *
-   * Projecting the value instead put "800" where 800 falls on a range still
-   * reading 0..30 — roughly seventeen hundred pixels above a plot 240 tall.
-   * The labels shot off the top, came back as the range caught up, and the
-   * chart looked like it had thrown them. As a fraction, the top tick is the
-   * top of the axis throughout, whatever number it happens to carry.
-   */
-  const span = targetScale.value.max - targetScale.value.min || 1
-  const plot = plotHeight(box.value)
-  return left.map((v, i) => {
-    const fraction = (v - targetScale.value.min) / span
-    return {
-      v,
-      /*
-       * Keyed by POSITION, not by value. A tick keyed by its value is a
-       * different element every time the range moves, so hiding a series
-       * replaced the whole axis at once — the numbers jumped to their new
-       * places instead of moving there.
-       */
-      key: i,
-      y: box.value.top + plot - fraction * plot,
-      label: fmt(v),
-      rightLabel: right[i] != null ? fmtRight(right[i]) : "",
-    }
-  })
-})
-
-/** Thin out x labels so they never collide at narrow widths. */
-const xLabelStride = computed(() => {
-  const w = plotWidth(box.value)
-  if (w <= 0 || count.value === 0) return 1
-  const longest = Math.max(...labels.value.map((l) => l.length), 1)
-  return Math.max(1, Math.ceil((count.value * (longest * 6.5 + 16)) / w))
-})
-
-const xLabels = computed(() =>
-  xLabelIndices(labels.value.length, xLabelStride.value).map((i) => ({
-    label: labels.value[i],
-    i,
-    x: xAt(i, count.value, box.value, banded.value),
-  })),
-)
 
 // ── marks ──────────────────────────────────────
 const baseY = computed(() =>
@@ -860,294 +458,68 @@ const lines = computed(() =>
   }),
 )
 
-/** Every bar as an absolute rect — grouped side by side, or stacked. */
-const bars = computed(() => {
-  if (props.type !== "bar" || count.value === 0 || plotWidth(box.value) <= 0) return []
-  const band = plotWidth(box.value) / count.value
-  /* Bars read as a series of measurements, not as a filled block: keep real
-     ground visible between bands, and cap the width so a 4-point chart doesn't
-     turn into slabs. */
-  const inner = Math.min(band * 0.6, props.stacked ? 46 : 30 * (visible.value.length || 1))
-  const n = visible.value.length || 1
-  const slot = props.stacked ? inner : inner / n
-  const out: {
-    key: string
-    x: number
-    y: number
-    w: number
-    h: number
-    color: string
-    index: number
-    /** Which end of its stack this segment terminates; both when standalone. */
-    roundTop: boolean
-    roundBottom: boolean
-    d: string
-  }[] = []
-
-  const posTop = new Array(count.value).fill(0)
-  const negTop = new Array(count.value).fill(0)
-
-  visible.value.forEach((s, si) => {
-    // Heights from the drawn copy, so bars grow and shrink to their new values;
-    // a series just arriving rises from the baseline.
-    const drawn = drawnById.value.get(s.id)
-    for (let i = 0; i < count.value; i++) {
-      const raw = drawn ? drawn.values[i] : s.values[i]
-      if (raw == null) continue
-      const v = raw * (drawn?.enter ?? 1)
-      const centre = xAt(i, count.value, box.value, true)
-      const x = props.stacked ? centre - inner / 2 : centre - inner / 2 + si * slot
-      let y: number
-      let h: number
-      if (props.stacked) {
-        // Each stacked bar starts where the previous one of its sign ended.
-        const prev = v >= 0 ? posTop[i] : negTop[i]
-        const from = yAt(prev, scale.value.min, scale.value.max, box.value)
-        const to = yAt(prev + v, scale.value.min, scale.value.max, box.value)
-        y = Math.min(from, to)
-        h = Math.abs(to - from)
-        if (v >= 0) posTop[i] += v
-        else negTop[i] += v
-      } else {
-        const sc = scaleOf(s)
-        const top = yAt(v, sc.min, sc.max, box.value)
-        const base = yAt(clamp(0, sc.min, sc.max), sc.min, sc.max, box.value)
-        y = Math.min(top, base)
-        h = Math.abs(top - base)
-      }
-      out.push({
-        key: `${s.id}-${i}`,
-        x,
-        y,
-        w: Math.max(1, slot - (props.stacked ? 0 : 2)),
-        h: Math.max(v === 0 ? 0 : 1, h),
-        color: s.color,
-        index: i,
-        /* A standalone bar rounds only the end it grows toward: a negative one
-           hangs off the baseline, so its square end is the top. */
-        roundTop: props.stacked || v >= 0,
-        roundBottom: props.stacked || v < 0,
-        d: "",
+/** Every bar as an absolute rect — grouped side by side, or stacked (see chartBars). */
+const bars = computed(() =>
+  props.type === "bar"
+    ? layoutBars({
+        series: visible.value,
+        drawn: drawnById.value,
+        count: count.value,
+        box: box.value,
+        stacked: !!props.stacked,
+        scale: scale.value,
+        scaleOf,
       })
-    }
-  })
-
-  /*
-   * A stack is one bar cut into pieces, so only its outer ends round. Which
-   * piece is outermost isn't known while stacking (it depends on how many
-   * series had a value at that index), so the ends are resolved here, once the
-   * column is complete: topmost piece rounds its top, bottommost its bottom,
-   * everything between stays square and the joins read as one shape.
-   */
-  if (props.stacked) {
-    const columns = new Map<number, typeof out>()
-    for (const b of out) {
-      const col = columns.get(b.index) ?? []
-      col.push(b)
-      columns.set(b.index, col)
-    }
-    for (const col of columns.values()) {
-      const top = Math.min(...col.map((b) => b.y))
-      const bottom = Math.max(...col.map((b) => b.y + b.h))
-      for (const b of col) {
-        b.roundTop = b.y === top
-        b.roundBottom = b.y + b.h === bottom
-      }
-    }
-  }
-
-  for (const b of out) {
-    b.d = barPath(b.x, b.y, b.w, b.h, 4, { top: b.roundTop, bottom: b.roundBottom })
-  }
-  return out
-})
-
-// ── hover ──────────────────────────────────────
-const active = ref(-1)
-const pointer = ref({ x: 0, y: 0 })
-
-/* The hover of another chart in the group, as a slot of this one. */
-const { peerLabel, publish } = useChartSync(() => props.syncGroup)
-const labelIndex = computed(() => (props.syncGroup ? new Map(fullLabels.value.map((label, i) => [label, i])) : null))
-const peerSlot = computed(() => {
-  const source = peerLabel.value == null ? undefined : labelIndex.value?.get(peerLabel.value)
-  return source === undefined ? -1 : slotOf(view.value, source)
-})
-const crosshair = computed(() => (active.value >= 0 ? active.value : peerSlot.value))
-watch(active, (slot) => publish(slot >= 0 ? (labels.value[slot] ?? null) : null))
-
-/* Past this many px a press on the plot is a selection, not a click. */
-let swallowClick = false
-const selection = ref<{ from: number; to: number } | null>(null)
-
-const onPointerDown = (e: PointerEvent) => {
-  if (!props.zoomable || e.button !== 0) return
-  const el = e.currentTarget as SVGElement
-  const offset = (ev: PointerEvent) => ev.clientX - el.getBoundingClientRect().left
-  const pressedAt = offset(e)
-  startPointerDrag(e, {
-    move(ev) {
-      const x = offset(ev)
-      if (Math.abs(x - pressedAt) > MOUSE_SLOP) selection.value = { from: pressedAt, to: x }
-    },
-    end(completed) {
-      const picked = selection.value
-      selection.value = null
-      if (!completed || !picked) return
-      swallowClick = true
-      const ends = [picked.from, picked.to].map((x) => sourceOf(view.value, nearestIndex(x, geo.value)))
-      setRange(clampRange({ start: ends[0], end: ends[1] }, fullCount.value))
-    },
-  })
-}
-
-const onMove = (e: PointerEvent) => {
-  keyboard.value = false
-  const el = e.currentTarget as SVGElement
-  const rect = el.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  pointer.value = { x, y: e.clientY - rect.top }
-  active.value = nearestIndex(x, geo.value)
-}
-
-const selectionBox = computed(() => {
-  if (!selection.value) return null
-  const right = box.value.width - box.value.right
-  const [from, to] = [selection.value.from, selection.value.to].map((x) => clamp(x, box.value.left, right))
-  return { x: Math.min(from, to), width: Math.abs(to - from) }
-})
-
-function zoomBy(factor: number, anchor: number) {
-  setRange(zoomRange(range.value, fullCount.value, anchor, factor))
-}
-
-/* Plain wheel stays the page's: a chart in a dashboard must not trap scrolling. */
-const onWheel = (e: WheelEvent) => {
-  if (!props.zoomable || !e.ctrlKey || !ready.value) return
-  e.preventDefault()
-  const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-  const plot = plotWidth(box.value) || 1
-  zoomBy(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, (e.clientX - rect.left - box.value.left) / plot)
-}
-
-const resetZoom = () => {
-  if (range.value) setRange(null)
-}
-
-const onLeave = () => {
-  active.value = -1
-}
-
-const pointEvent = (originalEvent: MouseEvent): ChartPointEvent => ({
-  index: sourceOf(view.value, active.value),
-  label: labels.value[active.value] ?? "",
-  values: allSeries.value.map((s) => s.values[active.value] ?? null),
-  originalEvent,
-})
-
-/* A tap fires pointerleave before click, which has already cleared the hover,
-   so the index comes from the click itself. */
-const onClick = (e: MouseEvent) => {
-  if (swallowClick) {
-    swallowClick = false
-    return
-  }
-  const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-  active.value = nearestIndex(e.clientX - rect.left, geo.value)
-  if (active.value < 0) return
-  emit("pointClick", pointEvent(e))
-}
-
-/*
- * The menu itself belongs to the caller — which actions a point offers is an
- * application question. All the chart owes is WHICH point was hit, resolved
- * before the menu opens so the items can be built for it.
- *
- * A right-click can land without a preceding pointermove (touch long-press, or
- * a click straight after a scroll), so the index is resolved from this event
- * rather than trusting whatever hover left behind.
- */
-const menuPoint = ref<ChartPointEvent | null>(null)
-
-/* Resolved on the right-click, so the menu describes the point actually hit. */
-const menuEntries = computed(() =>
-  props.menuItems && menuPoint.value ? props.menuItems(menuPoint.value) : [],
+    : [],
 )
 
-const onContextMenu = (e: MouseEvent) => {
-  const rect = (e.currentTarget as SVGElement).getBoundingClientRect()
-  active.value = nearestIndex(e.clientX - rect.left, geo.value)
-  if (active.value < 0) return
-  menuPoint.value = pointEvent(e)
-  emit("pointContextMenu", menuPoint.value)
-}
-
-const activeX = computed(() =>
-  crosshair.value < 0 ? 0 : xAt(crosshair.value, count.value, box.value, banded.value),
-)
-
-/** Dots on the crosshair — one per visible series that has a value here. */
-const activePoints = computed(() => {
-  if (crosshair.value < 0) return []
-  return visible.value
-    .map((s) => ({ s, v: s.values[crosshair.value] }))
-    .filter((r): r is { s: (typeof visible.value)[number]; v: number } => r.v != null)
-    .map(({ s, v }) => {
-      const sc = scaleOf(s)
-      // The dot rides the curve as drawn; the figure is the reading itself.
-      const at = drawnById.value.get(s.id)?.values[crosshair.value] ?? v
-      return {
-        color: s.color,
-        id: s.id,
-        name: s.name,
-        value: v,
-        y: yAt(at, sc.min, sc.max, box.value),
-      }
-    })
+// ── hover, zoom and keys (see chartInteraction) ──
+const {
+  active,
+  crosshair,
+  selectionBox,
+  menuEntries,
+  activeX,
+  activePoints,
+  tooltipRows,
+  tooltipTarget,
+  summary,
+  readout,
+  onPointerDown,
+  onMove,
+  onWheel,
+  onLeave,
+  onClick,
+  onContextMenu,
+  onKeydown,
+  onBlur,
+  resetZoom,
+} = useChartInteraction({
+  zoomable: () => !!props.zoomable,
+  syncGroup: () => props.syncGroup,
+  menuItems: () => props.menuItems,
+  ariaLabel: () => props.ariaLabel,
+  title: () => props.title,
+  pointLabel: () => strings.value.point,
+  onPointClick: (point) => emit("pointClick", point),
+  onPointContextMenu: (point) => emit("pointContextMenu", point),
+  setRange,
+  view,
+  range,
+  fullLabels,
+  fullCount,
+  labels,
+  allSeries,
+  visible,
+  count,
+  box,
+  geo,
+  banded,
+  ready,
+  drawnById,
+  scaleOf,
+  fmtSeries,
 })
-
-const tooltipRows = computed(() =>
-  active.value < 0
-    ? []
-    : visible.value.map((s) => ({
-        id: s.id,
-        name: s.name,
-        color: s.color,
-        text:
-          s.values[active.value] == null
-            ? "—"
-            : fmtSeries(s, s.values[active.value] as number),
-      })),
-)
-
-/*
- * The tooltip trails the pointer on a soft spring rather than being pinned to
- * it. Two reasons it is animated rather than positioned directly: the crosshair
- * SNAPS to the nearest point, so a pinned card would jump a whole band at a
- * time sideways while gliding vertically; and a card that lags slightly reads as
- * following the cursor instead of being welded to it.
- *
- * x tracks the snapped crosshair (the card belongs to the point it describes),
- * y tracks the raw pointer, clamped into the plot so it can't ride off the top
- * or bottom edge. The spring is the kit's shared "float" feel.
- */
-const CARD_W = 150
-const CARD_GAP = 14
-
-const tooltipTarget = computed(() => {
-  const flip = activeX.value > box.value.width - CARD_W
-  const y = Math.min(
-    Math.max(pointer.value.y, box.value.top + 8),
-    box.value.top + plotHeight(box.value) - 8,
-  )
-  return {
-    x: flip ? activeX.value - CARD_GAP : activeX.value + CARD_GAP,
-    y,
-    flip,
-  }
-})
-
-const floatTransition = usePillTransition("float")
 
 // ── animation ──────────────────────────────────
 // One clip rect wipes across the plot; re-keyed when the chart changes KIND so
@@ -1184,218 +556,39 @@ const clipId = `lp-chart-${useId()}`
 const gradientId = (name: string, index: number) =>
   `${clipId}-g-${index}-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}`
 
-// ── overlays ───────────────────────────────────
-const thresholdMarks = computed(() =>
-  props.thresholds.flatMap((t, i) => {
-    if (!Number.isFinite(t.value) || width.value <= 0) return []
-    const sc = t.axis === "right" && rightScale.value ? rightScale.value : scale.value
-    const y = yAt(t.value, sc.min, sc.max, box.value)
-    const to = t.to != null && Number.isFinite(t.to) ? yAt(t.to, sc.min, sc.max, box.value) : null
-    return [
-      {
-        key: i,
-        y,
-        top: to == null ? y : Math.min(y, to),
-        height: to == null ? 0 : Math.abs(to - y),
-        label: t.label,
-        color: t.color ?? "var(--color-line-strong)",
-        solid: !!t.solid,
-      },
-    ]
-  }),
-)
+// ── overlays (see chartOverlays) ───────────────
+const { thresholdMarks, markerMarks, bandMarks, annotationMarks } = useChartOverlays({
+  thresholds: () => props.thresholds,
+  markers: () => props.markers,
+  bands: () => props.bands,
+  annotations: () => props.annotations,
+  view,
+  fullLabels,
+  fullCount,
+  fullSeries,
+  hidden,
+  width,
+  box,
+  count,
+  banded,
+  scale,
+  rightScale,
+})
 
-const markerMarks = computed(() =>
-  props.markers.flatMap((m, i) => {
-    const index = slotOf(view.value, markerIndex(m.at, fullLabels.value, fullCount.value))
-    if (index < 0 || width.value <= 0) return []
-    return [
-      {
-        key: i,
-        x: xAt(index, count.value, box.value, banded.value),
-        label: m.label,
-        color: m.color ?? "var(--color-line-strong)",
-      },
-    ]
-  }),
-)
-
-/* A source point's x, held to the plot when the window has left it behind. */
-const xOfSource = (source: number): number => {
-  if (source < view.value.start) return box.value.left
-  if (source > view.value.end) return box.value.width - box.value.right
-  return xAt(slotOf(view.value, source), count.value, box.value, banded.value)
-}
-
-const bandMarks = computed(() =>
-  props.bands.flatMap((b, i) => {
-    const ends = [markerIndex(b.from, fullLabels.value, fullCount.value), markerIndex(b.to, fullLabels.value, fullCount.value)]
-    if (ends.some((end) => end < 0) || width.value <= 0) return []
-    const from = Math.min(...ends)
-    const to = Math.max(...ends)
-    if (to < view.value.start || from > view.value.end) return []
-    const x = xOfSource(from)
-    return [{ key: i, x, width: xOfSource(to) - x, label: b.label, color: b.color ?? "var(--color-line-strong)" }]
-  }),
-)
-
-const annotationMarks = computed(() =>
-  props.annotations.flatMap((a, i) => {
-    const source = markerIndex(a.at, fullLabels.value, fullCount.value)
-    const slot = slotOf(view.value, source)
-    const lead = fullSeries.value.find((s) => !hidden.value.has(s.id) && s.values[source] != null)
-    const value = a.value ?? lead?.values[source]
-    if (slot < 0 || value == null || width.value <= 0) return []
-    const sc = (a.value == null ? lead?.axis : a.axis) === "right" && rightScale.value ? rightScale.value : scale.value
-    const x = xAt(slot, count.value, box.value, banded.value)
-    return [
-      {
-        key: i,
-        x,
-        y: yAt(value, sc.min, sc.max, box.value),
-        label: a.label,
-        color: a.color ?? "var(--color-ink)",
-        anchor: x > box.value.width - CARD_W ? ("end" as const) : ("start" as const),
-      },
-    ]
-  }),
-)
-
-// ── keyboard & assistive text ──────────────────
-const summary = computed(
-  () => props.ariaLabel ?? chartSummary(visible.value, labels.value, fmtSeries, props.title),
-)
-
-/* Arrow keys walk the points the way the pointer does; the readout below is
-   announced politely so each step is heard without stealing focus. */
-const keyboard = ref(false)
-
-const onKeydown = (e: KeyboardEvent) => {
-  if (!count.value || !ready.value) return
-  const last = count.value - 1
-  let next: number
-  switch (e.key) {
-    case "ArrowRight":
-      next = active.value < 0 ? 0 : Math.min(last, active.value + 1)
-      break
-    case "ArrowLeft":
-      next = active.value < 0 ? last : Math.max(0, active.value - 1)
-      break
-    case "Home":
-      next = 0
-      break
-    case "End":
-      next = last
-      break
-    case "Enter":
-    case " ":
-      if (active.value < 0) return
-      e.preventDefault()
-      emit("pointClick", pointEvent(new (nodeWindow(e.target as Node).MouseEvent)("click")))
-      return
-    case "Escape":
-      active.value = -1
-      return
-    case "+":
-    case "=":
-    case "-":
-      if (!props.zoomable) return
-      e.preventDefault()
-      zoomBy(e.key === "-" ? 1 / ZOOM_STEP : ZOOM_STEP, active.value < 0 ? 0.5 : active.value / last)
-      return
-    case "0":
-      if (!props.zoomable) return
-      e.preventDefault()
-      resetZoom()
-      return
-    default:
-      return
-  }
-  e.preventDefault()
-  keyboard.value = true
-  active.value = next
-  const first = activePoints.value[0]
-  pointer.value = {
-    x: activeX.value,
-    y: first ? first.y : box.value.top + plotHeight(box.value) / 2,
-  }
-}
-
-const onBlur = () => {
-  if (keyboard.value) active.value = -1
-  keyboard.value = false
-}
-
-const readout = computed(() =>
-  keyboard.value && active.value >= 0
-    ? `${labels.value[active.value] ?? `${strings.value.point} ${active.value + 1}`}: ${tooltipRows.value
-        .map((r) => `${r.name} ${r.text}`)
-        .join(", ")}`
-    : "",
-)
-
-// ── export ─────────────────────────────────────
-// Every series, hidden ones included: what a reader toggled off for a closer
-// look is still part of the data they asked to take away.
-const svgEl = ref<SVGSVGElement | null>(null)
-
+// ── export (see chartExport) ───────────────────
 function exportCsv(options: ChartExportOptions & CsvOptions = {}): string {
-  const rows = fullLabels.value.map((label, i) => ({ label, i }))
-  const csv = toCsv(rows, [
-    { key: "label", label: strings.value.xColumn },
-    ...fullSeries.value.map((s) => ({ key: s.id, label: s.name, value: (r: { i: number }) => s.values[r.i] })),
-  ], options)
+  const csv = chartCsv({ labels: fullLabels.value, series: fullSeries.value, xColumn: strings.value.xColumn }, options)
   if (options.download !== false) {
     downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.csv`, csv, "text/csv;charset=utf-8", svgEl.value?.ownerDocument)
   }
   return csv
 }
 
-/*
- * The plot as a picture, in the theme it is shown in. The legend and title are
- * HTML, so they are painted onto the canvas separately, in the page's font; the
- * SVG travels with its computed colours inlined, because an SVG drawn as an
- * image cannot see the page's custom properties.
- */
 async function exportPng(options: ChartExportOptions & { scale?: number; background?: string } = {}): Promise<Blob | null> {
   const svg = svgEl.value
   if (!svg) return null
-  const style = nodeWindow(svg).getComputedStyle(root.value ?? svg)
-  const font = style.fontFamily
-  const ink = style.getPropertyValue("--color-ink").trim() || style.color
-  const muted = style.getPropertyValue("--color-muted-strong").trim() || style.color
   const legend = props.showLegend && allSeries.value.length > 1 ? visible.value : []
-  const blob = await svgToPng(svg, {
-    scale: options.scale,
-    padding: 16,
-    background: options.background ?? backgroundOf(root.value),
-    header: (ctx) => {
-      let y = 0
-      if (props.title) {
-        ctx.font = `500 14px ${font}`
-        ctx.fillStyle = ink
-        ctx.textBaseline = "top"
-        ctx.fillText(props.title, 0, y)
-        y += 22
-      }
-      if (legend.length) {
-        ctx.font = `12px ${font}`
-        ctx.textBaseline = "middle"
-        let x = 0
-        for (const s of legend) {
-          ctx.fillStyle = resolveCssColor(s.color, root.value ?? svg)
-          ctx.beginPath()
-          ctx.arc(x + 4, y + 8, 4, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.fillStyle = muted
-          ctx.fillText(s.name, x + 14, y + 8)
-          x += 14 + ctx.measureText(s.name).width + 16
-        }
-        y += 24
-      }
-      return y ? y + 8 : 0
-    },
-  })
+  const blob = await chartPng({ svg, root: root.value, title: props.title, legend }, options)
   if (options.download !== false) downloadFile(`${fileStem(options.filename ?? props.title, "chart")}.png`, blob, undefined, svgEl.value?.ownerDocument)
   return blob
 }
@@ -1422,30 +615,14 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       <slot name="actions" />
     </div>
 
-    <div
+    <ChartLegend
       v-if="showLegend && allSeries.length > 1"
-      class="flex flex-wrap items-center gap-x-4 gap-y-1.5"
-    >
-      <button
-        v-for="s in allSeries"
-        :key="s.id"
-        type="button"
-        class="group flex cursor-pointer items-center gap-1.5 rounded-inner text-xs outline-none transition-opacity duration-fast focus-visible:ring-2 focus-visible:ring-ring"
-        :class="hidden.has(s.id) ? 'opacity-40' : ''"
-        :aria-pressed="!hidden.has(s.id)"
-        @click="toggleSeries(s.id)"
-      >
-        <LegendSwatch :color="s.color" />
-        <span class="text-muted-strong group-hover:text-ink">{{ s.name }}</span>
-        <span
-          v-if="hasRightAxis && s.axis === 'right'"
-          class="text-[10px] text-muted"
-          :title="strings.rightAxis"
-        >
-          ↗
-        </span>
-      </button>
-    </div>
+      :series="allSeries"
+      :hidden="hidden"
+      :right-axis="hasRightAxis"
+      :right-axis-label="strings.rightAxis"
+      @toggle="toggleSeries"
+    />
 
     <!-- `always` keeps reka mounted while the items are still being resolved
          from the click that opens the menu. -->
@@ -1466,60 +643,17 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         <!-- Placeholder, empty state and plot each fill the same fixed height,
              so the swap only fades and rises; nothing around the chart moves. -->
         <LpSwap :swap-key="plotState">
-        <div v-if="loading" :style="{ height: `${height}px` }">
-          <span class="sr-only">{{ strings.loading }}</span>
-          <!-- Laid out with the real box's margins: tick stubs in the y gutter,
-               labels under the x axis, the marks in between. -->
-          <LpSkeleton
-            class="flex size-full"
-            :style="{ paddingTop: '10px', paddingBottom: showXAxis ? '26px' : '8px' }"
-          >
-            <div v-if="showYAxis" class="flex w-9 shrink-0 flex-col justify-between pr-2">
-              <div v-for="n in skeletonTicks" :key="n" class="lp-skeleton-item h-2 w-full -translate-y-1 rounded-control bg-surface-soft" />
-            </div>
-            <div class="relative min-w-0 flex-1">
-              <div v-if="showGrid" class="absolute inset-0 flex flex-col justify-between">
-                <div v-for="n in skeletonTicks" :key="n" class="h-px bg-line" />
-              </div>
-              <div v-if="type === 'bar'" class="absolute inset-0 flex items-end gap-[2%] px-[1%]">
-                <div
-                  v-for="(h, i) in skeletonBars"
-                  :key="i"
-                  class="lp-skeleton-item min-w-0 flex-1 rounded-t-[3px] bg-surface-soft"
-                  :style="{ height: `${h * 100}%` }"
-                />
-              </div>
-              <svg
-                v-else
-                class="absolute inset-0 size-full overflow-visible"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
-                <path
-                  v-if="type === 'area'"
-                  class="lp-skeleton-item"
-                  :d="`${skeletonPath} L100 100 L0 100 Z`"
-                  fill="var(--color-surface-soft)"
-                />
-                <path
-                  class="lp-skeleton-item"
-                  :d="skeletonPath"
-                  fill="none"
-                  stroke="var(--color-surface-soft)"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  vector-effect="non-scaling-stroke"
-                />
-              </svg>
-              <div
-                v-if="showXAxis"
-                class="absolute inset-x-0 -bottom-[18px] flex justify-between"
-              >
-                <div v-for="n in 5" :key="n" class="lp-skeleton-item h-2 w-8 rounded-control bg-surface-soft" />
-              </div>
-            </div>
-          </LpSkeleton>
-        </div>
+        <ChartSkeleton
+          v-if="loading"
+          :type="type"
+          :height="height"
+          :points="skeletonPoints"
+          :y-ticks="yTicks"
+          :show-grid="showGrid"
+          :show-x-axis="showXAxis"
+          :show-y-axis="showYAxis"
+          :loading-label="strings.loading"
+        />
 
         <LpEmptyState
           v-else-if="!hasData"
@@ -1813,42 +947,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
         </svg>
         </LpSwap>
 
-        <!-- tooltip: springs after the pointer (see tooltipTarget) -->
-        <Motion
+        <!-- tooltip: springs after the pointer (see ChartTooltip) -->
+        <ChartTooltip
           v-if="active >= 0 && ready"
-          as="div"
-          class="pointer-events-none absolute left-0 top-0 z-(--z-tooltip) min-w-32 px-2.5 py-2 group-data-[state=open]/plot:hidden"
-          :class="PANEL_SURFACE"
-          :initial="{ opacity: 0, scale: 0.96 }"
-          :animate="{
-            opacity: 1,
-            scale: 1,
-            x: tooltipTarget.flip ? `calc(${tooltipTarget.x}px - 100%)` : `${tooltipTarget.x}px`,
-            y: `calc(${tooltipTarget.y}px - 50%)`,
-          }"
-          :transition="floatTransition"
-        >
-          <!-- A point where one series has no value drops a row; easing the box
-               keeps the card from snapping mid-glide. -->
-          <LpShift axis="both">
-            <div class="mb-1 text-[11px] font-medium text-muted-strong">
-              {{ labels[active] }}
-            </div>
-            <div class="flex flex-col gap-1">
-              <div
-                v-for="r in tooltipRows"
-                :key="r.id"
-                class="flex items-center justify-between gap-3 text-xs"
-              >
-                <span class="flex items-center gap-1.5 text-muted">
-                  <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: r.color }" />
-                  {{ r.name }}
-                </span>
-                <span class="font-mono tabular-nums text-ink">{{ r.text }}</span>
-              </div>
-            </div>
-          </LpShift>
-        </Motion>
+          :label="labels[active]"
+          :rows="tooltipRows"
+          :target="tooltipTarget"
+        />
 
         <button
           v-if="zoomable && range && ready"
@@ -1875,25 +980,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(
       @change="setRange"
     />
 
-    <div v-if="dataTable && ready" class="sr-only">
-      <table>
-        <caption v-if="title">{{ title }}</caption>
-        <thead>
-          <tr>
-            <th scope="col"></th>
-            <th v-for="s in fullSeries" :key="s.id" scope="col">{{ s.name }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(label, i) in fullLabels" :key="i">
-            <th scope="row">{{ label }}</th>
-            <td v-for="s in fullSeries" :key="s.id">
-              {{ s.values[i] == null ? "—" : fmtSeries(s, s.values[i] as number) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <ChartDataTable
+      v-if="dataTable && ready"
+      :title="title"
+      :labels="fullLabels"
+      :series="fullSeries"
+      :format="fmtSeries"
+    />
   </div>
 </template>
 
