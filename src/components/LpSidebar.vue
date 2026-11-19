@@ -533,6 +533,7 @@ const searchField = computed(() => ({
   size: "sm" as const,
   icon: "lucide:search",
   clearable: true,
+  enterkeyhint: "search",
   class: "mb-2 shrink-0",
   placeholder: placeholder.value,
   "aria-label": placeholder.value,

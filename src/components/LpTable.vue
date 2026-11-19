@@ -2239,7 +2239,7 @@ usePaletteCommands(() => {
               <button
                 v-if="canExpand(entry.row)"
                 type="button"
-                class="inline-grid size-6 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+                class="lp-tap inline-grid size-6 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
                 :aria-expanded="expandedKeys.has(keyFor(entry.row, entry.index))"
                 :aria-label="expandedKeys.has(keyFor(entry.row, entry.index)) ? text.collapseRow : text.expandRow"
                 @click="toggleExpanded(keyFor(entry.row, entry.index))"
@@ -2474,7 +2474,7 @@ usePaletteCommands(() => {
           <button
             v-if="expansionOn && canExpand(entry.row)"
             type="button"
-            class="inline-grid size-6 shrink-0 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+            class="lp-tap inline-grid size-6 shrink-0 place-items-center rounded-small text-muted outline-none transition-colors duration-fast hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
             :class="activeLayout === 'cards' ? 'absolute right-2 bottom-2' : ''"
             :aria-expanded="expandedKeys.has(keyFor(entry.row, entry.index))"
             :aria-label="expandedKeys.has(keyFor(entry.row, entry.index)) ? text.collapseRow : text.expandRow"

@@ -211,7 +211,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
         <button
           v-if="expandable && !compact"
           type="button"
-          class="absolute right-2 top-1/2 z-20 grid size-6 -translate-y-1/2 place-items-center rounded-small text-muted outline-none transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="lp-tap absolute right-2 top-1/2 z-20 grid size-6 -translate-y-1/2 place-items-center rounded-small text-muted outline-none transition-colors hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="expandLabel"
           :aria-expanded="expanded"
           @click="emit('toggle')"
@@ -239,7 +239,7 @@ const delay = computed(() => (props.compact && !props.item.preview ? 250 : props
           <LpBadge v-if="item.badge != null" tone="neutral">{{ typeof item.badge === "number" ? item.badge.toLocaleString(locale) : item.badge }}</LpBadge>
           <LpKeys v-if="item.hotkey" :combo="item.hotkey" size="sm" />
         </div>
-        <div v-if="item.children?.length" class="flex max-h-[min(70vh,30rem)] flex-col gap-0.5 overflow-y-auto">
+        <div v-if="item.children?.length" class="flex max-h-[min(70dvh,30rem)] flex-col gap-0.5 overflow-y-auto">
           <component
             :is="rowOf(child).is"
             v-for="child in item.children"

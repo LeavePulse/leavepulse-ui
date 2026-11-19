@@ -273,6 +273,15 @@ const props = withDefaults(
      * picks by zoom. Default "full".
      */
     detail?: DetailLevel | "auto"
+    /**
+     * How far the view zooms out and in (default 0.3 and 2). Fitting stops at
+     * `minZoom` too, so a wide graph in a phone-sized canvas needs a lower one
+     * to be framed whole.
+     */
+    minZoom?: number
+    maxZoom?: number
+    /** A double click or double tap zooms in. Default true. */
+    zoomOnDoubleClick?: boolean
     labels?: Partial<TopologyLabels>
   }>(),
   {
@@ -292,6 +301,9 @@ const props = withDefaults(
     fitOnResize: "never",
     dataRevision: undefined,
     detail: "full",
+    minZoom: 0.3,
+    maxZoom: 2,
+    zoomOnDoubleClick: true,
     labels: undefined,
   },
 )
@@ -921,8 +933,9 @@ defineExpose({
     :selection-mode="SelectionMode.Partial"
     @keydown.capture="onKeydown"
     :default-viewport="{ zoom: 0.9 }"
-    :min-zoom="0.3"
-    :max-zoom="2"
+    :min-zoom="minZoom"
+    :max-zoom="maxZoom"
+    :zoom-on-double-click="zoomOnDoubleClick"
     class="lp-topology @container"
   >
     <Background :gap="22" :size="1.4" pattern-color="var(--color-line-strong)" />

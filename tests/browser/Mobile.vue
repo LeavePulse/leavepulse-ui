@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import type { DateRange } from "../../src"
-import { LpAlert, LpAutocomplete, LpBadge, LpButton, LpCard, LpCheckbox, LpCodeBlock, LpColorPicker, LpConfirmHost, LpContextMenu, LpDataList, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpEmptyState, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSection, LpSegmented, LpSlider, LpStat, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, confirm, useToast } from "../../src"
+import { LayoutCanvas, LpAlert, LpAutocomplete, LpBadge, LpButton, LpCard, LpCheckbox, LpCodeBlock, LpColorPicker, LpConfirmHost, LpContextMenu, LpDataList, LpDatePicker, LpDateRangePicker, LpDrawer, LpDropdownMenu, LpEditable, LpEmptyState, LpHoverCard, LpImageEditor, LpInput, LpLightbox, LpModal, LpNotificationBell, LpNumberField, LpPhoneInput, LpRadioGroup, LpSection, LpSegmented, LpSlider, LpStat, LpSwitch, LpPopover, LpSelect, LpTagsInput, LpTextarea, LpTimeField, LpToaster, LpTooltip, LpVideoPlayer, confirm, makeLayout, useToast } from "../../src"
+import sample from "../../preview/assets/video-backdrop-sample.webm"
 
 const tags = ref(["alpha"])
 const time = ref("09:30")
@@ -33,6 +34,8 @@ const level = ref(0)
 const segment = ref("a")
 const pixel = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="3000"><rect width="4000" height="3000" fill="gray"/></svg>')
 const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" }]
+const find = ref("")
+const layout = makeLayout(["left", "right"])
 </script>
 
 <template>
@@ -40,6 +43,7 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
     <section aria-label="Entries" class="flex flex-col gap-3">
       <LpInput aria-label="Small input" size="sm" />
       <LpInput aria-label="Input" />
+      <LpInput v-model="find" type="search" aria-label="Find" />
       <LpTextarea aria-label="Notes" />
       <LpNumberField aria-label="Count" size="sm" :model-value="2" />
       <LpTagsInput v-model="tags" aria-label="Tags" />
@@ -75,6 +79,14 @@ const images = [{ src: pixel, title: "One" }, { src: `${pixel}#2`, title: "Two" 
       <LpButton size="xs" square aria-label="Tiny">+</LpButton>
       <div class="w-full" data-test-slider><LpSlider v-model="level" aria-label="Level" :min="0" :max="100" /></div>
       <output aria-label="Level value">{{ level }}</output>
+    </section>
+    <section aria-label="Media">
+      <LpVideoPlayer :src="sample" title="Clip" :remember="false" />
+      <div class="flex h-32 w-full" data-test-layout>
+        <LayoutCanvas :model-value="layout" edit>
+          <template #block="{ block }"><p>{{ block }}</p></template>
+        </LayoutCanvas>
+      </div>
     </section>
     <section aria-label="Editor">
       <LpImageEditor :file="pixel" aspect="square" />

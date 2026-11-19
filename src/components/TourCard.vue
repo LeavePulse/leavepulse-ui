@@ -31,7 +31,7 @@ defineEmits<{
   <LpSwap :swap-key="index">
     <div class="flex items-start justify-between gap-3">
       <p class="font-medium" aria-live="polite">{{ step?.title }}</p>
-      <button type="button" class="text-muted hover:text-ink" :aria-label="labels.close" @click="$emit('dismiss')">
+      <button type="button" class="lp-tap text-muted hover:text-ink" :aria-label="labels.close" @click="$emit('dismiss')">
         <LpIcon name="lucide:x" class="size-4" />
       </button>
     </div>

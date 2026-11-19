@@ -162,7 +162,7 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
       </LayoutNode>
       <div
         v-if="edit && i < node.children.length - 1"
-        class="group relative z-[6] shrink-0 basis-2.5"
+        class="lp-tap group relative z-[6] shrink-0 basis-2.5 touch-none"
         :class="node.dir === 'row' ? 'cursor-col-resize' : 'cursor-row-resize'"
         @pointerdown="(e) => startSplitter(e, node as Split, i)"
       >
@@ -226,7 +226,7 @@ function startSplitter(ev: PointerEvent, parent: Split, index: number) {
         <button
           v-if="edit && tabClosable(block)"
           type="button"
-          class="mr-1 grid size-3.5 shrink-0 place-items-center rounded-pill text-muted outline-none hover:bg-line hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+          class="mr-1 grid size-3.5 shrink-0 place-items-center rounded-pill pointer-coarse:size-6 text-muted outline-none hover:bg-line hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
           :aria-label="`Close ${tabTitle(block)}`"
           @click="emit('remove-block', node.id, i)"
         >

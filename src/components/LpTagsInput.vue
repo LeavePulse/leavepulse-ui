@@ -506,6 +506,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
         <TagsInputInput
           :ref="(c) => (inputEl = (c as { $el?: HTMLInputElement } | null)?.$el ?? null)"
           :placeholder="modelValue.length ? undefined : placeholder"
+          enterkeyhint="done"
           :aria-invalid="field.invalid || undefined"
           :aria-describedby="describedBy"
           :role="options ? 'combobox' : undefined"

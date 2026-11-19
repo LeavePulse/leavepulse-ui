@@ -163,8 +163,11 @@ const shellClass = computed(() =>
 // class/style belong to the wrapper (so `<LpInput class="...">` lays out the
 // whole field); every other attr (autocomplete, name, @keyup, inputmode…) goes
 // to the real <input>.
+// A search field's Enter key reads "Search" on a phone keyboard unless the
+// caller names another.
 const inputAttrs = computed(() => {
   const { class: _c, style: _s, ...rest } = attrs
+  if (props.type === "search" && rest.enterkeyhint == null && rest.enterKeyHint == null) return { enterkeyhint: "search", ...rest }
   return rest
 })
 
@@ -220,7 +223,7 @@ usePaletteControl({ label: () => props.label, disabled: () => field.value.disabl
         @input="onInputEvent"
       />
       <slot name="trailing" />
-      <button v-if="showClear" type="button" :aria-label="text.clear" class="shrink-0 rounded-inner p-1 text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring" @pointerdown.prevent @click="clear">
+      <button v-if="showClear" type="button" :aria-label="text.clear" class="lp-tap shrink-0 rounded-inner p-1 text-muted outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-ring" @pointerdown.prevent @click="clear">
         <LpIcon name="lucide:x" :size="size === 'sm' ? 12 : 16" />
       </button>
     </div>

@@ -101,6 +101,7 @@ const action =
       clearable
       :placeholder="labels.search"
       :aria-label="labels.search"
+      enterkeyhint="search"
     />
 
     <div class="flex flex-wrap items-center gap-1">
