@@ -2,7 +2,6 @@ import {
   computed,
   reactive,
   ref,
-  toRaw,
   toValue,
   watch,
   type ComputedRef,
@@ -10,6 +9,7 @@ import {
   type Ref,
   type UnwrapRef,
 } from "vue"
+import { cloneRaw as clone } from "./clone"
 
 /*
  * Form state that every form ends up writing by hand: the values, which
@@ -86,18 +86,27 @@ export interface UseForm<T extends object> {
   handleSubmit: (fn: (values: T) => unknown) => (event?: Event) => Promise<void>
 }
 
-function clone<T>(value: T): T {
-  try {
-    return structuredClone(toRaw(value))
-  } catch {
-    return JSON.parse(JSON.stringify(value)) as T
+/*
+ * Members matched by value, not identity: a cloned Map or Set holds copies of
+ * its object keys and members. A Map's members are its [key, value] entries.
+ */
+function sameMembers(a: Map<unknown, unknown> | Set<unknown>, b: Map<unknown, unknown> | Set<unknown>): boolean {
+  if (a.size !== b.size) return false
+  const rest: unknown[] = [...b]
+  for (const item of a) {
+    const at = rest.findIndex((other) => deepEqual(item, other))
+    if (at === -1) return false
+    rest.splice(at, 1)
   }
+  return true
 }
 
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
-  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime()
+  if (a instanceof Date || b instanceof Date) return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
+  if (a instanceof Map || b instanceof Map) return a instanceof Map && b instanceof Map && sameMembers(a, b)
+  if (a instanceof Set || b instanceof Set) return a instanceof Set && b instanceof Set && sameMembers(a, b)
   if (Array.isArray(a) !== Array.isArray(b)) return false
   const ka = Object.keys(a)
   const kb = Object.keys(b)

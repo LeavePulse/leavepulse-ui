@@ -495,6 +495,7 @@ export type { UseFormDraft, UseFormDraftOptions } from "./composables/useFormDra
 export { DEFAULT_MASK_TOKENS, applyMask, maskDelete, parseMask, useInputMask } from "./composables/useInputMask"
 export type { MaskOptions, MaskResult, MaskSpec, MaskToken, MaskTokens, UseInputMaskOptions } from "./composables/useInputMask"
 export { deepEqual, useForm } from "./composables/useForm"
+export { cloneRaw } from "./composables/clone"
 export type { FieldBinding, FieldRule, FormErrorMessage, FormErrors, FormRules, UseForm, UseFormOptions } from "./composables/useForm"
 
 export { useSettled } from "./composables/useSettled"
