@@ -10770,6 +10770,13 @@
     ]
    },
    {
+    "name": "headerCase",
+    "type": "LabelCase | undefined",
+    "required": false,
+    "default": "undefined",
+    "description": "The case of the column headers: `upper` in capitals with letter spacing,\n`none` as the labels are written. Unset, the theme decides through\n`--lp-table-header-transform` / `--lp-table-header-tracking` (capitals\nunless a theme changes them)."
+   },
+   {
     "name": "cardWidth",
     "type": "string | undefined",
     "required": false,
@@ -10901,6 +10908,12 @@
     "type": "string | undefined",
     "required": false,
     "description": "Heading shown above the list (defaults to the `title` label)."
+   },
+   {
+    "name": "headingCase",
+    "type": "LabelCase | undefined",
+    "required": false,
+    "description": "The heading's case: `upper` in capitals with letter spacing, `none` as\nwritten. Unset, the theme decides through `--lp-toc-heading-transform` /\n`--lp-toc-heading-tracking` (capitals unless a theme changes them)."
    },
    {
     "name": "offset",
@@ -11954,6 +11967,26 @@
     "required": false,
     "default": "\"full\"",
     "description": "How much to draw. \"simple\" leaves services out, with their edges moved to\ntheir hosts; \"overview\" folds each `groupBy` group into one node; \"auto\"\npicks by zoom. Default \"full\"."
+   },
+   {
+    "name": "minZoom",
+    "type": "number | undefined",
+    "required": false,
+    "default": "0.3",
+    "description": "How far the view zooms out and in (default 0.3 and 2). Fitting stops at\n`minZoom` too, so a wide graph in a phone-sized canvas needs a lower one\nto be framed whole."
+   },
+   {
+    "name": "maxZoom",
+    "type": "number | undefined",
+    "required": false,
+    "default": "2"
+   },
+   {
+    "name": "zoomOnDoubleClick",
+    "type": "boolean | undefined",
+    "required": false,
+    "default": "true",
+    "description": "A double click or double tap zooms in. Default true."
    },
    {
     "name": "labels",

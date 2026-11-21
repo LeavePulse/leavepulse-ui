@@ -228,6 +228,31 @@ test("every header reads in the same case, sortable or not", async ({ page }) =>
   expect(transform).toBe("uppercase")
 })
 
+type Page = import("@playwright/test").Page
+const headerCase = (page: Page, table: string) =>
+  page.locator(`[aria-label="${table}"]`).first().evaluate((el) => {
+    const read = (node: Element) => {
+      const style = getComputedStyle(node)
+      return `${style.textTransform} ${style.letterSpacing}`
+    }
+    const button = el.querySelector("thead button")!
+    const plain = [...el.querySelectorAll("thead th")].find((th) => !th.querySelector("button"))!
+    return [read(button), read(plain)]
+  })
+
+test("headerCase none writes the headers as given, at normal spacing", async ({ page }) => {
+  await page.goto(open("case-none"))
+  expect(await headerCase(page, "As written")).toEqual(["none normal", "none normal"])
+})
+
+test("the theme's header case applies without a prop, and the prop wins over it", async ({ page }) => {
+  await page.goto(open("case-theme"))
+  expect(await headerCase(page, "Theme case")).toEqual(["none normal", "none normal"])
+  const own = await headerCase(page, "Own case")
+  expect(own.map((value) => value.split(" ")[0])).toEqual(["uppercase", "uppercase"])
+  expect(own.every((value) => value.split(" ")[1] !== "normal")).toBe(true)
+})
+
 test("a plain table has no frame of its own", async ({ page }) => {
   await page.goto(open("plain"))
   const border = await page.locator("[data-reka-scroll-area-viewport]").evaluate((el) => getComputedStyle(el.parentElement!).borderTopWidth)

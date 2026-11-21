@@ -64,6 +64,7 @@ import {
   type TableFilters,
 } from "./tableFilter"
 import { resolveRowMenu, type TableRowMenuResult } from "./tableRowMenu"
+import { labelCaseVars, type LabelCase } from "./labelCase"
 
 /** How a column reads in a list line: alone, after its label, or not at all. */
 export type TableListMode = boolean | "label"
@@ -468,6 +469,13 @@ const props = withDefaults(
      * section of its own.
      */
     variant?: "framed" | "plain"
+    /**
+     * The case of the column headers: `upper` in capitals with letter spacing,
+     * `none` as the labels are written. Unset, the theme decides through
+     * `--lp-table-header-transform` / `--lp-table-header-tracking` (capitals
+     * unless a theme changes them).
+     */
+    headerCase?: LabelCase
     /** The narrowest a card may get in the `cards` layout; the grid fits as many as fit. */
     cardWidth?: string
   }>(),
@@ -500,6 +508,7 @@ const props = withDefaults(
     layouts: undefined,
     layoutBelow: undefined,
     variant: "framed",
+    headerCase: undefined,
     cardWidth: "16rem",
   },
 )
@@ -2031,6 +2040,7 @@ usePaletteCommands(() => {
       <thead
         ref="headEl"
         :class="stickyHeader ? 'sticky top-0 z-10 bg-surface-soft' : ''"
+        :style="labelCaseVars('lp-table-header', headerCase)"
       >
         <tr class="border-b border-line bg-surface-soft">
           <th v-if="expansionOn" class="w-px p-0" :style="fixedLayout ? { width: EXPAND_COLUMN_WIDTH } : undefined" :class="cellY" />
@@ -2052,7 +2062,7 @@ usePaletteCommands(() => {
             v-for="col in shownColumns"
             :key="col.key"
             :style="headStyle(col)"
-            class="px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+            class="px-4 text-[11px] font-semibold text-muted [letter-spacing:var(--lp-table-header-tracking,0.08em)] [text-transform:var(--lp-table-header-transform,uppercase)]"
             :class="[alignClass(col.align), cellY, col.pin ? PIN_HEAD : '', canResize(col) && !col.pin ? 'relative' : '']"
             :data-lp-col="measuredCol(col)"
             :aria-sort="
@@ -2073,7 +2083,7 @@ usePaletteCommands(() => {
             <LpContextMenu v-if="col.sortable || col.filterable" :items="headerMenu(col)">
             <button
               type="button"
-              class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 uppercase outline-none transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
+              class="group/sort -mx-1 inline-flex items-center gap-1 rounded-small px-1 outline-none [text-transform:inherit] transition-colors duration-[var(--duration-fast)] hover:text-ink focus-visible:ring-2 focus-visible:ring-ring"
               :class="[
                 col.align === 'right' ? 'flex-row-reverse' : '',
                 sortOf(col) ? 'text-ink' : '',

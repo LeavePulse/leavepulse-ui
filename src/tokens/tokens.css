@@ -90,6 +90,14 @@
   --lp-glow-spread-bottom: 26px;
   --lp-card-lift: 2px;
 
+  /* Small caps labels: the case of a table's column headers and of a contents
+     rail's heading. `none` + `normal` writes them as given. A component's own
+     `headerCase` / `headingCase` prop overrides these; see labelCase.ts. */
+  --lp-table-header-transform: uppercase;
+  --lp-table-header-tracking: 0.08em;
+  --lp-toc-heading-transform: uppercase;
+  --lp-toc-heading-tracking: 0.08em;
+
   /* ── surface / skin ──────────────────────────────
      The skin axis (flat default). applyTheme() overrides these at runtime per
      TokenSet.surface; components paint panels via .lp-skin-panel which reads

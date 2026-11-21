@@ -706,6 +706,13 @@ inside: the values in order, or a compare on two values.
 />
 ```
 
+Column headers read in spaced capitals by default. `headerCase="none"` writes
+them as given, at normal letter spacing (`"upper"` asks for capitals). Unset, the
+theme decides: set `--lp-table-header-transform: none` and
+`--lp-table-header-tracking: normal` on `:root` or a wrapper to change every
+table below it, and the prop still wins per table. LpTableOfContents does the
+same for its heading with `headingCase` and `--lp-toc-heading-*`.
+
 ### Clipboard feedback
 
 `useClipboard().copy(text, { toast: true, errorToast: true })` says the kit's

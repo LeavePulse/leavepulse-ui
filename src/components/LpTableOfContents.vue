@@ -15,6 +15,7 @@ import { useLabels } from "../composables/useLpConfig"
 import { useView, viewDocument, viewWindow } from "../composables/useView"
 import { atScrollEnd, scrollMarginTop, scrollParent, scrollToElement } from "../composables/scroll"
 import { usePillTransition } from "../composables/usePillTransition"
+import { labelCaseVars, type LabelCase } from "./labelCase"
 
 export interface TocLink {
   id: string
@@ -33,6 +34,12 @@ const props = withDefaults(
     links: TocLink[]
     /** Heading shown above the list (defaults to the `title` label). */
     title?: string
+    /**
+     * The heading's case: `upper` in capitals with letter spacing, `none` as
+     * written. Unset, the theme decides through `--lp-toc-heading-transform` /
+     * `--lp-toc-heading-tracking` (capitals unless a theme changes them).
+     */
+    headingCase?: LabelCase
     /**
      * The least distance, px from the top, of the scroll-spy trigger line. The
      * line sits at a quarter of the view when that is lower: a heading a
@@ -200,7 +207,10 @@ onBeforeUnmount(() => {
 
 <template>
   <nav :aria-label="heading" class="text-sm">
-    <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+    <p
+      class="mb-2.5 text-[11px] font-semibold text-muted [letter-spacing:var(--lp-toc-heading-tracking,0.08em)] [text-transform:var(--lp-toc-heading-transform,uppercase)]"
+      :style="labelCaseVars('lp-toc-heading', headingCase)"
+    >
       {{ heading }}
     </p>
     <ul class="relative flex flex-col gap-0.5 border-l border-line" @mouseleave="hoveredId = null">

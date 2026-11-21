@@ -18,6 +18,12 @@ const columns: TableColumn<Row>[] = [
   { key: "load", label: "Load", sortable: true },
 ]
 
+// One sortable header (a button) and one plain one (the cell's own text).
+const caseColumns: TableColumn<Row>[] = [
+  { key: "name", label: "Name", sortable: true },
+  { key: "site", label: "Site" },
+]
+
 const shrinkFilters = ref<Record<string, unknown[]>>({})
 const filterColumns: TableColumn<Row>[] = columns.map((col) => (col.key === "site" ? { ...col, filterable: true } : col))
 
@@ -181,6 +187,11 @@ const token = ref<TableSelectionToken | null>(null)
     <LpTable v-else-if="part === 'expand-list'" :columns="layoutColumns" :rows="base" row-key="id" layout="list" expandable aria-label="Expand list">
       <template #expanded="{ row }"><div class="detail">detail {{ row.name }}</div></template>
     </LpTable>
+    <LpTable v-else-if="part === 'case-none'" :columns="caseColumns" :rows="base" row-key="id" header-case="none" aria-label="As written" />
+    <div v-else-if="part === 'case-theme'" style="--lp-table-header-transform: none; --lp-table-header-tracking: normal">
+      <LpTable :columns="caseColumns" :rows="base" row-key="id" aria-label="Theme case" />
+      <LpTable :columns="caseColumns" :rows="base" row-key="id" header-case="upper" aria-label="Own case" />
+    </div>
     <LpTable v-else-if="part === 'plain'" :columns="layoutColumns" :rows="base" row-key="id" variant="plain" aria-label="Plain" />
     <template v-else-if="part === 'token'">
       <LpTable
