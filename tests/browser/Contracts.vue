@@ -24,6 +24,37 @@ const chosen = ref("tcp")
 const open = ref(true)
 const saved = ref<unknown[]>([])
 const ran = ref("")
+/*
+ * Streamed search: each batch waits for the test to call __nextBatch(), so the
+ * rows land in a known order. The fallback row is all there is at first; the
+ * batches then fill in above it (a disabled count first, then the hits).
+ */
+const streamGates: (() => void)[] = []
+;(window as unknown as { __nextBatch: () => boolean }).__nextBatch = () => {
+  const open = streamGates.shift()
+  open?.()
+  return !!open
+}
+const streamRow = (n: number) => ({ id: `hit-${n}`, label: `Hit ${n}`, group: "Results", onSelect: () => { ran.value = `hit-${n}` } })
+const streamBatches = [
+  [{ id: "count", label: "Results counted", group: "Results", disabled: true }, streamRow(2)],
+  [{ id: "count", label: "Results counted", group: "Results", disabled: true }, streamRow(1), ...Array.from({ length: 12 }, (_, i) => streamRow(i + 2))],
+  [{ id: "count", label: "Results counted", group: "Results", disabled: true }, streamRow(1), ...Array.from({ length: 14 }, (_, i) => streamRow(i + 2))],
+]
+async function* streamSearch(_query: string, signal: AbortSignal) {
+  for (const batch of streamBatches) {
+    // A superseded search gives its gate up, so the next one is the live search's.
+    await new Promise<void>((resolve) => {
+      streamGates.push(resolve)
+      signal.addEventListener("abort", () => streamGates.splice(streamGates.indexOf(resolve) >>> 0, 1), { once: true })
+    })
+    yield batch
+  }
+}
+const streamCommands = [
+  { id: "web", label: "Search the web for {query}", fallback: true, onSelect: () => { ran.value = "web" } },
+  { id: "stream-mode", label: "Streamed mode", prefix: "~", children: streamSearch },
+]
 const noteCommands = [
   { id: "note", label: "Summary above the results", disabled: true },
   { id: "first", label: "First action", onSelect: () => { ran.value = "first" } },
@@ -71,6 +102,10 @@ const menuItems = [{ label: "Move to", children: [
   <main class="mx-auto flex max-w-xl flex-col gap-4 p-6">
     <template v-if="scenario === 'palette-note'">
       <LpCommandPalette :open="true" :commands="noteCommands" />
+      <output aria-label="Ran">{{ ran }}</output>
+    </template>
+    <template v-else-if="scenario === 'palette-stream'">
+      <LpCommandPalette :open="true" :commands="streamCommands" :search="streamSearch" :debounce="0" />
       <output aria-label="Ran">{{ ran }}</output>
     </template>
     <CommandContextDemo v-else-if="scenario === 'context-palette'" testing :manual-commands="mode === 'override' ? [{ id: 'service/cpu', label: 'Custom processor action' }] : undefined" />

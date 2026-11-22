@@ -413,3 +413,16 @@ export function imageOf(c: Pick<Command, "image" | "icon">): CommandImage | null
 // The avatar's own radii are drawn for 36px and up; at the icon's size a card
 // radius rounds a square into a blob. Whole literals so Tailwind sees them.
 export const IMAGE_RADIUS = { circle: "rounded-pill", soft: "rounded-[6px]", square: "rounded-[3px]" } as const
+
+/**
+ * Where the highlight goes when the rows change under it. Until someone moves
+ * it (arrows, the pointer, unfolding a group), it belongs at the top: batches
+ * that land above a synthetic row ("Search … for") are better answers, and
+ * keeping the highlight on that row pushed them out of view and made Enter
+ * open it instead. Once it was chosen, it follows its row by identity; a row
+ * that is gone sends it back to the top. Disabled rows are the caller's to skip.
+ */
+export function keptHighlight(ids: readonly string[], selectedId: string | null, chosen: boolean): number {
+  if (!chosen || !selectedId) return 0
+  return Math.max(0, ids.indexOf(selectedId))
+}

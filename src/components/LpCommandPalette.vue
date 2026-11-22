@@ -70,6 +70,7 @@ import {
 import {
   absoluteHref,
   isSafeHref,
+  keptHighlight,
   moreRowId,
   PALETTE_MODES,
   type PaletteMode,
@@ -332,6 +333,12 @@ const inputName = computed(() =>
 )
 const selectedIndex = ref(0)
 const selectedId = ref<string | null>(null)
+/*
+ * Whether someone put the highlight where it is (arrows, the pointer, Tab
+ * into a row's actions and back) since the list last started over. Until then
+ * the highlight follows the top of the list as results arrive.
+ */
+let userChose = false
 const inputRef = ref<HTMLInputElement | null>(null)
 const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
 
@@ -346,7 +353,7 @@ const scrollRef = ref<{ viewportEl: HTMLElement | null } | null>(null)
  * a row of data), and deep-tracking them would walk it on every keystroke.
  */
 const trail = shallowRef<Command[]>([])
-const trailState = shallowRef<{ query: string; selectedId: string | null }[]>([])
+const trailState = shallowRef<{ query: string; selectedId: string | null; chose: boolean }[]>([])
 const mode = computed<Command | null>(() => trail.value[trail.value.length - 1] ?? null)
 
 /*
@@ -427,6 +434,9 @@ function openActions(c: Command) {
   const actionsMode: Command = { id: `${c.id}:actions`, label: c.label, icon: c.icon, children: actions }
   syntheticModes.add(actionsMode)
   hints.use(HINT_SIGNALS.paletteActions)
+  // Opening a row's actions picks that row: back out, and it is still the one.
+  const index = flatIndexOf(c)
+  if (index >= 0) choose(index)
   enter(actionsMode)
   inputRef.value?.focus()
 }
@@ -471,7 +481,7 @@ watch(
 )
 
 function enter(c: Command, parentQuery = query.value) {
-  trailState.value = [...trailState.value, { query: parentQuery, selectedId: selectedId.value }]
+  trailState.value = [...trailState.value, { query: parentQuery, selectedId: selectedId.value, chose: userChose }]
   trail.value = [...trail.value, c]
   query.value = ""
   select(0)
@@ -485,7 +495,7 @@ function enter(c: Command, parentQuery = query.value) {
 
 /** Unwind the trail to `depth` entries — 0 is the root. */
 function popTo(depth: number) {
-  const state = trailState.value[depth] || { query: "", selectedId: null }
+  const state = trailState.value[depth] || { query: "", selectedId: null, chose: false }
   const next = trail.value.slice(0, Math.max(0, depth))
   trailState.value = trailState.value.slice(0, Math.max(0, depth))
   trail.value = next
@@ -496,7 +506,10 @@ function popTo(depth: number) {
   refresh()
   void nextTick(() => {
     const index = state.selectedId ? flat.value.findIndex((c) => rowId(c) === state.selectedId) : -1
-    select(index >= 0 ? index : 0)
+    // Back on the row someone chose before going in; a row they never chose,
+    // or one not loaded again yet, leaves the list following its top.
+    if (index >= 0 && state.chose) choose(index)
+    else select(0)
   })
   inputRef.value?.focus()
 }
@@ -751,12 +764,13 @@ watch([query, trail, () => props.open], () => {
   expanded.value = new Set()
   keyboardSelection.value = true
 })
+// Sync, so the rows a new query brings are never placed by the last query's pick.
+watch([query, trail, () => props.open], () => { userChose = false }, { flush: "sync" })
 watch(
   () => flat.value.map(rowId).join("|"),
   () => {
-    const index = selectedId.value ? flat.value.findIndex((c) => rowId(c) === selectedId.value) : -1
     keyboardSelection.value = true
-    select(index >= 0 ? index : 0)
+    select(keptHighlight(flat.value.map(rowId), selectedId.value, userChose))
   },
 )
 watch([selectedIndex, () => flat.value.map(rowId).join("|")], async () => {
@@ -765,9 +779,11 @@ watch([selectedIndex, () => flat.value.map(rowId).join("|")], async () => {
 })
 
 function scrollSelectedIntoView() {
-  const el = scrollRef.value?.viewportEl?.querySelector<HTMLElement>(
-    `[data-cmd-index="${selectedIndex.value}"]`,
-  )
+  const viewportEl = scrollRef.value?.viewportEl
+  // Not chosen yet: the top of the list is on screen, headings and notes
+  // above the highlight included, so rows streaming in above stay in sight.
+  if (viewportEl && !userChose) viewportEl.scrollTop = 0
+  const el = viewportEl?.querySelector<HTMLElement>(`[data-cmd-index="${selectedIndex.value}"]`)
   el?.scrollIntoView({ block: "nearest" })
 }
 
@@ -783,7 +799,10 @@ function select(index: number, keyboard = false, step: 1 | -1 = 1) {
   selectedIndex.value = flat.value[next]?.disabled ? (len ? clamp(index, 0, len - 1) : 0) : next
   const row = flat.value[selectedIndex.value]
   selectedId.value = row ? rowId(row) : null
-  if (keyboard) keyboardSelection.value = true
+  if (keyboard) {
+    keyboardSelection.value = true
+    userChose = true
+  }
 }
 
 function moveDown() {
@@ -826,7 +845,12 @@ let hovered: Command | null = null
 function onPointerMove(event: PointerEvent) {
   if (!keyboardSelection.value || (!event.movementX && !event.movementY)) return
   keyboardSelection.value = false
-  if (hovered) select(flatIndexOf(hovered))
+  if (hovered) choose(flatIndexOf(hovered))
+}
+/* A pick by the pointer: from here on the highlight stays with its row. */
+function choose(index: number) {
+  userChose = true
+  select(index)
 }
 function onCloseAutoFocus(event: Event) {
   if (!afterClose) return
@@ -857,7 +881,7 @@ watch([editing, () => props.open], () => { if (!editing.value || !props.open) st
 onBeforeUnmount(() => stopEditorFocus?.())
 function onPointerEnter(c: Command) {
   hovered = c
-  if (!keyboardSelection.value) select(flatIndexOf(c))
+  if (!keyboardSelection.value) choose(flatIndexOf(c))
 }
 function onPointerLeave() {
   hovered = null
@@ -904,6 +928,7 @@ async function run(row: Command | undefined) {
   const group = moreOf.get(row)
   if (group !== undefined) {
     selectedId.value = firstHidden.get(row) ?? null
+    userChose = true
     expanded.value = new Set([...expanded.value, group])
     inputRef.value?.focus()
     return
@@ -941,7 +966,7 @@ async function run(row: Command | undefined) {
     // Inside a mode the highlight stays on what was just picked, so trying
     // themes one after another is a matter of the arrow keys; at the root the
     // list it came from is gone and the top is the honest place to land.
-    if (mode.value) void nextTick(() => select(Math.max(0, flat.value.findIndex((x) => x.id === c.id))))
+    if (mode.value) void nextTick(() => choose(Math.max(0, flat.value.findIndex((x) => x.id === c.id))))
     else select(0)
     inputRef.value?.focus()
     return

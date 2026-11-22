@@ -258,3 +258,106 @@ test("arrowing round the list never lands on the disabled note", async ({ page }
   await input.press("Enter")
   await expect(page.getByLabel("Ran")).toHaveText("first")
 })
+
+/*
+ * A streamed search: the fallback row is all there is when the query lands and
+ * takes the highlight; the hits then arrive above it in batches.
+ */
+async function streamed(page: import("@playwright/test").Page) {
+  await page.goto("/tests/browser/?scenario=palette-stream")
+  const input = page.getByRole("combobox").first()
+  await expect(input).toBeFocused()
+  const active = () => page.evaluate(() => {
+    const id = document.querySelector("[role=combobox]")?.getAttribute("aria-activedescendant")
+    return id ? document.getElementById(id)?.textContent?.trim() ?? "" : ""
+  })
+  const listTop = () => page.evaluate(() => {
+    let el = document.querySelector("[data-cmd-index]")?.parentElement ?? null
+    while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement
+    return { top: el?.scrollTop ?? -1, overflows: !!el && el.scrollHeight > el.clientHeight }
+  })
+  const nextBatch = async (row: string) => {
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __nextBatch: () => boolean }).__nextBatch())).toBe(true)
+    await expect(page.getByRole("option", { name: row, exact: true })).toBeAttached()
+  }
+  return { input, active, listTop, nextBatch }
+}
+
+test("streamed hits landing above the fallback row take the highlight, and the list stays at its top", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 700 })
+  const { input, active, listTop, nextBatch } = await streamed(page)
+  await input.fill("sodium")
+  await expect.poll(active).toContain("Search the web for sodium")
+  // The first batch opens with a disabled count: the highlight steps over it.
+  await nextBatch("Hit 2")
+  await expect.poll(active).toBe("Hit 2")
+  // A better hit arrives above the one highlighted.
+  await nextBatch("Hit 1")
+  await expect.poll(active).toBe("Hit 1")
+  await nextBatch("Hit 15")
+  await expect.poll(active).toBe("Hit 1")
+  const { top, overflows } = await listTop()
+  expect(overflows).toBe(true)
+  expect(top).toBe(0)
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("hit-1")
+})
+
+test("once the arrows moved the highlight, a later batch leaves it where it was put", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 700 })
+  const { input, active, nextBatch } = await streamed(page)
+  await input.fill("sodium")
+  await nextBatch("Hit 2")
+  await expect.poll(active).toBe("Hit 2")
+  // Up from the first hit wraps round to the fallback row at the bottom.
+  await input.press("ArrowUp")
+  await expect.poll(active).toContain("Search the web for sodium")
+  await nextBatch("Hit 1")
+  await nextBatch("Hit 15")
+  await expect.poll(active).toContain("Search the web for sodium")
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("web")
+})
+
+test("a new query lets the highlight follow the top again", async ({ page }) => {
+  const { input, active, nextBatch } = await streamed(page)
+  await input.fill("sodium")
+  await nextBatch("Hit 2")
+  await input.press("ArrowUp")
+  await input.fill("lithium")
+  await nextBatch("Hit 2")
+  await expect.poll(active).toBe("Hit 2")
+  await nextBatch("Hit 1")
+  await expect.poll(active).toBe("Hit 1")
+})
+
+test("a mode's streamed children follow the top until the arrows move", async ({ page }) => {
+  const { input, active, nextBatch } = await streamed(page)
+  await input.fill("~")
+  await nextBatch("Hit 2")
+  await expect.poll(active).toBe("Hit 2")
+  await nextBatch("Hit 1")
+  await expect.poll(active).toBe("Hit 1")
+  await input.press("ArrowDown")
+  await expect.poll(active).toBe("Hit 2")
+  await nextBatch("Hit 15")
+  await expect.poll(active).toBe("Hit 2")
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("hit-2")
+})
+
+test("moving the pointer over a row picks it, and later batches leave it there", async ({ page }) => {
+  const { input, active, nextBatch } = await streamed(page)
+  await input.fill("sodium")
+  await nextBatch("Hit 2")
+  await expect.poll(active).toBe("Hit 2")
+  const fallback = page.getByRole("option", { name: /Search the web for sodium/ })
+  const box = (await fallback.boundingBox())!
+  await page.mouse.move(box.x + 10, box.y + box.height / 2)
+  await page.mouse.move(box.x + 20, box.y + box.height / 2)
+  await expect.poll(active).toContain("Search the web for sodium")
+  await nextBatch("Hit 1")
+  await expect.poll(active).toContain("Search the web for sodium")
+  await input.press("Enter")
+  await expect(page.getByLabel("Ran")).toHaveText("web")
+})

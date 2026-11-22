@@ -8,6 +8,7 @@ import {
   absoluteHref,
   commandKey,
   isSafeHref,
+  keptHighlight,
   moreRowId,
   readRecent,
   recentKey,
@@ -268,4 +269,19 @@ test("settleFetched rethrows a failure after the batches it already handed on", 
   }
   await expect(settleFetched(broken(), new AbortController().signal, (r) => seen.push(r))).rejects.toThrow("remote down")
   expect(seen).toEqual([["local"]])
+})
+
+test("an unchosen highlight goes to the top as rows land above it", () => {
+  // The synthetic row was highlighted alone; results streamed in above it.
+  expect(keptHighlight(["search-web"], "search-web", false)).toBe(0)
+  expect(keptHighlight(["a", "b", "search-web"], "search-web", false)).toBe(0)
+  expect(keptHighlight(["a", "b", "c", "search-web"], "a", false)).toBe(0)
+})
+
+test("a chosen highlight stays on its row, and a row that is gone sends it to the top", () => {
+  expect(keptHighlight(["a", "b", "search-web"], "b", true)).toBe(1)
+  expect(keptHighlight(["z", "a", "b", "search-web"], "b", true)).toBe(2)
+  expect(keptHighlight(["a", "search-web"], "b", true)).toBe(0)
+  expect(keptHighlight(["a"], null, true)).toBe(0)
+  expect(keptHighlight([], "a", true)).toBe(0)
 })
