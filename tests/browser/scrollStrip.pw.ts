@@ -60,6 +60,38 @@ test("a press on an item that drags itself is left to it, so the row does not sc
   expect(await reorder.evaluate((el) => el.scrollLeft)).toBe(0)
 })
 
+test("items moved on a held press: a drag at once scrolls the row and moves nothing", async ({ page }) => {
+  const row = page.locator('[data-testid="held"] [data-lp-strip-row]')
+  const card = row.getByText("Card 2", { exact: true })
+  const box = (await card.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width / 2 - i * 15, box.y + box.height / 2)
+  await page.mouse.up()
+  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100)
+  await expect(page.getByTestId("held-order")).toHaveText(/^Card 1,Card 2,Card 3,/)
+})
+
+test("items moved on a held press: holding first moves the item and leaves the row where it was", async ({ page }) => {
+  const row = page.locator('[data-testid="held"] [data-lp-strip-row]')
+  await row.evaluate((el) => (el.scrollLeft = 200))
+  const frame = (await row.boundingBox())!
+  const cards = await row.locator("[data-drag-key]").evaluateAll((els) =>
+    els.map((el) => ({ key: el.getAttribute("data-drag-key")!, box: el.getBoundingClientRect().toJSON() as DOMRect })),
+  )
+  const middle = frame.x + frame.width / 2
+  const at = cards.findIndex((card) => card.box.left > middle)
+  const [target, mover] = [cards[at - 1]!, cards[at]!]
+  const y = mover.box.top + mover.box.height / 2
+  await page.mouse.move(mover.box.left + 6, y)
+  await page.mouse.down()
+  await page.waitForTimeout(450)
+  for (let i = 1; i <= 8; i++) await page.mouse.move(mover.box.left + 6 - ((mover.box.left - target.box.left) * i) / 8, y)
+  await page.mouse.up()
+  await expect(page.getByTestId("held-order")).toContainText(`${mover.key},${target.key}`)
+  expect(await row.evaluate((el) => el.scrollLeft)).toBe(200)
+})
+
 test("a click on an item still clicks it", async ({ page }) => {
   await page.getByRole("button", { name: "Branch 3", exact: true }).click()
   await expect(page.getByTestId("clicked")).toHaveText("Branch 3")

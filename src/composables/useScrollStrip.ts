@@ -3,6 +3,7 @@ import { prefersReducedMotion } from "./easing"
 import { momentumDistance, wheelPixels } from "./gesture"
 import { isHTMLElement, nodeWindow } from "./realm"
 import { scrollToElement } from "./scroll"
+import { GESTURE_CLAIM_EVENT } from "./dragPress"
 import { useGesture } from "./useGesture"
 
 /*
@@ -18,7 +19,9 @@ import { useGesture } from "./useGesture"
  *   an ordinary click on the item under it; a drag past that swallows the
  *   click, and a release while moving coasts on. A press on an item that
  *   drags itself (`draggable="true"`, a row reordered by drag and drop) is
- *   left to that item, so a row can both scroll and reorder.
+ *   left to that item, so a row can both scroll and reorder. An item that
+ *   useDragDrop moves after a held press (`hold`) takes the press over when
+ *   its drag starts (GESTURE_CLAIM_EVENT), and the row stops scrolling.
  * - The focused item is kept in view, scrolling the row and nothing else
  *   (scrollIntoView would move every scrollable ancestor too).
  * - Touch keeps the browser's own scrolling and scroll snap; a snapping row
@@ -234,6 +237,7 @@ export function useScrollStrip(target: MaybeRefOrGetter<HTMLElement | null | und
       box.addEventListener("scroll", measure, { passive: true })
       box.addEventListener("wheel", onWheel, { passive: false })
       box.addEventListener("focusin", onFocusin)
+      box.addEventListener(GESTURE_CLAIM_EVENT, gesture.cancel)
       measure()
       onCleanup(() => {
         resize.disconnect()
@@ -241,6 +245,7 @@ export function useScrollStrip(target: MaybeRefOrGetter<HTMLElement | null | und
         box.removeEventListener("scroll", measure)
         box.removeEventListener("wheel", onWheel)
         box.removeEventListener("focusin", onFocusin)
+        box.removeEventListener(GESTURE_CLAIM_EVENT, gesture.cancel)
         stopEase()
       })
     },

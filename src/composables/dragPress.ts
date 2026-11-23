@@ -1,6 +1,7 @@
-import { HOLD_TO_DRAG_MS, TOUCH_SLOP } from "./gesture"
+import { HOLD_TO_DRAG_MS, slopFor } from "./gesture"
 import { onBeforeUnmount, onMounted, readonly, ref, watch, type Ref } from "vue"
 import { scrollParent } from "./scroll"
+import { isNode } from "./realm"
 import { nodeWindow } from "./useView"
 
 /*
@@ -22,7 +23,17 @@ import { nodeWindow } from "./useView"
  *
  * Listeners follow `root`: a root that renders after the owner mounted (a list
  * behind a loader) is picked up when it appears.
+ *
+ * When the press becomes the gesture, the element pressed dispatches
+ * GESTURE_CLAIM_EVENT (bubbling): a gesture of its own an ancestor runs on the
+ * same press, such as a strip dragged sideways to scroll it, drops it and
+ * leaves the pointer to this one. It goes from the pressed element rather
+ * than `root`, since the strip may sit inside `root` as well as around it. Near either edge of the box that scrolls along an axis, the box
+ * scrolls that way, so a row reordered sideways follows the pointer too.
  */
+
+/** Dispatched (bubbling) from the pressed element when its press becomes the gesture. */
+export const GESTURE_CLAIM_EVENT = "lp-gesture-claim"
 export interface DragPressOptions {
   root: Ref<HTMLElement | null>
   /** The pointer moved, or the box scrolled under it, while the gesture runs. */
@@ -45,6 +56,8 @@ const SCROLL_STEP = 14
 
 interface Pending {
   pointerId: number
+  pointerType: string
+  origin: EventTarget | null
   x: number
   y: number
   begin: (x: number, y: number) => boolean
@@ -56,6 +69,7 @@ export function useDragPress(options: DragPressOptions) {
   const active = ref(false)
   let pending: Pending | null = null
   let scroller: HTMLElement | null = null
+  let scrollerX: HTMLElement | null = null
   let x = 0
   let y = 0
   let frame = 0
@@ -68,12 +82,15 @@ export function useDragPress(options: DragPressOptions) {
     pending = null
   }
 
-  function go(begin: (x: number, y: number) => boolean, at: { x: number; y: number }) {
+  function go(begin: (x: number, y: number) => boolean, at: { x: number; y: number }, origin: EventTarget | null) {
     if (!begin(at.x, at.y)) return
     active.value = true
     x = at.x
     y = at.y
     scroller = scrollParent(options.root.value)
+    scrollerX = scrollParent(options.root.value, { axis: "x", self: true })
+    const from = isNode(origin) && origin.isConnected ? origin : options.root.value
+    from?.dispatchEvent(new CustomEvent(GESTURE_CLAIM_EVENT, { bubbles: true }))
     hostWindow().getSelection()?.removeAllRanges()
     if (options.root.value) options.root.value.style.userSelect = "none"
     if (!frame) frame = requestAnimationFrame(tick)
@@ -88,16 +105,16 @@ export function useDragPress(options: DragPressOptions) {
     if (!holds && !how.slop) {
       // Keeps the press from starting a text selection or moving focus mid-gesture.
       event.preventDefault()
-      go(begin, at)
+      go(begin, at, event.target)
       return
     }
-    pending = { pointerId: event.pointerId, ...at, begin, slop: holds ? 0 : how.slop ?? 0, timer: null }
+    pending = { pointerId: event.pointerId, pointerType: event.pointerType, origin: event.target, ...at, begin, slop: holds ? 0 : how.slop ?? 0, timer: null }
     if (!holds) return
     pending.timer = setTimeout(() => {
       const held = pending
       pending = null
       if (!held) return
-      go(held.begin, held)
+      go(held.begin, held, held.origin)
       navigator.vibrate?.(8)
     }, how.hold ?? HOLD_TO_DRAG_MS)
   }
@@ -110,8 +127,14 @@ export function useDragPress(options: DragPressOptions) {
     if (delta) {
       if (scroller) scroller.scrollTop += delta
       else hostWindow().scrollBy(0, delta)
-      options.move(x, y)
     }
+    let deltaX = 0
+    if (scrollerX) {
+      const row = scrollerX.getBoundingClientRect()
+      deltaX = x > row.right - EDGE_PX ? SCROLL_STEP : x < row.left + EDGE_PX ? -SCROLL_STEP : 0
+      if (deltaX) scrollerX.scrollLeft += deltaX
+    }
+    if (delta || deltaX) options.move(x, y)
     frame = requestAnimationFrame(tick)
   }
 
@@ -131,14 +154,17 @@ export function useDragPress(options: DragPressOptions) {
     if (pending && event.pointerId === pending.pointerId) {
       const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y)
       if (pending.timer) {
-        if (moved > TOUCH_SLOP) cancelPending()
+        // A mouse that moves before the hold is over is scrolling or
+        // selecting, the way a finger is: it lets the press go.
+        if (moved > slopFor(pending.pointerType)) cancelPending()
         return
       }
       if (moved <= pending.slop) return
       const { begin } = pending
       const at = { x: pending.x, y: pending.y }
+      const { origin } = pending
       pending = null
-      go(begin, at)
+      go(begin, at, origin)
     }
     if (!active.value) return
     x = event.clientX

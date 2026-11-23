@@ -1,11 +1,22 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { LpScrollStrip, LpTabs } from "../../src"
+import { LpScrollStrip, LpTabs, useDragDrop } from "../../src"
 
 const clicked = ref<string[]>([])
 const items = Array.from({ length: 24 }, (_, i) => `Branch ${i + 1}`)
 const tab = ref(new URLSearchParams(location.search).get("tab") ?? "t1")
 const allTabs = Array.from({ length: 12 }, (_, i) => ({ value: `t${i + 1}`, label: `Section ${i + 1}` }))
+const held = ref(Array.from({ length: 16 }, (_, i) => `Card ${i + 1}`))
+const heldRoot = ref<HTMLElement | null>(null)
+useDragDrop({
+  root: heldRoot,
+  hold: true,
+  onDrop: (item, _zone, _from, { before }) => {
+    const rest = held.value.filter((card) => card !== item)
+    const at = before === null ? rest.length : rest.indexOf(before)
+    held.value = [...rest.slice(0, at), item, ...rest.slice(at)]
+  },
+})
 const late = new URLSearchParams(location.search).has("late")
 const tabs = ref(late ? [] : allTabs)
 if (late) setTimeout(() => { tabs.value = allTabs }, 600)
@@ -40,6 +51,19 @@ if (late) setTimeout(() => { tabs.value = allTabs }, 600)
       </span>
     </LpScrollStrip>
     </div>
+    <div ref="heldRoot" data-testid="held">
+    <LpScrollStrip class="w-80 rounded-control border border-line" content-class="gap-2 p-2" data-drop-zone="row" data-drop-sort="x" aria-label="Held cards">
+      <span
+        v-for="card in held"
+        :key="card"
+        :data-drag-key="card"
+        class="shrink-0 rounded-full border border-line px-3 py-1 text-sm"
+      >
+        {{ card }}
+      </span>
+    </LpScrollStrip>
+    </div>
+    <p data-testid="held-order">{{ held.join(",") }}</p>
     <div class="w-72" data-testid="tabs">
       <LpTabs v-model="tab" :items="tabs" />
     </div>

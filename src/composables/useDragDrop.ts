@@ -1,4 +1,4 @@
-import { MOUSE_SLOP } from "./gesture"
+import { HOLD_TO_DRAG_MS, MOUSE_SLOP } from "./gesture"
 import { nextTick, readonly, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from "vue"
 import { useDragPress } from "./dragPress"
 import { durationToken, prefersReducedMotion } from "./easing"
@@ -20,7 +20,9 @@ import { nodeWindow } from "./useView"
  * A mouse or pen starts dragging once it moves a few pixels, so a click on the
  * item stays a click. A finger holds still for HOLD_TO_DRAG_MS first, so a
  * swipe through the list still scrolls it, and the long press does not open
- * the context menu once it has turned into a drag. Controls inside an item
+ * the context menu once it has turned into a drag. With `hold` every pointer
+ * holds first: items in a row a mouse drags sideways to scroll (LpScrollStrip)
+ * move on a held press, and a press that moves at once scrolls the row. Controls inside an item
  * (buttons, links, fields, `data-no-drag`) never start one.
  *
  * While dragging, a copy of the item follows the pointer, the item itself
@@ -52,6 +54,11 @@ export interface UseDragDropOptions<I, Z> {
   root: Ref<HTMLElement | null>
   /** Turn dragging off without unmounting (e.g. read-only). */
   enabled?: MaybeRefOrGetter<boolean>
+  /**
+   * Hold still before a drag starts, a mouse and pen too: true for
+   * HOLD_TO_DRAG_MS, or a time in ms. Default: only a finger holds.
+   */
+  hold?: MaybeRefOrGetter<boolean | number | undefined>
   /** Map an item's `data-drag-key` to the item. Defaults to the string itself. */
   item?: (raw: string) => I | undefined
   /** Map a zone's `data-drop-zone` to the zone. Defaults to the string itself. */
@@ -314,7 +321,11 @@ export function useDragDrop<I = string, Z = string>(options: UseDragDropOptions<
     if (!el || !options.root.value?.contains(el)) return
     const control = target?.closest(NO_DRAG)
     if (control && control !== el && el.contains(control)) return
-    press.start(event, (x, y) => begin(el, x, y), { slop: MOUSE_SLOP })
+    const hold = toValue(options.hold)
+    press.start(event, (x, y) => begin(el, x, y), {
+      slop: MOUSE_SLOP,
+      hold: hold === true ? HOLD_TO_DRAG_MS : typeof hold === "number" ? hold : undefined,
+    })
   }
 
   watch(
