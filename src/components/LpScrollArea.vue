@@ -329,8 +329,14 @@ function onThumbPointerDown(event: PointerEvent) {
 
     <ScrollAreaViewport
       ref="viewportRef"
-      class="w-full min-h-0 min-w-0 flex-1 rounded-[inherit] outline-none [&>div]:!block [&>div]:!min-w-0"
+      class="w-full min-h-0 min-w-0 flex-1 outline-none [&>div]:!block [&>div]:!min-w-0"
       :class="[
+        // Rounded only while it shows the inset focus ring. Otherwise the
+        // root clips it: overflow-hidden on a bordered root cuts at the
+        // border's inner curve (the radius less the border), where the root's
+        // own radius, inherited, left a sliver of fill in each corner between
+        // the border and the content.
+        pointerFocus ? '' : 'focus-visible:rounded-[inherit]',
         instant ? '' : 'scroll-smooth motion-reduce:scroll-auto',
         pointerFocus ? '' : 'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
       ]"

@@ -334,3 +334,13 @@ test("an expandable row opens its detail from a list line too", async ({ page })
   await expect(page.locator(".detail")).toHaveText("detail alpha")
   await expect(page.locator(".lp-item").first().getByRole("button", { name: "Collapse row" })).toHaveAttribute("aria-expanded", "true")
 })
+
+test("a framed table's content is cut at its border's inner curve, not past it", async ({ page }) => {
+  await page.goto(open("sort"))
+  const frame = page.locator("table").first().locator("xpath=ancestor::*[contains(@class,'border')][1]")
+  const viewport = page.locator("[data-reka-scroll-area-viewport]").first()
+  const radius = (el: import("@playwright/test").Locator) => el.evaluate((e) => getComputedStyle(e).borderTopLeftRadius)
+  expect(await radius(frame)).not.toBe("0px")
+  expect(await radius(viewport)).toBe("0px")
+  expect(await frame.evaluate((e) => getComputedStyle(e).overflow)).toBe("hidden")
+})
