@@ -16,7 +16,9 @@ import { useGesture } from "./useGesture"
  *   our own, so quick notches add up instead of restarting.
  * - A mouse or pen drags the row. A press that stays within a few pixels is
  *   an ordinary click on the item under it; a drag past that swallows the
- *   click, and a release while moving coasts on.
+ *   click, and a release while moving coasts on. A press on an item that
+ *   drags itself (`draggable="true"`, a row reordered by drag and drop) is
+ *   left to that item, so a row can both scroll and reorder.
  * - The focused item is kept in view, scrolling the row and nothing else
  *   (scrollIntoView would move every scrollable ancestor too).
  * - Touch keeps the browser's own scrolling and scroll snap; a snapping row
@@ -181,6 +183,7 @@ export function useScrollStrip(target: MaybeRefOrGetter<HTMLElement | null | und
   let snapType: string | null = null
   const gesture = useGesture(el, {
     pointerTypes: ["mouse", "pen"],
+    ignore: '[draggable="true"]',
     enabled: () => toValue(options.drag) !== false && overflowing.value,
     onDragStart() {
       const box = el()

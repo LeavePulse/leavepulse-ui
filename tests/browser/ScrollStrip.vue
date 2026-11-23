@@ -28,6 +28,18 @@ if (late) setTimeout(() => { tabs.value = allTabs }, 600)
     </LpScrollStrip>
     </div>
     <p data-testid="clicked">{{ clicked.join(",") }}</p>
+    <div data-testid="reorder">
+    <LpScrollStrip class="w-80 rounded-control border border-line" content-class="gap-2 p-2" aria-label="Cards">
+      <span
+        v-for="item in items"
+        :key="item"
+        draggable="true"
+        class="shrink-0 rounded-full border border-line px-3 py-1 text-sm"
+      >
+        {{ item }}
+      </span>
+    </LpScrollStrip>
+    </div>
     <div class="w-72" data-testid="tabs">
       <LpTabs v-model="tab" :items="tabs" />
     </div>

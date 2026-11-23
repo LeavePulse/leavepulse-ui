@@ -48,6 +48,18 @@ test("dragging with the mouse scrolls the strip and does not click what it start
   await expect(page.getByTestId("clicked")).toHaveText("")
 })
 
+test("a press on an item that drags itself is left to it, so the row does not scroll", async ({ page }) => {
+  const reorder = page.locator('[data-testid="reorder"] [data-lp-strip-row]')
+  const card = reorder.getByText("Branch 2", { exact: true })
+  const box = (await card.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width / 2 - i * 15, box.y + box.height / 2)
+  await page.mouse.up()
+  await page.waitForTimeout(100)
+  expect(await reorder.evaluate((el) => el.scrollLeft)).toBe(0)
+})
+
 test("a click on an item still clicks it", async ({ page }) => {
   await page.getByRole("button", { name: "Branch 3", exact: true }).click()
   await expect(page.getByTestId("clicked")).toHaveText("Branch 3")
