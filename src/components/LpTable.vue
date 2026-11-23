@@ -1300,7 +1300,18 @@ function exportCsv(options: TableExportOptions = {}): string {
   return csv
 }
 
-defineExpose({ reload: () => fetchPage(), exportCsv })
+/*
+ * For a parent that knows its next `rows` is a live change the eye should
+ * follow (a file added or removed outside the app) rather than a reload or a
+ * different list. The rows that arrive or leave then animate as a filter's
+ * would; a change too big to follow still lands at once (ROW_MOTION_LIMIT).
+ * Call it right before handing the table the new rows.
+ */
+function animateNextChange() {
+  withMotion(() => {})
+}
+
+defineExpose({ reload: () => fetchPage(), exportCsv, animateNextChange })
 
 // ── selection ────────────────────────────────────────────────
 const selectedSet = computed(() => new Set(props.selected))
