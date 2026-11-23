@@ -30,35 +30,62 @@ export function panelsAround(hole: Box, viewport: Size): Box[] {
   ]
 }
 
-const CORNER_STEPS = 6
+/** The scrim's mask, as the style properties that carry it. */
+export type HoleMask = {
+  maskImage: string
+  maskSize: string
+  maskPosition: string
+  maskRepeat: string
+  maskComposite: string
+}
+
+const FILL = "linear-gradient(#000 0 0)"
+// A hard edge one pixel wide: antialiased like the ring drawn over it.
+const DOT = "radial-gradient(closest-side, #000 calc(100% - 1px), transparent)"
 
 /**
- * The dimmed, blurred layer as one clip: the whole viewport with the hole cut
- * out (evenodd), corners rounded like the ring drawn around it. One layer
- * instead of the four panels, because each panel blurred the page on its own
- * and the blur's edges showed as seams where they met. The point count never
- * changes, so the clip eases between steps on every engine; with no target
- * the hole shrinks to a dot in the middle.
+ * The dimmed, blurred layer as one mask: the whole viewport minus the hole,
+ * corners rounded like the ring drawn around it. One layer instead of the
+ * four panels, because each panel blurred the page on its own and the blur's
+ * edges showed as seams where they met.
+ *
+ * A mask and not a clip-path: under an ancestor with a rounded clip (a
+ * desktop shell's `clip-path: inset(0 round 12px)` on body, or a rounded
+ * `overflow: hidden` wrapper) Chromium dropped the scrim's own clip-path from
+ * its backdrop-filter, and the lit target came out dimmed and blurred like
+ * the rest. The mask is honoured there.
+ *
+ * The hole is drawn from plain gradients sized and placed in pixels, two bars
+ * and four corner dots, and subtracted from a full fill. Sizes and positions
+ * are what move between steps, never the images, and the layer count never
+ * changes, so the hole eases as a mask-size/mask-position transition on every
+ * engine. With no target it shrinks to a dot in the middle.
  */
-export function holeClip(hole: Box | null, viewport: Size, radius: number): string {
+export function holeMask(hole: Box | null, viewport: Size, radius: number): HoleMask {
   const h = hole ?? { x: viewport.width / 2, y: viewport.height / 2, width: 0, height: 0 }
   const r = Math.max(0, Math.min(radius, h.width / 2, h.height / 2))
   const px = (n: number) => `${Math.round(n * 100) / 100}px`
-  const corners: [number, number, number][] = [
-    [h.x + h.width - r, h.y + r, -90],
-    [h.x + h.width - r, h.y + h.height - r, 0],
-    [h.x + r, h.y + h.height - r, 90],
-    [h.x + r, h.y + r, 180],
+  const at = (x: number, y: number) => `${px(x)} ${px(y)}`
+  const right = h.x + h.width - 2 * r
+  const bottom = h.y + h.height - 2 * r
+  const layers: [image: string, size: string, position: string][] = [
+    [FILL, "100% 100%", "0px 0px"],
+    [FILL, at(h.width, h.height - 2 * r), at(h.x, h.y + r)],
+    [FILL, at(h.width - 2 * r, h.height), at(h.x + r, h.y)],
+    [DOT, at(2 * r, 2 * r), at(h.x, h.y)],
+    [DOT, at(2 * r, 2 * r), at(right, h.y)],
+    [DOT, at(2 * r, 2 * r), at(h.x, bottom)],
+    [DOT, at(2 * r, 2 * r), at(right, bottom)],
   ]
-  const points: string[] = []
-  for (const [cx, cy, start] of corners) {
-    for (let i = 0; i <= CORNER_STEPS; i++) {
-      const angle = ((start + (90 * i) / CORNER_STEPS) * Math.PI) / 180
-      points.push(`${px(cx + r * Math.cos(angle))} ${px(cy + r * Math.sin(angle))}`)
-    }
+  return {
+    maskImage: layers.map((layer) => layer[0]).join(", "),
+    maskSize: layers.map((layer) => layer[1]).join(", "),
+    maskPosition: layers.map((layer) => layer[2]).join(", "),
+    maskRepeat: "no-repeat",
+    // The top layer (the full fill) takes away everything under it; the hole's
+    // pieces add up into one rounded rectangle first.
+    maskComposite: layers.map((_, i) => (i === 0 ? "subtract" : "add")).join(", "),
   }
-  const outer = [`0px 0px`, `${px(viewport.width)} 0px`, `${px(viewport.width)} ${px(viewport.height)}`, `0px ${px(viewport.height)}`, `0px 0px`]
-  return `polygon(evenodd, ${[...outer, ...points, points[0]].join(", ")})`
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { holeClip, holeOf, panelsAround } from "../src/components/tour"
+import { holeMask, holeOf, panelsAround } from "../src/components/tour"
 
 const viewport = { width: 1000, height: 800 }
 
@@ -29,21 +29,29 @@ describe("panelsAround", () => {
   })
 })
 
-describe("holeClip", () => {
+describe("holeMask", () => {
   const viewport = { width: 800, height: 600 }
-  const count = (clip: string) => clip.split(",").length
+  const layers = (value: string) => value.split(/,(?![^(]*\))/).map((part) => part.trim())
 
-  test("cuts the hole out of the whole viewport with evenodd", () => {
-    const clip = holeClip({ x: 100, y: 50, width: 200, height: 80 }, viewport, 8)
-    expect(clip.startsWith("polygon(evenodd, 0px 0px, 800px 0px, 800px 600px, 0px 600px, 0px 0px")).toBe(true)
-    expect(clip).toContain("292px 50px")
+  test("subtracts the hole from a full fill", () => {
+    const mask = holeMask({ x: 100, y: 50, width: 200, height: 80 }, viewport, 8)
+    expect(layers(mask.maskComposite)).toEqual(["subtract", "add", "add", "add", "add", "add", "add"])
+    expect(layers(mask.maskSize)[0]).toBe("100% 100%")
+    // The two bars of the rounded rectangle, inset by the radius.
+    expect(layers(mask.maskSize).slice(1, 3)).toEqual(["200px 64px", "184px 80px"])
+    expect(layers(mask.maskPosition).slice(1, 3)).toEqual(["100px 58px", "108px 50px"])
+    // The bottom-right corner dot.
+    expect(layers(mask.maskPosition)[6]).toBe("284px 114px")
   })
 
-  test("keeps the same point count with or without a target, so it can ease", () => {
-    expect(count(holeClip(null, viewport, 8))).toBe(count(holeClip({ x: 1, y: 1, width: 10, height: 10 }, viewport, 8)))
+  test("keeps the same layers with or without a target, so it can ease", () => {
+    const none = holeMask(null, viewport, 8)
+    const some = holeMask({ x: 1, y: 1, width: 10, height: 10 }, viewport, 8)
+    expect(none.maskImage).toBe(some.maskImage)
+    expect(layers(none.maskPosition).length).toBe(layers(some.maskPosition).length)
   })
 
   test("never rounds a corner past half of a small hole", () => {
-    expect(holeClip({ x: 0, y: 0, width: 4, height: 4 }, viewport, 8)).toContain("4px 2px")
+    expect(layers(holeMask({ x: 0, y: 0, width: 4, height: 4 }, viewport, 8).maskSize)[3]).toBe("4px 4px")
   })
 })

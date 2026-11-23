@@ -47,7 +47,7 @@ export interface TourStep {
  * scrim, a card beside it says what it is, and the user steps through with the
  * buttons or the arrow keys.
  *
- * The dim is one blurred layer clipped around the hole (`holeClip`), so the
+ * The dim is one blurred layer masked around the hole (`holeMask`), so the
  * blur has no seams; four transparent panels around the hole take the clicks,
  * so the target stays clickable (a `try` step waits for exactly that click).
  * Both glide between targets on any engine, WebKitGTK included. Closing fades
@@ -72,7 +72,7 @@ import { scrollToElement } from "../composables/scroll"
 import { PANEL_SURFACE } from "./dropdown"
 import TourCard from "./TourCard.vue"
 import type { Box } from "../composables/spatialNav"
-import { holeClip, holeOf, panelsAround } from "./tour"
+import { holeMask, holeOf, panelsAround } from "./tour"
 import { usePortalTarget } from "../composables/useView"
 
 /** Wording of the tour. `{n}` and `{total}` in `progress` are replaced. */
@@ -153,7 +153,7 @@ const panels = computed(() =>
     : [{ x: 0, y: 0, width: viewport.value.width, height: viewport.value.height }],
 )
 const radius = ref(8)
-const clip = computed(() => holeClip(hole.value, viewport.value, radius.value))
+const mask = computed(() => holeMask(hole.value, viewport.value, radius.value))
 // A target taller than the screen leaves no room for the card above or below
 // it, and floating-ui only slides the card along the edge, never back onto the
 // screen: it would sit off-screen with its buttons. Such a card rests on the
@@ -452,10 +452,13 @@ const portalTo = usePortalTarget()
       leave-to-class="opacity-0"
     >
     <div v-if="open" class="lp-tour pointer-events-none fixed inset-0 z-(--z-tour)" @pointerdown.stop>
+      <!-- The glide is !important: .lp-scrim's own transition (the blur's
+           hand-over, unlayered in tokens.css) outranks a utility, and the hole
+           jumped to the next target while the ring was still on its way. -->
       <div
         class="lp-scrim absolute inset-0"
-        :class="gliding && 'transition-[clip-path] duration-[var(--duration-medium)] ease-[var(--ease-emphasized)] motion-reduce:transition-none'"
-        :style="{ clipPath: clip }"
+        :class="gliding && 'transition-[mask-position,mask-size]! duration-[var(--duration-medium)]! ease-[var(--ease-emphasized)]! motion-reduce:transition-none!'"
+        :style="mask"
       />
       <div
         v-for="(panel, i) in panels"
