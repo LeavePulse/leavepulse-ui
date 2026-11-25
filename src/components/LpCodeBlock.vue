@@ -95,7 +95,11 @@ const text = useLabels<CodeBlockLabels>(
 )
 
 const code = computed(() => props.modelValue ?? "")
-const rawLines = computed(() => code.value.replace(/\n$/, "").split("\n"))
+/* A trailing newline is not shown as a last empty line in a read-only block.
+   An editable one keeps it: the textarea over the copy shows that line, and a
+   copy one line shorter cannot scroll as far, so at the bottom of the file
+   the two slid apart and the caret and selection landed a line off. */
+const rawLines = computed(() => (props.locked ? code.value.replace(/\n$/, "") : code.value).split("\n"))
 
 // ── fold parsing ─────────────────────────────────────────────
 // A segment is either a run of plain lines or a collapsible region. Line objects

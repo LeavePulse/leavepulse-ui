@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { LpBreadcrumbs, LpDrawer, LpDropdownMenu, LpFrame, LpLightbox, LpModal } from "../../src"
+import { LpBreadcrumbs, LpCodeBlock, LpDrawer, LpDropdownMenu, LpFrame, LpLightbox, LpModal } from "../../src"
 
 const mode = new URLSearchParams(location.search).get("mode")
 const open = ref(false)
@@ -22,6 +22,8 @@ const images = computed(() =>
     : [{ src: jpeg.value, title: "One" }, { src: `${jpeg.value}#2`, title: "Two" }],
 )
 const items = [{ label: "Pick", onSelect: () => (picked.value = "picked") }]
+// A file as it is saved: every line ends in a newline, the last one too.
+const code = ref(Array.from({ length: 40 }, (_, i) => `key-${i}: ${i}`).join("\n") + "\n")
 </script>
 
 <template>
@@ -41,6 +43,14 @@ const items = [{ label: "Pick", onSelect: () => (picked.value = "picked") }]
         <div v-if="mode === 'modal-editor'" contenteditable="true" aria-label="Editor">Text</div>
         <input v-else aria-label="Field" />
       </LpModal>
+    </template>
+    <template v-else-if="mode === 'code-edit'">
+      <LpCodeBlock
+        v-model="code"
+        :locked="false"
+        line-numbers
+        height="200px"
+      />
     </template>
     <template v-else-if="mode === 'crumbs'">
       <LpBreadcrumbs

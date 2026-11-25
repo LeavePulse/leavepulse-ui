@@ -110,3 +110,15 @@ test("a crumb with an action is a button that runs it", async ({ page }) => {
   // The last crumb is where you are, not a way to get there.
   await expect(page.getByRole("button", { name: "config.yml" })).toHaveCount(0)
 })
+
+test("an editable block ending in a newline scrolls its highlighted copy to the very bottom", async ({ page }) => {
+  await page.goto(scenario("code-edit"))
+  const area = page.locator("textarea")
+  const [typed, shown] = await area.evaluate((el) => {
+    el.scrollTop = 1e6
+    el.dispatchEvent(new Event("scroll"))
+    return [el.scrollTop, (el.nextElementSibling as HTMLElement).scrollTop]
+  })
+  expect(typed).toBeGreaterThan(0)
+  expect(shown).toBe(typed)
+})
