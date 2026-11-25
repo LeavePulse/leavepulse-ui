@@ -696,8 +696,11 @@ const guardOutside = useOutsideGuard()
           :class="dir === 'right' ? 'left-0' : 'right-0'"
           @pointerdown="startResize"
         >
+          <!-- Seen only on hover: at rest the panel's own border is the edge.
+               A line of its own there ran straight past the rounded corners,
+               which the border follows. It stops where they begin. -->
           <span
-            class="absolute inset-y-0 w-px bg-line transition-colors group-hover/resize:bg-brand"
+            class="absolute inset-y-[var(--radius-card)] w-px bg-transparent transition-colors group-hover/resize:bg-brand"
             :class="dir === 'right' ? 'left-0' : 'right-0'"
           />
         </div>
