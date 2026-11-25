@@ -174,6 +174,8 @@ export { compilePattern, findIds, messageShape, structuredPayload, timeMs } from
 export type { LogExportFormat, LogId, LogIdKind, LogTimeRange, PatternError } from "./components/logTools"
 export type { LogLevel, LogLine } from "./components/LpLogViewer.vue"
 export type { LogViewerLabels } from "./components/LpLogViewer.vue"
+export { parseAnsi } from "./components/ansi"
+export type { LogColorRun } from "./components/ansi"
 export { countLevels, matchPositions, matchesTerm, ringWindow, stepMatch } from "./components/logSearch"
 export { default as LpMediaGallery } from "./components/LpMediaGallery.vue"
 export type { MediaGalleryLabels } from "./components/LpMediaGallery.vue"

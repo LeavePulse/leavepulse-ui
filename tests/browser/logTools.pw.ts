@@ -50,3 +50,9 @@ test("jumping by time selects the closest line, and a download carries what is s
   const file = await download
   expect(file.suggestedFilename()).toBe("logs.log")
 })
+
+test("a line coloured with ANSI codes shows the colour and keeps plain text", async ({ page }) => {
+  const word = page.locator("[data-log-row] span[style]", { hasText: /^connected$/ })
+  await expect(word).toHaveAttribute("style", /--color-success/)
+  await expect(page.locator("[data-log-row]").nth(1)).not.toContainText("\x1b")
+})

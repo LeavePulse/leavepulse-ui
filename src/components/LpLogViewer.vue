@@ -53,6 +53,7 @@ import {
   type LogTimeRange,
   type MessagePart,
 } from "./logTools"
+import { colorPieces } from "./ansi"
 import { formatLogTime as fmtTime, LOG_LEVEL_ORDER, logLevelLook as metaFor, logLineText as lineText, parseLogLine } from "./logFormat"
 import { useLogFreeze } from "./logFreeze"
 import { useLogTail } from "./logTail"
@@ -510,14 +511,23 @@ function menuFor(line: LogLine, index: number): ContextMenuItemDef[] {
 
 // Split a message around the (case-insensitive) highlight term so we can wrap
 // matches in <mark> without v-html. Empty/absent term → single plain part.
-type Part = MessagePart
+/** A part of the message, with where it starts in it for the colour runs. */
+type Part = MessagePart & { offset: number }
 function splitHighlight(message: string): Part[] {
+  let offset = 0
+  return cutHighlight(message).map((part) => {
+    const placed = { ...part, offset }
+    offset += part.text.length
+    return placed
+  })
+}
+function cutHighlight(message: string): MessagePart[] {
   if (props.linkIds || regex.value) {
     const hits = regex.value ? (pattern.value?.ranges(message) ?? []) : termRanges(message, term.value)
     return messageParts(message, hits, props.linkIds ? findIds(message) : [])
   }
   if (!term.value) return [{ text: message, hit: false }]
-  const parts: Part[] = []
+  const parts: MessagePart[] = []
   const lower = message.toLowerCase()
   const needle = term.value.toLowerCase()
   let i = 0
@@ -778,7 +788,13 @@ const { class: rootClass, attrs: rest } = useMergedAttrs(() =>
                 v-else-if="part.hit"
                 class="rounded-xs bg-accent/30 text-ink"
               >{{ part.text }}</mark>
-              <template v-else>{{ part.text }}</template>
+              <template v-else>
+                <span
+                  v-for="(piece, k) in colorPieces(part.text, part.offset, line.message.includes('\n') ? undefined : line.runs)"
+                  :key="k"
+                  :style="piece.style"
+                >{{ piece.text }}</span>
+              </template>
             </template>
             <!-- compact: how many consecutive identical lines were folded here.
                  Keyed on count so each new fold re-mounts the chip and pops it,

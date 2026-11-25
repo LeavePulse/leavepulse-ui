@@ -3,6 +3,8 @@
  * helpers can share them. LpLogViewer.vue re-exports every one.
  */
 
+import type { LogColorRun } from "./ansi"
+
 export interface LogViewerLabels {
   [key: string]: string
   empty: string
@@ -47,4 +49,9 @@ export interface LogLine {
   time?: number | string
   /** Short origin tag (service / module), rendered as a dim chip. */
   source?: string
+  /**
+   * Colours over `message`, by offset: what `parseAnsi` takes out of a
+   * console's ANSI-coloured line. Search hits and links still show over them.
+   */
+  runs?: LogColorRun[]
 }

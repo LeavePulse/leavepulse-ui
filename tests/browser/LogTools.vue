@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref } from "vue"
-import { LpLogViewer, type LogLine } from "../../src"
+import { LpLogViewer, parseAnsi, type LogLine } from "../../src"
 
 const lines: LogLine[] = [
   { time: 1000, level: "info", source: "api", message: "job 41 failed" },
-  { time: 2000, level: "info", source: "db", message: "connected" },
+  // A console line coloured with ANSI codes, as a server sends it.
+  (() => {
+    const { text, runs } = parseAnsi("\x1b[32mconnected\x1b[0m")
+    return { time: 2000, level: "info", source: "db", message: text, runs } as LogLine
+  })(),
   { time: 3000, level: "info", source: "api", message: "job 42 failed" },
   { time: 4000, level: "error", source: "api", message: '{"user":{"id":7},"trace_id":"abc123"}' },
 ]
