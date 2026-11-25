@@ -148,6 +148,13 @@ const props = withDefaults(
     /** Accessible name for a drawer without a visible `title`. */
     ariaLabel?: string
     /**
+     * The body fills the panel's height instead of scrolling as a whole: a
+     * flex column the content sizes itself in, for content that scrolls on
+     * its own — a log, an editor, a list beside a preview. Off, the body
+     * scrolls and its content keeps its natural height.
+     */
+    fill?: boolean
+    /**
      * Browser Back closes it, and opening it adds a history entry. Unset
      * follows `provideOverlayHistory` (off without one); `"reopen"` also
      * opens it again on Forward; `false` keeps it out of history, for an
@@ -748,7 +755,10 @@ const guardOutside = useOutsideGuard()
           <!-- min-w-0 on the body + scroll content so a wide child (e.g. a log
                viewer's min-w-max rows with wrap off) scrolls INSIDE itself
                instead of stretching the whole panel into a horizontal scroll. -->
-          <LpScrollArea class="min-h-0 min-w-0 flex-1" :content-class="`min-w-0 ${padClass}`">
+          <div v-if="fill" class="flex min-h-0 min-w-0 flex-1 flex-col" :class="padClass">
+            <slot :close="requestClose" />
+          </div>
+          <LpScrollArea v-else class="min-h-0 min-w-0 flex-1" :content-class="`min-w-0 ${padClass}`">
             <slot :close="requestClose" />
           </LpScrollArea>
         </div>

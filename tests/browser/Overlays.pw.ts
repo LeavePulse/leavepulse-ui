@@ -91,3 +91,14 @@ test("copying a non-PNG releases the bitmap and reports once", async ({ page }) 
   await expect(page.locator("output[aria-label=Copied]")).toHaveText("One:true")
   expect(await page.evaluate(() => (window as unknown as Counted).bitmapsClosed)).toBe(1)
 })
+
+test("a filling drawer gives its content the panel's height", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 720 })
+  await page.goto(scenario("drawer-fill"))
+  await page.getByRole("button", { name: "Open", exact: true }).click()
+  const body = page.getByLabel("Filled body")
+  await expect(body).toBeVisible()
+  // Header and padding aside, the content reaches the bottom of the panel
+  // rather than stopping at the height of its one line.
+  await expect.poll(async () => (await body.boundingBox())?.height ?? 0).toBeGreaterThan(500)
+})
