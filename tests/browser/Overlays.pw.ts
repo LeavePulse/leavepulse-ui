@@ -102,3 +102,11 @@ test("a filling drawer gives its content the panel's height", async ({ page }) =
   // rather than stopping at the height of its one line.
   await expect.poll(async () => (await body.boundingBox())?.height ?? 0).toBeGreaterThan(500)
 })
+
+test("a crumb with an action is a button that runs it", async ({ page }) => {
+  await page.goto(scenario("crumbs"))
+  await page.getByRole("button", { name: "plugins" }).click()
+  await expect(page.getByLabel("Picked")).toHaveText("plugins")
+  // The last crumb is where you are, not a way to get there.
+  await expect(page.getByRole("button", { name: "config.yml" })).toHaveCount(0)
+})

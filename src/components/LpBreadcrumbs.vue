@@ -22,6 +22,12 @@ export interface Crumb {
   to?: string | Record<string, unknown>
   /** Leading icon, for crumbs that carry a glyph (a home root, a section). */
   icon?: string
+  /**
+   * What clicking the crumb does, for a path that is no URL (a folder in a
+   * file browser, a step back in a dialog): the crumb becomes a button. A
+   * crumb with neither this nor a link stays plain text.
+   */
+  onSelect?: () => void
 }
 
 /** Wording of the breadcrumb landmark. */
@@ -44,6 +50,9 @@ const text = useLabels<BreadcrumbsLabels>("breadcrumbs", { nav: "Breadcrumb" }, 
 const linkComponent = useLinkComponent()
 
 function linkOf(item: Crumb) {
+  if (item.onSelect && item.to == null && item.href == null) {
+    return { is: "button", props: { type: "button", onClick: item.onSelect } }
+  }
   if (props.as && props.as !== "a") {
     if (item.to != null) return { is: props.as, props: { to: item.to } }
     return item.href != null ? { is: "a", props: { href: item.href } } : null

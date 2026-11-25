@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { LpDrawer, LpDropdownMenu, LpFrame, LpLightbox, LpModal } from "../../src"
+import { LpBreadcrumbs, LpDrawer, LpDropdownMenu, LpFrame, LpLightbox, LpModal } from "../../src"
 
 const mode = new URLSearchParams(location.search).get("mode")
 const open = ref(false)
@@ -41,6 +41,16 @@ const items = [{ label: "Pick", onSelect: () => (picked.value = "picked") }]
         <div v-if="mode === 'modal-editor'" contenteditable="true" aria-label="Editor">Text</div>
         <input v-else aria-label="Field" />
       </LpModal>
+    </template>
+    <template v-else-if="mode === 'crumbs'">
+      <LpBreadcrumbs
+        :items="[
+          { label: 'root', onSelect: () => (picked = 'root') },
+          { label: 'plugins', onSelect: () => (picked = 'plugins') },
+          { label: 'config.yml' },
+        ]"
+      />
+      <output aria-label="Picked">{{ picked }}</output>
     </template>
     <template v-else-if="mode === 'drawer-fill'">
       <button @click="open = true">Open</button>
