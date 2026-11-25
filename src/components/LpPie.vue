@@ -24,7 +24,7 @@ import { clamp } from "../composables/clamp"
 import { isElement, useView, viewWindow } from "../composables/useView"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useHotkeys } from "../composables/useHotkeys"
-import { easeTravel, prefersReducedMotion } from "../composables/easing"
+import { easeTravel, flightFraction, prefersReducedMotion } from "../composables/easing"
 import { useReveal } from "../composables/useReveal"
 import { lerp, mixColor, useTween } from "../composables/useTween"
 import { arcPath, calloutLabels, resolveSlices, formatTick, type PieSlice } from "./chart"
@@ -347,7 +347,7 @@ const runSweep = () => {
   }
   const started = performance.now()
   const step = (now: number) => {
-    const t = Math.min(1, (now - started) / props.duration)
+    const t = flightFraction(now, started, props.duration)
     // The sweep is a journey around the circle, so it eases like one.
     sweep.value = easeTravel(t)
     sweepFrame = t < 1 ? requestAnimationFrame(step) : 0

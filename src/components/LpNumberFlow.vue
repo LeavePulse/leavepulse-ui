@@ -27,7 +27,7 @@
  *   <LpNumberFlow :value="eur" prefix="€" :decimals="2" grouped />
  */
 import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { easeOut, prefersReducedMotion } from "../composables/easing"
+import { easeOut, flightFraction, prefersReducedMotion } from "../composables/easing"
 import { useLocale } from "../composables/useLocale"
 import { decimalMark } from "./format"
 import { useRevealedValue } from "../composables/useRevealedValue"
@@ -180,7 +180,7 @@ const travel = (to: number) => {
 
   const started = performance.now()
   const step = (now: number) => {
-    const t = Math.min(1, (now - started) / props.duration)
+    const t = flightFraction(now, started, props.duration)
     /*
      * Two curves are at work and they must not both be hard. This one moves the
      * VALUE, which is what makes the columns spin; the WHEELS then settle onto

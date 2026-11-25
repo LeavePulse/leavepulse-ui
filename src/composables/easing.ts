@@ -188,3 +188,16 @@ export const tokenEase = (
     ? cubicBezier(n[0], n[1], n[2], n[3])
     : easeOut
 }
+
+/**
+ * How far through its flight a rolling number is, 0..1.
+ *
+ * A frame's timestamp is when the frame began, which can be a moment before
+ * the flight's start was read: unclamped, that gave a negative fraction, the
+ * curve ran backwards, and a count up from 0 showed a minus sign on its first
+ * frame ("-0", or "-373" mid-roll in a padded row).
+ */
+export function flightFraction(now: number, started: number, duration: number): number {
+  if (duration <= 0) return 1
+  return Math.min(1, Math.max(0, (now - started) / duration))
+}
